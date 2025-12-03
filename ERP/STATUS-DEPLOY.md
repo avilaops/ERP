@@ -2,7 +2,7 @@
 
 ## ✅ Repositório Configurado
 
-**Nome:** `avilaops/ERP`  
+**Nome:** `avilaops/ERP`
 **URL:** https://github.com/avilaops/ERP
 
 ---
@@ -93,19 +93,19 @@ https://github.com/avilaops/ERP/actions
 ## ⚠️ Problemas Comuns:
 
 ### ❌ Frontend build falha?
-**Causa:** Erro de compilação Rust/WASM  
+**Causa:** Erro de compilação Rust/WASM
 **Solução:** Verifique logs, pode ser dependência faltando
 
 ### ❌ Backend build falha?
-**Causa:** `MONGO_ATLAS_URI` não configurado  
+**Causa:** `MONGO_ATLAS_URI` não configurado
 **Solução:** Configure o Secret (Passo 2️⃣ acima)
 
 ### ❌ GitHub Pages não aparece?
-**Causa:** Branch `gh-pages` não criado ainda  
+**Causa:** Branch `gh-pages` não criado ainda
 **Solução:** Aguarde primeiro workflow completar com sucesso
 
 ### ❌ Container não faz push?
-**Causa:** Permissão do GHCR  
+**Causa:** Permissão do GHCR
 **Solução:** Vai em Settings → Actions → General → Workflow permissions → "Read and write permissions"
 
 ---
@@ -132,7 +132,7 @@ https://github.com/avilaops/ERP/actions
 
 ---
 
-**🚀 AÇÃO IMEDIATA:**  
+**🚀 AÇÃO IMEDIATA:**
 Configure o Secret do MongoDB AGORA para o build não falhar!
 
 https://github.com/avilaops/ERP/settings/secrets/actions

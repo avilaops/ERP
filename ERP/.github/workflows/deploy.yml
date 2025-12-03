@@ -59,6 +59,7 @@ jobs:
         cp ERP/frontend-wasm/index.html gh-pages/
         cp -r ERP/frontend-wasm/pkg gh-pages/
         cp ERP/Arcsat.ico gh-pages/
+        cp ERP/CNAME gh-pages/
 
     - name: Deploy to GitHub Pages
       uses: peaceiris/actions-gh-pages@v3
@@ -66,6 +67,7 @@ jobs:
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         publish_dir: ./gh-pages
+        cname: arcsat.com.br
 
   # Build e Push Backend Docker Image
   build-backend:
