@@ -24,11 +24,14 @@ No projeto Railway (já aberto no navegador):
 No serviço criado, vá em **"Variables"** e adicione:
 
 ```env
-MONGO_ATLAS_URI=mongodb+srv://nicolasrosaab_db_user:Gio4EAQhbEdQMISl@cluster0.npuhras.mongodb.net/erp
+MONGO_ATLAS_URI=$MONGO_ATLAS_URI (usar a mesma do ambiente local)
 PORT=3000
 RUST_LOG=info
 DATABASE_URL=sqlite:///app/database/erp.db
 ```
+
+⚠️ **IMPORTANTE:** Pegue o valor de `MONGO_ATLAS_URI` do seu ambiente local (já está configurado). 
+NÃO commitar credenciais no Git!
 
 ---
 
