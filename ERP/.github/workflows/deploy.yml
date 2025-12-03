@@ -45,20 +45,20 @@ jobs:
     - name: Cache cargo build
       uses: actions/cache@v3
       with:
-        path: frontend-wasm/target
+        path: ERP/frontend-wasm/target
         key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
 
     - name: Build WASM
       run: |
-        cd frontend-wasm
+        cd ERP/frontend-wasm
         wasm-pack build --target web --release
 
     - name: Prepare GitHub Pages
       run: |
         mkdir -p gh-pages
-        cp frontend-wasm/index.html gh-pages/
-        cp -r frontend-wasm/pkg gh-pages/
-        cp Arcsat.ico gh-pages/
+        cp ERP/frontend-wasm/index.html gh-pages/
+        cp -r ERP/frontend-wasm/pkg gh-pages/
+        cp ERP/Arcsat.ico gh-pages/
 
     - name: Deploy to GitHub Pages
       uses: peaceiris/actions-gh-pages@v3
@@ -100,8 +100,8 @@ jobs:
     - name: Build and push Docker image
       uses: docker/build-push-action@v5
       with:
-        context: .
-        file: ./Dockerfile
+        context: ./ERP
+        file: ./ERP/Dockerfile
         push: ${{ github.event_name != 'pull_request' }}
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
