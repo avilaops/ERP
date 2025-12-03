@@ -30,7 +30,7 @@ RUST_LOG=info
 DATABASE_URL=sqlite:///app/database/erp.db
 ```
 
-⚠️ **IMPORTANTE:** Pegue o valor de `MONGO_ATLAS_URI` do seu ambiente local (já está configurado). 
+⚠️ **IMPORTANTE:** Pegue o valor de `MONGO_ATLAS_URI` do seu ambiente local (já está configurado).
 NÃO commitar credenciais no Git!
 
 ---
