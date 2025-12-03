@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: erp-backend
+    ports:
+      - "3000:3000"
+    environment:
+      - RUST_LOG=info
+      - DATABASE_URL=sqlite:///app/data/avila_erp.db
+      - MONGO_ATLAS_URI=${MONGO_ATLAS_URI}
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/v1/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+  frontend:
+    image: nginx:alpine
+    container_name: erp-frontend
+    ports:
+      - "8080:80"
+    volumes:
+      - ./frontend-wasm/pkg:/usr/share/nginx/html/pkg:ro
+      - ./frontend-wasm/index.html:/usr/share/nginx/html/index.html:ro
+      - ./Arcsat.ico:/usr/share/nginx/html/Arcsat.ico:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  data:

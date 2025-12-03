@@ -1,0 +1,49 @@
+[package]
+name = "avila-erp-backend"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+# Web Framework (sem equivalente Avila compatível)
+axum.workspace = true
+tower.workspace = true
+tower-http.workspace = true
+
+# Database (sem equivalente Avila)
+sqlx.workspace = true
+
+# Serialization (mantido por compatibilidade com Axum/SQLx)
+serde.workspace = true
+serde_json.workspace = true
+
+# Async runtime (mantido por compatibilidade com Axum/SQLx)
+tokio.workspace = true
+
+# Logging (mantido por compatibilidade)
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+# Validation (sem equivalente Avila)
+validator.workspace = true
+
+# Error handling (mantido por simplicidade)
+anyhow.workspace = true
+thiserror.workspace = true
+
+# Time e UUID (mantidos por compatibilidade com SQLx)
+uuid.workspace = true
+chrono.workspace = true
+
+# Arxis Ecosystem
+avila-cache = { path = "../../../arxis/avila-cache" }
+avila-metrics = { path = "../../../arxis/avila-metrics" }
+
+[lib]
+name = "avila_erp"
+path = "src/lib.rs"
+
+[[bin]]
+name = "avila-erp-server"
+path = "src/main.rs"

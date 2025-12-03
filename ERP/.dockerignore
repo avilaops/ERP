@@ -1,0 +1,11 @@
+target/
+pkg/
+node_modules/
+.git/
+.gitignore
+*.db
+*.db-shm
+*.db-wal
+.env
+.vscode/
+*.log
