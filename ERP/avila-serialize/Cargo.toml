@@ -1,0 +1,28 @@
+[package]
+name = "avila-serialize"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["Nícolas Ávila <nicolas@avila.inc>"]
+license = "MIT OR Apache-2.0"
+description = "Fast binary serialization with zero-copy deserialization"
+repository = "https://github.com/avilaops/arxis"
+keywords = ["serialization", "binary", "zero-copy", "no-std"]
+categories = ["encoding", "no-std"]
+
+[lib]
+name = "avila_serialize"
+path = "src/lib.rs"
+
+[features]
+default = ["std"]
+std = []
+
+[dependencies]
+avila-error = { path = "../avila-error" }
+avila-buffer = { path = "../avila-buffer" }
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1

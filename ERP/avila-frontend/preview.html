@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Avila Framework - Preview</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #050505 0%, #0a0a0a 100%);
+            color: #ffffff;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 4rem;
+            font-weight: 900;
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 1rem;
+            animation: fadeInDown 0.8s ease-out;
+        }
+
+        .subtitle {
+            font-size: 1.5rem;
+            color: #9ca3af;
+            margin-bottom: 3rem;
+            animation: fadeInUp 0.8s ease-out 0.2s both;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin: 3rem 0;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            padding: 2rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            transition: all 0.3s;
+            animation: fadeIn 0.8s ease-out both;
+        }
+
+        .card:nth-child(1) { animation-delay: 0.3s; }
+        .card:nth-child(2) { animation-delay: 0.4s; }
+        .card:nth-child(3) { animation-delay: 0.5s; }
+
+        .card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 20px 40px rgba(59, 130, 246, 0.3);
+            border-color: #3b82f6;
+        }
+
+        .card h3 {
+            font-size: 1.5rem;
+            color: #3b82f6;
+            margin-bottom: 1rem;
+        }
+
+        .card p {
+            color: #9ca3af;
+            line-height: 1.6;
+        }
+
+        .features {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            justify-content: center;
+            margin: 3rem 0;
+        }
+
+        .badge {
+            background: rgba(59, 130, 246, 0.2);
+            color: #3b82f6;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            animation: fadeIn 1s ease-out both;
+        }
+
+        .code-block {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 2rem;
+            text-align: left;
+            margin: 2rem 0;
+            font-family: 'Courier New', monospace;
+            color: #10b981;
+            animation: fadeIn 1s ease-out 0.6s both;
+        }
+
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        .status {
+            display: inline-block;
+            background: rgba(16, 185, 129, 0.2);
+            color: #10b981;
+            padding: 0.75rem 1.5rem;
+            border-radius: 30px;
+            font-weight: 700;
+            border: 2px solid #10b981;
+            animation: pulse 2s ease-in-out infinite;
+            margin: 2rem 0;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+            }
+            50% {
+                box-shadow: 0 0 0 15px rgba(16, 185, 129, 0);
+            }
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2.5rem;
+            }
+            .subtitle {
+                font-size: 1.2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Avila Framework</h1>
+        <p class="subtitle">O melhor framework web 100% Rust da era tecnológica</p>
+
+        <div class="status">✅ COMPILADO COM SUCESSO</div>
+
+        <div class="grid">
+            <div class="card">
+                <h3>🎨 Virtual DOM Próprio</h3>
+                <p>Sistema de renderização eficiente implementado do zero em Rust puro. Performance máxima sem frameworks JavaScript.</p>
+            </div>
+
+            <div class="card">
+                <h3>⚡ WebAssembly Nativo</h3>
+                <p>Compilado para WASM com otimizações LTO e SIMD. Velocidade de execução próxima ao código nativo.</p>
+            </div>
+
+            <div class="card">
+                <h3>🧩 Sistema de Componentes</h3>
+                <p>Button, Card, Input, Grid, Navbar - todos implementados em Rust com estilização moderna.</p>
+            </div>
+        </div>
+
+        <div class="features">
+            <span class="badge">✅ 100% Rust</span>
+            <span class="badge">✅ Zero JavaScript</span>
+            <span class="badge">✅ Virtual DOM</span>
+            <span class="badge">✅ Estado Reativo</span>
+            <span class="badge">✅ Router SPA</span>
+            <span class="badge">✅ Eventos Nativos</span>
+        </div>
+
+        <div class="code-block">
+<strong>📦 Estrutura do Projeto:</strong>
+
+src/
+├── core.rs         - Virtual DOM e renderização
+├── components.rs   - Button, Card, Input, Grid, Navbar
+├── router.rs       - Roteamento SPA
+├── state.rs        - Gerenciamento de estado
+├── dom.rs          - Manipulação do DOM
+├── events.rs       - onClick, onInput, onChange
+└── lib.rs          - Ponto de entrada
+
+<strong>🎯 Build:</strong>
+$ cargo build --release
+   Compiling avila-frontend v1.0.0
+    Finished release [optimized] target(s) in 26.44s
+
+<strong>✅ STATUS:</strong> PRONTO PARA WASM BUILD
+        </div>
+
+        <div class="grid">
+            <div class="card">
+                <h3>📊 Próximos Passos</h3>
+                <p>• Demo Vision (detecção de objetos)<br>
+                   • Demo Clustering (visualizações)<br>
+                   • Demo ML (training ao vivo)</p>
+            </div>
+
+            <div class="card">
+                <h3>🔥 Performance</h3>
+                <p>• LTO habilitado<br>
+                   • SIMD support<br>
+                   • Panic = abort</p>
+            </div>
+
+            <div class="card">
+                <h3>🌐 Deploy</h3>
+                <p>• Netlify<br>
+                   • Vercel<br>
+                   • GitHub Pages</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

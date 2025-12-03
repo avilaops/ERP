@@ -1,0 +1,101 @@
+[package]
+name = "avila"
+version = "0.1.0"
+edition = "2021"
+authors = [
+    "Nícolas Ávila <nicolas@avila.inc>",
+    "Avila Development Team <dev@avila.inc>",
+]
+license = "MIT OR Apache-2.0"
+description = "Meta-package for the complete AVL Cloud Platform ecosystem - Brazil First! 🇧🇷"
+repository = "https://github.com/avilaops/arxis"
+homepage = "https://avila.inc"
+documentation = "https://docs.rs/avila"
+readme = "README.md"
+keywords = [
+    "cloud-platform",
+    "ecosystem",
+    "brazil",
+    "database",
+    "scientific-computing",
+]
+categories = ["science", "web-programming", "database", "algorithms"]
+rust-version = "1.70"
+
+[lib]
+name = "avila"
+path = "src/lib.rs"
+
+[features]
+default = ["scientific", "cloud"]
+# Scientific computing libraries
+scientific = [
+    "avila-math",
+    "avila-linalg",
+    "avila-telemetry",
+    "avila-ml",
+    "avila-clustering",
+    "avila-reduction",
+]
+# Cloud platform services
+cloud = [
+    "aviladb",
+    "avl-storage",
+    "avl-auth",
+    "avl-queue",
+]
+# Utilities
+utilities = [
+    "avila-compress",
+    "avila-arrow",
+    "avila-tokenizers",
+]
+# Data processing
+data = [
+    "avila-dataframe",
+    "avila-geo",
+]
+# Full platform (all features)
+full = ["scientific", "cloud", "utilities", "data"]
+
+[dependencies]
+# Scientific Computing
+avila-math = { version = "0.1.0", path = "../avila-math", optional = true }
+avila-linalg = { version = "0.1.1", path = "../avila-linalg", optional = true }
+avila-telemetry = { version = "0.1.0", path = "../avila-telemetry", optional = true }
+avila-ml = { version = "1.0.0", path = "../avila-ml", optional = true }
+avila-clustering = { version = "0.1.1", path = "../avila-clustering", optional = true }
+avila-reduction = { version = "0.1.0", path = "../avila-reduction", optional = true }
+
+# Cloud Platform
+aviladb = { version = "0.1.0", path = "../aviladb", optional = true }
+avl-storage = { version = "0.1.0", path = "../avl-storage", optional = true }
+avl-auth = { version = "0.1.0", path = "../avl-auth", optional = true }
+avl-queue = { version = "0.1.0", path = "../avl-queue", optional = true }
+
+# Utilities
+avila-compress = { version = "0.3.0", path = "../avila-compress", optional = true }
+avila-arrow = { version = "0.2.0", path = "../avila-arrow", optional = true }
+avila-tokenizers = { version = "0.1.0", path = "../avila-tokenizer", optional = true }
+
+# Data Processing
+avila-dataframe = { version = "0.2.0", path = "../avila-dataframe", optional = true }
+avila-geo = { version = "0.1.0", path = "../avila-geo", optional = true }
+
+[dev-dependencies]
+avila-async = { version = "0.5.0", path = "../avila-async" }
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+strip = true
+
+[profile.dev]
+opt-level = 0
+debug = true
+incremental = true
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

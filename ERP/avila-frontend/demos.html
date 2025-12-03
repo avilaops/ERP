@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Avila Workspace - Demos Interativos</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #3b82f6;
+            --secondary: #8b5cf6;
+            --accent: #ec4899;
+            --success: #10b981;
+            --dark: #0a0a0a;
+            --darker: #050505;
+            --text: #ffffff;
+            --text-secondary: #9ca3af;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, var(--darker) 0%, var(--dark) 100%);
+            color: var(--text);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+
+        /* Navbar */
+        nav {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 1.5rem 2rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        nav .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        nav .brand {
+            font-size: 1.75rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        nav .links {
+            display: flex;
+            gap: 2rem;
+        }
+
+        nav a {
+            color: var(--text);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+        }
+
+        nav a:hover {
+            color: var(--primary);
+            background: rgba(59, 130, 246, 0.1);
+        }
+
+        /* Hero */
+        .hero {
+            text-align: center;
+            padding: 4rem 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .hero h1 {
+            font-size: 4rem;
+            font-weight: 900;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 1rem;
+            animation: fadeInDown 0.8s ease-out;
+        }
+
+        .hero p {
+            font-size: 1.5rem;
+            color: var(--text-secondary);
+            margin-bottom: 3rem;
+            animation: fadeInUp 0.8s ease-out 0.2s both;
+        }
+
+        /* Demo Grid */
+        .demos {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 2rem;
+        }
+
+        .demo-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            padding: 2.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            transition: all 0.3s;
+            cursor: pointer;
+            animation: fadeIn 0.8s ease-out both;
+        }
+
+        .demo-card:nth-child(1) { animation-delay: 0.3s; }
+        .demo-card:nth-child(2) { animation-delay: 0.4s; }
+        .demo-card:nth-child(3) { animation-delay: 0.5s; }
+
+        .demo-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 20px 40px rgba(59, 130, 246, 0.3);
+            border-color: var(--primary);
+        }
+
+        .demo-card .icon {
+            font-size: 4rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .demo-card h2 {
+            font-size: 2rem;
+            color: var(--primary);
+            margin-bottom: 1rem;
+        }
+
+        .demo-card p {
+            color: var(--text-secondary);
+            margin-bottom: 1.5rem;
+            font-size: 1.1rem;
+        }
+
+        .demo-card .features {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .feature-tag {
+            background: rgba(59, 130, 246, 0.2);
+            color: var(--primary);
+            padding: 0.4rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        }
+
+        .demo-card .btn {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            padding: 1rem 2rem;
+            border-radius: 12px;
+            border: none;
+            font-weight: 700;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            width: 100%;
+        }
+
+        .demo-card .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(59, 130, 246, 0.4);
+        }
+
+        /* Stats */
+        .stats {
+            max-width: 1400px;
+            margin: 4rem auto;
+            padding: 0 2rem;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 2rem;
+        }
+
+        .stat {
+            text-align: center;
+            padding: 2rem;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .stat .number {
+            font-size: 3rem;
+            font-weight: 900;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .stat .label {
+            color: var(--text-secondary);
+            font-size: 1rem;
+            margin-top: 0.5rem;
+        }
+
+        /* Animations */
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 2.5rem;
+            }
+            .hero p {
+                font-size: 1.2rem;
+            }
+            .demos {
+                grid-template-columns: 1fr;
+            }
+            nav .links {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <div class="container">
+            <div class="brand">🚀 Avila Workspace</div>
+            <div class="links">
+                <a href="#vision">Vision</a>
+                <a href="#clustering">Clustering</a>
+                <a href="#ml">Machine Learning</a>
+                <a href="preview.html">Framework</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="hero">
+        <h1>🎯 Demos Interativos</h1>
+        <p>Explore as capacidades do Avila Workspace com demonstrações ao vivo</p>
+    </div>
+
+    <div class="demos">
+        <!-- Vision Demo -->
+        <div class="demo-card" id="vision">
+            <div class="icon">👁️</div>
+            <h2>Avila Vision</h2>
+            <p>Computer Vision de última geração com detecção de objetos, tracking e análise facial em tempo real.</p>
+            <div class="features">
+                <span class="feature-tag">YOLO Detection</span>
+                <span class="feature-tag">Face Recognition</span>
+                <span class="feature-tag">Pose Estimation</span>
+                <span class="feature-tag">Object Tracking</span>
+                <span class="feature-tag">Segmentation</span>
+            </div>
+            <button class="btn" onclick="openVisionDemo()">🎥 Testar Vision</button>
+        </div>
+
+        <!-- Clustering Demo -->
+        <div class="demo-card" id="clustering">
+            <div class="icon">🔮</div>
+            <h2>Avila Clustering</h2>
+            <p>Algoritmos de clustering com aceleração GPU. Visualize K-Means, DBSCAN, HDBSCAN em ação.</p>
+            <div class="features">
+                <span class="feature-tag">K-Means</span>
+                <span class="feature-tag">DBSCAN</span>
+                <span class="feature-tag">HDBSCAN</span>
+                <span class="feature-tag">GPU Accelerated</span>
+                <span class="feature-tag">Real-time</span>
+            </div>
+            <button class="btn" onclick="openClusteringDemo()">📊 Testar Clustering</button>
+        </div>
+
+        <!-- ML Demo -->
+        <div class="demo-card" id="ml">
+            <div class="icon">🧠</div>
+            <h2>Avila ML</h2>
+            <p>Deep Learning com Conv4D, autograd e treinamento de redes neurais. Veja o aprendizado acontecer.</p>
+            <div class="features">
+                <span class="feature-tag">Neural Networks</span>
+                <span class="feature-tag">Conv4D</span>
+                <span class="feature-tag">Autograd</span>
+                <span class="feature-tag">ONNX Export</span>
+                <span class="feature-tag">Live Training</span>
+            </div>
+            <button class="btn" onclick="openMLDemo()">🚀 Testar ML</button>
+        </div>
+
+        <!-- DataFrame Demo -->
+        <div class="demo-card">
+            <div class="icon">📊</div>
+            <h2>Avila DataFrame</h2>
+            <p>Manipulação de dados tabulares de alta performance com operações SQL-like e visualizações.</p>
+            <div class="features">
+                <span class="feature-tag">SQL Operations</span>
+                <span class="feature-tag">Aggregations</span>
+                <span class="feature-tag">Pivot Tables</span>
+                <span class="feature-tag">Fast CSV</span>
+            </div>
+            <button class="btn" onclick="openDataFrameDemo()">📈 Testar DataFrame</button>
+        </div>
+
+        <!-- Telemetry Demo -->
+        <div class="demo-card">
+            <div class="icon">📡</div>
+            <h2>Avila Telemetry</h2>
+            <p>Análise de séries temporais em tempo real com detecção de anomalias e previsão.</p>
+            <div class="features">
+                <span class="feature-tag">Time Series</span>
+                <span class="feature-tag">Anomaly Detection</span>
+                <span class="feature-tag">Forecasting</span>
+                <span class="feature-tag">FFT</span>
+            </div>
+            <button class="btn" onclick="openTelemetryDemo()">📡 Testar Telemetry</button>
+        </div>
+
+        <!-- Tokenizer Demo -->
+        <div class="demo-card">
+            <div class="icon">🔤</div>
+            <h2>Avila Tokenizer</h2>
+            <p>Tokenização avançada para NLP com suporte a BPE, WordPiece e SentencePiece.</p>
+            <div class="features">
+                <span class="feature-tag">BPE</span>
+                <span class="feature-tag">WordPiece</span>
+                <span class="feature-tag">SentencePiece</span>
+                <span class="feature-tag">Vocab Builder</span>
+            </div>
+            <button class="btn" onclick="openTokenizerDemo()">🔤 Testar Tokenizer</button>
+        </div>
+
+        <!-- Geo Demo -->
+        <div class="demo-card">
+            <div class="icon">🌍</div>
+            <h2>Avila Geo</h2>
+            <p>Geolocalização e análise espacial com mapas interativos e cálculo de rotas.</p>
+            <div class="features">
+                <span class="feature-tag">Interactive Maps</span>
+                <span class="feature-tag">GeoJSON</span>
+                <span class="feature-tag">Route Calculation</span>
+                <span class="feature-tag">Distance Metrics</span>
+            </div>
+            <button class="btn" onclick="openGeoDemo()">🌍 Testar Geo</button>
+        </div>
+    </div>
+
+    <div class="stats">
+        <div class="stat">
+            <div class="number">91</div>
+            <div class="label">Testes Passando</div>
+        </div>
+        <div class="stat">
+            <div class="number">100%</div>
+            <div class="label">Rust Puro</div>
+        </div>
+        <div class="stat">
+            <div class="number">16</div>
+            <div class="label">Projetos Avila</div>
+        </div>
+        <div class="stat">
+        <div class="stat">
+            <div class="number">7</div>
+            <div class="label">Demos Interativos</div>
+        </div>
+    </div>
+
+    <script>
+        function openVisionDemo() {
+            window.location.href = 'vision-demo.html';
+        }
+
+        function openClusteringDemo() {
+            window.location.href = 'clustering-demo.html';
+        }
+
+        function openMLDemo() {
+            window.location.href = 'ml-demo.html';
+        }
+
+        function openDataFrameDemo() {
+            window.location.href = 'dataframe-demo.html';
+        }
+
+        function openTelemetryDemo() {
+            window.location.href = 'telemetry-demo.html';
+        }
+
+        function openTokenizerDemo() {
+            window.location.href = 'tokenizer-demo.html';
+        }
+
+        function openGeoDemo() {
+            window.location.href = 'geo-demo.html';
+        }
+    </script>
+</body>
+</html>

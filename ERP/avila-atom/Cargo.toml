@@ -1,0 +1,30 @@
+﻿[package]
+name = "avila-atom"
+version = "0.7.0"
+edition = "2021"
+authors = [
+    "NÃ­colas Ãvila <nicolas@avila.inc>",
+    "Avila Development Team <dev@avila.inc>",
+]
+license = "MIT OR Apache-2.0"
+description = "Atomic computational structures - Option, Result, Vec, HashMap built from nucleus"
+repository = "https://github.com/avilaops/arxis"
+homepage = "https://avila.inc"
+keywords = ["data-structures", "collections", "primitives", "foundation"]
+categories = ["data-structures", "algorithms", "no-std"]
+
+[lib]
+name = "avila_atom"
+path = "src/lib.rs"
+
+[dependencies]
+# avila-nucleus = {  path = "../avila-nucleus" }  # Excluded (nested workspace)
+
+[features]
+default = ["std"]
+std = []
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1

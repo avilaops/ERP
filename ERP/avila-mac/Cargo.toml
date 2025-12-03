@@ -1,0 +1,28 @@
+[package]
+name = "avila-mac"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["Nícolas Ávila <nicolas@avila.inc>"]
+license = "MIT OR Apache-2.0"
+description = "Message authentication codes (HMAC, CMAC, Poly1305)"
+repository = "https://github.com/avilaops/arxis"
+keywords = ["mac", "hmac", "cmac", "poly1305", "no-std"]
+categories = ["cryptography", "no-std"]
+
+[lib]
+name = "avila_mac"
+path = "src/lib.rs"
+
+[features]
+default = ["std"]
+std = []
+
+[dependencies]
+avila-error = { path = "../avila-error" }
+avila-hash = { path = "../avila-hash" }
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1

@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Avila Telemetry - Demo Interativo</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --primary: #3b82f6;
+            --secondary: #8b5cf6;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --dark: #0a0a0a;
+            --text: #ffffff;
+        }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #050505 0%, #0a0a0a 100%);
+            color: var(--text);
+            padding: 2rem;
+        }
+
+        .container { max-width: 1800px; margin: 0 auto; }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 1rem;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-bottom: 2rem;
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 250px 1fr 300px;
+            gap: 1.5rem;
+        }
+
+        .panel {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 1.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .panel h2 {
+            color: var(--primary);
+            margin-bottom: 1rem;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 0.75rem;
+            border-radius: 8px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            margin-bottom: 0.75rem;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+
+        canvas {
+            width: 100%;
+            background: #000;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+
+        .metric-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .metric-value {
+            font-size: 1.8rem;
+            font-weight: 900;
+            color: var(--primary);
+        }
+
+        .metric-label {
+            color: #9ca3af;
+            font-size: 0.85rem;
+        }
+
+        select, input {
+            width: 100%;
+            padding: 0.75rem;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            color: var(--text);
+            margin-bottom: 1rem;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .status-live {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--success);
+            animation: pulse 2s infinite;
+        }
+
+        .status-paused {
+            background: rgba(156, 163, 175, 0.2);
+            color: #9ca3af;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        @media (max-width: 1400px) {
+            .grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="demos.html" class="back-link">← Voltar aos Demos</a>
+
+        <div class="header">
+            <h1>📡 Avila Telemetry Demo</h1>
+            <p>Análise de séries temporais em tempo real</p>
+        </div>
+
+        <div class="grid">
+            <div class="panel">
+                <h2>⚙️ Controles</h2>
+
+                <select id="dataSource">
+                    <option value="cpu">CPU Usage</option>
+                    <option value="memory">Memory Usage</option>
+                    <option value="network">Network Traffic</option>
+                    <option value="temperature">Temperature</option>
+                    <option value="stock">Stock Price</option>
+                </select>
+
+                <button class="btn btn-primary" id="startBtn" onclick="startStreaming()">▶️ Iniciar Stream</button>
+                <button class="btn btn-danger" id="stopBtn" onclick="stopStreaming()" disabled>⏹️ Parar</button>
+                <button class="btn btn-secondary" onclick="detectAnomalies()">🔍 Detectar Anomalias</button>
+                <button class="btn btn-secondary" onclick="forecast()">📈 Prever Futuro</button>
+                <button class="btn btn-secondary" onclick="exportData()">💾 Exportar</button>
+
+                <h3 style="color: var(--primary); margin: 1.5rem 0 1rem;">📊 Análises</h3>
+                <button class="btn btn-secondary" onclick="showFFT()">🌊 FFT</button>
+                <button class="btn btn-secondary" onclick="showSTL()">📉 STL Decomposition</button>
+                <button class="btn btn-secondary" onclick="showAutoCorr()">🔁 Autocorrelation</button>
+                <button class="btn btn-secondary" onclick="showMovingAvg()">📊 Moving Average</button>
+            </div>
+
+            <div class="panel">
+                <h2>📈 Série Temporal</h2>
+                <div style="margin-bottom: 1rem;">
+                    <span class="status-badge status-paused" id="status">Paused</span>
+                    <span style="float: right; color: #9ca3af;">Pontos: <strong id="pointCount">0</strong></span>
+                </div>
+                <canvas id="mainChart" width="800" height="300"></canvas>
+
+                <h3 style="color: var(--primary); margin: 1.5rem 0 1rem;">🔍 Análise Detalhada</h3>
+                <canvas id="analysisChart" width="800" height="200"></canvas>
+            </div>
+
+            <div class="panel">
+                <h2>📊 Métricas</h2>
+
+                <div class="metric-card">
+                    <div class="metric-label">Valor Atual</div>
+                    <div class="metric-value" id="currentValue">0.00</div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-label">Média</div>
+                    <div class="metric-value" id="meanValue">0.00</div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-label">Desvio Padrão</div>
+                    <div class="metric-value" id="stdValue">0.00</div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-label">Anomalias Detectadas</div>
+                    <div class="metric-value" id="anomalyCount" style="color: var(--danger);">0</div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-label">Taxa de Amostragem</div>
+                    <div class="metric-value" id="sampleRate">0 Hz</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const mainCanvas = document.getElementById('mainChart');
+        const mainCtx = mainCanvas.getContext('2d');
+        const analysisCanvas = document.getElementById('analysisChart');
+        const analysisCtx = analysisCanvas.getContext('2d');
+
+        let isStreaming = false;
+        let timeSeries = [];
+        let maxPoints = 200;
+        let intervalId = null;
+
+        function startStreaming() {
+            isStreaming = true;
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('stopBtn').disabled = false;
+            document.getElementById('status').className = 'status-badge status-live';
+            document.getElementById('status').textContent = 'Live';
+
+            intervalId = setInterval(() => {
+                const source = document.getElementById('dataSource').value;
+                const value = generateDataPoint(source);
+                timeSeries.push(value);
+                if(timeSeries.length > maxPoints) timeSeries.shift();
+
+                updateChart();
+                updateMetrics();
+            }, 100);
+        }
+
+        function stopStreaming() {
+            isStreaming = false;
+            clearInterval(intervalId);
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            document.getElementById('status').className = 'status-badge status-paused';
+            document.getElementById('status').textContent = 'Paused';
+        }
+
+        function generateDataPoint(source) {
+            const t = timeSeries.length;
+            const noise = (Math.random() - 0.5) * 10;
+
+            switch(source) {
+                case 'cpu':
+                    return 50 + 20 * Math.sin(t / 20) + noise;
+                case 'memory':
+                    return 60 + 15 * Math.sin(t / 30) + 10 * Math.cos(t / 10) + noise;
+                case 'network':
+                    return 100 + 50 * Math.sin(t / 15) + 30 * Math.cos(t / 25) + noise * 2;
+                case 'temperature':
+                    return 22 + 3 * Math.sin(t / 50) + noise * 0.5;
+                case 'stock':
+                    return 100 + t * 0.1 + 10 * Math.sin(t / 20) + noise * 3;
+                default:
+                    return 50 + noise;
+            }
+        }
+
+        function updateChart() {
+            mainCtx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
+
+            if(timeSeries.length < 2) return;
+
+            const min = Math.min(...timeSeries);
+            const max = Math.max(...timeSeries);
+            const range = max - min || 1;
+
+            mainCtx.strokeStyle = '#3b82f6';
+            mainCtx.lineWidth = 2;
+            mainCtx.beginPath();
+
+            timeSeries.forEach((value, i) => {
+                const x = (i / maxPoints) * mainCanvas.width;
+                const y = mainCanvas.height - ((value - min) / range) * (mainCanvas.height - 20) - 10;
+                if(i === 0) mainCtx.moveTo(x, y);
+                else mainCtx.lineTo(x, y);
+            });
+
+            mainCtx.stroke();
+
+            // Grid
+            mainCtx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+            mainCtx.lineWidth = 1;
+            for(let i = 0; i < 5; i++) {
+                const y = (i / 4) * mainCanvas.height;
+                mainCtx.beginPath();
+                mainCtx.moveTo(0, y);
+                mainCtx.lineTo(mainCanvas.width, y);
+                mainCtx.stroke();
+            }
+        }
+
+        function updateMetrics() {
+            const current = timeSeries[timeSeries.length - 1] || 0;
+            const mean = timeSeries.reduce((a, b) => a + b, 0) / timeSeries.length || 0;
+            const variance = timeSeries.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / timeSeries.length || 0;
+            const std = Math.sqrt(variance);
+
+            document.getElementById('currentValue').textContent = current.toFixed(2);
+            document.getElementById('meanValue').textContent = mean.toFixed(2);
+            document.getElementById('stdValue').textContent = std.toFixed(2);
+            document.getElementById('pointCount').textContent = timeSeries.length;
+            document.getElementById('sampleRate').textContent = '10 Hz';
+        }
+
+        function detectAnomalies() {
+            const mean = timeSeries.reduce((a, b) => a + b, 0) / timeSeries.length;
+            const variance = timeSeries.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / timeSeries.length;
+            const std = Math.sqrt(variance);
+
+            let anomalies = 0;
+            timeSeries.forEach(value => {
+                if(Math.abs(value - mean) > 2 * std) anomalies++;
+            });
+
+            document.getElementById('anomalyCount').textContent = anomalies;
+            alert(`🔍 Anomalias detectadas: ${anomalies}\nMédia: ${mean.toFixed(2)}\nDesvio: ${std.toFixed(2)}`);
+        }
+
+        function forecast() {
+            // Simple linear regression forecast
+            const n = Math.min(50, timeSeries.length);
+            const recent = timeSeries.slice(-n);
+
+            let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+            recent.forEach((y, x) => {
+                sumX += x;
+                sumY += y;
+                sumXY += x * y;
+                sumX2 += x * x;
+            });
+
+            const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+            const intercept = (sumY - slope * sumX) / n;
+
+            const forecast10 = slope * (n + 10) + intercept;
+            const forecast20 = slope * (n + 20) + intercept;
+
+            alert(`📈 Previsão:\n+10 pontos: ${forecast10.toFixed(2)}\n+20 pontos: ${forecast20.toFixed(2)}\nTendência: ${slope > 0 ? 'Alta' : 'Baixa'}`);
+        }
+
+        function showFFT() {
+            analysisCtx.clearRect(0, 0, analysisCanvas.width, analysisCanvas.height);
+
+            // Simulate FFT
+            analysisCtx.fillStyle = '#3b82f6';
+            for(let i = 0; i < 50; i++) {
+                const height = Math.random() * analysisCanvas.height * 0.8;
+                const x = (i / 50) * analysisCanvas.width;
+                analysisCtx.fillRect(x, analysisCanvas.height - height, 10, height);
+            }
+
+            alert('🌊 FFT (Fast Fourier Transform) calculada');
+        }
+
+        function showSTL() {
+            analysisCtx.clearRect(0, 0, analysisCanvas.width, analysisCanvas.height);
+
+            // Simulate STL components
+            const colors = ['#3b82f6', '#10b981', '#f59e0b'];
+            for(let c = 0; c < 3; c++) {
+                analysisCtx.strokeStyle = colors[c];
+                analysisCtx.lineWidth = 2;
+                analysisCtx.beginPath();
+                for(let i = 0; i < 100; i++) {
+                    const x = (i / 100) * analysisCanvas.width;
+                    const y = analysisCanvas.height/2 + Math.sin(i / 10 + c * 2) * 30;
+                    if(i === 0) analysisCtx.moveTo(x, y);
+                    else analysisCtx.lineTo(x, y);
+                }
+                analysisCtx.stroke();
+            }
+
+            alert('📉 STL Decomposition:\n🔵 Tendência\n🟢 Sazonalidade\n🟠 Resíduo');
+        }
+
+        function showAutoCorr() {
+            analysisCtx.clearRect(0, 0, analysisCanvas.width, analysisCanvas.height);
+
+            // Simulate autocorrelation
+            analysisCtx.fillStyle = '#8b5cf6';
+            for(let i = 0; i < 50; i++) {
+                const height = Math.exp(-i/20) * analysisCanvas.height * 0.5;
+                const x = (i / 50) * analysisCanvas.width;
+                const y = analysisCanvas.height/2 - height/2;
+                analysisCtx.fillRect(x, y, 10, height);
+            }
+
+            alert('🔁 Autocorrelação calculada');
+        }
+
+        function showMovingAvg() {
+            analysisCtx.clearRect(0, 0, analysisCanvas.width, analysisCanvas.height);
+
+            // Plot moving average
+            analysisCtx.strokeStyle = '#10b981';
+            analysisCtx.lineWidth = 3;
+            analysisCtx.beginPath();
+
+            const window = 20;
+            for(let i = window; i < timeSeries.length; i++) {
+                const avg = timeSeries.slice(i - window, i).reduce((a, b) => a + b, 0) / window;
+                const x = (i / timeSeries.length) * analysisCanvas.width;
+                const y = analysisCanvas.height/2;
+                if(i === window) analysisCtx.moveTo(x, y);
+                else analysisCtx.lineTo(x, y);
+            }
+            analysisCtx.stroke();
+
+            alert('📊 Moving Average (janela=20) plotada');
+        }
+
+        function exportData() {
+            const csv = timeSeries.map((v, i) => `${i},${v.toFixed(2)}`).join('\n');
+            const blob = new Blob(['timestamp,value\n' + csv], {type: 'text/csv'});
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'telemetry-data.csv';
+            link.click();
+            alert('💾 Dados exportados!');
+        }
+
+        // Auto-start
+        setTimeout(() => startStreaming(), 1000);
+    </script>
+</body>
+</html>

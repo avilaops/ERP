@@ -1,0 +1,19 @@
+﻿[package]
+name = "avila-framework"
+version = "0.1.0"
+edition = "2021"
+authors = ["Ãvila Project"]
+license = "MIT OR Apache-2.0"
+description = "Frontend framework 100% Rust with mathematical foundations"
+
+[dependencies]
+avila-math = { path = "../avila-math" }
+avila-linalg = { path = "../avila-linalg" }
+avila-numeric = { path = "../avila-numeric" }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "0.2"
+web-sys = { version = "0.3", features = ["Document", "Element", "Window", "HtmlElement", "Node", "console"] }
+
+[lib]
+crate-type = ["cdylib", "rlib"]

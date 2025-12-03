@@ -1,0 +1,17 @@
+[package]
+name = "avila-nucleus"
+version = "0.1.0"
+edition = "2021"
+description = "Ávila Engineering atomic primitives"
+authors = ["Ávila Engineering"]
+publish = false
+license = "Proprietary"
+
+[features]
+default = ["simd"]
+simd = []
+std = []
+
+[lib]
+name = "avila_nucleus"
+path = "src/lib.rs"

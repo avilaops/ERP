@@ -1,0 +1,95 @@
+# Criterion.toml - AvilaDB Benchmark Configuration
+
+# Output directory for benchmark results
+output_directory = "target/criterion"
+
+# HTML report generation
+html_report = true
+
+# Plot configuration
+[plot]
+# Use plotters for high-quality graphs
+enable = true
+
+# Measurement configuration
+[measurement]
+# Warm-up time (seconds)
+warm_up_time = 3
+
+# Measurement time (seconds)
+measurement_time = 10
+
+# Number of samples to collect
+sample_size = 100
+
+# Comparison configuration
+[comparison]
+# Noise threshold for significance
+significance_level = 0.05
+
+# Noise threshold percentage
+noise_threshold = 0.01
+
+# Report configuration
+[report]
+# Verbose output
+verbose = true
+
+# Save baseline for comparisons
+save_baseline = "main"
+
+# Benchmark-specific overrides
+[[bench]]
+name = "insert"
+sample_size = 100
+measurement_time = 10
+
+[[bench]]
+name = "query"
+sample_size = 100
+measurement_time = 10
+
+[[bench]]
+name = "compression"
+sample_size = 100
+measurement_time = 10
+
+[[bench]]
+name = "vector_build"
+sample_size = 10
+measurement_time = 20
+
+[[bench]]
+name = "vector_query"
+sample_size = 50
+measurement_time = 15
+
+[[bench]]
+name = "concurrent_inserts"
+sample_size = 50
+measurement_time = 20
+
+[[bench]]
+name = "concurrent_queries"
+sample_size = 50
+measurement_time = 20
+
+[[bench]]
+name = "latency_percentiles"
+sample_size = 1000
+measurement_time = 30
+
+[[bench]]
+name = "workload_game_backend"
+sample_size = 100
+measurement_time = 15
+
+[[bench]]
+name = "workload_ai_chat"
+sample_size = 100
+measurement_time = 15
+
+[[bench]]
+name = "workload_iot_sensors"
+sample_size = 100
+measurement_time = 15

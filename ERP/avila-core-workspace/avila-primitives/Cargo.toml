@@ -1,0 +1,17 @@
+[package]
+name = "avila-primitives"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[lib]
+name = "avila_primitives"
+path = "src/lib.rs"
+
+[dependencies]
+avila-nucleus = { path = "../avila-nucleus" }
+
+[features]
+default = []

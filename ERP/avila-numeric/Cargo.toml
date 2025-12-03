@@ -1,0 +1,35 @@
+[package]
+name = "avila-numeric"
+version = "0.1.0"
+edition = "2021"
+authors = [
+    "Nícolas Ávila <nicolas@avila.inc>",
+    "Avila Development Team <dev@avila.inc>",
+]
+license = "MIT"
+description = "Generic numeric traits for AVL Platform - integers, floats, and mathematical operations"
+repository = "https://github.com/avilaops/arxis"
+homepage = "https://avila.inc"
+documentation = "https://docs.rs/avila-numeric"
+readme = "README.md"
+keywords = ["numeric", "traits", "math", "generic", "avila"]
+categories = ["mathematics", "no-std"]
+rust-version = "1.70"
+
+[lib]
+name = "avila_numeric"
+path = "src/lib.rs"
+
+[features]
+default = ["std"]
+std = []
+
+[dependencies]
+
+[dev-dependencies]
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+strip = true

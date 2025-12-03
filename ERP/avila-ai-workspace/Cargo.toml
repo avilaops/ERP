@@ -1,0 +1,31 @@
+
+[workspace.package]
+edition = "2021"
+license = "MIT OR Apache-2.0"
+version = "0.1.0"
+publish = false
+authors = [
+    "Nícolas Ávila <nicolas@avila.inc>",
+    "Avila Development Team <dev@avila.inc>"
+]
+rust-version = "1.75"
+
+[workspace.metadata.avila]
+domain = "database"
+release_tag_prefix = "aviladb-"
+summary = "AvilaDB - Banco de dados com criptografia soberana implementada do zero"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[profile.release.build-override]
+opt-level = 3
+
+# Profile para performance máxima (requer Cargo nightly para rustflags em profile)
+# Use: RUSTFLAGS="-C target-cpu=native" cargo build --release
+[profile.extreme]
+inherits = "release"

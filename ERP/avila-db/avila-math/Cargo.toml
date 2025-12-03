@@ -1,0 +1,21 @@
+[package]
+name = "avila-math"
+version = "0.1.0"
+edition = "2021"
+description = "Ávila Engineering modular arithmetic primitives"
+authors = ["Ávila Engineering"]
+publish = false
+license = "Proprietary"
+
+[features]
+default = ["simd"]
+simd = ["avila-primitives/simd"]
+std = ["avila-primitives/std"]
+
+[dependencies]
+avila-nucleus = { path = "../avila-nucleus" }
+avila-primitives = { path = "../avila-primitives" }
+
+[lib]
+name = "avila_math"
+path = "src/lib.rs"

@@ -1,0 +1,15 @@
+[package]
+name = "avila-ndarray"
+version = "0.1.0"
+edition = "2021"
+authors = ["Nícolas Ávila <nicolas@avila.inc>"]
+license = "MIT OR Apache-2.0"
+description = "N-dimensional arrays - substitui ndarray"
+
+[dependencies]
+avila-parallel = { version = "0.4.0", path = "../avila-parallel" }
+rayon = "1.10"
+
+[lib]
+name = "avila_ndarray"
+path = "src/lib.rs"

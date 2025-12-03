@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Avila Tokenizer - Demo Interativo</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --primary: #3b82f6;
+            --secondary: #8b5cf6;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --dark: #0a0a0a;
+            --text: #ffffff;
+        }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #050505 0%, #0a0a0a 100%);
+            color: var(--text);
+            padding: 2rem;
+        }
+
+        .container { max-width: 1600px; margin: 0 auto; }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-bottom: 2rem;
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+
+        .panel {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 1.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .panel h2 {
+            color: var(--primary);
+            margin-bottom: 1rem;
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 200px;
+            padding: 1rem;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            color: var(--text);
+            font-family: 'Courier New', monospace;
+            font-size: 0.95rem;
+            resize: vertical;
+        }
+
+        .toolbar {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(59, 130, 246, 0.3);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+
+        select {
+            padding: 0.75rem;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            color: var(--text);
+            font-weight: 600;
+        }
+
+        .token-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            padding: 1rem;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            min-height: 100px;
+        }
+
+        .token {
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            border: 1px solid;
+        }
+
+        .token-word {
+            background: rgba(59, 130, 246, 0.2);
+            border-color: rgba(59, 130, 246, 0.5);
+            color: #60a5fa;
+        }
+
+        .token-subword {
+            background: rgba(139, 92, 246, 0.2);
+            border-color: rgba(139, 92, 246, 0.5);
+            color: #a78bfa;
+        }
+
+        .token-special {
+            background: rgba(16, 185, 129, 0.2);
+            border-color: rgba(16, 185, 129, 0.5);
+            color: #34d399;
+        }
+
+        .token-id {
+            font-size: 0.75rem;
+            opacity: 0.7;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            padding: 1rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: 900;
+            color: var(--primary);
+        }
+
+        .stat-label {
+            color: #9ca3af;
+            font-size: 0.85rem;
+            margin-top: 0.25rem;
+        }
+
+        .vocab-display {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 1rem;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+        }
+
+        .vocab-item {
+            padding: 0.5rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .vocab-item:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        @media (max-width: 1200px) {
+            .grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="demos.html" class="back-link">← Voltar aos Demos</a>
+
+        <div class="header">
+            <h1>🔤 Avila Tokenizer Demo</h1>
+            <p>Tokenização avançada: BPE, WordPiece, SentencePiece</p>
+        </div>
+
+        <div class="grid">
+            <div class="panel">
+                <h2>✍️ Input de Texto</h2>
+
+                <div class="toolbar">
+                    <select id="tokenizer">
+                        <option value="bpe">BPE (GPT-style)</option>
+                        <option value="wordpiece">WordPiece (BERT-style)</option>
+                        <option value="sentencepiece">SentencePiece</option>
+                        <option value="whitespace">Whitespace</option>
+                    </select>
+                    <button class="btn btn-primary" onclick="tokenize()">🔄 Tokenizar</button>
+                    <button class="btn btn-secondary" onclick="detokenize()">↩️ Detokenizar</button>
+                    <button class="btn btn-secondary" onclick="loadExample()">📝 Exemplo</button>
+                </div>
+
+                <textarea id="inputText" placeholder="Digite ou cole seu texto aqui...">The quick brown fox jumps over the lazy dog.</textarea>
+
+                <div class="stats">
+                    <div class="stat-card">
+                        <div class="stat-value" id="charCount">0</div>
+                        <div class="stat-label">Caracteres</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="wordCount">0</div>
+                        <div class="stat-label">Palavras</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="tokenCount">0</div>
+                        <div class="stat-label">Tokens</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="compression">0%</div>
+                        <div class="stat-label">Compressão</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h2>🎯 Tokens</h2>
+                <div class="token-container" id="tokenDisplay">
+                    <span style="color: #9ca3af;">Os tokens aparecerão aqui...</span>
+                </div>
+
+                <h3 style="color: var(--primary); margin: 1.5rem 0 1rem;">📊 Token IDs</h3>
+                <textarea id="tokenIds" readonly style="min-height: 100px; font-size: 0.85rem;" placeholder="IDs dos tokens..."></textarea>
+            </div>
+        </div>
+
+        <div class="panel" style="margin-top: 1.5rem;">
+            <h2>📚 Vocabulário (amostra)</h2>
+            <div class="vocab-display" id="vocabDisplay">
+                <div class="vocab-item"><span>[PAD]</span><span>0</span></div>
+                <div class="vocab-item"><span>[UNK]</span><span>1</span></div>
+                <div class="vocab-item"><span>[CLS]</span><span>2</span></div>
+                <div class="vocab-item"><span>[SEP]</span><span>3</span></div>
+                <div class="vocab-item"><span>[MASK]</span><span>4</span></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const vocab = {
+            '[PAD]': 0, '[UNK]': 1, '[CLS]': 2, '[SEP]': 3, '[MASK]': 4,
+            'the': 5, 'quick': 6, 'brown': 7, 'fox': 8, 'jumps': 9,
+            'over': 10, 'lazy': 11, 'dog': 12, 'a': 13, 'an': 14,
+            'is': 15, 'are': 16, 'was': 17, 'were': 18, 'be': 19,
+            'been': 20, 'being': 21, 'have': 22, 'has': 23, 'had': 24,
+            'do': 25, 'does': 26, 'did': 27, 'will': 28, 'would': 29,
+            'can': 30, 'could': 31, 'shall': 32, 'should': 33, 'may': 34,
+            'might': 35, 'must': 36, 'ought': 37, 'i': 38, 'you': 39,
+            'he': 40, 'she': 41, 'it': 42, 'we': 43, 'they': 44,
+            'what': 45, 'which': 46, 'who': 47, 'when': 48, 'where': 49,
+            'why': 50, 'how': 51, 'this': 52, 'that': 53, 'these': 54,
+            'those': 55, 'and': 56, 'or': 57, 'but': 58, 'if': 59,
+            'then': 60, 'else': 61, 'when': 62, 'at': 63, 'by': 64,
+            'for': 65, 'with': 66, 'about': 67, 'against': 68, 'between': 69,
+            'into': 70, 'through': 71, 'during': 72, 'before': 73, 'after': 74,
+            'above': 75, 'below': 76, 'to': 77, 'from': 78, 'up': 79,
+            'down': 80, 'in': 81, 'out': 82, 'on': 83, 'off': 84,
+            'over': 85, 'under': 86, 'again': 87, 'further': 88, 'then': 89,
+            'once': 90, 'here': 91, 'there': 92, 'all': 93, 'both': 94,
+            'each': 95, 'few': 96, 'more': 97, 'most': 98, 'other': 99,
+            'some': 100, 'such': 101, 'no': 102, 'nor': 103, 'not': 104,
+            'only': 105, 'own': 106, 'same': 107, 'so': 108, 'than': 109,
+            'too': 110, 'very': 111, 'hello': 112, 'world': 113, 'test': 114
+        };
+
+        let currentTokens = [];
+
+        document.getElementById('inputText').addEventListener('input', updateStats);
+
+        function updateStats() {
+            const text = document.getElementById('inputText').value;
+            const chars = text.length;
+            const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+
+            document.getElementById('charCount').textContent = chars;
+            document.getElementById('wordCount').textContent = words;
+        }
+
+        function tokenize() {
+            const text = document.getElementById('inputText').value;
+            const method = document.getElementById('tokenizer').value;
+
+            if(!text.trim()) {
+                alert('⚠️ Digite algum texto primeiro!');
+                return;
+            }
+
+            currentTokens = [];
+            const tokenIds = [];
+            const display = document.getElementById('tokenDisplay');
+            display.innerHTML = '';
+
+            switch(method) {
+                case 'bpe':
+                    currentTokens = tokenizeBPE(text);
+                    break;
+                case 'wordpiece':
+                    currentTokens = tokenizeWordPiece(text);
+                    break;
+                case 'sentencepiece':
+                    currentTokens = tokenizeSentencePiece(text);
+                    break;
+                case 'whitespace':
+                    currentTokens = text.trim().split(/\s+/);
+                    break;
+            }
+
+            currentTokens.forEach(token => {
+                const id = vocab[token.toLowerCase()] || 1;
+                tokenIds.push(id);
+
+                const tokenEl = document.createElement('div');
+                tokenEl.className = 'token ' + getTokenClass(token);
+                tokenEl.innerHTML = `<span>${token}</span><span class="token-id">${id}</span>`;
+                display.appendChild(tokenEl);
+            });
+
+            document.getElementById('tokenIds').value = tokenIds.join(', ');
+            document.getElementById('tokenCount').textContent = currentTokens.length;
+
+            const compression = ((1 - currentTokens.length / text.split(/\s+/).length) * 100).toFixed(0);
+            document.getElementById('compression').textContent = compression + '%';
+        }
+
+        function tokenizeBPE(text) {
+            // Simplified BPE
+            const words = text.match(/\w+|[^\w\s]/g) || [];
+            const tokens = [];
+
+            words.forEach(word => {
+                if(word.length > 5) {
+                    // Split long words
+                    tokens.push(word.substring(0, 3) + '##');
+                    tokens.push('##' + word.substring(3));
+                } else {
+                    tokens.push(word);
+                }
+            });
+
+            return tokens;
+        }
+
+        function tokenizeWordPiece(text) {
+            // Simplified WordPiece
+            const tokens = ['[CLS]'];
+            const words = text.match(/\w+|[^\w\s]/g) || [];
+
+            words.forEach(word => {
+                if(vocab[word.toLowerCase()]) {
+                    tokens.push(word);
+                } else if(word.length > 4) {
+                    // Split into subwords
+                    tokens.push(word.substring(0, 2));
+                    tokens.push('##' + word.substring(2));
+                } else {
+                    tokens.push(word);
+                }
+            });
+
+            tokens.push('[SEP]');
+            return tokens;
+        }
+
+        function tokenizeSentencePiece(text) {
+            // Simplified SentencePiece
+            const tokens = [];
+            const chars = text.split('');
+            let buffer = '';
+
+            chars.forEach(char => {
+                if(char === ' ') {
+                    if(buffer) tokens.push(buffer);
+                    tokens.push('▁');
+                    buffer = '';
+                } else {
+                    buffer += char;
+                }
+            });
+
+            if(buffer) tokens.push(buffer);
+            return tokens;
+        }
+
+        function getTokenClass(token) {
+            if(token.startsWith('[') && token.endsWith(']')) return 'token-special';
+            if(token.includes('##') || token === '▁') return 'token-subword';
+            return 'token-word';
+        }
+
+        function detokenize() {
+            if(currentTokens.length === 0) {
+                alert('⚠️ Tokenize primeiro!');
+                return;
+            }
+
+            let text = currentTokens
+                .filter(t => !t.startsWith('[') || !t.endsWith(']'))
+                .join(' ')
+                .replace(/##/g, '')
+                .replace(/▁/g, ' ')
+                .replace(/\s+([.,!?;:])/g, '$1');
+
+            document.getElementById('inputText').value = text;
+            updateStats();
+        }
+
+        function loadExample() {
+            const examples = [
+                "The quick brown fox jumps over the lazy dog.",
+                "Artificial intelligence is transforming the world of technology.",
+                "Natural language processing enables machines to understand human language.",
+                "Tokenization is a crucial step in NLP pipelines for text analysis.",
+                "Machine learning models require large amounts of training data."
+            ];
+
+            document.getElementById('inputText').value = examples[Math.floor(Math.random() * examples.length)];
+            updateStats();
+            tokenize();
+        }
+
+        // Generate vocab display
+        const vocabDisplay = document.getElementById('vocabDisplay');
+        Object.entries(vocab).slice(5, 50).forEach(([token, id]) => {
+            const item = document.createElement('div');
+            item.className = 'vocab-item';
+            item.innerHTML = `<span>${token}</span><span>${id}</span>`;
+            vocabDisplay.appendChild(item);
+        });
+
+        // Initialize
+        updateStats();
+        tokenize();
+    </script>
+</body>
+</html>

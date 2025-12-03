@@ -1,0 +1,23 @@
+[package]
+name = "avila-error"
+version = "0.2.0"
+edition = "2021"
+authors = ["Nícolas Ávila <nicolas@avila.inc>"]
+license = "MIT OR Apache-2.0"
+description = "AVL Platform error handling - replacement for anyhow/thiserror"
+repository = "https://github.com/avilaops/arxis"
+homepage = "https://avila.inc"
+keywords = ["error", "avila", "avl"]
+
+[dependencies]
+avila-error-derive = { path = "./avila-error-derive", version = "0.1.0", optional = true }
+
+[features]
+default = []
+derive = ["avila-error-derive"]
+context = []  # Trait Context para estilo anyhow
+full = ["derive", "context"]
+
+[lib]
+name = "avila_error"
+path = "src/lib.rs"

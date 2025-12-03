@@ -1,0 +1,45 @@
+[package]
+name = "avila-alloc"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = [
+    "Nícolas Ávila <nicolas@avila.inc>",
+    "Avila Development Team <dev@avila.inc>",
+]
+license = "MIT OR Apache-2.0"
+description = "Stack-first memory allocation strategies for the Avila ecosystem"
+repository = "https://github.com/avilaops/arxis"
+homepage = "https://avila.inc"
+documentation = "https://docs.rs/avila-alloc"
+readme = "README.md"
+keywords = ["allocator", "memory", "stack", "arena", "no-std"]
+categories = ["no-std", "memory-management"]
+
+[lib]
+name = "avila_alloc"
+path = "src/lib.rs"
+
+[features]
+default = ["std"]
+std = []
+
+[dependencies]
+avila-primitives = { path = "../avila-primitives" }
+
+[dev-dependencies]
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+strip = true
+
+[profile.dev]
+opt-level = 0
+debug = true
+incremental = true
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

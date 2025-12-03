@@ -1,0 +1,20 @@
+[package]
+name = "avila-primitives"
+version = "0.1.0"
+edition = "2021"
+description = "Ávila Engineering fixed-size integer primitives"
+authors = ["Ávila Engineering"]
+publish = false
+license = "Proprietary"
+
+[features]
+default = ["simd"]
+simd = ["avila-nucleus/simd"]
+std = ["avila-nucleus/std"]
+
+[dependencies]
+avila-nucleus = { path = "../avila-nucleus" }
+
+[lib]
+name = "avila_primitives"
+path = "src/lib.rs"

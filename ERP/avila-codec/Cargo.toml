@@ -1,0 +1,46 @@
+[package]
+name = "avila-codec"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = [
+    "Nícolas Ávila <nicolas@avila.inc>",
+    "Avila Development Team <dev@avila.inc>",
+]
+license = "MIT OR Apache-2.0"
+description = "Encoding/decoding utilities - hex, base64, base58 for the Avila ecosystem"
+repository = "https://github.com/avilaops/arxis"
+homepage = "https://avila.inc"
+documentation = "https://docs.rs/avila-codec"
+readme = "README.md"
+keywords = ["codec", "encoding", "hex", "base64", "no-std"]
+categories = ["no-std", "encoding"]
+
+[lib]
+name = "avila_codec"
+path = "src/lib.rs"
+
+[features]
+default = ["std"]
+std = []
+
+[dependencies]
+avila-primitives = { path = "../avila-primitives" }
+avila-error = { path = "../avila-error" }
+
+[dev-dependencies]
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+strip = true
+
+[profile.dev]
+opt-level = 0
+debug = true
+incremental = true
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

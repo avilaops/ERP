@@ -1,0 +1,23 @@
+[package]
+name = "aviladb-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lib]
+name = "aviladb_core"
+path = "src/lib.rs"
+
+[dependencies]
+avila-nucleus = { path = "../avila-nucleus" }
+avila-primitives = { path = "../avila-primitives" }
+avila-math = { path = "../avila-math" }
+avila-crypto = { path = "../avila-crypto" }
+avila-quinn = { path = "../avila-quinn" }
+
+[[bin]]
+name = "aviladb"
+path = "src/bin/aviladb.rs"

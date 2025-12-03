@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Avila Clustering - Demo Interativo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #3b82f6;
+            --secondary: #8b5cf6;
+            --success: #10b981;
+            --dark: #0a0a0a;
+            --text: #ffffff;
+        }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #050505 0%, #0a0a0a 100%);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 1rem;
+        }
+
+        .demo-area {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 2rem;
+        }
+
+        .panel {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            padding: 2rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .panel h2 {
+            color: var(--primary);
+            margin-bottom: 1.5rem;
+            font-size: 1.5rem;
+        }
+
+        .control-group {
+            margin-bottom: 2rem;
+        }
+
+        .control-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #9ca3af;
+            font-weight: 600;
+        }
+
+        select, input[type="range"], input[type="number"] {
+            width: 100%;
+            padding: 0.75rem;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 1rem;
+        }
+
+        input[type="range"] {
+            cursor: pointer;
+        }
+
+        .value-display {
+            text-align: right;
+            color: var(--primary);
+            font-weight: 700;
+            margin-top: 0.5rem;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 1rem;
+            border-radius: 8px;
+            border: none;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(59, 130, 246, 0.3);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        #canvas {
+            width: 100%;
+            height: 600px;
+            border-radius: 12px;
+            background: #000;
+            cursor: crosshair;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .stat-box {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            padding: 1rem;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 900;
+            color: var(--primary);
+        }
+
+        .stat-label {
+            font-size: 0.85rem;
+            color: #9ca3af;
+            margin-top: 0.5rem;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-bottom: 2rem;
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 600;
+            transition: color 0.3s;
+        }
+
+        .back-link:hover {
+            color: var(--secondary);
+        }
+
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-top: 1rem;
+            padding: 1rem;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+        }
+
+        @media (max-width: 1200px) {
+            .demo-area {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="demos.html" class="back-link">← Voltar aos Demos</a>
+
+        <div class="header">
+            <h1>🔮 Avila Clustering Demo</h1>
+            <p>Visualize algoritmos de clustering em tempo real</p>
+        </div>
+
+        <div class="demo-area">
+            <!-- Controls Panel -->
+            <div class="panel">
+                <h2>⚙️ Controles</h2>
+
+                <div class="control-group">
+                    <label>Algoritmo</label>
+                    <select id="algorithm">
+                        <option value="kmeans">K-Means</option>
+                        <option value="dbscan">DBSCAN</option>
+                        <option value="hdbscan">HDBSCAN</option>
+                        <option value="optics">OPTICS</option>
+                        <option value="spectral">Spectral</option>
+                    </select>
+                </div>
+
+                <div class="control-group" id="clustersControl">
+                    <label>Número de Clusters</label>
+                    <input type="range" id="numClusters" min="2" max="10" value="3">
+                    <div class="value-display" id="clustersValue">3</div>
+                </div>
+
+                <div class="control-group">
+                    <label>Número de Pontos</label>
+                    <input type="range" id="numPoints" min="50" max="500" step="50" value="200">
+                    <div class="value-display" id="pointsValue">200</div>
+                </div>
+
+                <div class="control-group" id="epsControl" style="display: none;">
+                    <label>Epsilon (DBSCAN)</label>
+                    <input type="range" id="epsilon" min="0.1" max="1" step="0.1" value="0.3">
+                    <div class="value-display" id="epsValue">0.3</div>
+                </div>
+
+                <div class="control-group" id="minPtsControl" style="display: none;">
+                    <label>Min Points</label>
+                    <input type="range" id="minPts" min="2" max="10" value="5">
+                    <div class="value-display" id="minPtsValue">5</div>
+                </div>
+
+                <button class="btn btn-primary" onclick="generateData()">🎲 Gerar Dados</button>
+                <button class="btn btn-primary" onclick="runClustering()">▶️ Executar Clustering</button>
+                <button class="btn btn-secondary" onclick="clearCanvas()">🗑️ Limpar</button>
+                <button class="btn btn-secondary" onclick="exportData()">💾 Exportar Dados</button>
+
+                <div class="stats">
+                    <div class="stat-box">
+                        <div class="stat-value" id="clusterCount">0</div>
+                        <div class="stat-label">Clusters</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value" id="pointCount">0</div>
+                        <div class="stat-label">Pontos</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value" id="timeElapsed">0ms</div>
+                        <div class="stat-label">Tempo</div>
+                    </div>
+                </div>
+
+                <div class="legend" id="legend"></div>
+            </div>
+
+            <!-- Canvas Panel -->
+            <div class="panel">
+                <h2>📊 Visualização</h2>
+                <canvas id="canvas"></canvas>
+                <p style="text-align: center; color: #9ca3af; margin-top: 1rem;">
+                    Clique no canvas para adicionar pontos manualmente
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // Set canvas size
+        canvas.width = canvas.offsetWidth;
+        canvas.height = 600;
+
+        let points = [];
+        let clusters = [];
+        const colors = [
+            '#3b82f6', '#ec4899', '#10b981', '#f59e0b',
+            '#8b5cf6', '#ef4444', '#14b8a6', '#f97316',
+            '#6366f1', '#84cc16'
+        ];
+
+        // Event listeners
+        document.getElementById('algorithm').addEventListener('change', updateControls);
+        document.getElementById('numClusters').addEventListener('input', (e) => {
+            document.getElementById('clustersValue').textContent = e.target.value;
+        });
+        document.getElementById('numPoints').addEventListener('input', (e) => {
+            document.getElementById('pointsValue').textContent = e.target.value;
+        });
+        document.getElementById('epsilon').addEventListener('input', (e) => {
+            document.getElementById('epsValue').textContent = e.target.value;
+        });
+        document.getElementById('minPts').addEventListener('input', (e) => {
+            document.getElementById('minPtsValue').textContent = e.target.value;
+        });
+
+        canvas.addEventListener('click', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            points.push({ x, y, cluster: -1 });
+            drawPoints();
+            updateStats();
+        });
+
+        function updateControls() {
+            const algo = document.getElementById('algorithm').value;
+            const clustersControl = document.getElementById('clustersControl');
+            const epsControl = document.getElementById('epsControl');
+            const minPtsControl = document.getElementById('minPtsControl');
+
+            clustersControl.style.display = ['kmeans', 'spectral'].includes(algo) ? 'block' : 'none';
+            epsControl.style.display = algo === 'dbscan' ? 'block' : 'none';
+            minPtsControl.style.display = ['dbscan', 'hdbscan'].includes(algo) ? 'block' : 'none';
+        }
+
+        function generateData() {
+            const numPoints = parseInt(document.getElementById('numPoints').value);
+            const numClusters = parseInt(document.getElementById('numClusters').value);
+            points = [];
+
+            for (let i = 0; i < numClusters; i++) {
+                const centerX = Math.random() * (canvas.width - 100) + 50;
+                const centerY = Math.random() * (canvas.height - 100) + 50;
+                const pointsPerCluster = Math.floor(numPoints / numClusters);
+
+                for (let j = 0; j < pointsPerCluster; j++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const radius = Math.random() * 50;
+                    points.push({
+                        x: centerX + Math.cos(angle) * radius,
+                        y: centerY + Math.sin(angle) * radius,
+                        cluster: -1
+                    });
+                }
+            }
+
+            drawPoints();
+            updateStats();
+        }
+
+        function runClustering() {
+            if (points.length === 0) {
+                alert('Gere dados primeiro!');
+                return;
+            }
+
+            const algo = document.getElementById('algorithm').value;
+            const startTime = performance.now();
+
+            switch (algo) {
+                case 'kmeans':
+                    kMeansClustering();
+                    break;
+                case 'dbscan':
+                    dbscanClustering();
+                    break;
+                case 'hdbscan':
+                    hdbscanClustering();
+                    break;
+                case 'optics':
+                    opticsClustering();
+                    break;
+                case 'spectral':
+                    spectralClustering();
+                    break;
+            }
+
+            const endTime = performance.now();
+            document.getElementById('timeElapsed').textContent = Math.round(endTime - startTime) + 'ms';
+
+            drawPoints();
+            updateLegend();
+            updateStats();
+        }
+
+        function kMeansClustering() {
+            const k = parseInt(document.getElementById('numClusters').value);
+
+            // Initialize centroids randomly
+            let centroids = [];
+            for (let i = 0; i < k; i++) {
+                centroids.push(points[Math.floor(Math.random() * points.length)]);
+            }
+
+            // Iterate
+            for (let iter = 0; iter < 10; iter++) {
+                // Assign points to nearest centroid
+                points.forEach(point => {
+                    let minDist = Infinity;
+                    let bestCluster = 0;
+
+                    centroids.forEach((centroid, idx) => {
+                        const dist = distance(point, centroid);
+                        if (dist < minDist) {
+                            minDist = dist;
+                            bestCluster = idx;
+                        }
+                    });
+
+                    point.cluster = bestCluster;
+                });
+
+                // Update centroids
+                for (let i = 0; i < k; i++) {
+                    const clusterPoints = points.filter(p => p.cluster === i);
+                    if (clusterPoints.length > 0) {
+                        centroids[i] = {
+                            x: clusterPoints.reduce((sum, p) => sum + p.x, 0) / clusterPoints.length,
+                            y: clusterPoints.reduce((sum, p) => sum + p.y, 0) / clusterPoints.length
+                        };
+                    }
+                }
+            }
+        }
+
+        function dbscanClustering() {
+            const eps = parseFloat(document.getElementById('epsilon').value) * 100;
+            const minPts = parseInt(document.getElementById('minPts').value);
+            let clusterIdx = 0;
+
+            points.forEach(p => p.cluster = -1);
+
+            points.forEach(point => {
+                if (point.cluster !== -1) return;
+
+                const neighbors = getNeighbors(point, eps);
+
+                if (neighbors.length < minPts) {
+                    point.cluster = -2; // Noise
+                } else {
+                    expandCluster(point, neighbors, clusterIdx, eps, minPts);
+                    clusterIdx++;
+                }
+            });
+        }
+
+        function getNeighbors(point, eps) {
+            return points.filter(p => distance(point, p) <= eps);
+        }
+
+        function expandCluster(point, neighbors, clusterIdx, eps, minPts) {
+            point.cluster = clusterIdx;
+
+            for (let i = 0; i < neighbors.length; i++) {
+                const neighbor = neighbors[i];
+
+                if (neighbor.cluster === -1) {
+                    neighbor.cluster = clusterIdx;
+                    const newNeighbors = getNeighbors(neighbor, eps);
+                    if (newNeighbors.length >= minPts) {
+                        neighbors.push(...newNeighbors);
+                    }
+                } else if (neighbor.cluster === -2) {
+                    neighbor.cluster = clusterIdx;
+                }
+            }
+        }
+
+        function hdbscanClustering() {
+            // Simplified HDBSCAN (similar to DBSCAN with varying epsilon)
+            dbscanClustering();
+        }
+
+        function opticsClustering() {
+            // Simplified OPTICS (similar to DBSCAN)
+            dbscanClustering();
+        }
+
+        function spectralClustering() {
+            // Simplified spectral (use k-means)
+            kMeansClustering();
+        }
+
+        function distance(p1, p2) {
+            return Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
+        }
+
+        function drawPoints() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            points.forEach(point => {
+                ctx.beginPath();
+                ctx.arc(point.x, point.y, 5, 0, Math.PI * 2);
+
+                if (point.cluster === -2) {
+                    ctx.fillStyle = '#666'; // Noise
+                } else if (point.cluster === -1) {
+                    ctx.fillStyle = '#fff'; // Unassigned
+                } else {
+                    ctx.fillStyle = colors[point.cluster % colors.length];
+                }
+
+                ctx.fill();
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            });
+        }
+
+        function updateLegend() {
+            const legend = document.getElementById('legend');
+            const uniqueClusters = [...new Set(points.map(p => p.cluster))].filter(c => c >= 0);
+
+            legend.innerHTML = uniqueClusters.map(cluster => `
+                <div class="legend-item">
+                    <div class="legend-color" style="background: ${colors[cluster % colors.length]}"></div>
+                    <span>Cluster ${cluster + 1}</span>
+                </div>
+            `).join('');
+        }
+
+        function updateStats() {
+            const uniqueClusters = [...new Set(points.map(p => p.cluster))].filter(c => c >= 0);
+            document.getElementById('clusterCount').textContent = uniqueClusters.length;
+            document.getElementById('pointCount').textContent = points.length;
+        }
+
+        function clearCanvas() {
+            points = [];
+            clusters = [];
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            document.getElementById('legend').innerHTML = '';
+            updateStats();
+            document.getElementById('timeElapsed').textContent = '0ms';
+        }
+
+        function exportData() {
+            const data = {
+                algorithm: document.getElementById('algorithm').value,
+                points: points,
+                timestamp: new Date().toISOString()
+            };
+
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'clustering-data.json';
+            link.click();
+        }
+
+        // Initialize
+        updateControls();
+        generateData();
+    </script>
+</body>
+</html>

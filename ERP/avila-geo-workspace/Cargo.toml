@@ -1,0 +1,16 @@
+
+[workspace.package]
+edition = "2021"
+license = "MIT OR Apache-2.0"
+version = "0.0.0"
+publish = ["crates-io"]
+authors = [
+    "Nícolas Ávila <nicolas@avila.inc>",
+    "Avila Development Team <dev@avila.inc>"
+]
+rust-version = "1.70"
+
+[workspace.metadata.avila]
+domain = "geo"
+release_tag_prefix = "geo-"
+summary = "Tecnologias de inteligência geoespacial, mapas e análise territorial"

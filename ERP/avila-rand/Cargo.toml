@@ -1,0 +1,11 @@
+[package]
+name = "avila-rand"
+version = "0.1.0"
+edition = "2021"
+authors = ["Nícolas Ávila <nicolas@avila.inc>"]
+license = "MIT OR Apache-2.0"
+description = "Gerador de números aleatórios nativo - substitui rand"
+
+[lib]
+name = "avila_rand"
+path = "src/lib.rs"

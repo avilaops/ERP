@@ -1,0 +1,26 @@
+[package]
+name = "avila-bignum"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["Nícolas Ávila <nicolas@avila.inc>"]
+license = "MIT OR Apache-2.0"
+description = "Big integer arithmetic (U1024, U2048, U4096, I4096)"
+repository = "https://github.com/avilaops/arxis"
+keywords = ["bignum", "bigint", "cryptography", "rsa", "no-std"]
+categories = ["mathematics", "no-std", "cryptography"]
+
+[lib]
+name = "avila_bignum"
+path = "src/lib.rs"
+
+[features]
+default = ["std"]
+std = []
+
+[dependencies]
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1

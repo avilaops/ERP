@@ -1,0 +1,20 @@
+[package]
+name = "avila-nucleus"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[lib]
+name = "avila_nucleus"
+path = "src/lib.rs"
+
+[dependencies]
+# ZERO external dependencies - núcleo atômico puro
+
+[features]
+default = []
+avx2 = []
+avx512 = []
+neon = []

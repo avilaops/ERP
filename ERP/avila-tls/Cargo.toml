@@ -1,0 +1,25 @@
+﻿[package]
+name = "avila-tls"
+version = "0.1.0"
+edition = "2021"
+authors = [
+    "Nícolas Ávila <nicolas@avila.inc>",
+    "Avila Development Team <dev@avila.inc>",
+]
+license = "MIT OR Apache-2.0"
+description = "Sovereign TLS 1.3 implementation using only avila-crypto primitives - zero external crypto dependencies"
+repository = "https://github.com/avilaops/arxis"
+homepage = "https://avila.inc"
+keywords = ["tls", "cryptography", "sovereign", "networking"]
+categories = ["cryptography", "network-programming", "no-std"]
+
+[dependencies]
+avila-crypto = { path = "../avila-crypto" }
+tokio = { version = "1.48", features = ["io-util", "net"], default-features = false }
+
+[dev-dependencies]
+tokio = { version = "1.48", features = ["full"] }
+
+[features]
+default = ["std"]
+std = []

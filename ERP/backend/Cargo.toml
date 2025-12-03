@@ -36,9 +36,9 @@ thiserror.workspace = true
 uuid.workspace = true
 chrono.workspace = true
 
-# Arxis Ecosystem - Comentado temporariamente para deploy
-# avila-cache = { path = "../../../arxis/avila-cache" }
-# avila-metrics = { path = "../../../arxis/avila-metrics" }
+# Arxis Ecosystem - Agora dentro do projeto
+avila-cache = { path = "../avila-cache" }
+avila-metrics = { path = "../avila-metrics" }
 
 [lib]
 name = "avila_erp"

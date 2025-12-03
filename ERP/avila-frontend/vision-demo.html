@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Avila Vision - Demo Interativo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #3b82f6;
+            --secondary: #8b5cf6;
+            --success: #10b981;
+            --dark: #0a0a0a;
+            --text: #ffffff;
+        }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #050505 0%, #0a0a0a 100%);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 1rem;
+        }
+
+        .demo-area {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .panel {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            padding: 2rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .panel h2 {
+            color: var(--primary);
+            margin-bottom: 1.5rem;
+            font-size: 1.5rem;
+        }
+
+        .upload-zone {
+            border: 2px dashed rgba(59, 130, 246, 0.5);
+            border-radius: 12px;
+            padding: 3rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: rgba(59, 130, 246, 0.05);
+        }
+
+        .upload-zone:hover {
+            border-color: var(--primary);
+            background: rgba(59, 130, 246, 0.1);
+        }
+
+        .upload-zone.dragover {
+            border-color: var(--success);
+            background: rgba(16, 185, 129, 0.1);
+        }
+
+        #preview-canvas {
+            width: 100%;
+            border-radius: 12px;
+            background: #000;
+            display: none;
+        }
+
+        .controls {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            margin-top: 1.5rem;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 1rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(59, 130, 246, 0.3);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .results {
+            margin-top: 1.5rem;
+        }
+
+        .detection-item {
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 0.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .detection-label {
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .detection-confidence {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--success);
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.9rem;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .stat-box {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            padding: 1rem;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 900;
+            color: var(--primary);
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            color: #9ca3af;
+            margin-top: 0.5rem;
+        }
+
+        .feature-toggles {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            margin-bottom: 1.5rem;
+        }
+
+        .toggle {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .toggle:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .toggle input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-bottom: 2rem;
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 600;
+            transition: color 0.3s;
+        }
+
+        .back-link:hover {
+            color: var(--secondary);
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .spinner {
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-top: 3px solid var(--primary);
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+            .demo-area {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="demos.html" class="back-link">← Voltar aos Demos</a>
+
+        <div class="header">
+            <h1>👁️ Avila Vision Demo</h1>
+            <p>Computer Vision com detecção de objetos em tempo real</p>
+        </div>
+
+        <div class="demo-area">
+            <!-- Upload Panel -->
+            <div class="panel">
+                <h2>📤 Upload de Imagem</h2>
+
+                <div class="upload-zone" id="uploadZone">
+                    <div style="font-size: 3rem; margin-bottom: 1rem;">📷</div>
+                    <p style="font-size: 1.2rem; margin-bottom: 0.5rem;">Arraste uma imagem ou clique para selecionar</p>
+                    <p style="color: #9ca3af; font-size: 0.9rem;">Suporta: JPG, PNG, WEBP</p>
+                </div>
+
+                <input type="file" id="fileInput" accept="image/*" style="display: none;">
+
+                <canvas id="preview-canvas"></canvas>
+
+                <div class="feature-toggles">
+                    <label class="toggle">
+                        <input type="checkbox" id="detectObjects" checked>
+                        <span>Detectar Objetos</span>
+                    </label>
+                    <label class="toggle">
+                        <input type="checkbox" id="detectFaces">
+                        <span>Reconhecimento Facial</span>
+                    </label>
+                    <label class="toggle">
+                        <input type="checkbox" id="detectPose">
+                        <span>Pose Estimation</span>
+                    </label>
+                </div>
+
+                <div class="controls">
+                    <button class="btn btn-primary" onclick="processImage()">🔍 Processar Imagem</button>
+                    <button class="btn btn-secondary" onclick="clearImage()">🗑️ Limpar</button>
+                    <button class="btn btn-secondary" onclick="downloadResult()">💾 Baixar Resultado</button>
+                </div>
+            </div>
+
+            <!-- Results Panel -->
+            <div class="panel">
+                <h2>📊 Resultados</h2>
+
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                    <p>Processando imagem com Avila Vision...</p>
+                </div>
+
+                <div id="results" style="display: none;">
+                    <div class="stats">
+                        <div class="stat-box">
+                            <div class="stat-value" id="objectCount">0</div>
+                            <div class="stat-label">Objetos Detectados</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-value" id="faceCount">0</div>
+                            <div class="stat-label">Faces Detectadas</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-value" id="processingTime">0ms</div>
+                            <div class="stat-label">Tempo de Processo</div>
+                        </div>
+                    </div>
+
+                    <div class="results" id="detectionList"></div>
+                </div>
+
+                <div id="placeholder" style="text-align: center; padding: 3rem; color: #9ca3af;">
+                    <div style="font-size: 4rem; margin-bottom: 1rem;">🎯</div>
+                    <p>Faça upload de uma imagem para ver as detecções</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentImage = null;
+        let canvas = document.getElementById('preview-canvas');
+        let ctx = canvas.getContext('2d');
+
+        // Upload Zone
+        const uploadZone = document.getElementById('uploadZone');
+        const fileInput = document.getElementById('fileInput');
+
+        uploadZone.addEventListener('click', () => fileInput.click());
+
+        uploadZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadZone.classList.add('dragover');
+        });
+
+        uploadZone.addEventListener('dragleave', () => {
+            uploadZone.classList.remove('dragover');
+        });
+
+        uploadZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadZone.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file && file.type.startsWith('image/')) {
+                loadImage(file);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                loadImage(file);
+            }
+        });
+
+        function loadImage(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    currentImage = img;
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    ctx.drawImage(img, 0, 0);
+                    canvas.style.display = 'block';
+                    uploadZone.style.display = 'none';
+                    document.getElementById('placeholder').style.display = 'none';
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function processImage() {
+            if (!currentImage) {
+                alert('Por favor, faça upload de uma imagem primeiro!');
+                return;
+            }
+
+            // Show loading
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('results').style.display = 'none';
+            document.getElementById('placeholder').style.display = 'none';
+
+            // Simulate processing
+            setTimeout(() => {
+                const detectObjects = document.getElementById('detectObjects').checked;
+                const detectFaces = document.getElementById('detectFaces').checked;
+                const detectPose = document.getElementById('detectPose').checked;
+
+                // Simulate detections
+                const detections = simulateDetections(detectObjects, detectFaces, detectPose);
+                displayResults(detections);
+
+                // Draw bounding boxes
+                drawDetections(detections);
+
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('results').style.display = 'block';
+            }, 1500);
+        }
+
+        function simulateDetections(objects, faces, pose) {
+            const detections = [];
+
+            if (objects) {
+                detections.push(
+                    { type: 'objeto', label: 'Pessoa', confidence: 0.95, bbox: [100, 50, 200, 300] },
+                    { type: 'objeto', label: 'Carro', confidence: 0.88, bbox: [300, 150, 150, 100] },
+                    { type: 'objeto', label: 'Cadeira', confidence: 0.76, bbox: [50, 200, 80, 120] }
+                );
+            }
+
+            if (faces) {
+                detections.push(
+                    { type: 'face', label: 'Face', confidence: 0.92, bbox: [120, 70, 60, 80] }
+                );
+            }
+
+            if (pose) {
+                detections.push(
+                    { type: 'pose', label: 'Pose Humana', confidence: 0.89, keypoints: 17 }
+                );
+            }
+
+            return detections;
+        }
+
+        function drawDetections(detections) {
+            // Redraw image
+            ctx.drawImage(currentImage, 0, 0);
+
+            // Draw bounding boxes
+            detections.forEach(det => {
+                if (det.bbox) {
+                    ctx.strokeStyle = det.type === 'face' ? '#ec4899' : '#3b82f6';
+                    ctx.lineWidth = 3;
+                    ctx.strokeRect(det.bbox[0], det.bbox[1], det.bbox[2], det.bbox[3]);
+
+                    // Label
+                    ctx.fillStyle = det.type === 'face' ? '#ec4899' : '#3b82f6';
+                    ctx.fillRect(det.bbox[0], det.bbox[1] - 25, det.bbox[2], 25);
+                    ctx.fillStyle = '#fff';
+                    ctx.font = 'bold 14px sans-serif';
+                    ctx.fillText(`${det.label} ${Math.round(det.confidence * 100)}%`,
+                                 det.bbox[0] + 5, det.bbox[1] - 8);
+                }
+            });
+        }
+
+        function displayResults(detections) {
+            const objectCount = detections.filter(d => d.type === 'objeto').length;
+            const faceCount = detections.filter(d => d.type === 'face').length;
+            const processingTime = Math.floor(Math.random() * 50) + 10;
+
+            document.getElementById('objectCount').textContent = objectCount;
+            document.getElementById('faceCount').textContent = faceCount;
+            document.getElementById('processingTime').textContent = processingTime + 'ms';
+
+            const list = document.getElementById('detectionList');
+            list.innerHTML = '<h3 style="margin-bottom: 1rem;">Detecções:</h3>';
+
+            detections.forEach(det => {
+                const item = document.createElement('div');
+                item.className = 'detection-item';
+                item.innerHTML = `
+                    <span class="detection-label">${det.label}</span>
+                    <span class="detection-confidence">${Math.round(det.confidence * 100)}%</span>
+                `;
+                list.appendChild(item);
+            });
+        }
+
+        function clearImage() {
+            currentImage = null;
+            canvas.style.display = 'none';
+            uploadZone.style.display = 'block';
+            document.getElementById('results').style.display = 'none';
+            document.getElementById('placeholder').style.display = 'block';
+            fileInput.value = '';
+        }
+
+        function downloadResult() {
+            if (!currentImage) {
+                alert('Nenhuma imagem para baixar!');
+                return;
+            }
+
+            const link = document.createElement('a');
+            link.download = 'avila-vision-result.png';
+            link.href = canvas.toDataURL();
+            link.click();
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,326 @@
+/// Pipeline completo de processamento de dados 3D/4D
+/// Demonstra integração entre Polars, Linfa, e análise científica
+
+use polars::prelude::*;
+use ndarray::{Array2, Axis};
+use linfa::prelude::*;
+use linfa_clustering::KMeans;
+use linfa_reduction::Pca;
+use rayon::prelude::*;
+use std::error::Error;
+use rand::Rng;
+
+// Helper function for random numbers
+fn random_f64() -> f64 {
+    rand::thread_rng().gen()
+}
+
+fn main() -> Result<(), Box<dyn Error>> {
+    println!("🚀 Pipeline de Processamento de Dados 3D/4D - Arxis\n");
+
+    // Pipeline 1: Análise de ondas gravitacionais
+    println!("📡 Pipeline 1: Análise de Ondas Gravitacionais");
+    gravitational_wave_pipeline()?;
+
+    // Pipeline 2: Clustering de eventos astrofísicos
+    println!("\n🌌 Pipeline 2: Clustering de Eventos Astrofísicos");
+    astrophysical_clustering()?;
+
+    // Pipeline 3: PCA para visualização 4D
+    println!("\n📊 Pipeline 3: Redução Dimensional 4D → 3D");
+    dimensional_reduction_4d()?;
+
+    // Pipeline 4: Time Series com anomaly detection
+    println!("\n⏱️  Pipeline 4: Análise Temporal com Detecção de Anomalias");
+    time_series_pipeline()?;
+
+    Ok(())
+}
+
+/// Pipeline 1: Processar dados de ondas gravitacionais
+fn gravitational_wave_pipeline() -> Result<(), Box<dyn Error>> {
+    // 1. Gerar dados sintéticos (em produção viria do LISA)
+    let n_samples = 100_000;
+    let timestamps: Vec<f64> = (0..n_samples).map(|i| i as f64 * 0.001).collect();
+
+    let strain_h: Vec<f64> = timestamps
+        .par_iter()
+        .map(|&t| {
+            // Simular sinal GW: chirp + ruído
+            let f0 = 50.0;
+            let chirp_rate = 10.0;
+            let f = f0 + chirp_rate * t;
+            let signal = (2.0 * std::f64::consts::PI * f * t).sin() * 1e-21;
+            let noise = (rand::thread_rng().gen::<f64>() - 0.5) * 1e-23;
+            signal + noise
+        })
+        .collect();
+
+    // 2. Criar DataFrame com Polars (eficiente para big data)
+    let mut df = df! {
+        "time" => timestamps.clone(),
+        "strain" => strain_h.clone(),
+    }?;
+
+    // 3. Feature engineering: adicionar colunas derivadas
+    df = df
+        .lazy()
+        .with_columns([
+            col("strain").abs().alias("abs_strain"),
+            col("strain").pow(2.0).alias("power"),
+        ])
+        .collect()?;
+
+    println!("  ✓ DataFrame criado: {} linhas", df.height());
+
+    // 4. Análise estatística com Polars
+    let stats = df
+        .lazy()
+        .select([
+            col("strain").mean().alias("mean_strain"),
+            col("strain").std(1).alias("std_strain"),
+            col("strain").min().alias("min_strain"),
+            col("strain").max().alias("max_strain"),
+        ])
+        .collect()?;
+
+    println!("  ✓ Estatísticas:");
+    println!("{}", stats);
+
+    // 5. Detectar eventos (strain > threshold)
+    let threshold = 5e-22;
+    let events = df
+        .lazy()
+        .filter(col("abs_strain").gt(lit(threshold)))
+        .select([col("time"), col("strain"), col("abs_strain")])
+        .collect()?;
+
+    println!("  ✓ Eventos detectados: {} (strain > {:.2e})", events.height(), threshold);
+
+    // 6. Exportar para análise posterior
+    if events.height() > 0 {
+        println!("  ✓ Primeiros 5 eventos:");
+        println!("{}", events.head(Some(5)));
+    }
+
+    Ok(())
+}
+
+/// Pipeline 2: Clustering de eventos astrofísicos em 4D
+fn astrophysical_clustering() -> Result<(), Box<dyn Error>> {
+    // 1. Gerar eventos astrofísicos sintéticos (em produção: dados do LISA)
+    let n_events = 5000;
+    let mut data = Vec::new();
+
+    for i in 0..n_events {
+        // Cluster 1: Binários de buracos negros (massa alta)
+        // Cluster 2: Binários de estrelas de nêutrons (massa baixa)
+        // Cluster 3: Eventos intermediários
+        let cluster_type = i % 3;
+
+        let (m1, m2, distance, freq) = match cluster_type {
+            0 => {
+                // Buracos negros: 20-50 M☉
+                let m1 = 20.0 + random_f64() * 30.0;
+                let m2 = 20.0 + random_f64() * 30.0;
+                let distance = 500.0 + random_f64() * 500.0; // Mpc
+                let freq = 50.0 + random_f64() * 50.0; // Hz
+                (m1, m2, distance, freq)
+            }
+            1 => {
+                // Estrelas de nêutrons: 1-3 M☉
+                let m1 = 1.0 + random_f64() * 2.0;
+                let m2 = 1.0 + random_f64() * 2.0;
+                let distance = 100.0 + random_f64() * 200.0;
+                let freq = 500.0 + random_f64() * 500.0;
+                (m1, m2, distance, freq)
+            }
+            _ => {
+                // Intermediários: buraco negro + estrela de nêutrons
+                let m1 = 5.0 + random_f64() * 10.0;
+                let m2 = 1.5 + random_f64() * 2.0;
+                let distance = 200.0 + random_f64() * 300.0;
+                let freq = 150.0 + random_f64() * 150.0;
+                (m1, m2, distance, freq)
+            }
+        };
+
+        data.push(vec![m1, m2, distance, freq]);
+    }
+
+    // 2. Converter para ndarray (para Linfa)
+    let flat_data: Vec<f64> = data.iter().flat_map(|v| v.iter().copied()).collect();
+    let data_matrix = Array2::from_shape_vec((n_events, 4), flat_data)?;
+
+    println!("  ✓ Dados 4D criados: {:?}", data_matrix.dim());
+
+    // 3. Normalizar dados (importante para clustering)
+    let mean = data_matrix.mean_axis(ndarray::Axis(0)).unwrap();
+    let std = data_matrix.std_axis(ndarray::Axis(0), 0.0);
+
+    let normalized = &data_matrix - &mean;
+    let normalized = &normalized / &std;
+
+    // 4. K-Means clustering (3 clusters)
+    let n_clusters = 3;
+    // linfa 0.7 requires (records, targets) tuple
+    let targets = Array2::zeros((n_events, 0)); // Empty targets for unsupervised
+    let dataset = DatasetBase::new(normalized.clone(), targets);
+
+    println!("  ✓ Executando K-Means com {} clusters...", n_clusters);
+    let model = KMeans::params(n_clusters)
+        .max_n_iterations(100)
+        .tolerance(1e-4)
+        .fit(&dataset)?;
+
+    // 5. Analisar resultados
+    let predictions = model.predict(&dataset);
+    let centroids = model.centroids();
+
+    println!("  ✓ Clustering completo!");
+    println!("  ✓ Centroides (normalizados):");
+    for (i, centroid) in centroids.rows().into_iter().enumerate() {
+        println!("    Cluster {}: [m1={:.2}, m2={:.2}, d={:.2}, f={:.2}]",
+            i,
+            centroid[0] * std[0] + mean[0],
+            centroid[1] * std[1] + mean[1],
+            centroid[2] * std[2] + mean[2],
+            centroid[3] * std[3] + mean[3]
+        );
+    }
+
+    // 6. Contar eventos por cluster
+    let mut counts = vec![0; n_clusters];
+    for &cluster in predictions.iter() {
+        counts[cluster] += 1;
+    }
+
+    println!("  ✓ Distribuição:");
+    for (i, count) in counts.iter().enumerate() {
+        println!("    Cluster {}: {} eventos ({:.1}%)",
+            i, count, (*count as f64 / n_events as f64) * 100.0
+        );
+    }
+
+    Ok(())
+}
+
+/// Pipeline 3: Redução dimensional 4D → 3D com PCA
+fn dimensional_reduction_4d() -> Result<(), Box<dyn Error>> {
+    // 1. Gerar dados 4D (espaço-tempo)
+    let n_points = 10_000;
+    let mut data_4d = Vec::new();
+
+    for _ in 0..n_points {
+        let x = random_f64() * 10.0;
+        let y = random_f64() * 10.0;
+        let z = random_f64() * 10.0;
+        let t = random_f64() * 10.0;
+
+        // Adicionar correlação (simular trajetória em espaço-tempo)
+        data_4d.push(vec![x, y, z, t + 0.1 * (x + y)]);
+    }
+
+    let flat_data: Vec<f64> = data_4d.iter().flat_map(|v| v.iter().copied()).collect();
+    let data_matrix = Array2::from_shape_vec((n_points, 4), flat_data)?;
+
+    println!("  ✓ Dados 4D: {:?}", data_matrix.dim());
+
+    // 2. PCA para reduzir a 3D
+    let targets = Array2::zeros((n_points, 0)); // Empty targets for unsupervised
+    let dataset = DatasetBase::new(data_matrix.clone(), targets);
+
+    println!("  ✓ Aplicando PCA (4D → 3D)...");
+    let pca = Pca::params(3).fit(&dataset)?;
+
+    let reduced = pca.transform(dataset);
+    println!("  ✓ Dados 3D: {:?}", reduced.targets().dim());
+
+    // 3. Calcular variância explicada
+    let explained_variance = pca.explained_variance();
+    let total_variance: f64 = explained_variance.iter().sum();
+
+    println!("  ✓ Variância explicada por componente:");
+    for (i, var) in explained_variance.iter().enumerate() {
+        println!("    PC{}: {:.2}% ({:.4})",
+            i + 1,
+            (var / total_variance) * 100.0,
+            var
+        );
+    }
+
+    // 4. Criar DataFrame com dados reduzidos
+    let pc1: Vec<f64> = reduced.targets().column(0).iter().copied().collect();
+    let pc2: Vec<f64> = reduced.targets().column(1).iter().copied().collect();
+    let pc3: Vec<f64> = reduced.targets().column(2).iter().copied().collect();
+
+    let df_reduced = df! {
+        "PC1" => pc1,
+        "PC2" => pc2,
+        "PC3" => pc3,
+    }?;
+
+    println!("  ✓ DataFrame 3D criado para visualização");
+    println!("{}", df_reduced.head(Some(5)));
+
+    Ok(())
+}
+
+/// Pipeline 4: Time Series com anomaly detection
+fn time_series_pipeline() -> Result<(), Box<dyn Error>> {
+    use avila_telemetry::{TimeSeries, AnomalyDetector};
+
+    // 1. Gerar série temporal com anomalias
+    let n_samples = 1000;
+    let mut data = Vec::new();
+
+    for i in 0..n_samples {
+        let t = i as f64 * 0.1;
+
+        // Sinal normal: senoide + tendência
+        let signal = 10.0 + 5.0 * (t / 10.0).sin() + t / 50.0;
+
+        // Adicionar anomalias esporádicas
+        let value = if i % 100 == 0 && i > 0 {
+            signal + 15.0 // Spike anômalo
+        } else {
+            signal + (random_f64() - 0.5) * 0.5 // Ruído normal
+        };
+
+        data.push(value);
+    }
+
+    println!("  ✓ Série temporal gerada: {} pontos", data.len());
+
+    // 2. Criar TimeSeries
+    let ts = TimeSeries::new(data);
+    let stats = ts.statistics();
+
+    println!("  ✓ Estatísticas:");
+    println!("    Média: {:.2}", stats.mean);
+    println!("    Desvio padrão: {:.2}", stats.std_dev);
+    println!("    Min: {:.2}, Max: {:.2}", stats.min, stats.max);
+
+    // 3. Detectar anomalias com Z-score
+    let detector = AnomalyDetector::new(3.0, 1.5); // 3-sigma, 1.5 IQR
+    let anomalies = detector.detect_zscore(&ts)?;
+
+    println!("  ✓ Anomalias detectadas: {}", anomalies.len());
+
+    if !anomalies.is_empty() {
+        println!("  ✓ Primeiras 5 anomalias:");
+        for (i, anomaly) in anomalies.iter().take(5).enumerate() {
+            println!("    Anomalia {}: índice={}, valor={:.2}, z-score={:.2}",
+                i + 1,
+                anomaly.index,
+                anomaly.value,
+                anomaly.score
+            );
+        }
+    }
+
+    // Note: ARIMA forecasting would go here with a proper time series library
+    // linfa doesn't have ARIMA yet - consider using avila-ml when available
+
+    Ok(())
+}

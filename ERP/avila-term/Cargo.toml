@@ -1,0 +1,17 @@
+[package]
+name = "avila-terminal"
+version = "0.1.0"
+edition = "2021"
+authors = ["Nícolas Ávila <nicolas@avila.inc>"]
+license = "MIT OR Apache-2.0"
+description = "AVL Platform terminal colors and formatting - replacement for colored"
+repository = "https://github.com/avilaops/arxis"
+homepage = "https://avila.inc"
+keywords = ["terminal", "colors", "ansi", "avila", "avl"]
+
+[dependencies]
+# Zero dependências - Rust std apenas
+
+[lib]
+name = "avila_terminal"
+path = "src/lib.rs"

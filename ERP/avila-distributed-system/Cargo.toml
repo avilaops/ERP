@@ -1,0 +1,22 @@
+[package]
+name = "avila-distributed-system"
+version = "0.1.0"
+edition = "2021"
+authors = ["Ávila Development Team"]
+description = "🍄 Fungi - Sistema distribuído que se espalha entre átomos"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/Avilaops/arxis"
+
+[dependencies]
+# AVL Platform - Hierarquia biológica (ZERO dependências externas!)
+avila-error = { version = "0.2.0", path = "../avila-error" }
+avila-id = { version = "0.1.0", path = "../avila-id" }
+avila-time = { version = "0.1.0", path = "../avila-time" }
+avila-molecule = { version = "0.1.0", path = "../avila-molecule" }
+
+# Async runtime (única dependência externa permitida para async)
+avila-async = { version = "0.5.0", path = "../avila-async" }
+tokio = { version = "1", features = ["full"] }
+
+[dev-dependencies]
+tokio-test = "0.4"

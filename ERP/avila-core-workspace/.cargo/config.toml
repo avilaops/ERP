@@ -1,0 +1,5 @@
+[registries.avila]
+index = "https://registry.avila.inc/index"
+
+[registry]
+default = "crates-io"

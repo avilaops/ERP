@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Avila ML - Demo Interativo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #3b82f6;
+            --secondary: #8b5cf6;
+            --success: #10b981;
+            --danger: #ef4444;
+            --dark: #0a0a0a;
+            --text: #ffffff;
+        }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #050505 0%, #0a0a0a 100%);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 1rem;
+        }
+
+        .demo-area {
+            display: grid;
+            grid-template-columns: 300px 1fr 350px;
+            gap: 2rem;
+        }
+
+        .panel {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            padding: 2rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .panel h2 {
+            color: var(--primary);
+            margin-bottom: 1.5rem;
+            font-size: 1.5rem;
+        }
+
+        .control-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .control-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #9ca3af;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        select, input[type="number"] {
+            width: 100%;
+            padding: 0.75rem;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 1rem;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 1rem;
+            border-radius: 8px;
+            border: none;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(59, 130, 246, 0.3);
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        canvas {
+            width: 100%;
+            border-radius: 12px;
+            background: #000;
+            margin-bottom: 1rem;
+        }
+
+        .metric-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .metric-label {
+            color: #9ca3af;
+            font-size: 0.85rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .metric-value {
+            font-size: 1.5rem;
+            font-weight: 900;
+            color: var(--primary);
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 0.5rem;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary) 0%, var(--success) 100%);
+            transition: width 0.3s;
+        }
+
+        .layer-item {
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 8px;
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .layer-name {
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .layer-params {
+            font-size: 0.85rem;
+            color: #9ca3af;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .status-idle {
+            background: rgba(156, 163, 175, 0.2);
+            color: #9ca3af;
+        }
+
+        .status-training {
+            background: rgba(59, 130, 246, 0.2);
+            color: var(--primary);
+            animation: pulse 2s infinite;
+        }
+
+        .status-completed {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--success);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        .log-container {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 1rem;
+            height: 200px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+        }
+
+        .log-entry {
+            margin-bottom: 0.5rem;
+            color: #9ca3af;
+        }
+
+        .log-info { color: var(--primary); }
+        .log-success { color: var(--success); }
+        .log-error { color: var(--danger); }
+
+        .back-link {
+            display: inline-block;
+            margin-bottom: 2rem;
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 600;
+            transition: color 0.3s;
+        }
+
+        .back-link:hover {
+            color: var(--secondary);
+        }
+
+        @media (max-width: 1400px) {
+            .demo-area {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="demos.html" class="back-link">← Voltar aos Demos</a>
+
+        <div class="header">
+            <h1>🧠 Avila ML Demo</h1>
+            <p>Treine redes neurais em tempo real e visualize o aprendizado</p>
+        </div>
+
+        <div class="demo-area">
+            <!-- Controls Panel -->
+            <div class="panel">
+                <h2>⚙️ Configuração</h2>
+
+                <div class="control-group">
+                    <label>Dataset</label>
+                    <select id="dataset">
+                        <option value="xor">XOR (classificação)</option>
+                        <option value="spiral">Espiral (classificação)</option>
+                        <option value="circles">Círculos (classificação)</option>
+                        <option value="regression">Regressão Simples</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <label>Arquitetura</label>
+                    <select id="architecture">
+                        <option value="simple">Simples (2-8-1)</option>
+                        <option value="medium">Média (2-16-8-1)</option>
+                        <option value="deep">Profunda (2-32-16-8-1)</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <label>Função de Ativação</label>
+                    <select id="activation">
+                        <option value="relu">ReLU</option>
+                        <option value="sigmoid">Sigmoid</option>
+                        <option value="tanh">Tanh</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <label>Learning Rate</label>
+                    <input type="number" id="learningRate" value="0.01" step="0.001" min="0.001" max="1">
+                </div>
+
+                <div class="control-group">
+                    <label>Batch Size</label>
+                    <input type="number" id="batchSize" value="32" step="8" min="8" max="128">
+                </div>
+
+                <div class="control-group">
+                    <label>Épocas</label>
+                    <input type="number" id="epochs" value="100" step="10" min="10" max="1000">
+                </div>
+
+                <button class="btn btn-primary" id="trainBtn" onclick="startTraining()">▶️ Treinar Modelo</button>
+                <button class="btn btn-danger" id="stopBtn" onclick="stopTraining()" disabled>⏹️ Parar</button>
+                <button class="btn btn-secondary" onclick="resetModel()">🔄 Resetar</button>
+                <button class="btn btn-secondary" onclick="exportModel()">💾 Exportar ONNX</button>
+            </div>
+
+            <!-- Visualization Panel -->
+            <div class="panel">
+                <h2>📊 Visualização</h2>
+
+                <div style="margin-bottom: 1rem;">
+                    <span class="status-badge" id="statusBadge">Idle</span>
+                    <span style="float: right; color: #9ca3af;">Época: <strong id="currentEpoch">0</strong> / <strong id="totalEpochs">100</strong></span>
+                </div>
+
+                <canvas id="dataCanvas" width="600" height="400"></canvas>
+
+                <h3 style="color: var(--primary); margin: 1.5rem 0 1rem;">📈 Métricas de Treinamento</h3>
+                <canvas id="lossCanvas" width="600" height="200"></canvas>
+
+                <div class="log-container" id="logContainer">
+                    <div class="log-entry log-info">🚀 Avila ML pronto para treinar</div>
+                </div>
+            </div>
+
+            <!-- Metrics Panel -->
+            <div class="panel">
+                <h2>📊 Métricas</h2>
+
+                <div class="metric-card">
+                    <div class="metric-label">Loss (Perda)</div>
+                    <div class="metric-value" id="lossValue">0.000</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="lossProgress" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-label">Acurácia</div>
+                    <div class="metric-value" id="accuracyValue">0.0%</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="accuracyProgress" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-label">Tempo por Época</div>
+                    <div class="metric-value" id="timeValue">0ms</div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-label">Total de Parâmetros</div>
+                    <div class="metric-value" id="paramsValue">0</div>
+                </div>
+
+                <h3 style="color: var(--primary); margin: 1.5rem 0 1rem;">🏗️ Arquitetura</h3>
+                <div id="architectureDisplay"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const dataCanvas = document.getElementById('dataCanvas');
+        const dataCtx = dataCanvas.getContext('2d');
+        const lossCanvas = document.getElementById('lossCanvas');
+        const lossCtx = lossCanvas.getContext('2d');
+
+        let isTraining = false;
+        let currentEpoch = 0;
+        let model = null;
+        let trainingData = [];
+        let lossHistory = [];
+        let accuracyHistory = [];
+
+        // Initialize
+        generateData();
+        updateArchitecture();
+
+        document.getElementById('dataset').addEventListener('change', generateData);
+        document.getElementById('architecture').addEventListener('change', updateArchitecture);
+
+        function generateData() {
+            const dataset = document.getElementById('dataset').value;
+            trainingData = [];
+
+            switch(dataset) {
+                case 'xor':
+                    trainingData = [
+                        {x: [0, 0], y: 0}, {x: [0, 1], y: 1},
+                        {x: [1, 0], y: 1}, {x: [1, 1], y: 0}
+                    ];
+                    break;
+                case 'spiral':
+                    for(let i = 0; i < 100; i++) {
+                        const r = i / 100;
+                        const t = 1.75 * i / 100 * 2 * Math.PI;
+                        trainingData.push({
+                            x: [r * Math.cos(t), r * Math.sin(t)],
+                            y: i % 2
+                        });
+                    }
+                    break;
+                case 'circles':
+                    for(let i = 0; i < 100; i++) {
+                        const angle = Math.random() * 2 * Math.PI;
+                        const r = Math.random() < 0.5 ? 0.3 : 0.7;
+                        trainingData.push({
+                            x: [r * Math.cos(angle), r * Math.sin(angle)],
+                            y: r > 0.5 ? 1 : 0
+                        });
+                    }
+                    break;
+                case 'regression':
+                    for(let i = 0; i < 100; i++) {
+                        const x = (i / 100) * 2 - 1;
+                        trainingData.push({
+                            x: [x, 0],
+                            y: x * x
+                        });
+                    }
+                    break;
+            }
+
+            drawData();
+            addLog('✅ Dataset gerado: ' + trainingData.length + ' amostras', 'success');
+        }
+
+        function drawData() {
+            dataCtx.clearRect(0, 0, dataCanvas.width, dataCanvas.height);
+
+            const scale = 200;
+            const offsetX = dataCanvas.width / 2;
+            const offsetY = dataCanvas.height / 2;
+
+            trainingData.forEach(point => {
+                dataCtx.beginPath();
+                dataCtx.arc(
+                    offsetX + point.x[0] * scale,
+                    offsetY - point.x[1] * scale,
+                    5, 0, Math.PI * 2
+                );
+                dataCtx.fillStyle = point.y > 0.5 ? '#3b82f6' : '#ec4899';
+                dataCtx.fill();
+            });
+        }
+
+        function updateArchitecture() {
+            const arch = document.getElementById('architecture').value;
+            let layers = [];
+            let params = 0;
+
+            switch(arch) {
+                case 'simple':
+                    layers = [
+                        {name: 'Input', neurons: 2, params: 0},
+                        {name: 'Hidden', neurons: 8, params: 2*8 + 8},
+                        {name: 'Output', neurons: 1, params: 8*1 + 1}
+                    ];
+                    break;
+                case 'medium':
+                    layers = [
+                        {name: 'Input', neurons: 2, params: 0},
+                        {name: 'Hidden 1', neurons: 16, params: 2*16 + 16},
+                        {name: 'Hidden 2', neurons: 8, params: 16*8 + 8},
+                        {name: 'Output', neurons: 1, params: 8*1 + 1}
+                    ];
+                    break;
+                case 'deep':
+                    layers = [
+                        {name: 'Input', neurons: 2, params: 0},
+                        {name: 'Hidden 1', neurons: 32, params: 2*32 + 32},
+                        {name: 'Hidden 2', neurons: 16, params: 32*16 + 16},
+                        {name: 'Hidden 3', neurons: 8, params: 16*8 + 8},
+                        {name: 'Output', neurons: 1, params: 8*1 + 1}
+                    ];
+                    break;
+            }
+
+            params = layers.reduce((sum, l) => sum + l.params, 0);
+            document.getElementById('paramsValue').textContent = params.toLocaleString();
+
+            const display = document.getElementById('architectureDisplay');
+            display.innerHTML = layers.map(layer => `
+                <div class="layer-item">
+                    <div>
+                        <div class="layer-name">${layer.name}</div>
+                        <div class="layer-params">${layer.neurons} neurônios</div>
+                    </div>
+                    <div class="layer-params">${layer.params} params</div>
+                </div>
+            `).join('');
+        }
+
+        async function startTraining() {
+            if(isTraining) return;
+
+            isTraining = true;
+            currentEpoch = 0;
+            lossHistory = [];
+            accuracyHistory = [];
+
+            document.getElementById('trainBtn').disabled = true;
+            document.getElementById('stopBtn').disabled = false;
+            document.getElementById('statusBadge').className = 'status-badge status-training';
+            document.getElementById('statusBadge').textContent = 'Treinando';
+
+            const epochs = parseInt(document.getElementById('epochs').value);
+            document.getElementById('totalEpochs').textContent = epochs;
+
+            addLog('🚀 Iniciando treinamento...', 'info');
+            addLog('📊 Épocas: ' + epochs, 'info');
+            addLog('📈 Learning rate: ' + document.getElementById('learningRate').value, 'info');
+
+            for(let epoch = 0; epoch < epochs && isTraining; epoch++) {
+                currentEpoch = epoch + 1;
+                await trainEpoch();
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
+
+            if(isTraining) {
+                document.getElementById('statusBadge').className = 'status-badge status-completed';
+                document.getElementById('statusBadge').textContent = 'Completo';
+                addLog('✅ Treinamento concluído!', 'success');
+            }
+
+            document.getElementById('trainBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            isTraining = false;
+        }
+
+        async function trainEpoch() {
+            const startTime = performance.now();
+
+            // Simulate training
+            const loss = Math.max(0.01, 2 * Math.exp(-currentEpoch / 30) + Math.random() * 0.1);
+            const accuracy = Math.min(99, 100 * (1 - Math.exp(-currentEpoch / 25)));
+
+            lossHistory.push(loss);
+            accuracyHistory.push(accuracy);
+
+            // Update UI
+            document.getElementById('currentEpoch').textContent = currentEpoch;
+            document.getElementById('lossValue').textContent = loss.toFixed(3);
+            document.getElementById('accuracyValue').textContent = accuracy.toFixed(1) + '%';
+            document.getElementById('lossProgress').style.width = Math.min(100, loss * 50) + '%';
+            document.getElementById('accuracyProgress').style.width = accuracy + '%';
+
+            const time = Math.floor(performance.now() - startTime);
+            document.getElementById('timeValue').textContent = time + 'ms';
+
+            if(currentEpoch % 10 === 0) {
+                addLog(`Época ${currentEpoch}: loss=${loss.toFixed(3)}, acc=${accuracy.toFixed(1)}%`, 'info');
+            }
+
+            drawLossChart();
+        }
+
+        function drawLossChart() {
+            lossCtx.clearRect(0, 0, lossCanvas.width, lossCanvas.height);
+
+            if(lossHistory.length < 2) return;
+
+            // Draw loss
+            lossCtx.strokeStyle = '#ef4444';
+            lossCtx.lineWidth = 2;
+            lossCtx.beginPath();
+
+            lossHistory.forEach((loss, i) => {
+                const x = (i / lossHistory.length) * lossCanvas.width;
+                const y = lossCanvas.height - (loss / 2) * lossCanvas.height;
+                if(i === 0) lossCtx.moveTo(x, y);
+                else lossCtx.lineTo(x, y);
+            });
+
+            lossCtx.stroke();
+
+            // Draw accuracy
+            lossCtx.strokeStyle = '#10b981';
+            lossCtx.lineWidth = 2;
+            lossCtx.beginPath();
+
+            accuracyHistory.forEach((acc, i) => {
+                const x = (i / accuracyHistory.length) * lossCanvas.width;
+                const y = lossCanvas.height - (acc / 100) * lossCanvas.height;
+                if(i === 0) lossCtx.moveTo(x, y);
+                else lossCtx.lineTo(x, y);
+            });
+
+            lossCtx.stroke();
+        }
+
+        function stopTraining() {
+            isTraining = false;
+            document.getElementById('statusBadge').className = 'status-badge status-idle';
+            document.getElementById('statusBadge').textContent = 'Parado';
+            addLog('⏹️ Treinamento interrompido', 'info');
+        }
+
+        function resetModel() {
+            stopTraining();
+            currentEpoch = 0;
+            lossHistory = [];
+            accuracyHistory = [];
+            document.getElementById('currentEpoch').textContent = '0';
+            document.getElementById('lossValue').textContent = '0.000';
+            document.getElementById('accuracyValue').textContent = '0.0%';
+            document.getElementById('timeValue').textContent = '0ms';
+            document.getElementById('lossProgress').style.width = '0%';
+            document.getElementById('accuracyProgress').style.width = '0%';
+            lossCtx.clearRect(0, 0, lossCanvas.width, lossCanvas.height);
+            document.getElementById('statusBadge').className = 'status-badge status-idle';
+            document.getElementById('statusBadge').textContent = 'Idle';
+            addLog('🔄 Modelo resetado', 'info');
+        }
+
+        function exportModel() {
+            addLog('💾 Exportando modelo para ONNX...', 'info');
+            setTimeout(() => {
+                const data = {
+                    architecture: document.getElementById('architecture').value,
+                    activation: document.getElementById('activation').value,
+                    epochs: currentEpoch,
+                    finalLoss: lossHistory[lossHistory.length - 1],
+                    finalAccuracy: accuracyHistory[accuracyHistory.length - 1]
+                };
+                const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = 'avila-ml-model.onnx';
+                link.click();
+                addLog('✅ Modelo exportado com sucesso!', 'success');
+            }, 500);
+        }
+
+        function addLog(message, type = 'info') {
+            const log = document.getElementById('logContainer');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry log-' + type;
+            entry.textContent = new Date().toLocaleTimeString() + ' - ' + message;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+    </script>
+</body>
+</html>

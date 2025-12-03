@@ -1,0 +1,30 @@
+[package]
+name = "avila-async"
+version = "0.5.0"
+edition = "2021"
+authors = ["Nícolas Ávila <nicolas@avila.inc>"]
+license = "MIT OR Apache-2.0"
+description = "Revolutionary async runtime - Quantum, Neural Networks, Blockchain, Genetic Algorithms, Zero dependencies"
+repository = "https://github.com/arxis/avila-async"
+homepage = "https://github.com/arxis/avila-async"
+documentation = "https://docs.rs/avila-async"
+keywords = ["async", "quantum", "neural", "blockchain", "genetic"]
+categories = ["asynchronous", "concurrency", "algorithms", "cryptography"]
+readme = "README.md"
+
+[lib]
+name = "avila_async"
+path = "src/lib.rs"
+
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true
+overflow-checks = false
+incremental = false
+
+[profile.dev]
+opt-level = 1

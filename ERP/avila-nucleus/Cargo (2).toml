@@ -1,0 +1,37 @@
+[package]
+name = "avila-nucleus"
+version = "0.1.0"
+edition = "2021"
+authors = [
+    "Nícolas Ávila <nicolas@avila.inc>",
+    "Avila Development Team <dev@avila.inc>",
+]
+license = "MIT OR Apache-2.0"
+description = "Atomic-level operations - Foundation of Avila cryptography stack"
+repository = "https://github.com/avilaops/arxis"
+homepage = "https://avila.inc"
+keywords = ["cryptography", "simd", "low-level", "no-std", "bitwise"]
+categories = ["cryptography", "no-std", "algorithms"]
+rust-version = "1.70"
+
+[lib]
+name = "avila_nucleus"
+path = "src/lib.rs"
+
+[dependencies]
+# ABSOLUTAMENTE ZERO - Operações atômicas puras
+
+[features]
+default = ["simd"]
+simd = []
+std = []
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[profile.bench]
+inherits = "release"

@@ -1,0 +1,27 @@
+[package]
+name = "avila-finite-fields"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["Nícolas Ávila <nicolas@avila.inc>"]
+license = "MIT OR Apache-2.0"
+description = "Finite field arithmetic for cryptography"
+repository = "https://github.com/avilaops/arxis"
+keywords = ["finite-field", "galois", "cryptography", "no-std"]
+categories = ["mathematics", "no-std", "cryptography"]
+
+[lib]
+name = "avila_finite_fields"
+path = "src/lib.rs"
+
+[features]
+default = ["std"]
+std = []
+
+[dependencies]
+avila-modular = { path = "../avila-modular" }
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1

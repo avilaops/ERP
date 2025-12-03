@@ -1,0 +1,49 @@
+[package]
+name = "avila-math"
+version = "0.1.0"
+edition = "2021"
+authors = [
+    "Nícolas Ávila <nicolas@avila.inc>",
+    "Avila Development Team <dev@avila.inc>",
+]
+license = "MIT OR Apache-2.0"
+rust-version = "1.70"
+description = "Arxis Foundation: The ARX (fortress) - Mathematical kernel with quaternions, tensors, 4D geometry, Conv4D, differential operators"
+repository = "https://github.com/avilaops/arxis"
+homepage = "https://avila.inc"
+documentation = "https://docs.rs/avila-math"
+readme = "README.md"
+keywords = ["arxis", "quaternions", "tensors", "4d-geometry", "fortress"]
+categories = ["mathematics", "science", "algorithms", "game-development"]
+exclude = ["target/", "*.swp", ".git*"]
+
+[dependencies]
+avila-parallel = { version = "0.4.0", path = "../avila-parallel" }
+avila-fft = { version = "0.3.0", path = "../avila-fft" }
+nalgebra = "0.33"   # Álgebra linear (SVD, eigenvalues)
+pyo3 = { version = "0.23", features = ["extension-module"], optional = true }
+numpy = { version = "0.23", optional = true }
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+approx = "0.5"      # Comparações com tolerância
+
+[features]
+default = []
+python = ["dep:pyo3", "dep:numpy"]
+
+# [[bench]]
+# name = "tensor_ops"
+# harness = false
+
+# [[bench]]
+# name = "conv4d"
+# harness = false
+
+# [[bench]]
+# name = "quaternions"
+# harness = false
+
+# [[bench]]
+# name = "fft"
+# harness = false

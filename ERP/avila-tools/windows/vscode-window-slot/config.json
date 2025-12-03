@@ -1,0 +1,14 @@
+{
+  "monitor": 0,
+  "layout": {
+    "columns": 2,
+    "rows": 2,
+    "padding": 12
+  },
+  "slotOrder": [0, 1, 2, 3],
+  "processNames": [
+    "Code",
+    "Code - Insiders"
+  ],
+  "pollingIntervalMs": 750
+}

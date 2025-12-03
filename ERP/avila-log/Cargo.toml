@@ -1,0 +1,11 @@
+[package]
+name = "avila-log"
+version = "0.2.0"
+edition = "2021"
+authors = ["Nícolas Ávila <nicolas@avila.inc>"]
+license = "MIT OR Apache-2.0"
+description = "Sistema de logging completo - substitui tracing"
+
+[lib]
+name = "avila_log"
+path = "src/lib.rs"

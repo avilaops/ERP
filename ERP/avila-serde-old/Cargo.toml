@@ -1,0 +1,46 @@
+[package]
+name = "avila-serialize"
+version = "0.1.0"
+edition = "2021"
+authors = [
+    "Nícolas Ávila <nicolas@avila.inc>",
+    "Avila Development Team <dev@avila.inc>",
+]
+license = "MIT"
+description = "High-performance serialization framework for AVL Platform - JSON, TOML, Binary, and more"
+repository = "https://github.com/avilaops/arxis"
+homepage = "https://avila.inc"
+documentation = "https://docs.rs/avila-serialize"
+readme = "README.md"
+keywords = ["serialization", "json", "toml", "binary", "codec"]
+categories = ["encoding", "parser-implementations", "data-structures"]
+rust-version = "1.70"
+
+[lib]
+name = "avila_serialize"
+path = "src/lib.rs"
+
+[features]
+default = ["json", "derive"]
+json = []
+toml = []
+binary = []
+derive = ["avila-serialize-derive"]
+full = ["json", "toml", "binary", "derive"]
+
+[dependencies]
+# Avila ecosystem
+avila-serialize-derive = { version = "0.1.0", path = "./avila-serialize-derive", optional = true }
+
+[dev-dependencies]
+criterion = "0.5"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+strip = true
+
+[profile.bench]
+inherits = "release"
+

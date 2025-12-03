@@ -1,0 +1,33 @@
+[package]
+name = "avila-linalg"
+version = "0.1.1"
+edition = "2021"
+authors = ["Nícolas Ávila <nicolas@avila.inc>", "Avila Development Team <dev@avila.inc>"]
+license = "MIT OR Apache-2.0"
+description = "Avila Linear Algebra - Álgebra linear genuína em Rust para o ecossistema Avila (vetores, matrizes, SVD, eigenvalues)"
+repository = "https://github.com/avilaops/arxis"
+homepage = "https://avilaops.com"
+documentation = "https://docs.rs/avila-linalg"
+readme = "README.md"
+keywords = ["linear-algebra", "matrix", "vector", "svd", "eigenvalues"]
+categories = ["mathematics", "science", "algorithms"]
+
+[dependencies]
+# Core - apenas o essencial
+num-traits = "0.2"  # Traits numéricos genéricos
+avila-parallel = { version = "0.4.0", path = "../avila-parallel", optional = true }
+avila-math = { version = "0.1.0", path = "../avila-math", optional = true }
+
+[dev-dependencies]
+# criterion = "0.5"  # TODO: adicionar quando tivermos benchmarks
+# approx = "0.5"     # TODO: comparações de floats em testes
+
+[features]
+default = []
+parallel = ["dep:avila-parallel"]  # Operações paralelas
+std = []              # Suporte std (default é no_std friendly)
+avila-math = ["dep:avila-math"]
+
+# [[bench]]
+# name = "matrix_ops"
+# harness = false

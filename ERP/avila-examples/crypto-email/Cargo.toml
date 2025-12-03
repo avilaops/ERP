@@ -1,0 +1,10 @@
+﻿[package]
+name = "crypto-email-demo"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+avila-crypto = { path = "../../avila-crypto" }
+avila-organ = { path = "../../avila-organ" }
+avila-tissue = { path = "../../avila-tissue" }
+tokio = { version = "1.48", features = ["full"] }

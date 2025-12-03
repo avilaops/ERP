@@ -1,0 +1,30 @@
+[package]
+name = "avila-tissue"
+version = "0.1.0"
+edition = "2021"
+authors = [
+    "Nícolas Ávila <nicolas@avila.inc>",
+    "Avila Development Team <dev@avila.inc>",
+]
+license = "MIT OR Apache-2.0"
+description = "Email tissue layer - Storage, indexing, searching, and organization"
+repository = "https://github.com/avilaops/arxis"
+homepage = "https://avila.inc"
+keywords = ["email", "storage", "indexing", "search", "database"]
+categories = ["email", "database"]
+
+[lib]
+name = "avila_tissue"
+path = "src/lib.rs"
+
+[dependencies]
+# avila-nucleus (excluded)
+avila-cell = { path = "../avila-cell" }
+avila-error = { path = "../avila-error" }
+avila-id = { path = "../avila-id" }
+avila-time = { path = "../avila-time" }
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1

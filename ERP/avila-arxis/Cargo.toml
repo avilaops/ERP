@@ -1,0 +1,17 @@
+[package]
+name = "avila-arxis"
+version = "0.1.0"
+edition = "2021"
+authors = ["Nícolas Ávila <nicolas@avila.inc>"]
+license = "MIT OR Apache-2.0"
+description = "Advanced mathematics library"
+
+[lib]
+name = "avila_arxis"
+path = "lib.rs"
+
+[dependencies]
+avila-math = { version = "0.1.0", path = "../avila-math" }
+rayon = "1.11"
+rand = "0.8"
+rand_distr = "0.4"

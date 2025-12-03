@@ -1,0 +1,28 @@
+[package]
+name = "avila-pool"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["Nícolas Ávila <nicolas@avila.inc>"]
+license = "MIT OR Apache-2.0"
+description = "Generic object pooling for connection and resource management"
+repository = "https://github.com/avilaops/arxis"
+keywords = ["pool", "connections", "resources", "no-std"]
+categories = ["data-structures", "no-std"]
+
+[lib]
+name = "avila_pool"
+path = "src/lib.rs"
+
+[features]
+default = ["std"]
+std = []
+
+[dependencies]
+avila-error = { path = "../avila-error" }
+avila-sync = { path = "../avila-sync" }
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1

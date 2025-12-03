@@ -1,0 +1,25 @@
+
+[package]
+name = "avx-primitives"
+version = "0.1.0"
+edition = "2021"
+authors = ["Nícolas Ávila"]
+description = "Tipos primitivos revolucionários de alta performance - U248, U2048, H1024"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/nicolasavila/avx-primitives"
+keywords = ["primitives", "uint", "hash", "cryptography", "algorithms"]
+categories = ["algorithms", "cryptography", "no-std"]
+
+[lib]
+name = "avx_primitives"
+path = "src/lib.rs"
+
+[dependencies]
+# Zero dependências externas - implementação 100% from scratch
+
+[dev-dependencies]
+criterion = "0.5"
+
+[features]
+default = ["std"]
+std = []

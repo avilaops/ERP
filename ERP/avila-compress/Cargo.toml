@@ -1,0 +1,58 @@
+[package]
+name = "avila-compress"
+version = "0.3.0"
+edition = "2021"
+authors = [
+    "Nícolas Ávila <nicolas@avila.inc>",
+    "Avila Development Team <dev@avila.inc>",
+]
+license = "MIT OR Apache-2.0"
+description = "Native compression library (LZ4, Zstd) for Avila ecosystem"
+repository = "https://github.com/avilaops/arxis"
+homepage = "https://avila.inc"
+documentation = "https://docs.rs/avila-compress"
+keywords = [
+    "compression",
+    "lz4",
+    "zstd",
+    "performance",
+    "streaming",
+]
+categories = ["compression", "algorithms"]
+rust-version = "1.70"
+
+[lib]
+name = "avila_compress"
+path = "src/lib.rs"
+
+[features]
+default = []
+# Pure Rust implementation - no features needed
+
+[dependencies]
+# Pure Rust implementation - no external dependencies!
+
+[dev-dependencies]
+# No dev dependencies for minimal build
+
+# [[bench]]
+# name = "compression_bench"
+# harness = false
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+strip = true
+
+[profile.bench]
+inherits = "release"
+
+[profile.dev]
+opt-level = 0
+debug = true
+incremental = true
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

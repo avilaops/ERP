@@ -1,0 +1,19 @@
+[package]
+name = "avila-cell-core"
+version = "0.1.0"
+edition = "2021"
+authors = ["Nícolas Ávila <nicolas@avila.inc>"]
+license = "MIT OR Apache-2.0"
+description = "Core types and traits for avila-cell"
+
+[dependencies]
+avila-error = { version = "0.2.0", path = "../avila-error" }
+avila-id = { version = "0.1.0", path = "../avila-id" }
+
+[features]
+default = ["std"]
+std = []
+
+[lib]
+name = "avila_cell_core"
+path = "src/lib.rs"

@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arxis Documentation - The Mathematical Citadel</title>
+    <meta name="description"
+        content="Official documentation for Arxis - Research-grade Rust library for physics, mathematics, and scientific computing">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+</head>
+
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <span class="logo">🏛️</span>
+                <span class="brand-name">Arxis Docs</span>
+            </div>
+            <ul class="nav-links">
+                <li><a href="#home" class="active">Home</a></li>
+                <li><a href="#getting-started">Getting Started</a></li>
+                <li><a href="#modules">Modules</a></li>
+                <li><a href="#api">API Reference</a></li>
+                <li><a href="https://github.com/avilaops/arxis" target="_blank">GitHub</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <header class="hero">
+        <div class="hero-content">
+            <h1>🏛️ Arxis Documentation</h1>
+            <p class="subtitle">The Mathematical Citadel · The Computational Engine</p>
+            <p class="tagline">Research-grade Rust library for General Relativity, Gravitational Waves, and Advanced
+                Mathematics</p>
+            <div class="hero-buttons">
+                <a href="#getting-started" class="btn btn-primary">Get Started</a>
+                <a href="https://github.com/avilaops/arxis" class="btn btn-secondary">View on GitHub</a>
+            </div>
+            <div class="badges">
+                <img src="https://img.shields.io/badge/rust-1.70%2B-CE422B.svg" alt="Rust 1.70+">
+                <img src="https://img.shields.io/badge/tests-101%20passing-00C853.svg" alt="101 tests passing">
+                <img src="https://img.shields.io/badge/NASA-LISA%20Ready-blue.svg" alt="NASA LISA Ready">
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+        <!-- What is Arxis -->
+        <section id="home" class="section">
+            <h2>🎯 What is Arxis?</h2>
+            <p class="intro">
+                <strong>Arxis</strong> is the mathematical citadel and computational engine for scientific computing in
+                Rust.
+            </p>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">🏛️</div>
+                    <h3>ARX (Fortress)</h3>
+                    <p>Unshakeable foundation with rigorous mathematics: quaternions, tensors, 4D geometry</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">⚙️</div>
+                    <h3>AXIS (Engine)</h3>
+                    <p>Central motor driving complex systems and high-performance simulations</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🛡️</div>
+                    <h3>Robust Protection</h3>
+                    <p>Rust's type safety, rigorous testing (101 tests), reliable APIs</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🚀</div>
+                    <h3>Native Performance</h3>
+                    <p>Mission-critical calculations with zero-cost abstractions</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Getting Started -->
+        <section id="getting-started" class="section">
+            <h2>🚀 Getting Started</h2>
+
+            <h3>Installation</h3>
+            <p>Add to your <code>Cargo.toml</code>:</p>
+            <pre><code>[dependencies]
+arxis_quaternions = "0.2.0"
+avila-math = { git = "https://github.com/avilaops/arxis" }
+avila-telemetry = { git = "https://github.com/avilaops/arxis" }
+</code></pre>
+
+            <h3>Quick Example</h3>
+            <pre><code>use arxis_quaternions::Quat3D;
+use std::f64::consts::PI;
+
+// 3D rotation with quaternions
+let q = Quat3D::from_axis_angle([0.0, 0.0, 1.0], PI / 2.0);
+let v = [1.0, 0.0, 0.0];
+let rotated = q.rotate_vector(v); // ≈ [0.0, 1.0, 0.0]
+</code></pre>
+
+            <div class="info-box">
+                <strong>📖 Next Steps:</strong>
+                <ul>
+                    <li><a href="#modules">Explore Core Modules</a></li>
+                    <li><a href="tutorials/quaternions.html">Quaternions Tutorial</a></li>
+                    <li><a href="examples/lisa-pipeline.html">LISA Pipeline Example</a></li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- Core Modules -->
+        <section id="modules" class="section">
+            <h2>📦 Core Modules</h2>
+
+            <div class="module-grid">
+                <div class="module-card">
+                    <h3>avila-math</h3>
+                    <p class="module-desc">Mathematical kernel with quaternions, tensors, and linear algebra</p>
+                    <div class="module-stats">
+                        <span class="badge">26 tests</span>
+                        <span class="badge">Zero dependencies</span>
+                    </div>
+                    <a href="modules/avila-math.html" class="module-link">Documentation →</a>
+                </div>
+
+                <div class="module-card">
+                    <h3>avila-telemetry</h3>
+                    <p class="module-desc">Time series analysis, anomaly detection, and forecasting</p>
+                    <div class="module-stats">
+                        <span class="badge">22 tests</span>
+                        <span class="badge">NASA standards</span>
+                    </div>
+                    <a href="modules/avila-telemetry.html" class="module-link">Documentation →</a>
+                </div>
+
+                <div class="module-card">
+                    <h3>arxis_quaternions</h3>
+                    <p class="module-desc">Complete LISA scientific pipeline for gravitational wave analysis</p>
+                    <div class="module-stats">
+                        <span class="badge">101 tests</span>
+                        <span class="badge">NASA/LISA ready</span>
+                    </div>
+                    <a href="modules/arxis-quaternions.html" class="module-link">Documentation →</a>
+                </div>
+
+                <div class="module-card">
+                    <h3>avx-gpu</h3>
+                    <p class="module-desc">Cross-platform GPU computing (WGPU, CUDA, ROCm, Metal)</p>
+                    <div class="module-stats">
+                        <span class="badge">Multi-backend</span>
+                        <span class="badge">High performance</span>
+                    </div>
+                    <a href="modules/avx-gpu.html" class="module-link">Documentation →</a>
+                </div>
+
+                <div class="module-card">
+                    <h3>avx-image</h3>
+                    <p class="module-desc">Computer vision with YOLO, tracking, and image processing</p>
+                    <div class="module-stats">
+                        <span class="badge">Real-time</span>
+                        <span class="badge">YOLO v8</span>
+                    </div>
+                    <a href="modules/avx-image.html" class="module-link">Documentation →</a>
+                </div>
+
+                <div class="module-card">
+                    <h3>avx-telemetry</h3>
+                    <p class="module-desc">Observability and metrics for AVX platform</p>
+                    <div class="module-stats">
+                        <span class="badge">Prometheus</span>
+                        <span class="badge">Distributed</span>
+                    </div>
+                    <a href="modules/avx-telemetry.html" class="module-link">Documentation →</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- API Reference -->
+        <section id="api" class="section">
+            <h2>📚 API Reference</h2>
+            <div class="api-grid">
+                <div class="api-card">
+                    <h3>Core Math</h3>
+                    <ul>
+                        <li><a href="api/quaternions.html">Quaternions (Quat3D)</a></li>
+                        <li><a href="api/dual-quaternions.html">Dual Quaternions</a></li>
+                        <li><a href="api/so4.html">SO(4) Rotations</a></li>
+                        <li><a href="api/geometry4d.html">4D Geometry</a></li>
+                        <li><a href="api/tensors.html">Tensors (0D-4D)</a></li>
+                    </ul>
+                </div>
+
+                <div class="api-card">
+                    <h3>Physics</h3>
+                    <ul>
+                        <li><a href="api/gravitational-waves.html">Gravitational Waves</a></li>
+                        <li><a href="api/lisa.html">LISA Mission</a></li>
+                        <li><a href="api/relativity.html">General Relativity</a></li>
+                        <li><a href="api/cosmology.html">Cosmology</a></li>
+                        <li><a href="api/lensing.html">Gravitational Lensing</a></li>
+                    </ul>
+                </div>
+
+                <div class="api-card">
+                    <h3>Time Series</h3>
+                    <ul>
+                        <li><a href="api/timeseries.html">TimeSeries</a></li>
+                        <li><a href="api/anomaly.html">Anomaly Detection</a></li>
+                        <li><a href="api/forecasting.html">Forecasting (ARIMA)</a></li>
+                        <li><a href="api/decomposition.html">Decomposition</a></li>
+                    </ul>
+                </div>
+
+                <div class="api-card">
+                    <h3>AVX Platform</h3>
+                    <ul>
+                        <li><a href="api/avx-gpu.html">GPU Computing</a></li>
+                        <li><a href="api/avx-image.html">Computer Vision</a></li>
+                        <li><a href="api/avx-gateway.html">API Gateway</a></li>
+                        <li><a href="api/avx-events.html">Event System</a></li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- Resources -->
+        <section class="section">
+            <h2>📖 Additional Resources</h2>
+            <div class="resources-grid">
+                <a href="tutorials/" class="resource-card">
+                    <div class="resource-icon">🎓</div>
+                    <h3>Tutorials</h3>
+                    <p>Step-by-step guides for beginners and advanced users</p>
+                </a>
+                <a href="examples/" class="resource-card">
+                    <div class="resource-icon">💡</div>
+                    <h3>Examples</h3>
+                    <p>Real-world code examples and use cases</p>
+                </a>
+                <a href="guides/" class="resource-card">
+                    <div class="resource-icon">📋</div>
+                    <h3>Guides</h3>
+                    <p>Best practices and architectural patterns</p>
+                </a>
+                <a href="https://github.com/avilaops/arxis/discussions" class="resource-card">
+                    <div class="resource-icon">💬</div>
+                    <h3>Community</h3>
+                    <p>Ask questions and share knowledge</p>
+                </a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="footer-section">
+                <h4>Arxis</h4>
+                <p>The Mathematical Citadel</p>
+                <p>Built with ❤️ by Avila</p>
+            </div>
+            <div class="footer-section">
+                <h4>Documentation</h4>
+                <ul>
+                    <li><a href="#getting-started">Getting Started</a></li>
+                    <li><a href="#modules">Modules</a></li>
+                    <li><a href="#api">API Reference</a></li>
+                    <li><a href="tutorials/">Tutorials</a></li>
+                </ul>
+            </div>
+            <div class="footer-section">
+                <h4>Community</h4>
+                <ul>
+                    <li><a href="https://github.com/avilaops/arxis">GitHub</a></li>
+                    <li><a href="https://github.com/avilaops/arxis/discussions">Discussions</a></li>
+                    <li><a href="https://github.com/avilaops/arxis/issues">Issues</a></li>
+                    <li><a href="https://crates.io/crates/arxis_quaternions">Crates.io</a></li>
+                </ul>
+            </div>
+            <div class="footer-section">
+                <h4>Contact</h4>
+                <ul>
+                    <li>Email: nicolas@avila.inc</li>
+                    <li>Website: <a href="https://avilaops.com">avilaops.com</a></li>
+                    <li>GitHub: <a href="https://github.com/avilaops">@avilaops</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2024 Avila. Licensed under MIT OR Apache-2.0</p>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+
+</html>

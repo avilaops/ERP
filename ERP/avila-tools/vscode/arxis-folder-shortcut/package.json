@@ -1,0 +1,37 @@
+{
+  "name": "arxis-folder-shortcut",
+  "displayName": "Arxis Folder Shortcut",
+  "description": "Comando e atalho para adicionar rapidamente a pasta Arxis ao workspace atual.",
+  "version": "0.0.1",
+  "publisher": "arxis",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "arxisFolderShortcut.addFolder",
+        "title": "Adicionar pasta Arxis ao workspace"
+      }
+    ],
+    "configuration": {
+      "title": "Arxis Folder Shortcut",
+      "properties": {
+        "arxisFolderShortcut.targetPath": {
+          "type": "string",
+          "default": "D\\\\GitHub\\\\arxis",
+          "description": "Caminho absoluto da pasta Arxis que será adicionada ao workspace ao acionar o atalho."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "test": "node ./tests/workspaceManager.test.js"
+  },
+  "devDependencies": {},
+  "license": "MIT"
+}

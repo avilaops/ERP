@@ -1,0 +1,28 @@
+[package]
+name = "avila-buffer"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["Nícolas Ávila <nicolas@avila.inc>"]
+license = "MIT OR Apache-2.0"
+description = "High-performance buffer management with zero-copy operations"
+repository = "https://github.com/avilaops/arxis"
+keywords = ["buffer", "zero-copy", "io", "no-std"]
+categories = ["no-std", "data-structures"]
+
+[lib]
+name = "avila_buffer"
+path = "src/lib.rs"
+
+[features]
+default = ["std"]
+std = []
+
+[dependencies]
+avila-primitives = { path = "../avila-primitives" }
+avila-error = { path = "../avila-error" }
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1

@@ -1,0 +1,248 @@
+{
+  "catalog_name": "LISA-O1-Test",
+  "catalog_version": "1.0.0",
+  "pipeline_version": "arxis-0.2.0",
+  "total_events": 15,
+  "events": [
+    {
+      "id": "LISA-GW-240120",
+      "gps_time": 170,
+      "utc_time": "2024-01-20T00:00:00Z",
+      "snr": 67648460.52239309,
+      "far": 0.000001,
+      "confidence": 0.95,
+      "source_type": "MBHB",
+      "parameters": {
+        "mass_1": 500000,
+        "mass_2": 466666.6666666667,
+        "chirp_mass": 420465.8443152853,
+        "total_mass": 966666.6666666667,
+        "distance": 30000000000000000000000000
+      }
+    },
+    {
+      "id": "LISA-GW-240121",
+      "gps_time": 9820,
+      "utc_time": "2024-01-20T00:01:00Z",
+      "snr": 67587379.21207328,
+      "far": 0.000001,
+      "confidence": 0.95,
+      "source_type": "MBHB",
+      "parameters": {
+        "mass_1": 500000,
+        "mass_2": 466666.6666666667,
+        "chirp_mass": 420465.8443152853,
+        "total_mass": 966666.6666666667,
+        "distance": 30000000000000000000000000
+      }
+    },
+    {
+      "id": "LISA-GW-240122",
+      "gps_time": 870,
+      "utc_time": "2024-01-20T00:02:00Z",
+      "snr": 63464176.55634944,
+      "far": 0.000001,
+      "confidence": 0.95,
+      "source_type": "MBHB",
+      "parameters": {
+        "mass_1": 500000,
+        "mass_2": 466666.6666666667,
+        "chirp_mass": 420465.8443152853,
+        "total_mass": 966666.6666666667,
+        "distance": 30000000000000000000000000
+      }
+    },
+    {
+      "id": "LISA-GW-240123",
+      "gps_time": 9110,
+      "utc_time": "2024-01-20T00:03:00Z",
+      "snr": 63292185.22027293,
+      "far": 0.000001,
+      "confidence": 0.95,
+      "source_type": "MBHB",
+      "parameters": {
+        "mass_1": 500000,
+        "mass_2": 466666.6666666667,
+        "chirp_mass": 420465.8443152853,
+        "total_mass": 966666.6666666667,
+        "distance": 30000000000000000000000000
+      }
+    },
+    {
+      "id": "LISA-GW-240124",
+      "gps_time": 1580,
+      "utc_time": "2024-01-20T00:04:00Z",
+      "snr": 54834422.42559604,
+      "far": 0.000001,
+      "confidence": 0.95,
+      "source_type": "MBHB",
+      "parameters": {
+        "mass_1": 500000,
+        "mass_2": 466666.6666666667,
+        "chirp_mass": 420465.8443152853,
+        "total_mass": 966666.6666666667,
+        "distance": 30000000000000000000000000
+      }
+    },
+    {
+      "id": "LISA-GW-240125",
+      "gps_time": 8410,
+      "utc_time": "2024-01-20T00:05:00Z",
+      "snr": 54709588.28267448,
+      "far": 0.000001,
+      "confidence": 0.95,
+      "source_type": "MBHB",
+      "parameters": {
+        "mass_1": 500000,
+        "mass_2": 466666.6666666667,
+        "chirp_mass": 420465.8443152853,
+        "total_mass": 966666.6666666667,
+        "distance": 30000000000000000000000000
+      }
+    },
+    {
+      "id": "LISA-GW-240126",
+      "gps_time": 2280,
+      "utc_time": "2024-01-20T00:06:00Z",
+      "snr": 43839797.02153304,
+      "far": 0.000001,
+      "confidence": 0.95,
+      "source_type": "MBHB",
+      "parameters": {
+        "mass_1": 500000,
+        "mass_2": 466666.6666666667,
+        "chirp_mass": 420465.8443152853,
+        "total_mass": 966666.6666666667,
+        "distance": 30000000000000000000000000
+      }
+    },
+    {
+      "id": "LISA-GW-240127",
+      "gps_time": 7710,
+      "utc_time": "2024-01-20T00:07:00Z",
+      "snr": 43601445.74986206,
+      "far": 0.000001,
+      "confidence": 0.95,
+      "source_type": "MBHB",
+      "parameters": {
+        "mass_1": 500000,
+        "mass_2": 466666.6666666667,
+        "chirp_mass": 420465.8443152853,
+        "total_mass": 966666.6666666667,
+        "distance": 30000000000000000000000000
+      }
+    },
+    {
+      "id": "LISA-GW-240128",
+      "gps_time": 2980,
+      "utc_time": "2024-01-20T00:08:00Z",
+      "snr": 32715453.765166488,
+      "far": 0.000001,
+      "confidence": 0.95,
+      "source_type": "MBHB",
+      "parameters": {
+        "mass_1": 500000,
+        "mass_2": 466666.6666666667,
+        "chirp_mass": 420465.8443152853,
+        "total_mass": 966666.6666666667,
+        "distance": 30000000000000000000000000
+      }
+    },
+    {
+      "id": "LISA-GW-240129",
+      "gps_time": 7000,
+      "utc_time": "2024-01-20T00:09:00Z",
+      "snr": 32523665.269642983,
+      "far": 0.000001,
+      "confidence": 0.95,
+      "source_type": "MBHB",
+      "parameters": {
+        "mass_1": 500000,
+        "mass_2": 466666.6666666667,
+        "chirp_mass": 420465.8443152853,
+        "total_mass": 966666.6666666667,
+        "distance": 30000000000000000000000000
+      }
+    },
+    {
+      "id": "LISA-GW-240130",
+      "gps_time": 3690,
+      "utc_time": "2024-01-20T00:10:00Z",
+      "snr": 23446712.938926943,
+      "far": 0.000001,
+      "confidence": 0.95,
+      "source_type": "MBHB",
+      "parameters": {
+        "mass_1": 500000,
+        "mass_2": 466666.6666666667,
+        "chirp_mass": 420465.8443152853,
+        "total_mass": 966666.6666666667,
+        "distance": 30000000000000000000000000
+      }
+    },
+    {
+      "id": "LISA-GW-240131",
+      "gps_time": 6300,
+      "utc_time": "2024-01-20T00:11:00Z",
+      "snr": 23315718.356425542,
+      "far": 0.000001,
+      "confidence": 0.95,
+      "source_type": "MBHB",
+      "parameters": {
+        "mass_1": 500000,
+        "mass_2": 466666.6666666667,
+        "chirp_mass": 420465.8443152853,
+        "total_mass": 966666.6666666667,
+        "distance": 30000000000000000000000000
+      }
+    },
+    {
+      "id": "LISA-GW-240132",
+      "gps_time": 4390,
+      "utc_time": "2024-01-20T00:12:00Z",
+      "snr": 16678007.666791303,
+      "far": 0.000001,
+      "confidence": 0.95,
+      "source_type": "MBHB",
+      "parameters": {
+        "mass_1": 500000,
+        "mass_2": 466666.6666666667,
+        "chirp_mass": 420465.8443152853,
+        "total_mass": 966666.6666666667,
+        "distance": 30000000000000000000000000
+      }
+    },
+    {
+      "id": "LISA-GW-240133",
+      "gps_time": 5590,
+      "utc_time": "2024-01-20T00:13:00Z",
+      "snr": 16588136.871177547,
+      "far": 0.000001,
+      "confidence": 0.95,
+      "source_type": "MBHB",
+      "parameters": {
+        "mass_1": 500000,
+        "mass_2": 466666.6666666667,
+        "chirp_mass": 420465.8443152853,
+        "total_mass": 966666.6666666667,
+        "distance": 30000000000000000000000000
+      }
+    },
+    {
+      "id": "LISA-GW-240134",
+      "gps_time": 4970,
+      "utc_time": "2024-01-20T00:14:00Z",
+      "snr": 15044513.42391879,
+      "far": 0.000001,
+      "confidence": 0.95,
+      "source_type": "MBHB",
+      "parameters": {
+        "mass_1": 1125000,
+        "mass_2": 466666.6666666667,
+        "chirp_mass": 619049.1873291574,
+        "total_mass": 1591666.6666666667,
+        "distance": 30000000000000000000000000
+      }
+    }
+  ]
+}

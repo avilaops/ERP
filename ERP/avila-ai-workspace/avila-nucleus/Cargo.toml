@@ -1,0 +1,23 @@
+[package]
+name = "avila-nucleus"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lib]
+name = "avila_nucleus"
+path = "src/lib.rs"
+
+[dependencies]
+# ZERO dependencies - tudo implementado do zero
+
+[dev-dependencies]
+criterion = "0.5"
+
+# Benchmarks comentados até serem implementados
+# [[bench]]
+# name = "simd_ops"
+# harness = false

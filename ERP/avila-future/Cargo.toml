@@ -1,0 +1,14 @@
+[package]
+name = "avila-future"
+version = "0.1.0"
+edition = "2021"
+authors = ["Nícolas Ávila <nicolas@avila.inc>"]
+license = "MIT OR Apache-2.0"
+description = "Futures nativo - substitui futures crate"
+
+[dependencies]
+tokio = { version = "1.42", features = ["rt", "macros"] }
+
+[lib]
+name = "avila_future"
+path = "src/lib.rs"

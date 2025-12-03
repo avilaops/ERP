@@ -1,0 +1,20 @@
+[package]
+name = "avila-errors-derive"
+version = "0.1.0"
+edition = "2021"
+authors = [
+    "Nícolas Ávila <nicolas@avila.inc>",
+    "Avila Development Team <dev@avila.inc>",
+]
+license = "MIT"
+description = "Derive macros for avila-errors"
+repository = "https://github.com/avilaops/arxis"
+homepage = "https://avila.inc"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+quote = "1.0"
+syn = { version = "2.0", features = ["full"] }
+proc-macro2 = "1.0"

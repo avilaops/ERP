@@ -1,0 +1,58 @@
+[package]
+name = "avila-arrow"
+version = "0.2.0"
+edition = "2021"
+authors = [
+    "Nícolas Ávila <nicolas@avila.inc>",
+    "Avila Development Team <dev@avila.inc>",
+]
+license = "MIT OR Apache-2.0"
+description = "Zero-copy columnar format with scientific arrays (Quaternions, Complex, Tensors, Spinors), SIMD acceleration (35x), and native compression (125x RLE, 16x BitPack, 4x Delta) - Zero external dependencies"
+repository = "https://github.com/avilaops/arxis"
+homepage = "https://avila.cloud"
+documentation = "https://docs.rs/avila-arrow"
+readme = "README.md"
+keywords = ["arrow", "columnar", "quaternion", "scientific", "compression"]
+categories = ["science", "database-implementations", "data-structures"]
+
+[dependencies]
+# Core dependencies (zero-copy, no_std compatible)
+byteorder = "1.5"
+
+# Optional features
+flatbuffers = { version = "24.3", optional = true }
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[features]
+default = ["scientific"]
+scientific = []  # Scientific types (Quaternion, Tensor4D, Complex, Spinor)
+compression = []  # Integration with avila-compress (future)
+aviladb = []  # AvilaDB native integration (future)
+ipc = ["flatbuffers"]  # Arrow IPC format support
+
+[[bench]]
+name = "simd_bench"
+harness = false
+
+[[bench]]
+name = "extended_bench"
+harness = false
+
+[[bench]]
+name = "compression_bench"
+harness = false
+
+[lib]
+name = "avila_arrow"
+path = "src/lib.rs"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+
+[profile.bench]
+opt-level = 3
+lto = true

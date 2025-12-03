@@ -1,0 +1,19 @@
+[package]
+name = "avila-crypto"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[lib]
+name = "avila_crypto"
+path = "src/lib.rs"
+
+[dependencies]
+avila-nucleus = { path = "../avila-nucleus" }
+avila-primitives = { path = "../avila-primitives" }
+avila-math = { path = "../avila-math" }
+
+[features]
+default = []

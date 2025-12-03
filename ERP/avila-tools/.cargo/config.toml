@@ -1,0 +1,8 @@
+[registries.avila]
+index = "https://registry.avila.inc/index"
+
+[registries.crates-io]
+index = "https://github.com/rust-lang/crates.io-index"
+
+[registry]
+default = "avila"

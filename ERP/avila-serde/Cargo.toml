@@ -1,0 +1,22 @@
+[package]
+name = "avila-serde"
+version = "0.2.0"
+edition = "2021"
+authors = ["Nícolas Ávila <nicolas@avila.inc>"]
+license = "MIT OR Apache-2.0"
+description = "AVL Platform serialization - replacement for serde/serde_json"
+repository = "https://github.com/avilaops/arxis"
+homepage = "https://avila.inc"
+keywords = ["serde", "json", "serialization", "avila", "avl"]
+
+[dependencies]
+avila-serde-derive = { path = "./avila-serde-derive", version = "0.1.0", optional = true }
+
+[features]
+default = []
+derive = ["avila-serde-derive"]
+full = ["derive"]
+
+[lib]
+name = "avila_serde"
+path = "src/lib.rs"

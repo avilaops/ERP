@@ -1,0 +1,39 @@
+[package]
+name = "avila-parallel"
+version = "0.4.0"
+edition = "2021"
+authors = [
+    "Nícolas Ávila <nicolas@avila.inc>",
+    "Avila Development Team <dev@avila.inc>",
+]
+license = "MIT"
+description = "Zero-dependency parallel library with work stealing, SIMD, lock-free operations, adaptive execution, and memory-efficient algorithms"
+repository = "https://github.com/avilaops/arxis"
+homepage = "https://avila.inc"
+documentation = "https://docs.rs/avila-parallel"
+readme = "README.md"
+keywords = ["parallel", "threads", "work-stealing", "lock-free", "adaptive"]
+categories = ["concurrency", "algorithms", "no-std"]
+rust-version = "1.70"
+
+[lib]
+name = "avila_parallel"
+path = "src/lib.rs"
+
+[features]
+default = []
+
+[dependencies]
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "parallel_operations"
+harness = false
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+strip = true

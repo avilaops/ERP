@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Avila DataFrame - Demo Interativo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #3b82f6;
+            --secondary: #8b5cf6;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --dark: #0a0a0a;
+            --text: #ffffff;
+        }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #050505 0%, #0a0a0a 100%);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1800px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 1rem;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-bottom: 2rem;
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 250px 1fr 300px;
+            gap: 1.5rem;
+        }
+
+        .panel {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 1.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .panel h2 {
+            color: var(--primary);
+            margin-bottom: 1rem;
+            font-size: 1.3rem;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 0.75rem;
+            border-radius: 8px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            margin-bottom: 0.75rem;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(59, 130, 246, 0.3);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-warning {
+            background: var(--warning);
+            color: white;
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        .control-group {
+            margin-bottom: 1rem;
+        }
+
+        .control-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #9ca3af;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 0.75rem;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 0.95rem;
+        }
+
+        .table-container {
+            overflow-x: auto;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        th {
+            background: rgba(59, 130, 246, 0.2);
+            color: var(--primary);
+            padding: 1rem;
+            text-align: left;
+            font-weight: 700;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        td {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        tr:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .stat-label {
+            color: #9ca3af;
+            font-size: 0.85rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: 900;
+            color: var(--primary);
+        }
+
+        .operation-log {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 1rem;
+            height: 200px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+        }
+
+        .log-entry {
+            margin-bottom: 0.5rem;
+            color: #9ca3af;
+        }
+
+        .log-success { color: var(--success); }
+        .log-info { color: var(--primary); }
+        .log-warning { color: var(--warning); }
+        .log-error { color: var(--danger); }
+
+        .chart-container {
+            margin-top: 1rem;
+        }
+
+        canvas {
+            width: 100%;
+            height: 250px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+        }
+
+        @media (max-width: 1400px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="demos.html" class="back-link">← Voltar aos Demos</a>
+
+        <div class="header">
+            <h1>📊 Avila DataFrame Demo</h1>
+            <p>Manipulação de dados tabulares de alta performance</p>
+        </div>
+
+        <div class="main-grid">
+            <!-- Controls -->
+            <div class="panel">
+                <h2>🛠️ Operações</h2>
+
+                <button class="btn btn-primary" onclick="generateRandomData()">🎲 Gerar Dados</button>
+                <button class="btn btn-primary" onclick="loadCSV()">📂 Carregar CSV</button>
+                <button class="btn btn-secondary" onclick="filterData()">🔍 Filtrar</button>
+                <button class="btn btn-secondary" onclick="sortData()">↕️ Ordenar</button>
+                <button class="btn btn-secondary" onclick="groupData()">📦 Agrupar</button>
+                <button class="btn btn-success" onclick="aggregateData()">📈 Agregar</button>
+                <button class="btn btn-success" onclick="pivotData()">🔄 Pivot</button>
+                <button class="btn btn-warning" onclick="mergeData()">🔗 Merge</button>
+                <button class="btn btn-warning" onclick="exportData()">💾 Exportar</button>
+                <button class="btn btn-danger" onclick="clearData()">🗑️ Limpar</button>
+
+                <div style="margin-top: 1.5rem;">
+                    <div class="control-group">
+                        <label>Linhas</label>
+                        <input type="number" id="rowCount" value="100" min="10" max="10000">
+                    </div>
+                    <div class="control-group">
+                        <label>Coluna para Filtro</label>
+                        <select id="filterColumn">
+                            <option value="age">Age</option>
+                            <option value="salary">Salary</option>
+                            <option value="department">Department</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label>Valor do Filtro</label>
+                        <input type="text" id="filterValue" placeholder="ex: >30">
+                    </div>
+                </div>
+            </div>
+
+            <!-- DataFrame Display -->
+            <div class="panel">
+                <h2>📋 DataFrame</h2>
+                <div id="dataframeInfo" style="margin-bottom: 1rem; color: #9ca3af; font-size: 0.9rem;">
+                    Nenhum dado carregado
+                </div>
+                <div class="table-container">
+                    <table id="dataTable">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Nome</th>
+                                <th>Idade</th>
+                                <th>Departamento</th>
+                                <th>Salário</th>
+                                <th>Desempenho</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody">
+                            <tr>
+                                <td colspan="6" style="text-align: center; padding: 3rem; color: #9ca3af;">
+                                    Clique em "Gerar Dados" para começar
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="chart-container">
+                    <h3 style="color: var(--primary); margin-bottom: 1rem;">📊 Visualização</h3>
+                    <canvas id="chartCanvas"></canvas>
+                </div>
+            </div>
+
+            <!-- Statistics -->
+            <div class="panel">
+                <h2>📊 Estatísticas</h2>
+
+                <div class="stat-card">
+                    <div class="stat-label">Linhas</div>
+                    <div class="stat-value" id="statRows">0</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-label">Colunas</div>
+                    <div class="stat-value" id="statCols">6</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-label">Salário Médio</div>
+                    <div class="stat-value" id="statAvgSalary">$0</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-label">Idade Média</div>
+                    <div class="stat-value" id="statAvgAge">0</div>
+                </div>
+
+                <h3 style="color: var(--primary); margin: 1.5rem 0 1rem;">📝 Log de Operações</h3>
+                <div class="operation-log" id="operationLog">
+                    <div class="log-entry log-info">🚀 DataFrame pronto</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let dataframe = [];
+        const departments = ['Engineering', 'Sales', 'Marketing', 'HR', 'Finance'];
+        const names = ['Alice', 'Bob', 'Charlie', 'Diana', 'Eve', 'Frank', 'Grace', 'Henry', 'Ivy', 'Jack'];
+
+        function generateRandomData() {
+            const count = parseInt(document.getElementById('rowCount').value);
+            dataframe = [];
+
+            for(let i = 0; i < count; i++) {
+                dataframe.push({
+                    id: i + 1,
+                    name: names[Math.floor(Math.random() * names.length)] + ' ' + (Math.floor(Math.random() * 100)),
+                    age: Math.floor(Math.random() * 40) + 25,
+                    department: departments[Math.floor(Math.random() * departments.length)],
+                    salary: Math.floor(Math.random() * 100000) + 30000,
+                    performance: (Math.random() * 5).toFixed(1)
+                });
+            }
+
+            renderTable();
+            updateStatistics();
+            renderChart();
+            addLog(`✅ ${count} linhas geradas com sucesso`, 'success');
+        }
+
+        function loadCSV() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.csv';
+            input.onchange = e => {
+                const file = e.target.files[0];
+                const reader = new FileReader();
+                reader.onload = event => {
+                    parseCSV(event.target.result);
+                };
+                reader.readAsText(file);
+            };
+            input.click();
+        }
+
+        function parseCSV(csv) {
+            const lines = csv.split('\n');
+            const headers = lines[0].split(',');
+            dataframe = [];
+
+            for(let i = 1; i < lines.length; i++) {
+                if(lines[i].trim()) {
+                    const values = lines[i].split(',');
+                    const row = {};
+                    headers.forEach((header, index) => {
+                        row[header.trim()] = values[index]?.trim();
+                    });
+                    dataframe.push(row);
+                }
+            }
+
+            renderTable();
+            updateStatistics();
+            addLog(`✅ CSV carregado: ${dataframe.length} linhas`, 'success');
+        }
+
+        function filterData() {
+            const column = document.getElementById('filterColumn').value;
+            const filterValue = document.getElementById('filterValue').value;
+
+            if(!filterValue) {
+                addLog('⚠️ Especifique um valor para filtrar', 'warning');
+                return;
+            }
+
+            const originalLength = dataframe.length;
+
+            if(filterValue.startsWith('>')) {
+                const value = parseFloat(filterValue.substring(1));
+                dataframe = dataframe.filter(row => parseFloat(row[column]) > value);
+            } else if(filterValue.startsWith('<')) {
+                const value = parseFloat(filterValue.substring(1));
+                dataframe = dataframe.filter(row => parseFloat(row[column]) < value);
+            } else {
+                dataframe = dataframe.filter(row => String(row[column]).includes(filterValue));
+            }
+
+            renderTable();
+            updateStatistics();
+            addLog(`🔍 Filtrado: ${originalLength} → ${dataframe.length} linhas`, 'info');
+        }
+
+        function sortData() {
+            const column = document.getElementById('filterColumn').value;
+            dataframe.sort((a, b) => {
+                const valA = isNaN(a[column]) ? a[column] : parseFloat(a[column]);
+                const valB = isNaN(b[column]) ? b[column] : parseFloat(b[column]);
+                return valA > valB ? 1 : -1;
+            });
+            renderTable();
+            addLog(`↕️ Ordenado por ${column}`, 'info');
+        }
+
+        function groupData() {
+            const grouped = {};
+            dataframe.forEach(row => {
+                const dept = row.department;
+                if(!grouped[dept]) grouped[dept] = [];
+                grouped[dept].push(row);
+            });
+
+            addLog(`📦 Agrupado por departamento: ${Object.keys(grouped).length} grupos`, 'info');
+            console.log('Grouped data:', grouped);
+        }
+
+        function aggregateData() {
+            const byDept = {};
+            dataframe.forEach(row => {
+                const dept = row.department;
+                if(!byDept[dept]) {
+                    byDept[dept] = { count: 0, totalSalary: 0, totalAge: 0 };
+                }
+                byDept[dept].count++;
+                byDept[dept].totalSalary += parseFloat(row.salary);
+                byDept[dept].totalAge += parseFloat(row.age);
+            });
+
+            Object.keys(byDept).forEach(dept => {
+                const data = byDept[dept];
+                addLog(`${dept}: ${data.count} pessoas, salário médio: $${(data.totalSalary/data.count).toFixed(0)}`, 'info');
+            });
+
+            addLog('✅ Agregação concluída', 'success');
+        }
+
+        function pivotData() {
+            addLog('🔄 Pivot table criada (veja o console)', 'info');
+            const pivot = {};
+            dataframe.forEach(row => {
+                if(!pivot[row.department]) pivot[row.department] = {};
+                const ageGroup = Math.floor(row.age / 10) * 10;
+                if(!pivot[row.department][ageGroup]) pivot[row.department][ageGroup] = 0;
+                pivot[row.department][ageGroup]++;
+            });
+            console.log('Pivot table:', pivot);
+        }
+
+        function mergeData() {
+            const additionalData = dataframe.map(row => ({
+                ...row,
+                bonus: Math.floor(row.salary * 0.1),
+                years: Math.floor(Math.random() * 15) + 1
+            }));
+            dataframe = additionalData;
+            renderTable();
+            updateStatistics();
+            addLog('🔗 Merge realizado: 2 colunas adicionadas', 'success');
+        }
+
+        function exportData() {
+            const csv = [
+                Object.keys(dataframe[0]).join(','),
+                ...dataframe.map(row => Object.values(row).join(','))
+            ].join('\n');
+
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'avila-dataframe-export.csv';
+            link.click();
+            addLog('💾 Dados exportados para CSV', 'success');
+        }
+
+        function clearData() {
+            dataframe = [];
+            renderTable();
+            updateStatistics();
+            addLog('🗑️ Dados limpos', 'info');
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('tableBody');
+
+            if(dataframe.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 3rem; color: #9ca3af;">Nenhum dado disponível</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = dataframe.slice(0, 100).map(row => `
+                <tr>
+                    <td>${row.id}</td>
+                    <td>${row.name}</td>
+                    <td>${row.age}</td>
+                    <td>${row.department}</td>
+                    <td>$${parseInt(row.salary).toLocaleString()}</td>
+                    <td>${row.performance}</td>
+                </tr>
+            `).join('');
+
+            document.getElementById('dataframeInfo').textContent =
+                `Mostrando ${Math.min(100, dataframe.length)} de ${dataframe.length} linhas`;
+        }
+
+        function updateStatistics() {
+            document.getElementById('statRows').textContent = dataframe.length.toLocaleString();
+
+            if(dataframe.length > 0) {
+                const avgSalary = dataframe.reduce((sum, row) => sum + parseFloat(row.salary), 0) / dataframe.length;
+                const avgAge = dataframe.reduce((sum, row) => sum + parseFloat(row.age), 0) / dataframe.length;
+
+                document.getElementById('statAvgSalary').textContent = '$' + Math.floor(avgSalary).toLocaleString();
+                document.getElementById('statAvgAge').textContent = avgAge.toFixed(1);
+            }
+        }
+
+        function renderChart() {
+            const canvas = document.getElementById('chartCanvas');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if(dataframe.length === 0) return;
+
+            // Count by department
+            const deptCounts = {};
+            dataframe.forEach(row => {
+                deptCounts[row.department] = (deptCounts[row.department] || 0) + 1;
+            });
+
+            const depts = Object.keys(deptCounts);
+            const counts = Object.values(deptCounts);
+            const maxCount = Math.max(...counts);
+
+            const barWidth = canvas.width / depts.length - 20;
+            const barSpacing = 10;
+
+            depts.forEach((dept, i) => {
+                const barHeight = (counts[i] / maxCount) * (canvas.height - 40);
+                const x = i * (barWidth + barSpacing) + 10;
+                const y = canvas.height - barHeight - 20;
+
+                // Draw bar
+                const gradient = ctx.createLinearGradient(x, y, x, canvas.height);
+                gradient.addColorStop(0, '#3b82f6');
+                gradient.addColorStop(1, '#8b5cf6');
+                ctx.fillStyle = gradient;
+                ctx.fillRect(x, y, barWidth, barHeight);
+
+                // Draw label
+                ctx.fillStyle = '#9ca3af';
+                ctx.font = '12px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(dept.substring(0, 3), x + barWidth/2, canvas.height - 5);
+                ctx.fillText(counts[i], x + barWidth/2, y - 5);
+            });
+        }
+
+        function addLog(message, type = 'info') {
+            const log = document.getElementById('operationLog');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry log-' + type;
+            entry.textContent = new Date().toLocaleTimeString() + ' - ' + message;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        // Initialize
+        generateRandomData();
+    </script>
+</body>
+</html>

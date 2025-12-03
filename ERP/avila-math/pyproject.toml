@@ -1,0 +1,65 @@
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "avila-math"
+version = "0.1.0"
+description = "Arxis Foundation: Mathematical kernel with quaternions, tensors, 4D geometry, autograd, and adaptive filters"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT OR Apache-2.0" }
+authors = [
+    { name = "Nícolas Ávila", email = "nicolas@avila.inc" },
+]
+keywords = [
+    "quaternions",
+    "tensors",
+    "4d-geometry",
+    "autograd",
+    "kalman-filter",
+    "rust",
+    "scientific-computing",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Rust",
+    "Topic :: Scientific/Engineering :: Mathematics",
+    "Topic :: Scientific/Engineering :: Physics",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+dependencies = [
+    "numpy>=1.20",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "black>=22.0",
+    "mypy>=0.990",
+]
+
+[project.urls]
+Homepage = "https://arxis.avilaops.com"
+Repository = "https://github.com/avilaops/arxis"
+Documentation = "https://docs.rs/avila-math"
+
+[tool.maturin]
+features = ["python"]
+module-name = "avila_math"
+python-source = "python"
+
+[tool.black]
+line-length = 100
+target-version = ['py38', 'py39', 'py310', 'py311']

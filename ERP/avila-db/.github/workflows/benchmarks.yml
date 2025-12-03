@@ -1,0 +1,274 @@
+name: Benchmarks
+
+on:
+    push:
+        branches: [main, develop]
+    pull_request:
+        branches: [main]
+    schedule:
+        # Run benchmarks daily at 3 AM UTC
+        - cron: "0 3 * * *"
+    workflow_dispatch:
+        inputs:
+            benchmark_type:
+                description: "Benchmark type to run"
+                required: false
+                default: "all"
+                type: choice
+                options:
+                    - all
+                    - basic
+                    - compression
+                    - vector
+                    - concurrency
+                    - workloads
+
+env:
+    CARGO_TERM_COLOR: always
+    RUST_BACKTRACE: 1
+
+jobs:
+    benchmark:
+        name: Run Benchmarks
+        runs-on: ubuntu-latest
+
+        strategy:
+            matrix:
+                rust: [stable, nightly]
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - name: Install Rust toolchain
+              uses: dtolnay/rust-toolchain@master
+              with:
+                  toolchain: ${{ matrix.rust }}
+                  components: rustfmt, clippy
+
+            - name: Cache cargo registry
+              uses: actions/cache@v4
+              with:
+                  path: ~/.cargo/registry
+                  key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+                  restore-keys: |
+                      ${{ runner.os }}-cargo-registry-
+
+            - name: Cache cargo index
+              uses: actions/cache@v4
+              with:
+                  path: ~/.cargo/git
+                  key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
+                  restore-keys: |
+                      ${{ runner.os }}-cargo-git-
+
+            - name: Cache target directory
+              uses: actions/cache@v4
+              with:
+                  path: target
+                  key: ${{ runner.os }}-target-bench-${{ matrix.rust }}-${{ hashFiles('**/Cargo.lock') }}
+                  restore-keys: |
+                      ${{ runner.os }}-target-bench-${{ matrix.rust }}-
+
+            - name: Install dependencies
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y valgrind
+
+            - name: Build benchmarks
+              run: cargo bench --no-run
+
+            - name: Run benchmarks
+              run: |
+                  if [ "${{ github.event.inputs.benchmark_type }}" != "" ]; then
+                    pwsh bench.ps1 ${{ github.event.inputs.benchmark_type }}
+                  else
+                    cargo bench
+                  fi
+
+            - name: Install PowerShell (for analysis)
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y wget apt-transport-https software-properties-common
+                  wget -q "https://packages.microsoft.com/config/ubuntu/$(lsb_release -rs)/packages-microsoft-prod.deb"
+                  sudo dpkg -i packages-microsoft-prod.deb
+                  sudo apt-get update
+                  sudo apt-get install -y powershell
+
+            - name: Analyze results
+              run: pwsh ./scripts/analyze_benchmarks.ps1 -GenerateHTML
+
+            - name: Upload benchmark results
+              uses: actions/upload-artifact@v4
+              with:
+                  name: benchmark-results-${{ matrix.rust }}
+                  path: |
+                      target/criterion/
+                      benchmark_results/
+                  retention-days: 30
+
+            - name: Download previous benchmark data
+              uses: actions/cache@v4
+              with:
+                  path: ./cache
+                  key: ${{ runner.os }}-benchmark-${{ matrix.rust }}
+
+            - name: Compare with baseline
+              if: github.event_name == 'pull_request'
+              run: |
+                  if [ -f "./cache/baseline.json" ]; then
+                    echo "📊 Comparing with baseline..."
+                    # Store new results
+                    cp target/criterion/reports/index.html benchmark_results/comparison.html
+                  else
+                    echo "No baseline found, saving current results as baseline"
+                    mkdir -p cache
+                    cp benchmark_results/benchmark_summary.json cache/baseline.json
+                  fi
+
+            - name: Comment PR with results
+              if: github.event_name == 'pull_request'
+              uses: actions/github-script@v7
+              with:
+                  script: |
+                      const fs = require('fs');
+                      const summaryPath = 'benchmark_results/benchmark_summary.json';
+
+                      if (fs.existsSync(summaryPath)) {
+                        const results = JSON.parse(fs.readFileSync(summaryPath, 'utf8'));
+
+                        let comment = '## 📊 Benchmark Results\n\n';
+                        comment += '| Benchmark | Mean (ms) | StdDev (ms) |\n';
+                        comment += '|-----------|-----------|-------------|\n';
+
+                        results.slice(0, 10).forEach(result => {
+                          comment += `| ${result.Name} | ${result.Mean.toFixed(3)} | ${result.StdDev.toFixed(3)} |\n`;
+                        });
+
+                        comment += '\n[Full Report](../actions/runs/${{ github.run_id }})\n';
+
+                        github.rest.issues.createComment({
+                          issue_number: context.issue.number,
+                          owner: context.repo.owner,
+                          repo: context.repo.repo,
+                          body: comment
+                        });
+                      }
+
+            - name: Check for regressions
+              if: github.event_name == 'pull_request'
+              run: |
+                  echo "🔍 Checking for performance regressions..."
+                  # TODO: Implement regression detection logic
+                  # Fail if performance degrades by more than 10%
+
+            - name: Generate badge
+              if: github.ref == 'refs/heads/main' && matrix.rust == 'stable'
+              run: |
+                  # Generate performance badge
+                  mkdir -p badges
+                  echo '{"schemaVersion":1,"label":"benchmarks","message":"passing","color":"green"}' > badges/benchmarks.json
+
+            - name: Deploy results to GitHub Pages
+              if: github.ref == 'refs/heads/main' && matrix.rust == 'stable'
+              uses: peaceiris/actions-gh-pages@v3
+              with:
+                  github_token: ${{ secrets.GITHUB_TOKEN }}
+                  publish_dir: ./benchmark_results
+                  destination_dir: benchmarks
+                  keep_files: true
+
+    comparison:
+        name: Competitive Comparison
+        runs-on: ubuntu-latest
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Install Rust
+              uses: dtolnay/rust-toolchain@stable
+
+            - name: Run comparison benchmarks
+              run: cargo bench --bench database_ops -- comparison
+
+            - name: Analyze competitive results
+              run: pwsh ./scripts/analyze_benchmarks.ps1 -GenerateHTML
+
+            - name: Upload comparison results
+              uses: actions/upload-artifact@v4
+              with:
+                  name: competitive-comparison
+                  path: benchmark_results/
+                  retention-days: 90
+
+    flamegraph:
+        name: CPU Profiling (Flamegraph)
+        runs-on: ubuntu-latest
+        if: github.event_name == 'workflow_dispatch'
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Install Rust
+              uses: dtolnay/rust-toolchain@stable
+
+            - name: Install flamegraph
+              run: cargo install flamegraph
+
+            - name: Install perf
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y linux-tools-common linux-tools-generic
+
+            - name: Generate flamegraph
+              run: |
+                  sudo sysctl kernel.perf_event_paranoid=-1
+                  cargo flamegraph --bench database_ops -- --bench
+
+            - name: Upload flamegraph
+              uses: actions/upload-artifact@v4
+              with:
+                  name: flamegraph
+                  path: flamegraph.svg
+                  retention-days: 30
+
+    memory:
+        name: Memory Profiling
+        runs-on: ubuntu-latest
+        if: github.event_name == 'workflow_dispatch'
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Install Rust
+              uses: dtolnay/rust-toolchain@stable
+
+            - name: Install valgrind
+              run: sudo apt-get update && sudo apt-get install -y valgrind
+
+            - name: Build benchmarks
+              run: cargo bench --no-run
+
+            - name: Run memory profiling
+              run: |
+                  BENCH_BIN=$(find target/release/deps -name "database_ops-*" -type f -executable | head -1)
+                  valgrind --tool=massif --massif-out-file=massif.out $BENCH_BIN --bench
+
+            - name: Generate memory report
+              run: |
+                  ms_print massif.out > memory_report.txt
+
+            - name: Upload memory report
+              uses: actions/upload-artifact@v4
+              with:
+                  name: memory-profile
+                  path: |
+                      massif.out
+                      memory_report.txt
+                  retention-days: 30

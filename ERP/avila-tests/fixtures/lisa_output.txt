@@ -1,0 +1,291 @@
+warning: unused import: `std::f64::consts::PI`
+ --> src\geometry\geometry4d.rs:5:5
+  |
+5 | use std::f64::consts::PI;
+  |     ^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `Vector`
+  --> src\physics\einstein.rs:12:37
+   |
+12 | use crate::tensor::tensor::{Matrix, Vector};
+   |                                     ^^^^^^
+
+warning: unused import: `GravitationalWave`
+  --> src\physics\lisa.rs:12:37
+   |
+12 | use crate::physics::{CompactBinary, GravitationalWave};
+   |                                     ^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `Add`, `IndexMut`, `Index`, `Mul`, and `Sub`
+ --> src\tensor\tensor.rs:9:16
+  |
+9 | use std::ops::{Add, Index, IndexMut, Mul, Sub};
+  |                ^^^  ^^^^^  ^^^^^^^^  ^^^  ^^^
+
+warning: unused import: `Vector`
+ --> src\tensor\tensor4d.rs:4:37
+  |
+4 | use crate::tensor::{Tensor, Matrix, Vector};
+  |                                     ^^^^^^
+
+warning: variable does not need to be mutable
+   --> src\physics\geodesic.rs:121:13
+    |
+121 |         let mut k1_pos = state.velocity;
+    |             ----^^^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `source_density`
+   --> src\physics\gravitational_lensing.rs:369:9
+    |
+369 |         source_density: f64,
+    |         ^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+help: if this is intentional, prefix it with an underscore
+    |
+369 |         _source_density: f64,
+    |         +
+help: you might have meant to pattern match on the similarly named constant `LISA_F_MAX`
+    |
+369 -         source_density: f64,
+369 +         physics::lisa::LISA_F_MAX: f64,
+    |
+
+warning: field `params` is never read
+   --> src\physics\cosmology.rs:340:5
+    |
+338 | pub struct CosmicStructure {
+    |            --------------- field in this struct
+339 |     /// Par├ómetros cosmol├│gicos
+340 |     params: CosmologicalParameters,
+    |     ^^^^^^
+    |
+    = note: `CosmicStructure` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `arxis_quaternions` (lib) generated 8 warnings (run `cargo fix --lib -p arxis_quaternions` to apply 7 suggestions)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.03s
+     Running `target\debug\examples\lisa_example.exe`
+ÔòöÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòù
+Ôòæ   ARXIS - NASA/ESA LISA Mission Applications              Ôòæ
+Ôòæ   Space-Based Gravitational Wave Observatory              Ôòæ
+ÔòÜÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòØ
+
+ÔòöÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòù
+Ôòæ LISA Mission Parameters                                    Ôòæ
+ÔòÜÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòØ
+
+­ƒôí MISSION CONFIGURATION:
+   ÔÇó Lifetime: 4 years
+   ÔÇó Arm length: 2.5 million km
+   ÔÇó SNR threshold: 7
+   ÔÇó Frequency band: 0.1 mHz - 1 Hz
+
+ÔòöÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòù
+Ôòæ Case 1: Supermassive Black Hole Binary                    Ôòæ
+ÔòÜÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòØ
+
+­ƒîî SCENARIO: SMBH merger similar to OJ 287 system
+   (Real system with 18 billion + 150 million MÔÿë)
+
+LISA Source: SMBH
+Masses: 1.00e6 MÔÿë + 5.00e5 MÔÿë
+Redshift: z = 1.000
+Distance: 4282.7 Mpc
+GW Frequency: 3.4712 mHz
+In LISA band: YES
+Chirp Mass: 6.08e5 MÔÿë
+Characteristic Strain: 6.22e-13
+SNR (LISA): 2414786876912.9
+Time to coalescence: 2.68e-6 years
+Observable cycles: 2.93e-1
+
+Ô£à DETECTION: Source is DETECTABLE by LISA
+   ÔÇó SNR well above threshold (2414786876912.9 > 7)
+   ÔÇó Will observe 2.93e-1 gravitational wave cycles
+
+­ƒôè PARAMETER ESTIMATION:
+   ÔÇó Chirp mass uncertainty: 0.00%
+   ÔÇó Distance uncertainty: 0.00%
+   ÔÇó Sky localization: ~100 deg┬▓ (3 detectors)
+
+
+ÔòöÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòù
+Ôòæ Case 2: Extreme Mass Ratio Inspiral (EMRI)                Ôòæ
+ÔòÜÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòØ
+
+­ƒÄ» SCENARIO: Stellar-mass black hole orbiting SMBH
+   (10 MÔÿë around 1 million MÔÿë supermassive black hole)
+
+LISA Source: EMRI
+Masses: 1.00e6 MÔÿë + 1.00e1 MÔÿë
+Redshift: z = 0.500
+Distance: 2141.4 Mpc
+GW Frequency: 0.4817 mHz
+In LISA band: YES
+Chirp Mass: 1.00e3 MÔÿë
+Characteristic Strain: 7.64e-18
+SNR (LISA): 18967.5
+Time to coalescence: 4.88e1 years
+Observable cycles: 1.52e4
+
+Ô£à DETECTION: EMRI is DETECTABLE by LISA
+   ÔÇó Will map spacetime around SMBH
+   ÔÇó Test general relativity in strong field
+   ÔÇó Measure SMBH spin and mass precisely
+
+­ƒö¼ SCIENCE VALUE:
+   ÔÇó Unique probe of strong-field gravity
+   ÔÇó Map spacetime geometry near SMBH
+   ÔÇó Test general relativity at extreme precision
+   ÔÇó Constrain alternative gravity theories
+
+
+ÔòöÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòù
+Ôòæ Case 3: Galactic Verification Binary                      Ôòæ
+ÔòÜÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòØ
+
+Ô¡É SCENARIO: Ultra-compact white dwarf binary
+   (Similar to ZTFJ1539+5027 - 7 minute orbital period)
+
+LISA Source: GalacticBinary
+Masses: 6.00e-1 MÔÿë + 5.00e-1 MÔÿë
+Redshift: z = 0.000
+Distance: 0.0 Mpc
+GW Frequency: 4.7619 mHz
+In LISA band: YES
+Chirp Mass: 4.76e-1 MÔÿë
+Characteristic Strain: 2.19e-17
+SNR (LISA): 120578915.5
+Time to coalescence: 1.10e5 years
+Observable cycles: 6.01e5
+
+Ô£à DETECTION: Galactic binary DETECTABLE
+   ÔÇó Known source (verification binary)
+   ÔÇó Can be cross-checked with EM observations
+   ÔÇó Helps calibrate LISA sensitivity
+
+­ƒÄ» VERIFICATION:
+   ÔÇó Dozens of known systems like this
+   ÔÇó Guaranteed detections for LISA
+   ÔÇó Cross-check with optical/X-ray data
+   ÔÇó Test data analysis pipelines
+
+
+ÔòöÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòù
+Ôòæ LISA Science: Population Statistics                       Ôòæ
+ÔòÜÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòØ
+
+­ƒôê EXPECTED DETECTIONS (4-year mission):
+
+   ­ƒîî SMBH Mergers:
+      ÔÇó Intrinsic rate: 10 GpcÔü╗┬│ yrÔü╗┬╣
+      ÔÇó Expected detections: 1645230 events
+      ÔÇó Redshift range: 0.1 - 20
+      ÔÇó Mass range: 10ÔüÁ - 10ÔüÀ MÔÿë
+
+   ­ƒÄ» EMRIs:
+      ÔÇó Expected: 10-100 events
+      ÔÇó Observation time: months to year per event
+      ÔÇó Unique GR tests in strong field
+
+   Ô¡É Galactic Binaries:
+      ÔÇó ~10,000 resolvable systems
+      ÔÇó ~Millions in confusion noise
+      ÔÇó Milky Way astrophysics
+
+
+ÔòöÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòù
+Ôòæ Multi-Messenger Astronomy with LISA                       Ôòæ
+ÔòÜÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòØ
+
+­ƒö¡ LISA + ELECTROMAGNETIC TELESCOPES:
+
+   ­ƒôí Pre-merger Alerts:
+      ÔÇó LISA detects weeks/months before merger
+      ÔÇó Alert EM telescopes (HST, JWST, VLT)
+      ÔÇó Search for host galaxy and AGN activity
+      ÔÇó Measure redshift ÔåÆ standard sirens
+
+   ­ƒÆ½ Standard Sirens:
+      ÔÇó GW ÔåÆ luminosity distance
+      ÔÇó EM ÔåÆ redshift
+      ÔÇó Combined ÔåÆ HÔéÇ measurement
+      ÔÇó Independent of distance ladder
+
+   ­ƒÄ» Expected Accuracy:
+      ÔÇó HÔéÇ: ~1-2% with ~20 standard sirens
+      ÔÇó Dark energy equation of state
+      ÔÇó Cosmological parameters
+
+
+ÔòöÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòù
+Ôòæ                LISA Science Impact                         Ôòæ
+ÔòÜÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòØ
+
+­ƒîƒ TRANSFORMATIVE SCIENCE:
+
+   1´©ÅÔâú  BLACK HOLE ASTROPHYSICS:
+      ÔÇó SMBH formation and growth
+      ÔÇó Seed black hole population
+      ÔÇó SMBH spin distribution
+      ÔÇó Galaxy merger history
+
+   2´©ÅÔâú  FUNDAMENTAL PHYSICS:
+      ÔÇó Test general relativity
+      ÔÇó Strong-field regime (EMRIs)
+      ÔÇó Graviton mass limits
+      ÔÇó Alternative gravity theories
+
+   3´©ÅÔâú  COSMOLOGY:
+      ÔÇó Standard sirens ÔåÆ HÔéÇ
+      ÔÇó Dark energy properties
+      ÔÇó Stochastic GW background
+      ÔÇó Early universe physics
+
+   4´©ÅÔâú  ASTROPHYSICS:
+      ÔÇó Milky Way structure
+      ÔÇó White dwarf populations
+      ÔÇó Stellar evolution
+      ÔÇó Compact object physics
+
+
+ÔòöÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòù
+Ôòæ            ARXIS Support for LISA Science                  Ôòæ
+ÔòÜÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòØ
+
+­ƒÆ╗ CURRENT CAPABILITIES:
+
+   Ô£ô SMBH waveform modeling
+   Ô£ô EMRI trajectory calculation
+   Ô£ô SNR estimation for LISA
+   Ô£ô Population statistics
+   Ô£ô Cosmological distances
+   Ô£ô Source characterization
+
+­ƒÜÇ IN DEVELOPMENT:
+
+   ÔÇó Spin-orbit coupling
+   ÔÇó Post-Newtonian waveforms (3.5PN)
+   ÔÇó LISA Data Challenge integration
+   ÔÇó Parameter estimation (MCMC)
+   ÔÇó Multi-source analysis
+   ÔÇó Python bindings (PyO3)
+
+­ƒôÜ APPLICATIONS:
+
+   ÔÇó LISA Preparatory Science
+   ÔÇó Waveform template generation
+   ÔÇó Mission planning studies
+   ÔÇó Educational materials
+   ÔÇó Research publications
+
+ÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉ
+  ARXIS: Ready for LISA Science - Contact: nicolas@avila.inc
+ÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉ

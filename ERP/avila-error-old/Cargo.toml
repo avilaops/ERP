@@ -1,0 +1,39 @@
+[package]
+name = "avila-errors"
+version = "0.1.0"
+edition = "2021"
+authors = [
+    "Nícolas Ávila <nicolas@avila.inc>",
+    "Avila Development Team <dev@avila.inc>",
+]
+license = "MIT"
+description = "Error handling and propagation utilities for AVL Platform with rich context"
+repository = "https://github.com/avilaops/arxis"
+homepage = "https://avila.inc"
+documentation = "https://docs.rs/avila-errors"
+readme = "README.md"
+keywords = ["error", "error-handling", "result", "context", "avila"]
+categories = ["rust-patterns", "development-tools"]
+rust-version = "1.70"
+
+[lib]
+name = "avila_errors"
+path = "src/lib.rs"
+
+[features]
+default = ["derive"]
+derive = ["avila-errors-derive"]
+backtrace = []
+full = ["derive", "backtrace"]
+
+[dependencies]
+avila-errors-derive = { version = "0.1.0", path = "./avila-errors-derive", optional = true }
+
+[dev-dependencies]
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+strip = true
+

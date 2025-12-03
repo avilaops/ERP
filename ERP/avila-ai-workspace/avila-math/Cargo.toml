@@ -1,0 +1,16 @@
+[package]
+name = "avila-math"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lib]
+name = "avila_math"
+path = "src/lib.rs"
+
+[dependencies]
+avila-nucleus = { path = "../avila-nucleus" }
+avila-primitives = { path = "../avila-primitives" }
