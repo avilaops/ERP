@@ -1,7 +1,7 @@
-//! Compression utilities using avila-compress
+//! Compression utilities (placeholder - waiting for avila-compress)
 
 use crate::error::{AvilaError, Result};
-use avila_compress;
+// use avila_compress;  // Coming soon
 
 /// Compression level
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -17,13 +17,13 @@ pub enum CompressionLevel {
 }
 
 impl CompressionLevel {
-    /// Convert to avila-compress Level
-    pub fn to_avila_level(&self) -> avila_compress::Level {
+    /// Convert to avila-compress Level (placeholder)
+    pub fn _to_avila_level(&self) -> u8 {
         match self {
-            CompressionLevel::None => avila_compress::Level::Fast,
-            CompressionLevel::Fast => avila_compress::Level::Fast,
-            CompressionLevel::Balanced => avila_compress::Level::Balanced,
-            CompressionLevel::Best => avila_compress::Level::Best,
+            CompressionLevel::None => 0,
+            CompressionLevel::Fast => 1,
+            CompressionLevel::Balanced => 5,
+            CompressionLevel::Best => 9,
         }
     }
 }
@@ -40,15 +40,14 @@ pub fn compress(data: &[u8], level: CompressionLevel) -> Result<Vec<u8>> {
         return Ok(data.to_vec());
     }
 
-    // Use avila-compress LZ4 for maximum performance
-    avila_compress::compress(data)
-        .map_err(|e| AvilaError::Compression(e.to_string()))
+    // Placeholder: real compression coming soon
+    Ok(data.to_vec())
 }
 
 /// Decompress avila-compress (LZ4) data
 pub fn decompress(data: &[u8]) -> Result<Vec<u8>> {
-    avila_compress::decompress(data)
-        .map_err(|e| AvilaError::Compression(e.to_string()))
+    // Placeholder: real decompression coming soon
+    Ok(data.to_vec())
 }
 
 /// Calculate compression ratio

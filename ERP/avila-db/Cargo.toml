@@ -22,7 +22,17 @@ avila-serde = { version = "0.2.0", path = "../avila-serde" }
 avila-error = { version = "0.2.0", path = "../avila-error" }
 avila-id = { version = "0.1.0", path = "../avila-id" }
 avila-rand = { version = "0.1.0", path = "../avila-rand" }
-avila-crypto = { version = "0.1.0", path = "../avila-crypto" }
+avila-crypto = { version = "0.1.0", path = "../avila-core-workspace/avila-crypto" }
+
+# External dependencies necessárias
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+thiserror = "1"
+reqwest = { version = "0.11", features = ["json"] }
+rand = "0.8"
+tokio = { version = "1", features = ["full"] }
+base64 = "0.21"
 
 # Compression (internal) - Coming soon on crates.io
 # avila-compress = { version = "0.3.0", path = "../avila-compress" }
@@ -30,7 +40,7 @@ avila-crypto = { version = "0.1.0", path = "../avila-crypto" }
 # Networking
 avila-web = { version = "0.1.0", path = "../avila-web" }
 tower-http = { version = "0.6", features = ["cors", "trace"] }
-avila-http = { version = "0.1.0", path = "../avila-http" }
+# avila-http = { version = "0.1.0", path = "../avila-http" }
 brotli = "7.0"
 
 # Storage
@@ -41,7 +51,7 @@ sled = "0.34"  # Pure Rust embedded database
 # Observability
 avila-tracing = { version = "0.1.0", path = "../avila-tracing" }
 tracing-subscriber = "0.3"
-avx-telemetry = { version = "0.1", path = "../avx-telemetry" }
+# avx-telemetry = { version = "0.1", path = "../avx-telemetry" }
 
 # Vector search
 hnsw = { version = "0.11", optional = true }
@@ -72,6 +82,3 @@ full = ["vector-search", "distributed"]
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
-
-
-

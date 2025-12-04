@@ -12,7 +12,8 @@ data_dir = "./aviladb-data"
 
 # Máximo de threads de trabalho
 # Default: número de CPUs disponíveis
-# worker_threads = 8
+# 🚀 YOLO MODE: Maximum threads
+worker_threads = 32
 
 # Modo de operação
 # Valores: "standalone" | "cluster"
@@ -24,19 +25,23 @@ mode = "standalone"
 # Tamanho do cache em memória (MB)
 # Usado para armazenar dados frequentemente acessados
 # Default: 256
-cache_size_mb = 256
+# 🚀 YOLO MODE: Maximum cache!
+cache_size_mb = 8192
 
 # Intervalo para checkpoint/flush em disco (segundos)
 # Default: 60
-checkpoint_interval_sec = 60
+# 🚀 YOLO MODE: Less frequent checkpoints
+checkpoint_interval_sec = 300
 
 # Número de threads para compactação de LSM Tree
 # Default: 2
-compaction_threads = 2
+# 🚀 YOLO MODE: More threads!
+compaction_threads = 8
 
 # Tamanho do MemTable antes de flush (MB)
 # Default: 64
-memtable_size_mb = 64
+# 🚀 YOLO MODE: Bigger MemTable!
+memtable_size_mb = 256
 
 # Número máximo de níveis no LSM Tree
 # Default: 7
@@ -81,11 +86,13 @@ idle_timeout_sec = 30
 # Tamanho máximo de payload UDP (bytes)
 # QUIC usa UDP, então deve ser <= MTU da rede
 # Default: 1200 (seguro para maioria das redes)
-max_udp_payload = 1200
+# 🚀 YOLO MODE: Maximum UDP!
+max_udp_payload = 1500
 
 # Número de streams QUIC concorrentes por conexão
 # Default: 100
-max_concurrent_streams = 100
+# 🚀 YOLO MODE: 5x more streams!
+max_concurrent_streams = 500
 
 # Tamanho inicial da janela de congestionamento (bytes)
 # Default: 14720 (10 * max_udp_payload)
@@ -137,12 +144,14 @@ compression = "none"
 # true = durabilidade máxima mas mais lento
 # false = mais rápido mas risco de perda em crash
 # Default: true
-fsync_on_write = true
+# 🚀 YOLO MODE: ⚠️ DANGEROUS! No fsync = risk of data loss!
+fsync_on_write = false
 
 # Usa direct I/O (bypass page cache do SO)
 # Reduz latência mas requer hardware adequado
 # Default: false
-use_direct_io = false
+# 🚀 YOLO MODE: Direct I/O activated!
+use_direct_io = true
 
 
 [logging]
@@ -217,11 +226,13 @@ use_threshold_signatures = false
 
 # Usa AVX-512 se disponível
 # Default: true
+# 🚀 YOLO MODE: All CPU optimizations!
 use_avx512 = true
 
 # Usa huge pages (requer configuração do SO)
 # Default: false
-use_huge_pages = false
+# 🚀 YOLO MODE: Huge pages for memory!
+use_huge_pages = true
 
 
 # ========================================

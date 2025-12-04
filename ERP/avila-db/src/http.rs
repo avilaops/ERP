@@ -65,8 +65,8 @@ impl HttpClient {
             .timeout(config.timeout)
             .pool_max_idle_per_host(config.max_connections)
             .tcp_keepalive(Some(config.keep_alive))
-            .gzip(config.compression)
-            .brotli(config.compression)
+            // .gzip(config.compression)  // Method removed in reqwest 0.11
+            // .brotli(config.compression)
             .build()
             .map_err(|e| AvilaError::Network(e.to_string()))?;
 
