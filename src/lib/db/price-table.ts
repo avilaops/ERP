@@ -23,6 +23,12 @@ export type PriceTableItem = {
 /** For the directors only: the parameters and the costs of a version. */
 export type PublishedSnapshot = PriceTableVersion & { params: PricingParams; items: PriceTableItem[] };
 
+/** What the team sees of one product. No cost, credit nor packaging. */
+export type PublishedPrice = { productId: number; code: string | null; name: string; table: number; tableWithIpi: number };
+
+/** What the team sees of a version. Of the parameters, only the seller's free discount. */
+export type PublishedTable = { version: number; publishedAt: Date; freeDiscount: number; items: PublishedPrice[] };
+
 /** A refusal the user can act on. The message goes to the screen as it is. */
 export class PriceTableError extends Error {}
 
@@ -161,4 +167,43 @@ export async function publishPriceTable(
     if (pgErrorCode(error) === FOREIGN_KEY_VIOLATION) throw new PriceTableError(PRODUCT_GONE);
     throw error;
   }
+}
+
+/**
+ * The version as the team may see it. The cost never leaves the database here:
+ * the statements name only the columns of the published price, so there is
+ * nothing to leak to a seller's browser.
+ */
+export async function loadPublishedTable(version: number, conn: Queryable = db()): Promise<PublishedTable | null> {
+  if (!Number.isSafeInteger(version) || version <= 0) return null;
+  const { rows } = await conn.query(
+    "SELECT version, published_at, free_discount FROM price_table_versions WHERE version = $1",
+    [version],
+  );
+  if (!rows[0]) return null;
+
+  const items = await conn.query(
+    "SELECT product_id, code, name, table_price, table_price_with_ipi FROM price_table_items WHERE version = $1 ORDER BY product_id",
+    [version],
+  );
+  return {
+    version: Number(rows[0].version),
+    publishedAt: rows[0].published_at as Date,
+    freeDiscount: Number(rows[0].free_discount),
+    items: items.rows.map((row) => ({
+      productId: Number(row.product_id),
+      code: row.code === null ? null : String(row.code),
+      name: String(row.name),
+      table: Number(row.table_price),
+      tableWithIpi: Number(row.table_price_with_ipi),
+    })),
+  };
+}
+
+/** Every publication, from the newest to the oldest. */
+export async function listVersions(conn: Queryable = db()): Promise<PriceTableVersion[]> {
+  const { rows } = await conn.query(
+    "SELECT version, published_at, published_by FROM price_table_versions ORDER BY version DESC",
+  );
+  return rows.map(toVersion);
 }

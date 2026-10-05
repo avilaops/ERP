@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { loadParams, saveParams } from "@/lib/db/params";
-import { latestVersion, loadPublishedSnapshot, publishPriceTable } from "@/lib/db/price-table";
+import {
+  latestVersion,
+  listVersions,
+  loadPublishedSnapshot,
+  loadPublishedTable,
+  publishPriceTable,
+} from "@/lib/db/price-table";
 import { createProduct, deleteProduct, listProducts, updateProduct } from "@/lib/db/products";
 import { draftPriceTable } from "@/lib/price-table";
 import type { PriceTableDraft } from "@/lib/price-table";
@@ -183,4 +189,37 @@ test("excluir depois de publicar: quem já saiu numa versão só pode ser desati
 
   await deleteProduct(neverPublished.id, db.pool);
   assert.ok((await listProducts({}, db.pool)).every((product) => product.id !== neverPublished.id));
+});
+
+test("a equipe não recebe custo do banco: a leitura dela só tem nome, código e preço", { skip }, async () => {
+  const table = await loadPublishedTable(1, db.pool);
+  assert.ok(table);
+  assert.deepEqual(Object.keys(table), ["version", "publishedAt", "freeDiscount", "items"]);
+  for (const item of table.items) {
+    assert.deepEqual(Object.keys(item), ["productId", "code", "name", "table", "tableWithIpi"]);
+  }
+  assert.equal(table.version, 1);
+  assert.equal(table.freeDiscount, 0.2);
+  assert.deepEqual(
+    table.items.map(({ code, table: price, tableWithIpi }) => [code, price, tableWithIpi]),
+    PRINT.map(({ code, table: price, tableWithIpi }) => [code, price, tableWithIpi]),
+  );
+
+  // O mesmo retrato que a diretoria lê, sem as colunas de custo.
+  const snapshot = await loadPublishedSnapshot(1, db.pool);
+  assert.equal(table.publishedAt.getTime(), snapshot?.publishedAt.getTime());
+  assert.deepEqual(table.items.map((item) => item.productId), snapshot?.items.map((item) => item.productId));
+  // A v2 saiu com outro desconto livre: cada versão mostra o seu.
+  assert.equal((await loadPublishedTable(2, db.pool))?.freeDiscount, 0.1);
+
+  for (const version of [99, 0, -1, 1.5, Number.NaN]) {
+    assert.equal(await loadPublishedTable(version, db.pool), null, String(version));
+  }
+});
+
+test("versões: da mais nova para a mais antiga", { skip }, async () => {
+  const versions = await listVersions(db.pool);
+  assert.deepEqual(versions.map((item) => item.version), [3, 2, 1]);
+  assert.deepEqual(versions[0], await latestVersion(db.pool));
+  assert.equal(versions[2].publishedBy, WHO);
 });

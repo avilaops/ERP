@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { canAccess, MENU_ITEMS, menuFor } from "@/lib/auth/permissions";
+import { canAccess, MENU_ITEMS, menuFor, seesCosts } from "@/lib/auth/permissions";
 import type { MenuItemKey } from "@/lib/auth/permissions";
 import { ROLE_LABELS, ROLES } from "@/lib/auth/roles";
 import type { Role } from "@/lib/auth/roles";
@@ -83,4 +83,16 @@ test("menuFor devolve só os itens do perfil, na ordem do manual", () => {
     "/tabela-precos",
     "/simulador",
   ]);
+});
+
+test("custo, desconto máximo e lucro: só a Diretoria vê", () => {
+  assert.deepEqual(
+    COLUMNS.map((role) => [role, seesCosts(role)]),
+    [
+      ["DIRETORIA", true],
+      ["GERENTE_COMERCIAL", false],
+      ["VENDEDOR", false],
+      ["FINANCEIRO", false],
+    ],
+  );
 });

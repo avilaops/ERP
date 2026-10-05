@@ -53,3 +53,11 @@ export function canAccess(role: Role, key: MenuItemKey): boolean {
 export function menuFor(role: Role): MenuItem[] {
   return MENU_ITEMS.filter((item) => item.roles.includes(role));
 }
+
+/**
+ * Who sees cost, real cost, largest discounts and profit. The single source for
+ * "só o diretor vê": pages ask this, never compare the profile themselves.
+ */
+export function seesCosts(role: Role): boolean {
+  return role === "DIRETORIA";
+}

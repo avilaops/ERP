@@ -28,7 +28,7 @@ test("toda rota da matriz tem page.tsx que chama requirePermission com o própri
 });
 
 /** Pages already ported from the prototype. The others still say "Em construção". */
-const PORTED = ["parametros", "produtos"];
+const PORTED = ["parametros", "produtos", "tabela-precos"];
 
 test("páginas portadas não são mais marcador; as outras continuam Em construção", () => {
   for (const item of MENU_ITEMS) {
@@ -39,7 +39,7 @@ test("páginas portadas não são mais marcador; as outras continuam Em constru�
       assert.ok(code.includes("PlaceholderPage"), `${item.href} deveria estar Em construção`);
     }
   }
-  assert.equal(MENU_ITEMS.filter((item) => !PORTED.includes(item.key)).length, 12);
+  assert.equal(MENU_ITEMS.filter((item) => !PORTED.includes(item.key)).length, 11);
 });
 
 /** Every source file under the protected group, relative to it. */
@@ -65,6 +65,7 @@ test("a página lê o banco só depois de conferir a permissão", () => {
   const reads: [string, string, string[]][] = [
     ["/parametros", "parametros", ["loadParams(", "listProductCosts("]],
     ["/produtos", "produtos", ["loadParams(", "listProducts(", "latestVersion(", "loadPublishedSnapshot("]],
+    ["/tabela-precos", "tabela-precos", ["latestVersion(", "loadPublishedTable(", "loadPublishedSnapshot("]],
   ];
   for (const [route, key, calls] of reads) {
     const code = source(route);
@@ -75,6 +76,30 @@ test("a página lê o banco só depois de conferir a permissão", () => {
       assert.ok(code.indexOf(read) > permission, `${route}: ${read} antes do requirePermission`);
     }
   }
+});
+
+test("Tabela de preços: custo só é lido para quem pode ver, e nada da pasta vai para o navegador como código", () => {
+  const files = appFiles().filter((file) => file.startsWith("tabela-precos/"));
+  assert.ok(files.includes("tabela-precos/page.tsx"));
+  for (const file of files) {
+    // Sem componente de navegador nem ação: não existe prop para levar dado no payload.
+    assert.doesNotMatch(readFileSync(APP_DIR + file, "utf8"), /["']use (client|server)["']/, file);
+  }
+
+  const code = source("/tabela-precos");
+  // A página não lê o rascunho, não guarda resposta e não compara o perfil por conta própria.
+  for (const forbidden of ["@/lib/db/products", "@/lib/db/params", "use cache", "unstable_cache", '"DIRETORIA"']) {
+    assert.ok(!code.includes(forbidden), `tabela-precos/page.tsx contém ${forbidden}`);
+  }
+  assert.ok(code.includes('export const dynamic = "force-dynamic"'));
+  assert.ok(code.includes('const session = await requirePermission("tabela-precos")'));
+
+  const decides = code.indexOf("seesCosts(session.role)");
+  assert.ok(decides > 0, "quem vê custo tem de sair de seesCosts(session.role)");
+  assert.equal(code.split("loadPublishedSnapshot(").length - 1, 1, "loadPublishedSnapshot( tem de aparecer uma vez só");
+  assert.ok(code.indexOf("loadPublishedSnapshot(") > decides);
+  // O perfil e "ver custo" nunca vêm do endereço.
+  assert.doesNotMatch(code, /seesCosts\((?!session\.role\))/);
 });
 
 test("/pedidos/novo é protegida pelo item Pedidos", () => {

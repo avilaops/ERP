@@ -37,29 +37,34 @@ export function inTab(product: Product, tab: ProductTab): boolean {
 /** Lower case and without accents: "Extensão" and "extensao" are the same text. */
 const fold = (text: string) => text.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
 
-/** Looks for the text in name, code, supplier and supplier model. Blank text matches everything. */
-export function matchesSearch(product: Product, search: string): boolean {
+/** Whether any of the texts has what is searched for. Blank search matches everything. */
+export function matchesText(texts: (string | null)[], search: string): boolean {
   const wanted = fold(search.trim());
   if (wanted === "") return true;
-  return [product.name, product.code, product.supplierName, product.supplierModel].some(
-    (text) => text !== null && fold(text).includes(wanted),
-  );
+  return texts.some((text) => text !== null && fold(text).includes(wanted));
+}
+
+/** Looks for the text in name, code, supplier and supplier model. */
+export function matchesSearch(product: Product, search: string): boolean {
+  return matchesText([product.name, product.code, product.supplierName, product.supplierModel], search);
 }
 
 const collator = new Intl.Collator("pt-BR", { numeric: true, sensitivity: "base" });
 
-/** By code (LD-B2 before LD-B10); products without code come last, by name. */
-function byCode(a: Product, b: Product): number {
+/** By code (LD-B2 before LD-B10); what has no code comes last, by name. */
+export function compareByCode(a: { code: string | null; name: string }, b: { code: string | null; name: string }): number {
   if (a.code === null || b.code === null) {
     if (a.code !== b.code) return a.code === null ? 1 : -1;
-    return collator.compare(a.name, b.name) || a.id - b.id;
+    return collator.compare(a.name, b.name);
   }
-  return collator.compare(a.code, b.code) || a.id - b.id;
+  return collator.compare(a.code, b.code);
 }
 
 /** What the list shows: the products of the tab that match the search, in the order of the screen. */
 export function viewProducts(products: Product[], { tab, search }: { tab: ProductTab; search: string }): Product[] {
-  return products.filter((product) => inTab(product, tab) && matchesSearch(product, search)).sort(byCode);
+  return products
+    .filter((product) => inTab(product, tab) && matchesSearch(product, search))
+    .sort((a, b) => compareByCode(a, b) || a.id - b.id);
 }
 
 /** The counter in the corner of the list. The margin comes from the parameters, never from the text. */

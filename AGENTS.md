@@ -99,7 +99,9 @@ funções puras, sem banco e sem tela, conferidas com os números dos prints do 
    pedido do Rogério).
 3. **Custo, valor da China e lucro nunca vão para o navegador de quem não é
    Diretoria.** Em `quoteOrder`, tudo de `taxes` para baixo é o quadro "Só o diretor
-   vê": a página monta no servidor só o que o perfil pode ver.
+   vê": a página monta no servidor só o que o perfil pode ver. Quem vê custo é decidido
+   por `seesCosts` (`permissions.ts`); a leitura para a equipe (`loadPublishedTable`)
+   não traz custo do banco.
 4. **A pasta não conhece o resto do sistema.** Sem `next/*`, `react`, `@/lib/auth`,
    `process.env`, relógio ou rede: parâmetros e datas (`AAAA-MM-DD`) entram por
    argumento. `tests/pricing-purity.test.ts` falha se isso mudar.
@@ -122,7 +124,7 @@ funções puras, sem banco e sem tela, conferidas com os números dos prints do 
 2. **Só `src/lib/db/` fala SQL**, com `pg` direto, sem ORM. O resto do código chama as
    funções dela (`loadParams`, `saveParams`, `createProduct`, `listProducts`,
    `updateProduct`, `deleteProduct`, `applyAdvisoryCosts`, `publishPriceTable`,
-   `latestVersion`, `loadPublishedSnapshot`, …).
+   `latestVersion`, `loadPublishedSnapshot`, `loadPublishedTable`, `listVersions`, …).
    Arquivo com `"use client"` nunca importa `@/lib/db`.
 3. **Consulta só com parâmetros (`$1`).** Valor nunca é colado no texto do SQL.
 4. **Mudança de esquema é arquivo novo em `db/migrations/`** (`NNNN_nome.sql`), aplicado
