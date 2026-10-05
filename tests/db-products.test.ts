@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
-import { createProduct, deleteProduct, listProductCosts, listProducts, updateProduct } from "@/lib/db/products";
+import {
+  applyAdvisoryCosts,
+  createProduct,
+  deleteProduct,
+  listProductCosts,
+  listProducts,
+  updateProduct,
+} from "@/lib/db/products";
 import { openTestDb, SKIP_WITHOUT_DB } from "./db-helpers.ts";
 import type { TestDb } from "./db-helpers.ts";
 
@@ -171,4 +178,72 @@ test("excluir: produto que outra tabela referencia é recusado, com a saída de 
 
   await assert.rejects(() => deleteProduct(created.id, db.pool), /já tem histórico e não pode ser excluído\. Desative-o\./);
   assert.ok((await listProducts({}, db.pool)).some((product) => product.id === created.id));
+});
+
+const byCode = async (code: string) => (await listProducts({}, db.pool)).find((product) => product.code === code);
+
+test("colar custos: atualiza vários por código numa chamada; crédito e embalagem ausentes ficam como estavam", { skip }, async () => {
+  const first = await createProduct({ name: "Colagem A", code: "CC-001", advisoryCost: 100, taxCredit: 0.25, packaging: 7 }, WHO, db.pool);
+  const second = await createProduct({ name: "Colagem B", code: "CC-002", active: false }, WHO, db.pool);
+  const untouched = await createProduct({ name: "Colagem C", code: "CC-003", advisoryCost: 55 }, WHO, db.pool);
+
+  const updated = await applyAdvisoryCosts(
+    [
+      { code: "CC-001", advisoryCost: 8146.64 },
+      { code: "CC-002", advisoryCost: 8738.77, taxCredit: 0.2735316, packaging: 12.5 },
+    ],
+    OTHER,
+    db.pool,
+  );
+  assert.deepEqual(
+    [...updated].sort((a, b) => a.id - b.id),
+    [
+      { ...first, advisoryCost: 8146.64 },
+      // Não muda nome, código nem a situação: o inativo continua inativo.
+      { ...second, advisoryCost: 8738.77, taxCredit: 0.2735316, packaging: 12.5 },
+    ],
+  );
+  assert.deepEqual(await byCode("CC-001"), { ...first, advisoryCost: 8146.64 });
+  assert.deepEqual(await byCode("CC-003"), untouched);
+
+  const { rows } = await db.pool.query("SELECT code, updated_by FROM products WHERE code LIKE 'CC-%' ORDER BY code");
+  assert.deepEqual(rows, [
+    { code: "CC-001", updated_by: OTHER },
+    { code: "CC-002", updated_by: OTHER },
+    { code: "CC-003", updated_by: WHO },
+  ]);
+});
+
+test("colar custos: código que não existe não volta no resultado e não cria produto", { skip }, async () => {
+  const before = (await listProducts({}, db.pool)).length;
+  const updated = await applyAdvisoryCosts(
+    [
+      { code: "CC-003", advisoryCost: 60, packaging: 0 },
+      { code: "CC-404", advisoryCost: 10 },
+    ],
+    WHO,
+    db.pool,
+  );
+  assert.deepEqual(updated.map((product) => [product.code, product.advisoryCost]), [["CC-003", 60]]);
+  assert.equal((await listProducts({}, db.pool)).length, before);
+  assert.equal(await byCode("CC-404"), undefined);
+});
+
+test("colar custos: uma linha inválida recusa a lista inteira e nada muda; lista vazia não consulta", { skip }, async () => {
+  const before = await listProducts({}, db.pool);
+  const good = { code: "CC-001", advisoryCost: 1 };
+  const apply = (rows: Parameters<typeof applyAdvisoryCosts>[0], who = WHO) => applyAdvisoryCosts(rows, who, db.pool);
+
+  await assert.rejects(() => apply([good, { code: "CC-001", advisoryCost: 2 }]), /Código repetido na lista de custos: "CC-001"/);
+  await assert.rejects(() => apply([good, { code: "CC-002", advisoryCost: 0 }]), /maior que zero/);
+  await assert.rejects(() => apply([good, { code: "CC-002", advisoryCost: -1 }]), /Custo da assessoria/);
+  await assert.rejects(() => apply([good, { code: "CC-002", advisoryCost: Number.NaN }]), /Custo da assessoria/);
+  await assert.rejects(() => apply([good, { code: "CC-002", advisoryCost: 5, taxCredit: 1 }]), /Crédito de impostos/);
+  await assert.rejects(() => apply([good, { code: "CC-002", advisoryCost: 5, packaging: -1 }]), /Embalagem/);
+  await assert.rejects(() => apply([good, { code: "  ", advisoryCost: 5 }]), /sem código/);
+  await assert.rejects(() => apply([good], " "), /quem está lançando/);
+  assert.deepEqual(await listProducts({}, db.pool), before);
+
+  const noQuery = { query: () => Promise.reject(new Error("não era para consultar")) };
+  assert.deepEqual(await applyAdvisoryCosts([], WHO, noQuery), []);
 });

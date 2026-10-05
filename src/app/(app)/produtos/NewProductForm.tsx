@@ -1,7 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
-import type { ReactNode } from "react";
+import { useActionState } from "react";
 import { EMPTY_NEW_PRODUCT, fieldLabel, IDLE_NEW_PRODUCT, NEW_PRODUCT_FIELDS } from "@/lib/product-form";
 import type { NewProductKey, NewProductState } from "@/lib/product-form";
 
@@ -20,106 +19,87 @@ const HELP: Partial<Record<NewProductKey, string>> = {
 };
 
 /**
- * The page heading with the "+ Equipamento" button, and the form it opens in
- * the page itself. After an error the fields keep what was typed; after a save
- * they come back blank, ready for the next one.
+ * The form "+ Equipamento" opens in the page itself. After an error the fields
+ * keep what was typed; after a save they come back blank, ready for the next one.
  */
-export function NewProductForm({ heading, action }: { heading: ReactNode; action: CreateAction }) {
-  const [open, setOpen] = useState(false);
+export function NewProductForm({ action, onClose }: { action: CreateAction; onClose: () => void }) {
   const [state, formAction, pending] = useActionState(action, IDLE_NEW_PRODUCT);
   const values = state.status === "error" && state.values ? state.values : EMPTY_NEW_PRODUCT;
 
   return (
-    <>
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>{heading}</div>
-        <button
-          type="button"
-          aria-expanded={open}
-          aria-controls="novo-equipamento"
-          onClick={() => setOpen(!open)}
-          className="rounded border border-slate-300 bg-white px-4 py-2 font-medium hover:bg-slate-50"
-        >
-          + Equipamento
-        </button>
-      </div>
-
-      {open && (
-        <form
-          id="novo-equipamento"
-          action={formAction}
-          noValidate
-          className="mt-4 rounded-lg border border-slate-200 bg-white"
-        >
-          <h2 className="border-b border-slate-200 px-5 py-3 text-sm font-semibold uppercase tracking-wide">
-            Novo equipamento
-          </h2>
-          <div className="flex flex-col gap-5 p-5">
-            {state.status === "error" && (
-              <div role="alert" className="rounded border border-red-300 bg-red-50 p-4 text-sm text-red-900">
-                <p className="font-semibold">Nada foi gravado.</p>
-                <ul className="mt-1 list-disc pl-5">
-                  {state.errors.map((error) => (
-                    <li key={error}>{error}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {state.status === "saved" && (
-              <p role="status" className="rounded border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-900">
-                Equipamento cadastrado. Ele já aparece na lista.
-              </p>
-            )}
-
-            <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
-              {NEW_PRODUCT_FIELDS.map((key) => {
-                const invalid = state.invalid.includes(key);
-                const id = `novo-${key}`;
-                const numeric = key in UNIT;
-                return (
-                  <div key={key} className={key === "name" ? "sm:col-span-2" : undefined}>
-                    <label htmlFor={id} className="block text-sm font-medium">
-                      {fieldLabel(key)}
-                    </label>
-                    <input
-                      id={id}
-                      name={key}
-                      type="text"
-                      inputMode={numeric ? "decimal" : undefined}
-                      autoComplete="off"
-                      required={key === "name"}
-                      defaultValue={values[key]}
-                      aria-invalid={invalid || undefined}
-                      aria-describedby={HELP[key] ? `${id}-ajuda` : undefined}
-                      className={`mt-1 w-full min-w-0 rounded border bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-blue-600 ${
-                        numeric ? "text-right" : ""
-                      } ${invalid ? "border-red-500" : "border-slate-300"}`}
-                    />
-                    {HELP[key] && (
-                      <p id={`${id}-ajuda`} className="mt-1 text-xs text-slate-500">
-                        {HELP[key]}
-                      </p>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="flex gap-3">
-              <button
-                type="submit"
-                disabled={pending}
-                className="rounded bg-blue-700 px-4 py-2 font-medium text-white hover:bg-blue-800 disabled:opacity-60"
-              >
-                {pending ? "Gravando…" : "Salvar equipamento"}
-              </button>
-              <button type="button" onClick={() => setOpen(false)} className="rounded px-4 py-2 hover:bg-slate-100">
-                Fechar
-              </button>
-            </div>
+    <form
+      id="novo-equipamento"
+      action={formAction}
+      noValidate
+      className="mt-4 rounded-lg border border-slate-200 bg-white"
+    >
+      <h2 className="border-b border-slate-200 px-5 py-3 text-sm font-semibold uppercase tracking-wide">
+        Novo equipamento
+      </h2>
+      <div className="flex flex-col gap-5 p-5">
+        {state.status === "error" && (
+          <div role="alert" className="rounded border border-red-300 bg-red-50 p-4 text-sm text-red-900">
+            <p className="font-semibold">Nada foi gravado.</p>
+            <ul className="mt-1 list-disc pl-5">
+              {state.errors.map((error) => (
+                <li key={error}>{error}</li>
+              ))}
+            </ul>
           </div>
-        </form>
-      )}
-    </>
+        )}
+        {state.status === "saved" && (
+          <p role="status" className="rounded border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-900">
+            Equipamento cadastrado. Ele já aparece na lista.
+          </p>
+        )}
+
+        <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
+          {NEW_PRODUCT_FIELDS.map((key) => {
+            const invalid = state.invalid.includes(key);
+            const id = `novo-${key}`;
+            const numeric = key in UNIT;
+            return (
+              <div key={key} className={key === "name" ? "sm:col-span-2" : undefined}>
+                <label htmlFor={id} className="block text-sm font-medium">
+                  {fieldLabel(key)}
+                </label>
+                <input
+                  id={id}
+                  name={key}
+                  type="text"
+                  inputMode={numeric ? "decimal" : undefined}
+                  autoComplete="off"
+                  required={key === "name"}
+                  defaultValue={values[key]}
+                  aria-invalid={invalid || undefined}
+                  aria-describedby={HELP[key] ? `${id}-ajuda` : undefined}
+                  className={`mt-1 w-full min-w-0 rounded border bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-blue-600 ${
+                    numeric ? "text-right" : ""
+                  } ${invalid ? "border-red-500" : "border-slate-300"}`}
+                />
+                {HELP[key] && (
+                  <p id={`${id}-ajuda`} className="mt-1 text-xs text-slate-500">
+                    {HELP[key]}
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="flex gap-3">
+          <button
+            type="submit"
+            disabled={pending}
+            className="rounded bg-blue-700 px-4 py-2 font-medium text-white hover:bg-blue-800 disabled:opacity-60"
+          >
+            {pending ? "Gravando…" : "Salvar equipamento"}
+          </button>
+          <button type="button" onClick={onClose} className="rounded px-4 py-2 hover:bg-slate-100">
+            Fechar
+          </button>
+        </div>
+      </div>
+    </form>
   );
 }

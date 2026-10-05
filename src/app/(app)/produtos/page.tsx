@@ -10,10 +10,16 @@ import type { PricingParams } from "@/lib/pricing/params";
 import { productPrices } from "@/lib/pricing/table";
 import { productToRow } from "@/lib/product-form";
 import { counterText, hasCost, listHref, parseTab, PRODUCT_TABS, supplierLine, viewProducts } from "@/lib/products-view";
-import { createProductAction, deleteProductAction, setProductActiveAction, updateProductAction } from "./actions";
-import { NewProductForm } from "./NewProductForm";
+import {
+  createProductAction,
+  deleteProductAction,
+  pasteAdvisoryCostsAction,
+  setProductActiveAction,
+  updateProductAction,
+} from "./actions";
 import { ProductRow } from "./ProductRow";
 import type { ProductRowData } from "./ProductRow";
+import { ProductTools } from "./ProductTools";
 
 const ITEM = menuItem("produtos");
 
@@ -73,8 +79,9 @@ export default async function ProdutosPage({
 
   return (
     <>
-      <NewProductForm
-        action={createProductAction}
+      <ProductTools
+        create={createProductAction}
+        paste={pasteAdvisoryCostsAction}
         heading={
           <>
             <h1 className="text-2xl font-semibold">{ITEM.label}</h1>

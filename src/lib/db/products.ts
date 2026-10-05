@@ -1,5 +1,6 @@
 import { db, pgErrorCode } from "@/lib/db/pool";
 import type { Queryable } from "@/lib/db/pool";
+import type { AdvisoryCostRow } from "@/lib/advisory-paste";
 import { assertAmount, assertRate } from "@/lib/pricing/money";
 import type { ProductCost } from "@/lib/pricing/product";
 
@@ -200,6 +201,50 @@ export async function deleteProduct(id: number, conn: Queryable = db()): Promise
     }
     throw error;
   }
+}
+
+/**
+ * The costs of the advisory's sheet, by code, in a single statement: either every
+ * row is written or none. Does not create a product nor touch name, code or
+ * `active`. A code that no longer exists simply does not come back in the answer.
+ */
+export async function applyAdvisoryCosts(
+  rows: AdvisoryCostRow[],
+  updatedBy: string,
+  conn: Queryable = db(),
+): Promise<Product[]> {
+  if (updatedBy.trim() === "") throw new Error("Falta dizer quem está lançando os custos.");
+  const codes = new Set<string>();
+  for (const { code, advisoryCost, taxCredit, packaging } of rows) {
+    if (code.trim() === "" || code !== code.trim()) throw new Error("Custo da assessoria sem código do produto.");
+    if (codes.has(code)) throw new Error(`Código repetido na lista de custos: "${code}".`);
+    codes.add(code);
+    assertAmount(advisoryCost, "Custo da assessoria");
+    if (advisoryCost === 0) throw new Error("Custo da assessoria precisa ser maior que zero.");
+    if (taxCredit !== undefined) assertRate(taxCredit, "Crédito de impostos");
+    if (packaging !== undefined) assertAmount(packaging, "Embalagem");
+  }
+  if (rows.length === 0) return [];
+
+  const { rows: updated } = await conn.query(
+    `UPDATE products
+        SET advisory_cost = pasted.cost,
+            tax_credit = COALESCE(pasted.credit, tax_credit),
+            packaging = COALESCE(pasted.package, packaging),
+            updated_at = now(),
+            updated_by = $5
+       FROM unnest($1::text[], $2::numeric[], $3::numeric[], $4::numeric[]) AS pasted (pasted_code, cost, credit, package)
+      WHERE code = pasted.pasted_code
+      RETURNING ${COLUMNS}`,
+    [
+      rows.map((row) => row.code),
+      rows.map((row) => row.advisoryCost),
+      rows.map((row) => row.taxCredit ?? null),
+      rows.map((row) => row.packaging ?? null),
+      updatedBy,
+    ],
+  );
+  return updated.map(toProduct);
 }
 
 /** Products by name. `active` filters one side; without it, all of them. */
