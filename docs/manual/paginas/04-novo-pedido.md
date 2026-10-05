@@ -104,11 +104,11 @@ Este quadro aparece apenas para a diretoria. Ele abre a conta do pedido:
 1.  Com os campos obrigatórios preenchidos e dentro da política, feche o pedido. Fora da política, ele vai para **Aprovações**.
 2.  **Copiar proposta** copia o texto do orçamento para enviar ao cliente pelo WhatsApp ou e-mail.
 3.  **Salvar PDF** gera o orçamento em PDF com a marca da Ludus.
-4.  Em um pedido fechado, **Reabrir pedido** volta o pedido para edição e **Excluir** remove o pedido.
+4.  Em um pedido fechado, **Reabrir pedido** volta o pedido para negociação: ele sai das vendas do mês e, ao ser fechado de novo, conta no mês do novo fechamento. Se for preciso devolver dinheiro já recebido, a devolução fica pendente até o financeiro confirmar. **Cancelar** encerra o pedido com um motivo: as parcelas em aberto são canceladas e o histórico de recebimentos e comissões é mantido. **Excluir** só aparece em rascunhos sem nenhum registro financeiro.
 
 > **Atenção**
 >
-> Reabrir um pedido fechado pode alterar recebimentos e comissões já gerados. Confira o financeiro depois de reabrir.
+> Reabrir um pedido fechado recalcula só as parcelas ainda não recebidas. Valores já recebidos e as comissões geradas por eles não mudam; qualquer acerto sobre eles entra como um lançamento de ajuste, com o motivo.
 
 ---
 *Atualizado em 04/10/2026 · Ávila Ops Tecnologia*

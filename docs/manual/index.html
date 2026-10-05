@@ -299,9 +299,9 @@ ${fig("pedido-diretor","Quadro Só o diretor vê em uma venda para o Maranhão, 
 <li>Com os campos obrigatórios preenchidos e dentro da política, feche o pedido. Fora da política, ele vai para ${mp("Aprovações")}.</li>
 <li>${b("Copiar proposta")} copia o texto do orçamento para enviar ao cliente pelo WhatsApp ou e-mail.</li>
 <li>${b("Salvar PDF")} gera o orçamento em PDF com a marca da Ludus.</li>
-<li>Em um pedido fechado, ${b("Reabrir pedido")} volta o pedido para edição e ${b("Excluir")} remove o pedido.</li>
+<li>Em um pedido fechado, ${b("Reabrir pedido")} volta o pedido para negociação: ele sai das vendas do mês e, ao ser fechado de novo, conta no mês do novo fechamento. Se for preciso devolver dinheiro já recebido, a devolução fica pendente até o financeiro confirmar. ${b("Cancelar")} encerra o pedido com um motivo: as parcelas em aberto são canceladas e o histórico de recebimentos e comissões é mantido. ${b("Excluir")} só aparece em rascunhos sem nenhum registro financeiro.</li>
 </ol>
-<div class="note warn"><b>Atenção</b>Reabrir um pedido fechado pode alterar recebimentos e comissões já gerados. Confira o financeiro depois de reabrir.</div>`},
+<div class="note warn"><b>Atenção</b>Reabrir um pedido fechado recalcula só as parcelas ainda não recebidas. Valores já recebidos e as comissões geradas por eles não mudam; qualquer acerto sobre eles entra como um lançamento de ajuste, com o motivo.</div>`},
 
 {id:"pedidos", mod:"Comercial", title:"Lista de pedidos",
 lead:"Como acompanhar todos os pedidos e orçamentos da equipe e encontrar um pedido.",
@@ -598,7 +598,7 @@ body:`${PEND}
 <li>Defina a meta mensal de vendas da equipe e de cada vendedor.</li>
 </ol>
 <h2 id="s2">Acompanhamento</h2>
-<p>O ranking do <a href="#dashboard">Dashboard</a> compara as vendas fechadas de cada vendedor com a meta do mês.</p>`},
+<p>O ranking do <a href="#dashboard">Dashboard</a> compara as vendas fechadas de cada vendedor no período filtrado com a soma das metas mensais desse período (Este mês usa a meta do mês; 3 meses, a soma das 3 metas).</p>`},
 
 {id:"equipe", mod:"Configurações", title:"Equipe e acessos", pend:true,
 lead:"Como cadastrar usuários, definir perfis e desativar acessos.",
@@ -637,8 +637,8 @@ toc:["Fórmula","Exemplo","Onde aparece"],
 body:`
 <h2 id="s1">Fórmula</h2>
 <p>A entrada precisa cobrir o pagamento na China, a comissão do vendedor sobre a própria entrada e o lucro líquido da meta. O lucro é garantido na entrada porque o equipamento leva de 60 a 90 dias para chegar.</p>
-<div class="formula">entrada mínima = (valor da China + lucro líquido da meta) ÷ (1 − comissão)</div>
-<p>A divisão existe porque o vendedor ganha 2% sobre o que o cliente paga (sem IPI), e isso sai da própria entrada.</p>
+<div class="formula">entrada mínima = (valor da China + lucro líquido da meta) ÷ (1 − comissão × fator sem IPI)</div>
+<p>A divisão existe porque o vendedor ganha 2% sobre o que o cliente paga, sem IPI, e isso sai da própria entrada. O fator sem IPI é o total do pedido sem IPI dividido pelo total com IPI, calculado com os itens do pedido, porque cada equipamento pode ter IPI diferente. Com todos os itens a 13%, o fator é 1 ÷ 1,13.</p>
 <h2 id="s2">Exemplo</h2>
 <p>Mesa Flexora com 20% de desconto, venda dentro de SP:</p>
 <div class="table-wrap"><table>

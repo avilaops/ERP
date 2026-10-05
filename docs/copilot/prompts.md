@@ -1,0 +1,235 @@
+# Prompts para o Copilot: ERP Ludus
+
+O contexto permanente está em [`.github/copilot-instructions.md`](../../.github/copilot-instructions.md). O Copilot lê esse arquivo sozinho em toda conversa. Use os prompts abaixo no Copilot Chat em modo Agent, um por vez, na ordem do [roadmap](../roadmap.md).
+
+## 0. Preparar o protótipo (manual, antes do primeiro prompt)
+
+1. Abra o artifact do Rogério no Claude (acesso de editor para nicolas@avilaops.com).
+2. Copie o código completo do artifact para `prototype/app.jsx` (ou o nome original do arquivo).
+3. Se houver dados de exemplo no protótipo (equipamentos, parâmetros), salve também em `prototype/data/`.
+4. Commit: `chore: código do protótipo como referência`.
+
+## Fase 1. Infraestrutura e acessos (05/10 a 09/10)
+
+```text
+Siga .github/copilot-instructions.md.
+
+Leia prototype/ inteiro e faça um inventário em docs/copilot/inventario-prototipo.md:
+telas, componentes, entidades e campos, regras e fórmulas, textos de ajuda. Aponte
+qualquer regra do protótipo que divirja das instruções do projeto.
+Responda em especial como o protótipo calcula o valor a pagar na China (custo,
+margem, embalagem, quantidade) e atualize .github/copilot-instructions.md com a
+resposta antes de escrever código.
+
+Depois crie a base do projeto:
+1. Next.js com TypeScript strict, App Router, Tailwind, ESLint e pnpm.
+2. Prisma com PostgreSQL (DATABASE_URL no .env.example) e docker-compose com
+   postgres:16 para desenvolvimento local.
+3. Schema Prisma completo, com tipos NUMERIC para dinheiro e enums do Postgres:
+   Organization, User (role: DIRETORIA | GERENTE_COMERCIAL | VENDEDOR | FINANCEIRO),
+   AuditLog (JSONB antes/depois), Settings (parâmetros com histórico),
+   StateTaxRate (UF, alíquota interna, FCP, observação),
+   Supplier, Product (código LD-xxx, nome, ref. fornecedor, preço US$, NCM, IPI,
+   custo assessoria, crédito de impostos, embalagem, ativo), PriceTableVersion
+   (número, snapshot JSONB, publicada_em, publicada_por),
+   Customer (PF/PJ, IE, contribuinte, endereço), Order, OrderItem, Approval,
+   LostReason, Receivable (parcela), Receipt (cada recebimento, imutável,
+   ligado à parcela), Payable, Commission (origem em Receipt OU Refund: receipt_id e refund_id
+   opcionais com CHECK exigindo exatamente um; competência DATE do mês da
+   origem), Refund (estorno/devolução, imutável, negativo, estornado_em,
+   pedido por e confirmado por), RefundRequest (devolução pendente),
+   OrderClosing (histórico de fechamentos), SalesGoal, IdempotencyKey. Datas de calendário em DATE e eventos em
+   TIMESTAMPTZ, conforme as instruções.
+4. Migration inicial e seed com os equipamentos, parâmetros e alíquotas por UF
+   do protótipo.
+5. Integração com o Auth central da Ávila Ops isolada em src/lib/auth/
+   (getSession, requirePermission). Para desenvolvimento e testes, um provedor
+   local com um usuário por perfil, habilitado SOMENTE quando NODE_ENV for
+   development ou test. Em produção, credenciais do Auth central ausentes ou
+   inválidas fazem a aplicação falhar na inicialização (falha fechada).
+   Teste automatizado que garante que o provedor local não existe no build de
+   produção.
+6. Layout com a sidebar do protótipo (logo, card "Seu acesso", botão
+   + Novo pedido) mostrando só os itens do perfil.
+7. Ambiente de produção já nesta fase: servidor em nuvem, PostgreSQL de
+   produção (separado do de desenvolvimento), domínio ludusequipamentos.com.br
+   com DNS e TLS, Auth central configurado com as credenciais reais, e um
+   pipeline mínimo no GitHub Actions (lint, typecheck, testes, build e deploy
+   na main). Documente variáveis e passos em docs/operacao.md.
+
+Pronto quando: cada um dos 4 perfis entra pelo endereço de produção e vê só a
+sua parte do sistema.
+Ao final: o que foi criado, como rodar localmente, como fazer deploy e o que
+ficou pendente.
+```
+
+## Fase 2. Porte do protótipo (12/10 a 23/10)
+
+### 2a. Motor de cálculo
+```text
+Siga .github/copilot-instructions.md.
+
+Porte TODAS as fórmulas do protótipo para src/modules/pricing/ como funções puras
+com Prisma.Decimal: custo real, impostos e taxas por UF e contribuinte, DIFAL,
+preço de tabela, preço com IPI, desconto máximo (Máx. SP e Máx. c/IE), faixa do
+desconto (na meta / abaixo / prejuízo), lucro líquido do pedido, entrada mínima,
+parcelas do saldo e comissão.
+
+Escreva testes Vitest que reproduzam os números do protótipo, incluindo:
+- entrada mínima: China 8.553,97 + lucro 2.304,55, comissão 2% = 11.054,17
+- multiplicador de tabela calculado a partir de parâmetros de exemplo do teste
+  (incluindo um encargo extra cadastrado), conferindo a fórmula, não um número fixo
+- venda para outro estado (não contribuinte) com alíquotas de exemplo montadas
+  no teste: DIFAL = interna do destino - 4%. As alíquotas reais por UF entram
+  no seed como configuração provisória, marcada "aguardando contador" em
+  Parâmetros, editável pela diretoria; a validação com o contador é a fase 4
+- parcelas que somam exatamente o saldo
+Compare cada resultado com o protótipo e liste divergências antes de seguir.
+```
+
+### 2b. Produtos e custos, Parâmetros e Tabela de preços
+```text
+Siga .github/copilot-instructions.md e reproduza as telas do protótipo:
+- Produtos e custos: abas Ativos / Sem custo / Sem código / Inativos, busca,
+  edição inline dos custos, "Colar custos da assessoria" (colar planilha),
+  "+ Equipamento", Desativar/Excluir, aviso "A equipe ainda vê a tabela vN"
+  e botão "Publicar vN+1" que grava o snapshot em PriceTableVersion.
+- Parâmetros: política comercial, impostos da venda, canal, lista de encargos
+  extras editável (nome, %, base, ativo) e o quadro Resultado
+  com a fórmula explicada e o botão "usar" na entrada mínima sugerida.
+- Tabela de preços: a versão publicada, sem custo nem margem para quem não é
+  diretoria.
+Só a DIRETORIA acessa Produtos e custos e Parâmetros. Registrar tudo no audit_log.
+```
+
+### 2c. Pedidos, aprovações e simulador
+```text
+Siga .github/copilot-instructions.md e reproduza o fluxo de pedido do protótipo:
+- Lista de pedidos com os cards (Em negociação, Fechado no mês, Taxa de
+  fechamento, Desconto médio fechado), abas por situação e busca.
+- Pedido: equipamentos, cliente PF/PJ com CEP, entrega e condições, desconto com
+  barra e faixa colorida, resumo, forma de pagamento com parcelas e o bloco de
+  recebimentos com comissão por parcela.
+- Quadro "Só o diretor vê" calculado no servidor e enviado só para a DIRETORIA.
+- Envio automático para aprovação pelas regras do projeto; tela Aprovações para
+  GERENTE_COMERCIAL e DIRETORIA, com aprovar/reprovar e comentário.
+  Pedido com lucro negativo só é aprovado pela DIRETORIA (checagem no servidor);
+  para o gerente ele aparece como "requer aprovação da diretoria", sem valores.
+  Reprovar leva o pedido para REPROVADO, editável pelo vendedor com o
+  comentário; reenviar cria novo Approval e volta para AGUARDANDO_APROVACAO,
+  mantendo as decisões anteriores. Mínimo de entrada exigido = maior entre o
+  percentual configurado e a fórmula; teste com entrada entre 64% e 65%.
+  A aprovação guarda o hash da revisão aprovada; mudar itens, quantidades,
+  desconto, UF, contribuinte, frete, entrada ou parcelas invalida a aprovação.
+  Teste: alterar o desconto de um pedido aprovado e tentar fechar deve voltar
+  para aprovação.
+- Clientes: lista com busca por nome, CNPJ/CPF e cidade, cadastro e edição
+  PF/PJ fora do pedido (CEP preenche o endereço; IE define contribuinte),
+  histórico de pedidos do cliente. Vendedor vê só os próprios clientes.
+- Copiar proposta (texto) e Salvar PDF com a marca da Ludus.
+- O pedido grava um snapshot imutável do cliente e da entrega (dados, IE,
+  contribuinte, endereço, UF); pedido, PDF e impostos sempre leem o snapshot.
+- Fechar pedido, baixar recebimento, reabrir e pagar comissão em transação
+  única e idempotente (teste: enviar o fechamento duas vezes não duplica
+  parcelas).
+- Fechar pedido gera os Receivable e um OrderClosing. Reabrir (só FECHADO)
+  exige confirmação, volta para ENVIADO, limpa fechado_em e recalcula o saldo
+  em aberto de cada parcela, inclusive a parte não recebida de parcela
+  parcial (teste: R$ 10.000 com R$ 4.000 recebidos, pedido reduzido em
+  R$ 3.000, saldo vai de R$ 6.000 para R$ 3.000), e a comissão futura.
+  Se for preciso devolver dinheiro, cria RefundRequest; o Refund só nasce
+  quando FINANCEIRO ou DIRETORIA confirma.
+- Cancelar: parcelas em aberto viram CANCELADA na mesma transação,
+  histórico financeiro preservado, pedido cancelado não reabre. Comissão de
+  recebimento já baixado nunca muda; acertos viram lançamento novo de ajuste,
+  com motivo, no audit_log. Teste: reabrir pedido com entrada já recebida não
+  altera a comissão dessa entrada.
+- Simulador: mesma conta do pedido sem gravar nada.
+Testes Playwright: (1) vendedor cria pedido com 25% de desconto, pedido vai
+para aprovação, gerente aprova, vendedor fecha; (2) pedido com prejuízo não
+pode ser aprovado pelo gerente, só pela diretoria.
+```
+
+### 2d. Financeiro, comissões e dashboard
+```text
+Siga .github/copilot-instructions.md e reproduza:
+- Recebimentos: lista por vencimento e situação, baixa total ou parcial com a
+  parcela travada (SELECT ... FOR UPDATE): soma das baixas nunca passa do
+  valor da parcela e soma dos estornos nunca passa do recebido. Teste com
+  duas baixas concorrentes. Fila de devoluções pendentes para confirmar.
+- Contas a pagar: lançamento, vencimento, baixa, vínculo opcional com pedido
+  (pagamento da China) e fornecedor.
+- Fornecedores: CNPJ, CPF ou exterior.
+- Comissões: seletor "Recebido em mês/ano -> pago 05/mês seguinte", cards,
+  tabela por vendedor, "Marcar como paga", lançamentos e "Baixar relatório" (CSV).
+- Preços e metas: meta mensal da equipe e de cada vendedor (SalesGoal), com
+  edição pela DIRETORIA e GERENTE_COMERCIAL e histórico por mês.
+- Dashboard: filtros de período e equipe, cards, vendas por mês (12 meses, com
+  IPI), funil, ranking de vendedores com % da meta e top 8 equipamentos
+  (sem IPI). O % da meta compara as vendas do período filtrado com a soma das
+  metas mensais do mesmo período (Este mês = meta do mês; 3 meses = soma das
+  3 metas; e assim por diante). Todas as
+  agregações em SQL no Postgres.
+Teste Playwright: dar baixa em uma parcela e conferir a comissão do mês.
+```
+
+## Fase 3. Carga e treinamento (26/10 a 30/10)
+
+```text
+Siga .github/copilot-instructions.md.
+1. Script de importação (CSV/planilha) de equipamentos com fotos, códigos e
+   descrições, com validação e relatório de erros. Fotos em storage de objetos
+   com chave `org/<organization_id>/produtos/<codigo>/<arquivo>`, sempre com o
+   organization_id da sessão na leitura, gravação e exclusão; o nome do
+   arquivo enviado pela Ludus continua sendo o código do produto.
+2. Tela Equipe e acessos: convidar usuário por e-mail, definir perfil, desativar.
+3. Revisão de segurança: permissão em toda action e query, nenhum campo sensível
+   (custo, valor China, lucro, margem) no payload de VENDEDOR, GERENTE_COMERCIAL
+   ou FINANCEIRO, com teste automatizado por perfil que chama as queries e
+   actions de pedido, produto e dashboard e verifica redação ou acesso negado;
+   testes de isolamento entre duas organizações (um usuário da organização A
+   não lê nem altera nada da B, mesmo forjando IDs); rate limit; headers de
+   segurança.
+4. Backup diário do Postgres (pg_dump) com retenção de 30 dias e procedimento de
+   restauração documentado em docs/operacao.md.
+5. Pipeline GitHub Actions criado na fase 1: incluir os testes Playwright e a
+   checagem de campos sensíveis como etapas obrigatórias antes do deploy.
+6. Validação com dados reais em produção: conferir a carga de equipamentos e
+   usuários, montar com o Rogério um pedido real de ponta a ponta (orçamento,
+   aprovação, fechamento, recebimento e comissão) e comparar os números com o
+   protótipo. Registrar o aceite em docs/aceite-fase3.md.
+7. Treinamento e entrada em operação: roteiro de treinamento por perfil
+   baseado no manual (docs/manual), sessão com a equipe, checklist de go-live
+   (domínio, login dos quatro perfis, backup rodando, tabela publicada,
+   usuários ativos) e plano de volta caso algo falhe no dia 30/10. A fase só
+   termina com a equipe vendendo pelo sistema.
+```
+
+## Fase 4. Fiscal no cálculo (03/11 a 13/11)
+
+```text
+Siga .github/copilot-instructions.md.
+1. Cadastro fiscal do produto: NCM, CEST, origem (1 = importação direta), IPI.
+2. Tabela StateTaxRate validada pelo contador (alíquota interna e FCP por UF);
+   tela de manutenção só para DIRETORIA.
+3. ICMS, DIFAL e FCP/FECP separados no custo, no pedido e na tabela de preços, com base de cálculo conforme o
+   contador definir (simples ou "por dentro"), configurável em Parâmetros.
+4. Relatório de impostos por período.
+Testes com uma venda para SP, uma para MA (não contribuinte), uma para estado
+com FCP diferente de zero e uma para
+contribuinte de outro estado.
+```
+
+## Fase 5. Orçamento e celular (16/11 a 27/11)
+
+```text
+Siga .github/copilot-instructions.md.
+1. PDF do orçamento com logo da Ludus e miniatura da foto de cada equipamento.
+2. PWA instalável (manifest, ícones, service worker para o shell), com telas de
+   pedido e lista otimizadas para celular.
+3. Envio do orçamento pelo WhatsApp (link com o texto da proposta).
+```
+
+## Fase 6. NF-e (a definir)
+
+Depende do certificado digital A1 da Ludus e da escolha do emissor. Quando decidido, criar o prompt a partir de `docs/copilot/inventario-prototipo.md` e das regras da fase 4.
