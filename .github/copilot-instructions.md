@@ -72,7 +72,9 @@ Conferência com o protótipo: Mesa Flexora, custo assessoria R$ 8.146,64, créd
 **Impostos e taxas são configuração, não código.** Os encargos ficam cadastrados em Parâmetros pela diretoria: os fixos acima e uma lista livre de encargos extras (nome, %, base: venda ou lucro, ativo/inativo). As duas bases entram em lugares diferentes da fórmula:
 - `impostos_e_taxas` = soma só dos encargos sobre a **venda** (ICMS/DIFAL, PIS/COFINS, comissão, anúncios, gateway e extras com base venda).
 - `encargos_sobre_lucro` = IRPJ/CSLL + extras com base lucro, e `lucro_antes_IR = lucro_alvo / (1 - encargos_sobre_lucro)`.
-Os testes cobrem um extra de cada base. Nenhuma alíquota fica fixa no código; a diretoria inclui, altera ou remove encargos na tela e a tabela recalcula. Os testes usam parâmetros de exemplo montados no próprio teste, não os valores de produção.
+Os testes cobrem um extra de cada base.
+- FCP/FECP do destino (alíquota por UF em `StateTaxRate`) entra em `impostos_e_taxas` junto com ICMS/DIFAL, tanto no pedido quanto na tabela de preços (pior caso). Teste com FCP diferente de zero.
+- Validação no servidor antes de salvar ou publicar parâmetros: `encargos_sobre_lucro < 100%` e `impostos_e_taxas_pior_caso + lucro_antes_IR < 100%` (com folga mínima configurável). Fora disso, salvar é recusado com mensagem clara. Testes nas duas fronteiras. Nenhuma alíquota fica fixa no código; a diretoria inclui, altera ou remove encargos na tela e a tabela recalcula. Os testes usam parâmetros de exemplo montados no próprio teste, não os valores de produção.
 O pior caso é o estado com maior ICMS + DIFAL (hoje MA, 23%). `lucro_antes_IR` como definido acima (com só IRPJ/CSLL, `lucro_alvo / (1 - irpj_csll)`). Para cada equipamento, calcular também o desconto máximo na meta para SP (`Máx. SP`) e para cliente contribuinte (`Máx. c/IE`).
 
 ### Tabela de preços versionada
@@ -109,7 +111,9 @@ Entrada (R$ ou %), forma, data (vazia = na confirmação). Saldo: forma, nº de 
 
 Cada recebimento (inclusive baixa parcial) é um evento imutável próprio (`Receipt`: parcela, valor, valor sem IPI, data e hora, forma, quem registrou). A comissão referencia o `Receipt` que a gerou; o mês da comissão é o mês do `Receipt` em America/Sao_Paulo (teste obrigatório: recebimento às 23:30 de 30/09 em São Paulo cai em setembro e é pago em 05/10). O valor sem IPI de um recebimento usa o `fator_sem_ipi` do pedido. `Commission` guarda só a comissão e o seu pagamento ao vendedor; nunca é usada como registro do dinheiro recebido.
 
-Comissão gerada por um recebimento baixado é **definitiva**, paga ou não: reabrir ou alterar o pedido nunca a altera nem apaga. Ao reabrir, só parcelas ainda não recebidas e a comissão futura são recalculadas. Se o novo total exigir acerto sobre valores já recebidos (estorno ou devolução), ele entra como lançamento novo de ajuste, com motivo, no mês em que acontece, registrado no `audit_log`.
+Comissão gerada por um recebimento baixado é **definitiva**, paga ou não: reabrir ou alterar o pedido nunca a altera nem apaga. Ao reabrir, só parcelas ainda não recebidas e a comissão futura são recalculadas. Se o novo total exigir acerto sobre valores já recebidos (estorno ou devolução), ele vira um registro financeiro próprio: `Refund` (evento imutável com sinal negativo, ligado ao pedido e à parcela, com valor, valor sem IPI, data, motivo e quem registrou) e a `Commission` de ajuste correspondente (negativa, ligada ao `Refund`, no mês em que acontece). Saldos de recebíveis, totais de comissão do mês, pagamentos e relatórios somam `Receipt`, `Refund` e ajustes. O `audit_log` registra o evento, mas não substitui esse registro.
+
+**Exclusão de pedido:** só pedido em `RASCUNHO` (ou não fechado) sem nenhum registro financeiro (parcela, recebimento, comissão) pode ser excluído. Pedido fechado ou com histórico financeiro só pode ser cancelado (`CANCELADO`, com motivo), nunca apagado; chaves estrangeiras financeiras sem `ON DELETE CASCADE`.
 
 ## UI
 - Identidade visual do protótipo: títulos em Barlow Condensed caixa alta, corpo sem serifa, fundo cinza claro, cards brancos, azul #2C47A8.

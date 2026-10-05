@@ -35,7 +35,7 @@ Depois crie a base do projeto:
    Customer (PF/PJ, IE, contribuinte, endereço), Order, OrderItem, Approval,
    LostReason, Receivable (parcela), Receipt (cada recebimento, imutável,
    ligado à parcela), Payable, Commission (ligada ao Receipt que a gerou),
-   SalesGoal, IdempotencyKey. Datas de calendário em DATE e eventos em
+   Refund (estorno/devolução, imutável, negativo), SalesGoal, IdempotencyKey. Datas de calendário em DATE e eventos em
    TIMESTAMPTZ, conforme as instruções.
 4. Migration inicial e seed com os equipamentos, parâmetros e alíquotas por UF
    do protótipo.
@@ -158,8 +158,10 @@ Teste Playwright: dar baixa em uma parcela e conferir a comissão do mês.
 ```text
 Siga .github/copilot-instructions.md.
 1. Script de importação (CSV/planilha) de equipamentos com fotos, códigos e
-   descrições, com validação e relatório de erros. Fotos em storage de objetos;
-   nome do arquivo = código do produto.
+   descrições, com validação e relatório de erros. Fotos em storage de objetos
+   com chave `org/<organization_id>/produtos/<codigo>/<arquivo>`, sempre com o
+   organization_id da sessão na leitura, gravação e exclusão; o nome do
+   arquivo enviado pela Ludus continua sendo o código do produto.
 2. Tela Equipe e acessos: convidar usuário por e-mail, definir perfil, desativar.
 3. Revisão de segurança: permissão em toda action e query, nenhum campo sensível
    (custo, valor China, lucro, margem) no payload de VENDEDOR, GERENTE_COMERCIAL
@@ -181,10 +183,11 @@ Siga .github/copilot-instructions.md.
 1. Cadastro fiscal do produto: NCM, CEST, origem (1 = importação direta), IPI.
 2. Tabela StateTaxRate validada pelo contador (alíquota interna e FCP por UF);
    tela de manutenção só para DIRETORIA.
-3. ICMS e DIFAL separados no custo e no pedido, com base de cálculo conforme o
+3. ICMS, DIFAL e FCP/FECP separados no custo, no pedido e na tabela de preços, com base de cálculo conforme o
    contador definir (simples ou "por dentro"), configurável em Parâmetros.
 4. Relatório de impostos por período.
-Testes com uma venda para SP, uma para MA (não contribuinte) e uma para
+Testes com uma venda para SP, uma para MA (não contribuinte), uma para estado
+com FCP diferente de zero e uma para
 contribuinte de outro estado.
 ```
 
