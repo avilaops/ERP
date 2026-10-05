@@ -69,7 +69,7 @@ preco_com_ipi = preco_tabela_sem_ipi x (1 + ipi)
 ```
 O crédito de impostos é guardado com precisão total (`NUMERIC(7,4)` ou maior) e nunca arredondado no cálculo; a tela mostra 1 casa.
 Conferência com o protótipo: Mesa Flexora, custo assessoria R$ 8.146,64, crédito exibido 28,1% (valor exato ≈ 28,1156%) → custo real R$ 6.148,97 → tabela sem IPI R$ 19.204,61 (custo x 3,123). O teste usa o crédito exato copiado do protótipo para o seed; com 28,1% arredondado o resultado seria R$ 6.150,31.
-**Atenção:** o protótipo mostra impostos e taxas no pior caso de 37,3%, mas os itens documentados aqui somam 34,75% (ICMS + DIFAL 23% + PIS/COFINS 9,25% + comissão 2% + anúncios 0,5%). A diferença de cerca de 2,5 pontos ainda não está identificada (pode ser base "por dentro", FCP ou outro item do protótipo). Na fase 1, o inventário do protótipo deve encontrar exatamente de onde ela vem e atualizar este arquivo; não inventar um item para fechar a conta. O teste do multiplicador 3,123 só é escrito depois disso.
+**Impostos e taxas são configuração, não código.** `impostos_e_taxas` é a soma dos encargos cadastrados em Parâmetros pela diretoria: os fixos acima e uma lista livre de encargos extras (nome, %, se incide sobre a venda ou sobre o lucro, ativo/inativo). Nenhuma alíquota fica fixa no código; a diretoria inclui, altera ou remove encargos na tela e a tabela recalcula. Os testes usam parâmetros de exemplo montados no próprio teste, não os valores de produção.
 O pior caso é o estado com maior ICMS + DIFAL (hoje MA, 23%). `lucro_antes_IR = lucro_alvo / (1 - irpj_csll)`. Para cada equipamento, calcular também o desconto máximo na meta para SP (`Máx. SP`) e para cliente contribuinte (`Máx. c/IE`).
 
 ### Tabela de preços versionada

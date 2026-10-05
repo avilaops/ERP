@@ -17,10 +17,9 @@ Siga .github/copilot-instructions.md.
 Leia prototype/ inteiro e faça um inventário em docs/copilot/inventario-prototipo.md:
 telas, componentes, entidades e campos, regras e fórmulas, textos de ajuda. Aponte
 qualquer regra do protótipo que divirja das instruções do projeto.
-Responda em especial: (1) de onde vêm os cerca de 2,5 pontos que faltam para
-os impostos e taxas do pior caso chegarem a 37,3%; (2) como o protótipo calcula
-o valor a pagar na China (custo, margem, embalagem, quantidade). Atualize
-.github/copilot-instructions.md com a resposta antes de escrever código.
+Responda em especial como o protótipo calcula o valor a pagar na China (custo,
+margem, embalagem, quantidade) e atualize .github/copilot-instructions.md com a
+resposta antes de escrever código.
 
 Depois crie a base do projeto:
 1. Next.js com TypeScript strict, App Router, Tailwind, ESLint e pnpm.
@@ -75,7 +74,8 @@ parcelas do saldo e comissão.
 
 Escreva testes Vitest que reproduzam os números do protótipo, incluindo:
 - entrada mínima: China 8.553,97 + lucro 2.304,55, comissão 2% = 11.054,17
-- multiplicador de tabela com os parâmetros iniciais: custo x 3,123
+- multiplicador de tabela calculado a partir de parâmetros de exemplo do teste
+  (incluindo um encargo extra cadastrado), conferindo a fórmula, não um número fixo
 - venda para MA (não contribuinte): DIFAL 19%
 - parcelas que somam exatamente o saldo
 Compare cada resultado com o protótipo e liste divergências antes de seguir.
@@ -88,7 +88,8 @@ Siga .github/copilot-instructions.md e reproduza as telas do protótipo:
   edição inline dos custos, "Colar custos da assessoria" (colar planilha),
   "+ Equipamento", Desativar/Excluir, aviso "A equipe ainda vê a tabela vN"
   e botão "Publicar vN+1" que grava o snapshot em PriceTableVersion.
-- Parâmetros: política comercial, impostos da venda, canal e o quadro Resultado
+- Parâmetros: política comercial, impostos da venda, canal, lista de encargos
+  extras editável (nome, %, base, ativo) e o quadro Resultado
   com a fórmula explicada e o botão "usar" na entrada mínima sugerida.
 - Tabela de preços: a versão publicada, sem custo nem margem para quem não é
   diretoria.
