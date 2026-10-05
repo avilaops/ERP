@@ -35,8 +35,10 @@ Depois crie a base do projeto:
    Customer (PF/PJ, IE, contribuinte, endereço), Order, OrderItem, Approval,
    LostReason, Receivable (parcela), Receipt (cada recebimento, imutável,
    ligado à parcela), Payable, Commission (origem em Receipt OU Refund: receipt_id e refund_id
-   opcionais com CHECK exigindo exatamente um), Refund (estorno/devolução,
-   imutável, negativo), SalesGoal, IdempotencyKey. Datas de calendário em DATE e eventos em
+   opcionais com CHECK exigindo exatamente um; competência DATE do mês da
+   origem), Refund (estorno/devolução, imutável, negativo, estornado_em,
+   pedido por e confirmado por), RefundRequest (devolução pendente),
+   OrderClosing (histórico de fechamentos), SalesGoal, IdempotencyKey. Datas de calendário em DATE e eventos em
    TIMESTAMPTZ, conforme as instruções.
 4. Migration inicial e seed com os equipamentos, parâmetros e alíquotas por UF
    do protótipo.
@@ -77,7 +79,10 @@ Escreva testes Vitest que reproduzam os números do protótipo, incluindo:
 - entrada mínima: China 8.553,97 + lucro 2.304,55, comissão 2% = 11.054,17
 - multiplicador de tabela calculado a partir de parâmetros de exemplo do teste
   (incluindo um encargo extra cadastrado), conferindo a fórmula, não um número fixo
-- venda para MA (não contribuinte): DIFAL 19%
+- venda para outro estado (não contribuinte) com alíquotas de exemplo montadas
+  no teste: DIFAL = interna do destino - 4%. As alíquotas reais por UF entram
+  no seed como configuração provisória, marcada "aguardando contador" em
+  Parâmetros, editável pela diretoria; a validação com o contador é a fase 4
 - parcelas que somam exatamente o saldo
 Compare cada resultado com o protótipo e liste divergências antes de seguir.
 ```
@@ -127,8 +132,15 @@ Siga .github/copilot-instructions.md e reproduza o fluxo de pedido do protótipo
 - Fechar pedido, baixar recebimento, reabrir e pagar comissão em transação
   única e idempotente (teste: enviar o fechamento duas vezes não duplica
   parcelas).
-- Fechar pedido gera os Receivable. Reabrir pedido exige confirmação e só
-  recalcula parcelas ainda não recebidas e a comissão futura. Comissão de
+- Fechar pedido gera os Receivable e um OrderClosing. Reabrir (só FECHADO)
+  exige confirmação, volta para ENVIADO, limpa fechado_em e recalcula o saldo
+  em aberto de cada parcela, inclusive a parte não recebida de parcela
+  parcial (teste: R$ 10.000 com R$ 4.000 recebidos, pedido reduzido em
+  R$ 3.000, saldo vai de R$ 6.000 para R$ 3.000), e a comissão futura.
+  Se for preciso devolver dinheiro, cria RefundRequest; o Refund só nasce
+  quando FINANCEIRO ou DIRETORIA confirma.
+- Cancelar: parcelas em aberto viram CANCELADA na mesma transação,
+  histórico financeiro preservado, pedido cancelado não reabre. Comissão de
   recebimento já baixado nunca muda; acertos viram lançamento novo de ajuste,
   com motivo, no audit_log. Teste: reabrir pedido com entrada já recebida não
   altera a comissão dessa entrada.
@@ -141,7 +153,10 @@ pode ser aprovado pelo gerente, só pela diretoria.
 ### 2d. Financeiro, comissões e dashboard
 ```text
 Siga .github/copilot-instructions.md e reproduza:
-- Recebimentos: lista por vencimento e situação, baixa total ou parcial.
+- Recebimentos: lista por vencimento e situação, baixa total ou parcial com a
+  parcela travada (SELECT ... FOR UPDATE): soma das baixas nunca passa do
+  valor da parcela e soma dos estornos nunca passa do recebido. Teste com
+  duas baixas concorrentes. Fila de devoluções pendentes para confirmar.
 - Contas a pagar: lançamento, vencimento, baixa, vínculo opcional com pedido
   (pagamento da China) e fornecedor.
 - Fornecedores: CNPJ, CPF ou exterior.
