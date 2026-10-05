@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
-import { createProduct, listProductCosts, listProducts } from "@/lib/db/products";
+import { createProduct, deleteProduct, listProductCosts, listProducts, updateProduct } from "@/lib/db/products";
 import { openTestDb, SKIP_WITHOUT_DB } from "./db-helpers.ts";
 import type { TestDb } from "./db-helpers.ts";
 
@@ -81,4 +81,94 @@ test("produto: o motor recebe só os ativos que já têm custo", { skip }, async
 test("produto: o banco recusa crédito fora de [0, 1) e custo negativo", { skip }, async () => {
   await assert.rejects(() => db.pool.query("UPDATE products SET tax_credit = 1"), /check/i);
   await assert.rejects(() => db.pool.query("UPDATE products SET advisory_cost = -1"), /check/i);
+});
+
+const OTHER = "outra@teste.local";
+
+test("alterar: custo, crédito e embalagem voltam como entraram, e fica quem alterou", { skip }, async () => {
+  const created = await createProduct({ name: "Para alterar", code: "UP-001" }, WHO, db.pool);
+  const updated = await updateProduct(
+    created.id,
+    { advisoryCost: 8738.77, taxCredit: 0.2811565, packaging: 12.5 },
+    OTHER,
+    db.pool,
+  );
+  assert.deepEqual(updated, { ...created, advisoryCost: 8738.77, taxCredit: 0.2811565, packaging: 12.5 });
+  assert.deepEqual((await listProducts({}, db.pool)).find((product) => product.id === created.id), updated);
+
+  const { rows } = await db.pool.query("SELECT updated_by, updated_at > created_at AS touched FROM products WHERE id = $1", [
+    created.id,
+  ]);
+  assert.deepEqual(rows[0], { updated_by: OTHER, touched: true });
+});
+
+test("alterar: só o que vem no patch muda; nome e código passam pela mesma limpeza do cadastro", { skip }, async () => {
+  const created = await createProduct(
+    { name: "Para desativar", code: "UP-002", supplierName: "DHZ", advisoryCost: 100, taxCredit: 0.25, packaging: 3 },
+    WHO,
+    db.pool,
+  );
+  const inactive = await updateProduct(created.id, { active: false }, WHO, db.pool);
+  assert.deepEqual(inactive, { ...created, active: false });
+  assert.deepEqual(await updateProduct(created.id, { active: true }, WHO, db.pool), created);
+
+  const renamed = await updateProduct(created.id, { name: "  Renomeado  ", code: "  " }, WHO, db.pool);
+  assert.deepEqual(renamed, { ...created, name: "Renomeado", code: null });
+});
+
+test("alterar: advisoryCost nulo volta o produto a sem custo", { skip }, async () => {
+  const created = await createProduct({ name: "Com custo", advisoryCost: 500, taxCredit: 0.1 }, WHO, db.pool);
+  const cleared = await updateProduct(created.id, { advisoryCost: null }, WHO, db.pool);
+  assert.equal(cleared.advisoryCost, null);
+  assert.equal(cleared.taxCredit, 0.1);
+});
+
+test("alterar: código repetido é recusado e nada muda", { skip }, async () => {
+  await createProduct({ name: "Dono do código", code: "UP-010" }, WHO, db.pool);
+  const other = await createProduct({ name: "Outro", code: "UP-011", advisoryCost: 10 }, WHO, db.pool);
+  await assert.rejects(
+    () => updateProduct(other.id, { code: "UP-010", advisoryCost: 99 }, WHO, db.pool),
+    /Já existe produto com o código "UP-010"/,
+  );
+  assert.deepEqual((await listProducts({}, db.pool)).find((product) => product.id === other.id), other);
+});
+
+test("alterar: entrada inválida dá erro antes de chegar ao banco, e id que não existe não é encontrado", { skip }, async () => {
+  const created = await createProduct({ name: "Intacto", advisoryCost: 10 }, WHO, db.pool);
+  const change = (patch: Parameters<typeof updateProduct>[1], who = WHO) => updateProduct(created.id, patch, who, db.pool);
+
+  await assert.rejects(() => change({ name: "   " }), /sem nome/);
+  await assert.rejects(() => change({ advisoryCost: -1 }), /Custo da assessoria/);
+  await assert.rejects(() => change({ advisoryCost: Number.NaN }), /Custo da assessoria/);
+  await assert.rejects(() => change({ taxCredit: 1 }), /Crédito de impostos/);
+  await assert.rejects(() => change({ packaging: -5 }), /Embalagem/);
+  await assert.rejects(() => change({ supplierPriceUsd: -1 }), /Preço do fornecedor/);
+  await assert.rejects(() => change({ active: false }, " "), /quem está alterando/);
+  assert.deepEqual((await listProducts({}, db.pool)).find((product) => product.id === created.id), created);
+
+  for (const id of [2_000_000_000, 0, -1, 1.5, Number.NaN]) {
+    await assert.rejects(() => updateProduct(id, { active: false }, WHO, db.pool), /Produto não encontrado/, String(id));
+  }
+});
+
+test("excluir: remove a linha; excluir de novo não encontra o produto", { skip }, async () => {
+  const created = await createProduct({ name: "Lançado por engano", code: "UP-020" }, WHO, db.pool);
+  const before = (await listProducts({}, db.pool)).length;
+
+  assert.deepEqual(await deleteProduct(created.id, db.pool), created);
+  const after = await listProducts({}, db.pool);
+  assert.equal(after.length, before - 1);
+  assert.ok(after.every((product) => product.id !== created.id));
+
+  await assert.rejects(() => deleteProduct(created.id, db.pool), /Produto não encontrado/);
+  await assert.rejects(() => deleteProduct(Number.NaN, db.pool), /Produto não encontrado/);
+});
+
+test("excluir: produto que outra tabela referencia é recusado, com a saída de desativar", { skip }, async () => {
+  const created = await createProduct({ name: "Com histórico", code: "UP-030" }, WHO, db.pool);
+  await db.pool.query("CREATE TABLE product_refs (product_id integer NOT NULL REFERENCES products (id))");
+  await db.pool.query("INSERT INTO product_refs VALUES ($1)", [created.id]);
+
+  await assert.rejects(() => deleteProduct(created.id, db.pool), /já tem histórico e não pode ser excluído\. Desative-o\./);
+  assert.ok((await listProducts({}, db.pool)).some((product) => product.id === created.id));
 });

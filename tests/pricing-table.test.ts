@@ -5,7 +5,7 @@ import { DEFAULT_PARAMS, validateParams } from "@/lib/pricing/params";
 import type { PricingParams } from "@/lib/pricing/params";
 import { chinaPayment, realCost } from "@/lib/pricing/product";
 import { INTERNAL_ICMS, UFS } from "@/lib/pricing/states";
-import { discountedMultiplier, maxDiscounts, tableMultiplier, tablePrice, withIpi } from "@/lib/pricing/table";
+import { discountedMultiplier, maxDiscounts, productPrices, tableMultiplier, tablePrice, withIpi } from "@/lib/pricing/table";
 import { channelRate, preTaxProfit, saleTaxes, worstCase } from "@/lib/pricing/taxes";
 
 const P = DEFAULT_PARAMS;
@@ -158,6 +158,33 @@ test("tabela fecha no centavo com o crédito em precisão cheia (print de Produt
     assert.equal(percent(maxDiscounts(item, P, { uf: "SP", taxpayer: false }).atTarget), "28.9", product.code);
     assert.equal(percent(maxDiscounts(item, P, { uf: "MA", taxpayer: true }).atTarget), "45.8", product.code);
   }
+});
+
+test("colunas calculadas da linha: as do print, com Máx. SP 28,9% e Máx. c/IE 45,8%", () => {
+  for (const product of PRINT_PRODUCTS) {
+    const prices = productPrices({ advisoryCost: product.advisoryCost, taxCredit: product.taxCredit, packaging: 0 }, P);
+    assert.ok(prices, product.code);
+    assert.equal(roundCents(prices.realCost), product.realCost, `custo real de ${product.code}`);
+    assert.equal(roundCents(prices.table), product.table, `tabela de ${product.code}`);
+    assert.equal(roundCents(prices.tableWithIpi), product.withIpi, `tabela com IPI de ${product.code}`);
+    assert.equal(percent(prices.maxSp), "28.9", product.code);
+    assert.equal(percent(prices.maxTaxpayer), "45.8", product.code);
+  }
+});
+
+test("colunas calculadas: sem preço de tabela não há colunas; a embalagem soma inteira ao custo real", () => {
+  assert.equal(productPrices({ advisoryCost: 0, taxCredit: 0, packaging: 0 }, P), null);
+
+  const cost = { advisoryCost: 8146.64, taxCredit: 0.2811565, packaging: 0 };
+  const without = productPrices(cost, P);
+  const packed = productPrices({ ...cost, packaging: 100 }, P);
+  assert.ok(without && packed);
+  near(packed.realCost - without.realCost, 100, 1e-9);
+  assert.equal(packed.table, tablePrice(packed.realCost, P));
+
+  // Só embalagem já dá preço: o custo real é ela.
+  assert.equal(productPrices({ advisoryCost: 0, taxCredit: 0, packaging: 100 }, P)?.realCost, 100);
+  assert.throws(() => productPrices({ ...cost, advisoryCost: -1 }, P), /Custo da assessoria precisa ser/);
 });
 
 test("partir do custo real já arredondado custa um centavo na tabela: por isso ele não é guardado", () => {

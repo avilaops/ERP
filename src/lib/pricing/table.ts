@@ -1,5 +1,8 @@
 import { assertAmount, RATE_EPSILON } from "@/lib/pricing/money";
 import type { PricingParams } from "@/lib/pricing/params";
+import { realCost } from "@/lib/pricing/product";
+import type { ProductCost } from "@/lib/pricing/product";
+import { ORIGIN_UF, UFS } from "@/lib/pricing/states";
 import { preTaxProfit, totalRate, worstCase } from "@/lib/pricing/taxes";
 import type { Destination } from "@/lib/pricing/taxes";
 
@@ -55,5 +58,36 @@ export function maxDiscounts(
   return {
     atTarget: 1 - cost / (tableTotal * costShare(rate, preTaxProfit(params))),
     noLoss: 1 - cost / (tableTotal * costShare(rate, 0)),
+  };
+}
+
+export type ProductPrices = {
+  /** Full precision: it is what the table price is made from. */
+  realCost: number;
+  /** Table price without IPI, full precision. */
+  table: number;
+  tableWithIpi: number;
+  /** Largest discount that keeps the target in a sale inside SP. */
+  maxSp: number;
+  /** The same for a taxpayer customer outside SP. */
+  maxTaxpayer: number;
+};
+
+// A taxpayer pays the interstate ICMS and no DIFAL, whatever the state: any one outside SP does.
+const [OUTSIDE_UF] = UFS.filter((uf) => uf !== ORIGIN_UF);
+
+/** The calculated columns of one product. `null` when there is no table price above zero. */
+export function productPrices(cost: ProductCost, params: PricingParams): ProductPrices | null {
+  const real = realCost(cost, params);
+  const table = tablePrice(real, params);
+  if (!(table > 0)) return null;
+
+  const item = { tableTotal: table, cost: real };
+  return {
+    realCost: real,
+    table,
+    tableWithIpi: withIpi(table, params),
+    maxSp: maxDiscounts(item, params, { uf: ORIGIN_UF, taxpayer: false }).atTarget,
+    maxTaxpayer: maxDiscounts(item, params, { uf: OUTSIDE_UF, taxpayer: true }).atTarget,
   };
 }

@@ -30,6 +30,12 @@ export type ProductInput = {
   active?: boolean;
 };
 
+/** Only the fields present are changed. `advisoryCost: null` takes the product back to "without cost". */
+export type ProductPatch = Partial<ProductInput>;
+
+/** A refusal the user can act on. The message goes to the screen as it is. */
+export class ProductError extends Error {}
+
 const COLUMNS =
   "id, name, code, supplier_name, supplier_model, supplier_price_usd, advisory_cost, tax_credit, packaging, active";
 
@@ -54,10 +60,59 @@ function toProduct(row: Record<string, unknown>): Product {
 }
 
 const UNIQUE_VIOLATION = "23505";
+const FOREIGN_KEY_VIOLATION = "23503";
+
+/** Field of a patch and its column. */
+const PATCH_COLUMNS: [keyof ProductPatch, string][] = [
+  ["name", "name"],
+  ["code", "code"],
+  ["supplierName", "supplier_name"],
+  ["supplierModel", "supplier_model"],
+  ["supplierPriceUsd", "supplier_price_usd"],
+  ["advisoryCost", "advisory_cost"],
+  ["taxCredit", "tax_credit"],
+  ["packaging", "packaging"],
+  ["active", "active"],
+];
+
+/** What goes to the column for one field of a patch, checked the same way as on creation. */
+function patchValue(field: keyof ProductPatch, patch: ProductPatch): unknown {
+  switch (field) {
+    case "name": {
+      const name = patch.name?.trim() ?? "";
+      if (name === "") throw new ProductError("Produto sem nome.");
+      return name;
+    }
+    case "code":
+    case "supplierName":
+    case "supplierModel":
+      return blankToNull(patch[field]);
+    case "supplierPriceUsd": {
+      const price = patch.supplierPriceUsd ?? null;
+      if (price !== null) assertAmount(price, "Preço do fornecedor");
+      return price;
+    }
+    case "advisoryCost": {
+      const cost = patch.advisoryCost ?? null;
+      if (cost !== null) assertAmount(cost, "Custo da assessoria");
+      return cost;
+    }
+    case "taxCredit":
+      assertRate(patch.taxCredit as number, "Crédito de impostos");
+      return patch.taxCredit;
+    case "packaging":
+      assertAmount(patch.packaging as number, "Embalagem");
+      return patch.packaging;
+    case "active":
+      return patch.active === true;
+  }
+}
+
+const isId = (id: number) => Number.isSafeInteger(id) && id > 0;
 
 export async function createProduct(input: ProductInput, updatedBy: string, conn: Queryable = db()): Promise<Product> {
   const name = input.name.trim();
-  if (name === "") throw new Error("Produto sem nome.");
+  if (name === "") throw new ProductError("Produto sem nome.");
   if (updatedBy.trim() === "") throw new Error("Falta dizer quem está cadastrando o produto.");
 
   const code = blankToNull(input.code);
@@ -91,7 +146,58 @@ export async function createProduct(input: ProductInput, updatedBy: string, conn
     );
     return toProduct(rows[0]);
   } catch (error) {
-    if (pgErrorCode(error) === UNIQUE_VIOLATION) throw new Error(`Já existe produto com o código "${code}".`);
+    if (pgErrorCode(error) === UNIQUE_VIOLATION) throw new ProductError(`Já existe produto com o código "${code}".`);
+    throw error;
+  }
+}
+
+/** Changes the fields present in the patch and answers with the row as it stayed. */
+export async function updateProduct(
+  id: number,
+  patch: ProductPatch,
+  updatedBy: string,
+  conn: Queryable = db(),
+): Promise<Product> {
+  if (updatedBy.trim() === "") throw new Error("Falta dizer quem está alterando o produto.");
+  const changes = PATCH_COLUMNS.filter(([field]) => patch[field] !== undefined).map(
+    ([field, column]) => [column, patchValue(field, patch)] as const,
+  );
+  if (!isId(id)) throw new ProductError("Produto não encontrado.");
+
+  // Fixed column names only; every value goes as a parameter.
+  const updates = [
+    ...changes.map(([column], index) => `${column} = $${index + 2}`),
+    "updated_at = now()",
+    `updated_by = $${changes.length + 2}`,
+  ].join(", ");
+
+  try {
+    const { rows } = await conn.query(`UPDATE products SET ${updates} WHERE id = $1 RETURNING ${COLUMNS}`, [
+      id,
+      ...changes.map(([, value]) => value),
+      updatedBy,
+    ]);
+    if (rows.length === 0) throw new ProductError("Produto não encontrado.");
+    return toProduct(rows[0]);
+  } catch (error) {
+    if (pgErrorCode(error) === UNIQUE_VIOLATION) {
+      throw new ProductError(`Já existe produto com o código "${blankToNull(patch.code)}".`);
+    }
+    throw error;
+  }
+}
+
+/** Removes the record and answers with what it was. Refused once anything else points to the product. */
+export async function deleteProduct(id: number, conn: Queryable = db()): Promise<Product> {
+  if (!isId(id)) throw new ProductError("Produto não encontrado.");
+  try {
+    const { rows } = await conn.query(`DELETE FROM products WHERE id = $1 RETURNING ${COLUMNS}`, [id]);
+    if (rows.length === 0) throw new ProductError("Produto não encontrado.");
+    return toProduct(rows[0]);
+  } catch (error) {
+    if (pgErrorCode(error) === FOREIGN_KEY_VIOLATION) {
+      throw new ProductError("Este equipamento já tem histórico e não pode ser excluído. Desative-o.");
+    }
     throw error;
   }
 }
