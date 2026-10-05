@@ -28,7 +28,7 @@ test("toda rota da matriz tem page.tsx que chama requirePermission com o própri
 });
 
 /** Pages already ported from the prototype. The others still say "Em construção". */
-const PORTED = ["parametros", "produtos", "tabela-precos"];
+const PORTED = ["parametros", "produtos", "tabela-precos", "clientes"];
 
 test("páginas portadas não são mais marcador; as outras continuam Em construção", () => {
   for (const item of MENU_ITEMS) {
@@ -39,7 +39,7 @@ test("páginas portadas não são mais marcador; as outras continuam Em constru�
       assert.ok(code.includes("PlaceholderPage"), `${item.href} deveria estar Em construção`);
     }
   }
-  assert.equal(MENU_ITEMS.filter((item) => !PORTED.includes(item.key)).length, 11);
+  assert.equal(MENU_ITEMS.filter((item) => !PORTED.includes(item.key)).length, 10);
 });
 
 /** Every source file under the protected group, relative to it. */
@@ -50,6 +50,7 @@ test("toda ação de servidor confere a permissão antes de qualquer outra coisa
   const actions = appFiles().filter((file) => /^\s*["']use server["']/m.test(readFileSync(APP_DIR + file, "utf8")));
   assert.ok(actions.includes("parametros/actions.ts"));
   assert.ok(actions.includes("produtos/actions.ts"));
+  assert.ok(actions.includes("clientes/actions.ts"));
   for (const file of actions) {
     const code = readFileSync(APP_DIR + file, "utf8");
     // Each exported action opens with the check: nothing is read from the form or the database before it.
@@ -65,6 +66,8 @@ test("a página lê o banco só depois de conferir a permissão", () => {
   const reads: [string, string, string[]][] = [
     ["/parametros", "parametros", ["loadParams(", "listProductCosts("]],
     ["/produtos", "produtos", ["loadParams(", "listProducts(", "latestVersion(", "loadPublishedSnapshot("]],
+    ["/clientes", "clientes", ["listCustomers("]],
+    ["/clientes/[id]", "clientes", ["getCustomer("]],
     ["/tabela-precos", "tabela-precos", ["latestVersion(", "loadPublishedTable(", "loadPublishedSnapshot("]],
   ];
   for (const [route, key, calls] of reads) {
@@ -108,7 +111,8 @@ test("/pedidos/novo é protegida pelo item Pedidos", () => {
 
 test("não existe página no grupo protegido sem requirePermission", () => {
   const all = pages();
-  assert.equal(all.length, MENU_ITEMS.length + 1);
+  // The menu items, plus /pedidos/novo and the record of one customer.
+  assert.equal(all.length, MENU_ITEMS.length + 2);
   for (const route of all) {
     assert.match(source(route), /await requirePermission\(/, route);
   }

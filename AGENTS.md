@@ -124,7 +124,9 @@ funções puras, sem banco e sem tela, conferidas com os números dos prints do 
 2. **Só `src/lib/db/` fala SQL**, com `pg` direto, sem ORM. O resto do código chama as
    funções dela (`loadParams`, `saveParams`, `createProduct`, `listProducts`,
    `updateProduct`, `deleteProduct`, `applyAdvisoryCosts`, `publishPriceTable`,
-   `latestVersion`, `loadPublishedSnapshot`, `loadPublishedTable`, `listVersions`, …).
+   `latestVersion`, `loadPublishedSnapshot`, `loadPublishedTable`, `listVersions`,
+   `createCustomer`, `updateCustomer`, `getCustomer`, `findCustomerByDocument`,
+   `listCustomers`, …).
    Arquivo com `"use client"` nunca importa `@/lib/db`.
 3. **Consulta só com parâmetros (`$1`).** Valor nunca é colado no texto do SQL.
 4. **Mudança de esquema é arquivo novo em `db/migrations/`** (`NNNN_nome.sql`), aplicado

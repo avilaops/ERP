@@ -30,7 +30,12 @@ async function withClient<T>(fn: (client: pg.PoolClient) => Promise<T>): Promise
 
 test("migração: aplica em ordem, registra e rodar de novo não muda nada", { skip }, async () => {
   const first = await withClient((client) => migrate(client, MIGRATIONS_DIR));
-  assert.deepEqual(first, ["0001_parametros_e_produtos.sql", "0002_parametros_iniciais.sql", "0003_tabela_publicada.sql"]);
+  assert.deepEqual(first, [
+    "0001_parametros_e_produtos.sql",
+    "0002_parametros_iniciais.sql",
+    "0003_tabela_publicada.sql",
+    "0004_clientes.sql",
+  ]);
 
   const second = await withClient((client) => migrate(client, MIGRATIONS_DIR));
   assert.deepEqual(second, []);
@@ -43,6 +48,7 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     [db.schema],
   );
   assert.deepEqual(tables.rows.map((row) => row.table_name), [
+    "customers",
     "price_table_items",
     "price_table_versions",
     "pricing_params",
