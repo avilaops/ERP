@@ -5,7 +5,7 @@ import type { PricingParams } from "@/lib/pricing/params";
 import { tableMultiplier } from "@/lib/pricing/table";
 
 /** Field of PricingParams and its column, in the order of the table. */
-const COLUMNS: [keyof PricingParams, string][] = [
+export const PARAM_COLUMNS: [keyof PricingParams, string][] = [
   ["targetNetProfit", "target_net_profit"],
   ["freeDiscount", "free_discount"],
   ["safetyMargin", "safety_margin"],
@@ -23,7 +23,18 @@ const COLUMNS: [keyof PricingParams, string][] = [
   ["fixedMonthlyExpenses", "fixed_monthly_expenses"],
 ];
 
-const COLUMN_LIST = COLUMNS.map(([, column]) => column).join(", ");
+const COLUMNS = PARAM_COLUMNS;
+
+/** The fifteen columns, as they go in a statement. */
+export const PARAM_COLUMN_LIST = COLUMNS.map(([, column]) => column).join(", ");
+const COLUMN_LIST = PARAM_COLUMN_LIST;
+
+/** A row with the fifteen columns, validated. numeric columns arrive as text; Number() keeps the eight places stored. */
+export function rowToParams(row: Record<string, unknown>): PricingParams {
+  const params = Object.fromEntries(COLUMNS.map(([field, column]) => [field, Number(row[column])])) as PricingParams;
+  validateParams(params);
+  return params;
+}
 
 /**
  * The directors' draft. The database is the only source: the row is created by
@@ -37,10 +48,7 @@ export async function loadParams(conn: Queryable = db()): Promise<PricingParams>
   const row = rows[0];
   if (!row) throw new Error("Parâmetros não cadastrados no banco. Rode `npm run db:migrate`.");
 
-  // numeric columns arrive as text; Number() keeps the eight places stored.
-  const params = Object.fromEntries(COLUMNS.map(([field, column]) => [field, Number(row[column])])) as PricingParams;
-  validateParams(params);
-  return params;
+  return rowToParams(row);
 }
 
 /** Validates, makes sure a table price exists for these parameters, then writes the single row. */

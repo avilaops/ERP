@@ -13,6 +13,10 @@ import {
   ProductError,
   updateProduct,
 } from "@/lib/db/products";
+import { loadParams } from "@/lib/db/params";
+import { latestVersion, loadPublishedSnapshot, PriceTableError, publishPriceTable } from "@/lib/db/price-table";
+import { draftPriceTable, NOTHING_TO_PUBLISH, pendingChanges } from "@/lib/price-table";
+import type { PublishState } from "@/lib/price-table";
 import { NEW_PRODUCT_FIELDS, parseProductForm, rawProductValues, ROW_FIELDS } from "@/lib/product-form";
 import type { NewProductState, ProductFieldKey, RowState } from "@/lib/product-form";
 
@@ -176,5 +180,42 @@ export async function pasteAdvisoryCostsAction(_previous: PasteState, formData: 
   } catch (error) {
     console.error("[produtos] falha ao colar custos:", error instanceof Error ? error.message : error);
     return pasteError(text, "Não foi possível ler ou gravar os custos agora. Nada foi alterado; tente de novo.");
+  }
+}
+
+const publishError = (message: string): PublishState => ({ status: "error", message });
+
+/**
+ * "Publicar vN+1": the draft of that moment becomes the version the team sells
+ * with. `expected` is the number the screen showed; if someone published in the
+ * meantime, nothing is written and the notice says so.
+ */
+export async function publishPriceTableAction(_previous: PublishState, formData: FormData): Promise<PublishState> {
+  const session = await requirePermission("produtos");
+
+  const expected = Number(formData.get("expected"));
+  try {
+    const [params, products, latest] = await Promise.all([loadParams(), listProducts({ active: true }), latestVersion()]);
+    const published = latest ? await loadPublishedSnapshot(latest.version) : null;
+
+    const draft = draftPriceTable(params, products);
+    if (draft.items.length === 0) return publishError(NOTHING_TO_PUBLISH);
+    if (!pendingChanges(draft, published)) return publishError(`Nada mudou desde a tabela v${latest?.version}.`);
+
+    const next = (latest?.version ?? 0) + 1;
+    if (expected !== next) {
+      return publishError("A tabela já foi publicada por outra pessoa. Confira o que está pendente e publique de novo.");
+    }
+
+    const { version } = await publishPriceTable(draft, next, session.email);
+    console.info(`[produtos] tabela v${version} publicada: ${draft.items.length} equipamento(s), por ${session.email}`);
+
+    revalidatePath(menuItem("produtos").href);
+    revalidatePath(menuItem("tabela-precos").href);
+    return { status: "published", message: `Tabela v${version} publicada. A equipe já vende com ela.` };
+  } catch (error) {
+    if (error instanceof PriceTableError) return publishError(error.message);
+    console.error("[produtos] falha ao publicar:", error instanceof Error ? error.message : error);
+    return publishError(FAILED);
   }
 }

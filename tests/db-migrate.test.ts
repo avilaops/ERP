@@ -30,7 +30,7 @@ async function withClient<T>(fn: (client: pg.PoolClient) => Promise<T>): Promise
 
 test("migração: aplica em ordem, registra e rodar de novo não muda nada", { skip }, async () => {
   const first = await withClient((client) => migrate(client, MIGRATIONS_DIR));
-  assert.deepEqual(first, ["0001_parametros_e_produtos.sql", "0002_parametros_iniciais.sql"]);
+  assert.deepEqual(first, ["0001_parametros_e_produtos.sql", "0002_parametros_iniciais.sql", "0003_tabela_publicada.sql"]);
 
   const second = await withClient((client) => migrate(client, MIGRATIONS_DIR));
   assert.deepEqual(second, []);
@@ -42,7 +42,13 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "SELECT table_name FROM information_schema.tables WHERE table_schema = $1 ORDER BY table_name",
     [db.schema],
   );
-  assert.deepEqual(tables.rows.map((row) => row.table_name), ["pricing_params", "products", "schema_migrations"]);
+  assert.deepEqual(tables.rows.map((row) => row.table_name), [
+    "price_table_items",
+    "price_table_versions",
+    "pricing_params",
+    "products",
+    "schema_migrations",
+  ]);
 });
 
 test("migração: os parâmetros iniciais não sobrescrevem o que a diretoria já gravou", { skip }, async () => {

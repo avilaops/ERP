@@ -64,7 +64,7 @@ test("toda ação de servidor confere a permissão antes de qualquer outra coisa
 test("a página lê o banco só depois de conferir a permissão", () => {
   const reads: [string, string, string[]][] = [
     ["/parametros", "parametros", ["loadParams(", "listProductCosts("]],
-    ["/produtos", "produtos", ["loadParams(", "listProducts("]],
+    ["/produtos", "produtos", ["loadParams(", "listProducts(", "latestVersion(", "loadPublishedSnapshot("]],
   ];
   for (const [route, key, calls] of reads) {
     const code = source(route);

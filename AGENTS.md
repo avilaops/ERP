@@ -121,7 +121,8 @@ funções puras, sem banco e sem tela, conferidas com os números dos prints do 
    ela o processo não sobe (`src/instrumentation-node.ts`).
 2. **Só `src/lib/db/` fala SQL**, com `pg` direto, sem ORM. O resto do código chama as
    funções dela (`loadParams`, `saveParams`, `createProduct`, `listProducts`,
-   `updateProduct`, `deleteProduct`, `applyAdvisoryCosts`, …).
+   `updateProduct`, `deleteProduct`, `applyAdvisoryCosts`, `publishPriceTable`,
+   `latestVersion`, `loadPublishedSnapshot`, …).
    Arquivo com `"use client"` nunca importa `@/lib/db`.
 3. **Consulta só com parâmetros (`$1`).** Valor nunca é colado no texto do SQL.
 4. **Mudança de esquema é arquivo novo em `db/migrations/`** (`NNNN_nome.sql`), aplicado
@@ -137,11 +138,18 @@ funções puras, sem banco e sem tela, conferidas com os números dos prints do 
    `saveParams` também confere que existe preço possível antes de gravar.
 7. **Custo real e preço de tabela não são colunas.** Saem sempre de `src/lib/pricing/`,
    a partir do custo da assessoria, do crédito (oito casas) e da embalagem.
+   Única exceção: o preço da tabela **publicada** (`price_table_items`), que é a saída do
+   motor no momento da publicação e não pode mudar quando o motor mudar. Custo real
+   continua não sendo coluna em lugar nenhum.
 8. **Teste de banco só em banco cujo nome termina em `_test`.** O apoio dos testes
    (`tests/db-helpers.ts`) recusa qualquer outro.
 9. **Ação de servidor é endpoint público:** toda função exportada de um arquivo
    `"use server"` começa com `await requirePermission(...)`, antes de ler o formulário
    ou o banco. `tests/routes.test.ts` falha se faltar.
+10. **Versão publicada não se altera nem se apaga**, e toda tabela que aponta para
+    `products` usa chave estrangeira sem `ON DELETE CASCADE`: equipamento que já saiu
+    numa versão só pode ser desativado. `src/lib/db/price-table.ts` não tem `UPDATE`,
+    `DELETE` nem `TRUNCATE`; erro de publicação se resolve publicando outra versão.
 
 ## Git
 

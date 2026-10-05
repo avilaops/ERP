@@ -2,24 +2,28 @@ import Link from "next/link";
 import { requirePermission } from "@/lib/auth";
 import { menuItem } from "@/lib/auth/permissions";
 import { loadParams } from "@/lib/db/params";
+import { latestVersion, loadPublishedSnapshot } from "@/lib/db/price-table";
 import { listProducts } from "@/lib/db/products";
 import type { Product } from "@/lib/db/products";
 import { showMoney, showPercent } from "@/lib/format";
 import { roundCents } from "@/lib/pricing/money";
 import type { PricingParams } from "@/lib/pricing/params";
 import { productPrices } from "@/lib/pricing/table";
+import { draftPriceTable, pendingChanges, publishNotice } from "@/lib/price-table";
 import { productToRow } from "@/lib/product-form";
 import { counterText, hasCost, listHref, parseTab, PRODUCT_TABS, supplierLine, viewProducts } from "@/lib/products-view";
 import {
   createProductAction,
   deleteProductAction,
   pasteAdvisoryCostsAction,
+  publishPriceTableAction,
   setProductActiveAction,
   updateProductAction,
 } from "./actions";
 import { ProductRow } from "./ProductRow";
 import type { ProductRowData } from "./ProductRow";
 import { ProductTools } from "./ProductTools";
+import { PublishBanner } from "./PublishBanner";
 
 const ITEM = menuItem("produtos");
 
@@ -74,7 +78,11 @@ export default async function ProdutosPage({
   const tab = parseTab(first(query.aba));
   const search = (first(query.q) ?? "").trim();
 
-  const [params, products] = await Promise.all([loadParams(), listProducts()]);
+  const [params, products, latest] = await Promise.all([loadParams(), listProducts(), latestVersion()]);
+  // What the team sees against what would be published now.
+  const published = latest ? await loadPublishedSnapshot(latest.version) : null;
+  const draft = draftPriceTable(params, products);
+  const notice = publishNotice(draft, latest, pendingChanges(draft, published));
   const rows = viewProducts(products, { tab, search }).map((product) => toRow(product, params));
 
   return (
@@ -92,6 +100,8 @@ export default async function ProdutosPage({
           </>
         }
       />
+
+      <PublishBanner notice={notice} action={publishPriceTableAction} />
 
       <section className="mt-6 rounded-lg border border-slate-200 bg-white" aria-label="Equipamentos">
         <div className="flex flex-wrap items-end justify-between gap-4 p-4">

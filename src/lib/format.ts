@@ -59,3 +59,8 @@ export function parseDays(text: string): number | null {
   const days = Number(clean);
   return Number.isSafeInteger(days) && days > 0 ? days : null;
 }
+
+/** A date for reading, as it is in São Paulo whatever the server's clock zone: `05/10/2026`. */
+export function showDate(date: Date): string {
+  return date.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "numeric" });
+}
