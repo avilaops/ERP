@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+.next/
+out/
+build/
+next-env.d.ts
+tsconfig.tsbuildinfo
+
+# Env (only the example is versioned)
+.env*
+!.env.example
+
+# Agent scratch space
+.work/
+
+# Misc
+.DS_Store
+*.pem
+npm-debug.log*

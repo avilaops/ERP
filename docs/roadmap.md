@@ -72,7 +72,7 @@ O maior risco é o prazo de 30/10 para começar a vender. Ele depende do domíni
 - [x] Proposta aprovada e entrada paga
 - [x] Acesso ao protótipo, ficha cadastral e logos recebidos
 - [ ] Domínio registrado e servidor no ar
-- [ ] Login com os quatro perfis funcionando
+- [x] Login com os quatro perfis funcionando
 - [ ] Protótipo portado e validado com um pedido de teste
 - [ ] Equipamentos cadastrados com fotos
 - [ ] Equipe treinada e sistema em operação (30/10)
