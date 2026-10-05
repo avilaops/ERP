@@ -13,3 +13,10 @@ export function roundCents(value: number): number {
 
 /** Slack for comparing rates that come out of a division. */
 export const RATE_EPSILON = 1e-9;
+
+/**
+ * Slack for placing a discount in a band: one hundredth of a percentage point.
+ * Table prices are rounded to cents, so the limit a table was built for (20%)
+ * comes out as 19.99999% and must still count as inside the band.
+ */
+export const BAND_SLACK = 1e-4;

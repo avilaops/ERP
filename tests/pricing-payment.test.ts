@@ -64,7 +64,8 @@ test("parcelas: entrada inválida dá erro", () => {
   assert.throws(() => installments({ ...base, count: 0 }), /parcelas/);
   assert.throws(() => installments({ ...base, count: 2.5 }), /parcelas/);
   assert.throws(() => installments({ ...base, firstInDays: -1 }), /Prazos/);
-  assert.throws(() => installments({ ...base, balance: -1 }), /Saldo/);
+  assert.throws(() => installments({ ...base, balance: -1 }), /Saldo a parcelar não pode ser negativo/);
+  assert.throws(() => installments({ ...base, balance: Number.NaN }), /Saldo a parcelar precisa ser um valor/);
   assert.throws(() => installments({ ...base, from: "28/09/2026" }), /Data inválida/);
 });
 

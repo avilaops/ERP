@@ -65,7 +65,8 @@ export function installments({
   if (!Number.isInteger(firstInDays) || firstInDays < 0 || !Number.isInteger(intervalDays) || intervalDays < 0) {
     throw new Error("Prazos das parcelas precisam ser dias inteiros, sem valor negativo.");
   }
-  if (!(balance >= 0)) throw new Error("Saldo a parcelar não pode ser negativo.");
+  if (!Number.isFinite(balance)) throw new Error("Saldo a parcelar precisa ser um valor em reais.");
+  if (balance < 0) throw new Error("Saldo a parcelar não pode ser negativo.");
 
   const totalCents = Math.round(roundCents(balance) * 100);
   const eachCents = Math.floor(totalCents / count);

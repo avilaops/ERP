@@ -1,4 +1,4 @@
-import { RATE_EPSILON, roundCents } from "@/lib/pricing/money";
+import { BAND_SLACK, RATE_EPSILON, roundCents } from "@/lib/pricing/money";
 import type { PricingParams } from "@/lib/pricing/params";
 import { requiredDownPayment } from "@/lib/pricing/payment";
 import { chinaPayment } from "@/lib/pricing/product";
@@ -80,8 +80,9 @@ function checkOrder({ items, discount, freight = 0 }: OrderInput): void {
       throw new Error("Item com preço ou custo inválido.");
     }
   }
-  if (!(discount >= 0 && discount < 1)) throw new Error("Desconto precisa ser de 0% até menos de 100%.");
-  if (!(freight >= 0)) throw new Error("Frete não pode ser negativo.");
+  checkDiscount(discount);
+  if (!Number.isFinite(freight)) throw new Error("Frete precisa ser um valor em reais.");
+  if (freight < 0) throw new Error("Frete não pode ser negativo.");
 }
 
 export function quoteOrder(order: OrderInput, params: PricingParams): OrderQuote {
@@ -148,9 +149,14 @@ export function quoteOrder(order: OrderInput, params: PricingParams): OrderQuote
 
 export type DiscountBand = "na-meta" | "abaixo-da-meta" | "prejuizo";
 
+function checkDiscount(discount: number): void {
+  if (!(discount >= 0 && discount < 1)) throw new Error("Desconto precisa ser de 0% até menos de 100%.");
+}
+
 export function discountBand(discount: number, max: MaxDiscounts): DiscountBand {
-  if (discount <= max.atTarget + RATE_EPSILON) return "na-meta";
-  if (discount <= max.noLoss + RATE_EPSILON) return "abaixo-da-meta";
+  checkDiscount(discount);
+  if (discount <= max.atTarget + BAND_SLACK) return "na-meta";
+  if (discount <= max.noLoss + BAND_SLACK) return "abaixo-da-meta";
   return "prejuizo";
 }
 
@@ -171,6 +177,7 @@ export function policyCheck(
   }: { discount: number; downPayment: number; invoiceTotal: number; band: DiscountBand },
   params: PricingParams,
 ): PolicyCheck {
+  checkDiscount(discount);
   const reasons: ApprovalReason[] = [];
   if (discount > params.freeDiscount + RATE_EPSILON) reasons.push("desconto-acima-do-livre");
   if (band !== "na-meta") reasons.push("fora-da-meta");

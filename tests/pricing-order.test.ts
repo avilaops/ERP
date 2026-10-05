@@ -102,7 +102,9 @@ test("pedido inválido dá erro em português", () => {
   assert.throws(() => quoteOrder({ ...MANUAL_ORDER, items: [{ ...FLEXORA, tableUnitPrice: 0 }] }, P), /preço ou custo/);
   assert.throws(() => quoteOrder({ ...MANUAL_ORDER, discount: 1 }, P), /Desconto/);
   assert.throws(() => quoteOrder({ ...MANUAL_ORDER, discount: -0.1 }, P), /Desconto/);
-  assert.throws(() => quoteOrder({ ...MANUAL_ORDER, freight: -1 }, P), /Frete/);
+  assert.throws(() => quoteOrder({ ...MANUAL_ORDER, freight: -1 }, P), /Frete não pode ser negativo/);
+  assert.throws(() => quoteOrder({ ...MANUAL_ORDER, freight: Number.NaN }, P), /Frete precisa ser um valor/);
+  assert.throws(() => quoteOrder({ ...MANUAL_ORDER, discount: Number.NaN }, P), /Desconto/);
 });
 
 test("faixa do desconto: na meta, abaixo da meta e prejuízo", () => {
@@ -112,6 +114,46 @@ test("faixa do desconto: na meta, abaixo da meta e prejuízo", () => {
   assert.equal(discountBand(0.21, max), "abaixo-da-meta");
   assert.equal(discountBand(0.49, max), "abaixo-da-meta");
   assert.equal(discountBand(0.5, max), "prejuizo");
+});
+
+test("faixa do desconto: 20% em MA não contribuinte = na-meta, apesar do preço arredondado a centavos", () => {
+  const destination = { uf: "MA", taxpayer: false } as const;
+  const cases: OrderInput["items"][] = [[FLEXORA, SECOND], [FLEXORA], [SECOND]];
+  for (const items of cases) {
+    const quote = quoteOrder({ items, discount: P.freeDiscount, destination }, P);
+    const max = maxDiscounts({ tableTotal: quote.tableTotal, cost: quote.equipmentCost }, P, destination);
+    // O limite sai 19,99999...% ou 20,00000...%: a tela mostra 20,0% nos três.
+    assert.equal(percent(max.atTarget, 1), "20.0");
+    const band = discountBand(P.freeDiscount, max);
+    assert.equal(band, "na-meta");
+    assert.deepEqual(
+      policyCheck(
+        { discount: P.freeDiscount, downPayment: quote.invoiceTotal, invoiceTotal: quote.invoiceTotal, band },
+        P,
+      ),
+      { needsApproval: false, reasons: [] },
+    );
+  }
+});
+
+test("faixa do desconto: a folga é de um centésimo de ponto, não mais", () => {
+  const max = { atTarget: 0.2, noLoss: 0.49 };
+  assert.equal(discountBand(0.2001, max), "na-meta");
+  assert.equal(discountBand(0.2002, max), "abaixo-da-meta");
+  assert.equal(discountBand(0.4901, max), "abaixo-da-meta");
+  assert.equal(discountBand(0.4902, max), "prejuizo");
+});
+
+test("faixa e política recusam desconto que não é número de 0% até menos de 100%", () => {
+  const max = { atTarget: 0.2, noLoss: 0.49 };
+  for (const discount of [Number.NaN, Number.POSITIVE_INFINITY, -0.01, 1, 1.5]) {
+    assert.throws(() => discountBand(discount, max), /Desconto precisa ser/, String(discount));
+    assert.throws(
+      () => policyCheck({ discount, downPayment: 1000, invoiceTotal: 1000, band: "na-meta" }, P),
+      /Desconto precisa ser/,
+      String(discount),
+    );
+  }
 });
 
 test("política: o pedido-gabarito só pede aprovação pela entrada", () => {
