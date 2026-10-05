@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { LOCAL_COOKIE, localProvider } from "@/lib/auth/local-provider";
 
-/** Writes the local sign-in cookie. Outside development and tests it does not exist. */
+/** Writes the local sign-in cookie. Without the local provider (see `isLocalProviderEnabled`) it does not exist. */
 export async function POST(request: Request): Promise<Response> {
   const provider = localProvider(process.env);
   if (!provider.available) return new Response("Not Found", { status: 404 });

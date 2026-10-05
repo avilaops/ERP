@@ -21,12 +21,12 @@ npm run dev                  # http://localhost:3020
 | --- | --- |
 | `npm run dev` | Sobe o sistema em desenvolvimento na porta 3020. |
 | `npm run build` | Gera a versão de produção. |
-| `npm run start` | Serve a versão de produção (exige as variáveis do `.env.example`). |
+| `npm run start` | Serve a versão de produção (exige as variáveis do `.env.example`, com `SSO_JWT_SECRET` de 32+ caracteres e `APP_URL` em https). |
 | `npm run lint` | Confere o código com o ESLint. |
 | `npm run typecheck` | Confere os tipos do TypeScript. |
 | `npm test` | Roda os testes automatizados. |
 
-O login é feito pelo Auth central da Ávila Ops, e o perfil de cada pessoa (Diretoria, Gerente comercial, Vendedor ou Financeiro) é definido dentro do ERP. Em desenvolvimento, `/dev/login` entra com um usuário de teste por perfil. Detalhes e regras para quem mexe no código estão no [`AGENTS.md`](AGENTS.md).
+O login é feito pelo Auth central da Ávila Ops, e o perfil de cada pessoa (Diretoria, Gerente comercial, Vendedor ou Financeiro) é definido dentro do ERP. Em desenvolvimento, com `ERP_LOCAL_LOGIN=1` no `.env.local`, `/dev/login` entra com um usuário de teste por perfil. Detalhes e regras para quem mexe no código estão no [`AGENTS.md`](AGENTS.md).
 
 ## Contato
 

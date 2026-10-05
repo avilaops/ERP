@@ -14,7 +14,7 @@ export default function DevLoginPage() {
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-4 p-6">
       <h1 className="text-2xl font-semibold">Login local</h1>
       <p className="text-sm text-slate-600">
-        Só existe em desenvolvimento. Escolha um perfil para ver o menu dele.
+        Só existe em desenvolvimento, com ERP_LOCAL_LOGIN=1. Escolha um perfil para ver o menu dele.
       </p>
       <form action="/dev/login/enter" method="post" className="flex flex-col gap-2">
         {provider.users.map((user) => (

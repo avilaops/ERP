@@ -15,7 +15,9 @@ export type SsoUser = {
 
 /**
  * Validates the central auth token locally. Anything wrong with it (signature,
- * issuer, expiry, shape, missing secret) yields `null`.
+ * issuer, expiry, shape, missing secret) yields `null`. A token without a
+ * numeric `exp` is refused: the library only checks expiry when the claim
+ * exists, and a session that never expires is not one the central auth issues.
  *
  * The SSO `papel` claim is deliberately not returned: the ERP profile comes
  * from the ERP's own user directory.
@@ -25,6 +27,7 @@ export function verifySsoToken(token: string | undefined, secret: string | undef
   try {
     const payload = jwt.verify(token, secret, { issuer: SSO_ISSUER, algorithms: ["HS256"] });
     if (typeof payload === "string") return null;
+    if (typeof payload.exp !== "number") return null;
     const { email, nome } = payload;
     if (typeof email !== "string" || email.trim() === "") return null;
     return { email, name: typeof nome === "string" && nome.trim() !== "" ? nome : email };

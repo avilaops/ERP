@@ -135,4 +135,10 @@ test("produção com configuração inválida não atende requisição (falha fe
   await withEnv({ ...PRODUCTION, SSO_JWT_SECRET: undefined }, async () => {
     await assert.rejects(() => getSession(), /SSO_JWT_SECRET ausente/);
   });
+  await withEnv({ ...PRODUCTION, SSO_JWT_SECRET: "segredo-curto" }, async () => {
+    await assert.rejects(() => getSession(), /SSO_JWT_SECRET curto/);
+  });
+  await withEnv({ ...PRODUCTION, APP_URL: "http://erp.teste.local" }, async () => {
+    await assert.rejects(() => requirePermission("dashboard"), /APP_URL sem https/);
+  });
 });

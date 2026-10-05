@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import { createHmac } from "node:crypto";
 import { test } from "node:test";
+import jwt from "jsonwebtoken";
 import { loginUrl, verifySsoToken } from "@/lib/auth/sso";
 import { SECRET, ssoToken } from "./helpers.ts";
 
@@ -25,6 +27,32 @@ test("emissor errado devolve null", () => {
 
 test("token expirado devolve null", () => {
   assert.equal(verifySsoToken(ssoToken({}, { expiresIn: -10 }), SECRET), null);
+});
+
+test("token sem exp numérico devolve null", () => {
+  const claims = { sub: "u1", email: "dir@teste.local", nome: "Diana Diretora" };
+  const sign = (extra: object) =>
+    jwt.sign({ ...claims, ...extra }, SECRET, { issuer: "auth.avilaops.com", algorithm: "HS256" });
+
+  const withoutExp = sign({});
+  assert.equal("exp" in (jwt.decode(withoutExp) as object), false);
+  assert.equal(verifySsoToken(withoutExp, SECRET), null);
+
+  // jsonwebtoken refuses to sign a non-numeric exp, so these are built by hand.
+  const encode = (value: object) => Buffer.from(JSON.stringify(value)).toString("base64url");
+  const signRaw = (payload: object) => {
+    const body = `${encode({ alg: "HS256", typ: "JWT" })}.${encode(payload)}`;
+    return `${body}.${createHmac("sha256", SECRET).update(body).digest("base64url")}`;
+  };
+  const future = Math.floor(Date.now() / 1000) + 3600;
+  const base = { ...claims, iss: "auth.avilaops.com" };
+  assert.deepEqual(verifySsoToken(signRaw({ ...base, exp: future }), SECRET), {
+    email: "dir@teste.local",
+    name: "Diana Diretora",
+  });
+  assert.equal(verifySsoToken(signRaw(base), SECRET), null);
+  assert.equal(verifySsoToken(signRaw({ ...base, exp: null }), SECRET), null);
+  assert.equal(verifySsoToken(signRaw({ ...base, exp: String(future) }), SECRET), null);
 });
 
 test("token malformado, vazio ou sem e-mail devolve null", () => {

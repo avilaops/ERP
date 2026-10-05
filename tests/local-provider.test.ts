@@ -8,6 +8,7 @@ import { APP_URL, redirectOf, SECRET, setCookies, withEnv } from "./helpers.ts";
 
 const PRODUCTION = {
   NODE_ENV: "production",
+  ERP_LOCAL_LOGIN: "1",
   SSO_JWT_SECRET: SECRET,
   APP_URL,
   ERP_USERS: "dir@teste.local:DIRETORIA",
@@ -21,9 +22,9 @@ const enter = (role: string) =>
     }),
   );
 
-test("em development e test o provedor local tem um usuário por perfil", () => {
+test("em development e test, com ERP_LOCAL_LOGIN=1, o provedor local tem um usuário por perfil", () => {
   for (const NODE_ENV of ["development", "test"]) {
-    const provider = localProvider({ NODE_ENV });
+    const provider = localProvider({ NODE_ENV, ERP_LOCAL_LOGIN: "1" });
     assert.ok(provider.available);
     assert.deepEqual(provider.users.map((user) => user.role), [...ROLES]);
     assert.ok(provider.users.every((user) => user.email.endsWith("@teste.local")));
@@ -34,9 +35,37 @@ test("em development e test o provedor local tem um usuário por perfil", () => 
 });
 
 test("em produção, ou com NODE_ENV ausente ou desconhecido, o provedor local é indisponível", () => {
-  assert.deepEqual(localProvider({ NODE_ENV: "production" }), { available: false });
-  assert.deepEqual(localProvider({}), { available: false });
-  assert.deepEqual(localProvider({ NODE_ENV: "staging" }), { available: false });
+  assert.deepEqual(localProvider({ NODE_ENV: "production", ERP_LOCAL_LOGIN: "1" }), { available: false });
+  assert.deepEqual(localProvider({ ERP_LOCAL_LOGIN: "1" }), { available: false });
+  assert.deepEqual(localProvider({ NODE_ENV: "staging", ERP_LOCAL_LOGIN: "1" }), { available: false });
+});
+
+test("sem ERP_LOCAL_LOGIN=1 o provedor local é indisponível mesmo em development e test", () => {
+  for (const NODE_ENV of ["development", "test"]) {
+    for (const ERP_LOCAL_LOGIN of [undefined, "", "0", "true", " 1"]) {
+      assert.deepEqual(localProvider({ NODE_ENV, ERP_LOCAL_LOGIN }), { available: false }, `${NODE_ENV}/${ERP_LOCAL_LOGIN}`);
+    }
+  }
+});
+
+test("em development sem ERP_LOCAL_LOGIN a rota responde 404 e o cookie local é ignorado", async () => {
+  await withEnv(
+    { NODE_ENV: "development", ERP_LOCAL_LOGIN: undefined, SSO_JWT_SECRET: undefined, APP_URL: undefined, ERP_USERS: undefined },
+    async () => {
+      setCookies({});
+      assert.equal((await enter("DIRETORIA")).status, 404);
+      assert.equal(globalThis.__TEST_COOKIES__?.has(LOCAL_COOKIE), false);
+
+      for (const role of ROLES) {
+        setCookies({ [LOCAL_COOKIE]: role });
+        assert.equal(await getSession(), null, role);
+        assert.match(
+          (await redirectOf(() => requirePermission("dashboard"))) ?? "",
+          /^https:\/\/auth\.avilaops\.com\/login\?/,
+        );
+      }
+    },
+  );
 });
 
 test("em produção a rota do login local responde 404 e não grava cookie", async () => {
@@ -61,8 +90,8 @@ test("em produção getSession não aceita o cookie do provedor local", async ()
   });
 });
 
-test("em development a rota grava o cookie e cada perfil entra", async () => {
-  await withEnv({ NODE_ENV: "development", SSO_JWT_SECRET: undefined, APP_URL: undefined, ERP_USERS: undefined }, async () => {
+test("em development com ERP_LOCAL_LOGIN=1 a rota grava o cookie e cada perfil entra", async () => {
+  await withEnv({ NODE_ENV: "development", ERP_LOCAL_LOGIN: "1", SSO_JWT_SECRET: undefined, APP_URL: undefined, ERP_USERS: undefined }, async () => {
     for (const role of ROLES) {
       setCookies({});
       const response = await enter(role);

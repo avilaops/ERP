@@ -1,6 +1,7 @@
 import jwt from "jsonwebtoken";
 
-export const SECRET = "segredo-de-teste";
+/** 32+ characters: production refuses a shorter SSO_JWT_SECRET. */
+export const SECRET = "segredo-de-teste-com-mais-de-32-caracteres";
 export const APP_URL = "https://erp.teste.local";
 
 declare global {
