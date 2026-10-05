@@ -34,8 +34,9 @@ Depois crie a base do projeto:
    (número, snapshot JSONB, publicada_em, publicada_por),
    Customer (PF/PJ, IE, contribuinte, endereço), Order, OrderItem, Approval,
    LostReason, Receivable (parcela), Receipt (cada recebimento, imutável,
-   ligado à parcela), Payable, Commission (ligada ao Receipt que a gerou),
-   Refund (estorno/devolução, imutável, negativo), SalesGoal, IdempotencyKey. Datas de calendário em DATE e eventos em
+   ligado à parcela), Payable, Commission (origem em Receipt OU Refund: receipt_id e refund_id
+   opcionais com CHECK exigindo exatamente um), Refund (estorno/devolução,
+   imutável, negativo), SalesGoal, IdempotencyKey. Datas de calendário em DATE e eventos em
    TIMESTAMPTZ, conforme as instruções.
 4. Migration inicial e seed com os equipamentos, parâmetros e alíquotas por UF
    do protótipo.
@@ -109,6 +110,10 @@ Siga .github/copilot-instructions.md e reproduza o fluxo de pedido do protótipo
   GERENTE_COMERCIAL e DIRETORIA, com aprovar/reprovar e comentário.
   Pedido com lucro negativo só é aprovado pela DIRETORIA (checagem no servidor);
   para o gerente ele aparece como "requer aprovação da diretoria", sem valores.
+  Reprovar leva o pedido para REPROVADO, editável pelo vendedor com o
+  comentário; reenviar cria novo Approval e volta para AGUARDANDO_APROVACAO,
+  mantendo as decisões anteriores. Mínimo de entrada exigido = maior entre o
+  percentual configurado e a fórmula; teste com entrada entre 64% e 65%.
   A aprovação guarda o hash da revisão aprovada; mudar itens, quantidades,
   desconto, UF, contribuinte, frete, entrada ou parcelas invalida a aprovação.
   Teste: alterar o desconto de um pedido aprovado e tentar fechar deve voltar
@@ -174,6 +179,15 @@ Siga .github/copilot-instructions.md.
    restauração documentado em docs/operacao.md.
 5. Pipeline GitHub Actions criado na fase 1: incluir os testes Playwright e a
    checagem de campos sensíveis como etapas obrigatórias antes do deploy.
+6. Validação com dados reais em produção: conferir a carga de equipamentos e
+   usuários, montar com o Rogério um pedido real de ponta a ponta (orçamento,
+   aprovação, fechamento, recebimento e comissão) e comparar os números com o
+   protótipo. Registrar o aceite em docs/aceite-fase3.md.
+7. Treinamento e entrada em operação: roteiro de treinamento por perfil
+   baseado no manual (docs/manual), sessão com a equipe, checklist de go-live
+   (domínio, login dos quatro perfis, backup rodando, tabela publicada,
+   usuários ativos) e plano de volta caso algo falhe no dia 30/10. A fase só
+   termina com a equipe vendendo pelo sistema.
 ```
 
 ## Fase 4. Fiscal no cálculo (03/11 a 13/11)
