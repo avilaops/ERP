@@ -21,6 +21,7 @@ export function CustomerForm({
   saved,
   required,
   cepNote,
+  hidden,
   action,
 }: {
   kind: CustomerKind;
@@ -31,6 +32,8 @@ export function CustomerForm({
   required: CustomerFieldKey[];
   /** `Pelo CEP, o estado é RS. …`, or `null`. */
   cepNote: string | null;
+  /** Fixed values that go with the record, such as the order it is being saved from. */
+  hidden?: Record<string, string>;
   action: SaveAction;
 }) {
   const [state, formAction, pending] = useActionState(action, IDLE_CUSTOMER);
@@ -91,6 +94,9 @@ export function CustomerForm({
     <form action={formAction} noValidate className="flex flex-col gap-6">
       {id !== null && <input type="hidden" name="id" value={id} />}
       <input type="hidden" name="kind" value={kind} />
+      {Object.entries(hidden ?? {}).map(([name, value]) => (
+        <input key={name} type="hidden" name={name} value={value} />
+      ))}
 
       {state.status === "error" && (
         <div role="alert" className="rounded border border-red-300 bg-red-50 p-4 text-sm text-red-900">

@@ -101,7 +101,10 @@ funções puras, sem banco e sem tela, conferidas com os números dos prints do 
    Diretoria.** Em `quoteOrder`, tudo de `taxes` para baixo é o quadro "Só o diretor
    vê": a página monta no servidor só o que o perfil pode ver. Quem vê custo é decidido
    por `seesCosts` (`permissions.ts`); a leitura para a equipe (`loadPublishedTable`)
-   não traz custo do banco.
+   não traz custo do banco. No pedido, `quoteSale` é a conta que a equipe vê (sem
+   custo) e `loadOrderStanding` é a única leitura de custo feita para pedido de quem não
+   é Diretoria: usa o custo no servidor e devolve só o nome da faixa do desconto. Nada
+   se calcula no navegador.
 4. **A pasta não conhece o resto do sistema.** Sem `next/*`, `react`, `@/lib/auth`,
    `process.env`, relógio ou rede: parâmetros e datas (`AAAA-MM-DD`) entram por
    argumento. `tests/pricing-purity.test.ts` falha se isso mudar.
@@ -126,7 +129,8 @@ funções puras, sem banco e sem tela, conferidas com os números dos prints do 
    `updateProduct`, `deleteProduct`, `applyAdvisoryCosts`, `publishPriceTable`,
    `latestVersion`, `loadPublishedSnapshot`, `loadPublishedTable`, `listVersions`,
    `createCustomer`, `updateCustomer`, `getCustomer`, `findCustomerByDocument`,
-   `listCustomers`, …).
+   `listCustomers`, `createOrder`, `getOrder`, `addOrderItem`, `setOrderItemQuantity`,
+   `removeOrderItem`, `saveOrderTerms`, `linkOrderCustomer`, `loadOrderStanding`, …).
    Arquivo com `"use client"` nunca importa `@/lib/db`.
 3. **Consulta só com parâmetros (`$1`).** Valor nunca é colado no texto do SQL.
 4. **Mudança de esquema é arquivo novo em `db/migrations/`** (`NNNN_nome.sql`), aplicado
@@ -151,8 +155,10 @@ funções puras, sem banco e sem tela, conferidas com os números dos prints do 
    `"use server"` começa com `await requirePermission(...)`, antes de ler o formulário
    ou o banco. `tests/routes.test.ts` falha se faltar.
 10. **Versão publicada não se altera nem se apaga**, e toda tabela que aponta para
-    `products` usa chave estrangeira sem `ON DELETE CASCADE`: equipamento que já saiu
-    numa versão só pode ser desativado. `src/lib/db/price-table.ts` não tem `UPDATE`,
+    `products`, `price_table_versions`, `price_table_items`, `customers` ou `orders` usa
+    chave estrangeira sem `ON DELETE CASCADE`. O preço do pedido é o da versão para a
+    qual o item aponta (`order_items` → `price_table_items`): pedido não tem coluna de
+    preço, custo nem total. Equipamento que já saiu numa versão só pode ser desativado. `src/lib/db/price-table.ts` não tem `UPDATE`,
     `DELETE` nem `TRUNCATE`; erro de publicação se resolve publicando outra versão.
 
 ## Git

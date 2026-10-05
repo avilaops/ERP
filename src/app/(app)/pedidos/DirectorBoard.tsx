@@ -1,0 +1,67 @@
+import { showMoney, showPercent } from "@/lib/format";
+import type { DirectorBoard as Board } from "@/lib/order-quote";
+
+/** `– R$ 7.304,31`: what leaves the sale. */
+const minus = (value: number) => `– ${showMoney(value)}`;
+
+type Row = [label: string, value: string, strong?: boolean];
+
+function Rows({ rows }: { rows: Row[] }) {
+  return (
+    <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-2 text-sm">
+      {rows.map(([label, value, strong]) => (
+        <div key={label} className="contents">
+          <dt className={strong ? "font-medium" : "text-slate-600"}>{label}</dt>
+          <dd className={`text-right ${strong ? "font-semibold" : ""}`}>{value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+/**
+ * The board "Só o diretor vê": taxes, cost, profit and the down payment the order
+ * needs. A server component on purpose: it is rendered only when the page has a
+ * board, and the page only has one for who `seesCosts`.
+ */
+export function DirectorBoard({ board }: { board: Board }) {
+  const { quote, max, targetNetProfit } = board;
+  const target = showPercent(targetNetProfit, 0);
+
+  const result: Row[] = [
+    ["Valor sem IPI", showMoney(quote.netSale)],
+    [`Impostos e taxas (${showPercent(quote.taxRate)})`, minus(quote.taxes)],
+    ...(quote.difalRate > 0 ? [[`DIFAL (${showPercent(quote.difalRate)})`, minus(quote.difal)] as Row] : []),
+    ["Custo dos equipamentos", minus(quote.equipmentCost)],
+    ...(quote.freight > 0 ? [["Frete", minus(quote.freight)] as Row] : []),
+    ["Sobra antes do IR", showMoney(quote.profitBeforeIncomeTax), true],
+    ["IRPJ + CSLL", minus(quote.incomeTax)],
+  ];
+  const profit: Row[] = [
+    ["Lucro líquido", `${showMoney(quote.netProfit)} · ${showPercent(quote.netProfitRate)}`, true],
+    [`Desconto máx. na meta (${target})`, showPercent(max.atTarget)],
+    ["Desconto máx. sem prejuízo", showPercent(max.noLoss)],
+  ];
+  const downPayment: Row[] = [
+    ["Pagar na China", showMoney(quote.chinaPayment)],
+    [`Lucro líquido da meta (${target})`, showMoney(quote.targetNetProfit)],
+    ["Comissão sobre a entrada", showMoney(quote.downPaymentCommission)],
+    ["Entrada mínima", `${showMoney(quote.requiredDownPayment)} · ${showPercent(quote.requiredDownPaymentRate, 0)} da nota`, true],
+  ];
+
+  return (
+    <aside className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-5" aria-labelledby="so-o-diretor">
+      <h2 id="so-o-diretor" className="text-xs font-semibold uppercase tracking-wide text-indigo-900">
+        Só o diretor vê
+      </h2>
+      <div className="mt-3 flex flex-col gap-3">
+        <Rows rows={result} />
+        <hr className="border-slate-200" />
+        <Rows rows={profit} />
+        <hr className="border-slate-200" />
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-indigo-900">Entrada necessária</h3>
+        <Rows rows={downPayment} />
+      </div>
+    </aside>
+  );
+}

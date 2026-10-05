@@ -51,6 +51,7 @@ test("toda ação de servidor confere a permissão antes de qualquer outra coisa
   assert.ok(actions.includes("parametros/actions.ts"));
   assert.ok(actions.includes("produtos/actions.ts"));
   assert.ok(actions.includes("clientes/actions.ts"));
+  assert.ok(actions.includes("pedidos/actions.ts"));
   for (const file of actions) {
     const code = readFileSync(APP_DIR + file, "utf8");
     // Each exported action opens with the check: nothing is read from the form or the database before it.
@@ -68,11 +69,12 @@ test("a página lê o banco só depois de conferir a permissão", () => {
     ["/produtos", "produtos", ["loadParams(", "listProducts(", "latestVersion(", "loadPublishedSnapshot("]],
     ["/clientes", "clientes", ["listCustomers("]],
     ["/clientes/[id]", "clientes", ["getCustomer("]],
+    ["/pedidos/novo", "pedidos", ["latestVersion(", "loadPublishedTable("]],
     ["/tabela-precos", "tabela-precos", ["latestVersion(", "loadPublishedTable(", "loadPublishedSnapshot("]],
   ];
   for (const [route, key, calls] of reads) {
     const code = source(route);
-    const permission = code.indexOf(`await requirePermission("${key}")`);
+    const permission = code.indexOf(`await requirePermission("${key}"`);
     assert.ok(permission > 0, route);
     for (const read of calls) {
       assert.ok(code.includes(read), `${route} não chama ${read}`);
@@ -105,14 +107,52 @@ test("Tabela de preços: custo só é lido para quem pode ver, e nada da pasta v
   assert.doesNotMatch(code, /seesCosts\((?!session\.role\))/);
 });
 
+test("Pedido: custo só é lido para quem pode ver, e nada dele vai para componente de navegador", () => {
+  const code = source("/pedidos/[numero]");
+  assert.ok(code.includes('export const dynamic = "force-dynamic"'));
+  assert.ok(code.includes('const session = await requirePermission("pedidos"'));
+  for (const forbidden of ['"DIRETORIA"', "use cache", "unstable_cache", "@/lib/db/products", "@/lib/db/params"]) {
+    assert.ok(!code.includes(forbidden), `pedidos/[numero]/page.tsx contém ${forbidden}`);
+  }
+
+  // O escopo e "ver custo" saem da sessão; o pedido é lido antes de qualquer custo.
+  assert.ok(code.includes("seesAllOrders(session.role) ? null : session.email"));
+  const permission = code.indexOf("await requirePermission(");
+  const decides = code.indexOf("seesCosts(session.role)");
+  assert.ok(decides > permission && permission > 0);
+  assert.doesNotMatch(code, /seesCosts\((?!session\.role\))/);
+  assert.doesNotMatch(code, /seesAllOrders\((?!session\.role\))/);
+  assert.equal(code.split("loadPublishedSnapshot(").length - 1, 1, "loadPublishedSnapshot( tem de aparecer uma vez só");
+  assert.ok(code.indexOf("loadPublishedSnapshot(") > decides);
+  for (const read of ["getOrder(", "loadPublishedTable(", "loadOrderStanding("]) {
+    assert.ok(code.indexOf(read) > permission, `${read} antes do requirePermission`);
+  }
+
+  // Nenhum componente de navegador da pasta conhece o quadro do diretor.
+  const files = appFiles().filter((file) => file.startsWith("pedidos/"));
+  const client = files.filter((file) => /^\s*["']use client["']/m.test(readFileSync(APP_DIR + file, "utf8")));
+  assert.ok(client.includes("pedidos/ActionForm.tsx"));
+  for (const file of client) {
+    assert.doesNotMatch(
+      readFileSync(APP_DIR + file, "utf8"),
+      /loadPublishedSnapshot|directorOf|DirectorBoard|OrderQuote|equipmentCost|netProfit|chinaPayment/,
+      file,
+    );
+  }
+  // E o quadro é componente de servidor.
+  assert.doesNotMatch(readFileSync(`${APP_DIR}pedidos/DirectorBoard.tsx`, "utf8"), /["']use client["']/);
+  // A lista de pedidos ainda é marcador: entra na parte seguinte.
+  assert.ok(source("/pedidos").includes("PlaceholderPage"));
+});
+
 test("/pedidos/novo é protegida pelo item Pedidos", () => {
   assert.ok(source("/pedidos/novo").includes(`await requirePermission("pedidos", "/pedidos/novo")`));
 });
 
 test("não existe página no grupo protegido sem requirePermission", () => {
   const all = pages();
-  // The menu items, plus /pedidos/novo and the record of one customer.
-  assert.equal(all.length, MENU_ITEMS.length + 2);
+  // The menu items, plus /pedidos/novo, one order and the record of one customer.
+  assert.equal(all.length, MENU_ITEMS.length + 3);
   for (const route of all) {
     assert.match(source(route), /await requirePermission\(/, route);
   }
