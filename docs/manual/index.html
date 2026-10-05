@@ -1,0 +1,771 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Manual Ludus ERP</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: central de ajuda estilo wiki. Barra superior, árvore de módulos à esquerda, página da funcionalidade ao centro (~70ch). */
+:root{
+  --bg:#eef0ec; --surface:#ffffff; --surface-2:#f6f7f4; --line:#dcdfd7; --ink:#1b1f24; --muted:#5d6570;
+  --accent:#2c47a8; --accent-ink:#ffffff; --accent-soft:#e6eaf8;
+  --info:#2c47a8; --info-bg:#eef1fb; --warn:#9a5b00; --warn-bg:#fff4e0; --ok:#1e7a46; --ok-bg:#e7f5ec; --pend:#6b5bb0; --pend-bg:#f0edfa;
+  --f-display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#14171b; --surface:#1c2025; --surface-2:#22272d; --line:#323840; --ink:#e8eaed; --muted:#a2a9b3;
+  --accent:#8fa4f0; --accent-ink:#10131a; --accent-soft:#232c48;
+  --info:#9fb1f2; --info-bg:#1f2640; --warn:#f0b357; --warn-bg:#3a2c12; --ok:#6fd39a; --ok-bg:#16301f; --pend:#bcaef0; --pend-bg:#2a2540;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#14171b; --surface:#1c2025; --surface-2:#22272d; --line:#323840; --ink:#e8eaed; --muted:#a2a9b3;
+  --accent:#8fa4f0; --accent-ink:#10131a; --accent-soft:#232c48;
+  --info:#9fb1f2; --info-bg:#1f2640; --warn:#f0b357; --warn-bg:#3a2c12; --ok:#6fd39a; --ok-bg:#16301f; --pend:#bcaef0; --pend-bg:#2a2540;
+  color-scheme:dark}
+*{box-sizing:border-box}
+html,body{background:var(--bg);color:var(--ink)}
+body{font-family:var(--f-body);font-size:16px;line-height:1.6}
+a{color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface);border-bottom:1px solid var(--line)}
+.top-in{display:flex;align-items:center;gap:16px;padding-block:10px;padding-inline:16px;max-width:1280px;margin:0 auto;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px;text-decoration:none;color:var(--ink)}
+.logo{width:104px;height:31px;background:currentColor;-webkit-mask:url(img/logo-mask.png) left center/contain no-repeat;mask:url(img/logo-mask.png) left center/contain no-repeat}
+.brand small{font-family:var(--f-display);font-weight:600;letter-spacing:.08em;text-transform:uppercase;font-size:14px;color:var(--muted);border-left:1px solid var(--line);padding-left:12px}
+.search{margin-left:auto;flex:1 1 220px;max-width:360px;position:relative}
+.search input{width:100%;font:inherit;font-size:15px;padding:8px 12px;border:1px solid var(--line);border-radius:6px;background:var(--surface-2);color:var(--ink)}
+.results{position:absolute;left:0;right:0;top:calc(100% + 4px);background:var(--surface);border:1px solid var(--line);border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,.12);max-height:60vh;overflow:auto}
+.results a{display:block;padding:8px 12px;text-decoration:none;color:var(--ink);border-bottom:1px solid var(--line)}
+.results a:hover,.results a:focus{background:var(--accent-soft)}
+.results span{display:block;font-size:13px;color:var(--muted)}
+
+.wrap{display:grid;grid-template-columns:270px minmax(0,1fr);gap:32px;max-width:1280px;margin:0 auto;padding-inline:16px;padding-block:24px 64px}
+nav.tree{position:sticky;top:calc(env(safe-area-inset-top,0px) + 70px);align-self:start;max-height:calc(100vh - 90px);overflow:auto;font-size:15px}
+.tree h4{font-family:var(--f-display);font-weight:700;text-transform:uppercase;letter-spacing:.07em;font-size:14px;color:var(--muted);margin:18px 0 4px}
+.tree h4:first-child{margin-top:0}
+.tree a{display:block;padding:4px 10px;border-radius:5px;text-decoration:none;color:var(--ink)}
+.tree a:hover{background:var(--surface)}
+.tree a[aria-current="page"]{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.tree .tag{font-size:11px;font-family:var(--f-mono);color:var(--pend);margin-left:4px}
+details.mtree{display:none}
+
+main{min-width:0}
+.page{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:32px clamp(18px,4vw,48px) 40px;max-width:900px}
+.crumb{font-size:14px;color:var(--muted);margin-bottom:6px}
+.crumb a{color:var(--muted)}
+h1{font-family:var(--f-display);font-weight:700;font-size:clamp(30px,4vw,40px);line-height:1.05;letter-spacing:.01em;text-transform:uppercase;margin:0 0 6px;text-wrap:balance}
+.lead{font-size:18px;color:var(--muted);max-width:66ch;margin:0 0 20px}
+.toc{background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:12px 18px;margin:0 0 28px;font-size:15px;max-width:66ch}
+.toc b{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.06em;font-size:14px;color:var(--muted)}
+.toc ol{margin:6px 0 0;padding-left:20px}
+h2{font-family:var(--f-display);font-weight:700;font-size:25px;text-transform:uppercase;letter-spacing:.02em;margin:36px 0 8px;padding-top:12px;border-top:1px solid var(--line);text-wrap:balance}
+h3{font-size:17px;font-weight:600;margin:22px 0 6px}
+.page p,.page li{max-width:68ch}
+.menu-path{display:inline-block;font-family:var(--f-mono);font-size:14px;background:var(--accent-soft);color:var(--accent);padding:1px 8px;border-radius:4px;white-space:nowrap}
+.btn{display:inline-block;font-family:var(--f-body);font-weight:600;font-size:14px;border:1px solid var(--line);background:var(--surface-2);padding:0 7px;border-radius:4px;white-space:nowrap}
+.steps{list-style:none;padding:0;margin:10px 0 16px}
+.steps>li{position:relative;padding-left:28px;margin:8px 0}
+.steps>li::before{content:"→";position:absolute;left:4px;top:0;color:var(--accent);font-weight:600}
+.steps ul{margin:4px 0 0;padding-left:18px}
+.steps ul li{margin:3px 0}
+figure{margin:18px 0 24px}
+figure img{display:block;width:100%;height:auto;border:1px solid var(--line);border-radius:6px;cursor:zoom-in;background:#fff}
+figcaption{font-size:14px;color:var(--muted);margin-top:6px}
+.table-wrap{overflow-x:auto;margin:12px 0 20px;border:1px solid var(--line);border-radius:6px}
+table{border-collapse:collapse;width:100%;font-size:15px;min-width:520px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{background:var(--surface-2);font-family:var(--f-display);font-weight:600;text-transform:uppercase;letter-spacing:.05em;font-size:14px;color:var(--muted)}
+tr:last-child td{border-bottom:0}
+td:first-child{font-weight:600;white-space:nowrap}
+.note{border-radius:6px;padding:12px 16px;margin:16px 0;font-size:15px;max-width:72ch;border:1px solid transparent}
+.note b:first-child{display:block;font-family:var(--f-display);text-transform:uppercase;letter-spacing:.06em;font-size:14px;margin-bottom:2px}
+.note.info{background:var(--info-bg);color:var(--ink);border-color:color-mix(in srgb,var(--info) 25%,transparent)}
+.note.info b:first-child{color:var(--info)}
+.note.warn{background:var(--warn-bg);border-color:color-mix(in srgb,var(--warn) 30%,transparent)}
+.note.warn b:first-child{color:var(--warn)}
+.note.ok{background:var(--ok-bg);border-color:color-mix(in srgb,var(--ok) 30%,transparent)}
+.note.ok b:first-child{color:var(--ok)}
+.note.pend{background:var(--pend-bg);border-color:color-mix(in srgb,var(--pend) 30%,transparent)}
+.note.pend b:first-child{color:var(--pend)}
+.formula{font-family:var(--f-mono);font-size:15px;background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:12px 16px;overflow-x:auto;white-space:pre;margin:12px 0}
+.pn{display:flex;justify-content:space-between;gap:12px;margin-top:40px;padding-top:16px;border-top:1px solid var(--line);flex-wrap:wrap}
+.pn a{text-decoration:none;max-width:48%}
+.pn small{display:block;color:var(--muted);font-size:13px}
+.updated{font-size:13px;color:var(--muted);margin-top:24px}
+
+.home-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-top:8px}
+.mod{border:1px solid var(--line);border-radius:6px;padding:14px 16px;background:var(--surface-2)}
+.mod h3{font-family:var(--f-display);font-weight:700;text-transform:uppercase;letter-spacing:.04em;font-size:18px;margin:0 0 6px}
+.mod ul{list-style:none;margin:0;padding:0;font-size:15px}
+.mod li{padding:2px 0}
+.mod a{text-decoration:none}
+
+.lb{position:fixed;inset:0;background:rgba(10,12,16,.86);display:flex;align-items:center;justify-content:center;padding:16px;z-index:20;cursor:zoom-out}
+[hidden]{display:none!important}
+.lb img{max-width:100%;max-height:100%;border-radius:4px}
+
+@media (max-width:860px){
+  .wrap{grid-template-columns:minmax(0,1fr);gap:16px;padding-block:16px 48px}
+  nav.tree{display:none}
+  details.mtree{display:block;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 14px}
+  details.mtree summary{font-weight:600;cursor:pointer}
+  details.mtree .tree{display:block;position:static;max-height:none;margin-top:8px}
+  .page{padding:22px 16px 28px}
+  .brand small{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-in">
+    <a class="brand" href="#inicio" aria-label="Manual Ludus ERP, início"><span class="logo" role="img" aria-label="Ludus"></span><small>Manual do sistema</small></a>
+    <div class="search">
+      <label for="q" hidden>Buscar no manual</label>
+      <input id="q" type="search" placeholder="Buscar no manual (ex.: entrada mínima)" autocomplete="off">
+      <div class="results" id="results" hidden></div>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <nav class="tree" id="tree" aria-label="Índice do manual"></nav>
+  <main>
+    <details class="mtree" id="mtree"><summary>Índice do manual</summary><div class="tree" id="tree2"></div></details>
+    <article class="page" id="page"></article>
+  </main>
+</div>
+<div class="lb" id="lb" hidden><img id="lbimg" alt=""></div>
+
+<script>
+const PEND = `<div class="note pend"><b>Tela em validação</b>Esta tela está sendo finalizada com a Ludus. O passo a passo abaixo descreve o funcionamento combinado; os prints e os nomes exatos dos campos entram quando ela for publicada.</div>`;
+const fig = (src, cap) => `<figure><img src="img/${src}.jpg" alt="${cap}" loading="lazy"><figcaption>${cap}</figcaption></figure>`;
+const mp = s => `<span class="menu-path">${s}</span>`;
+const b = s => `<span class="btn">${s}</span>`;
+
+const PAGES = [
+/* ---------------- PRIMEIROS PASSOS ---------------- */
+{id:"apresentacao", mod:"Primeiros passos", title:"Apresentação do sistema",
+lead:"O que é o Sistema Comercial da Ludus e como ele organiza o trabalho da equipe, do custo do equipamento até a comissão do vendedor.",
+toc:["Para que serve","Como os módulos se conectam","Quem usa"],
+body:`
+<h2 id="s1">Para que serve</h2>
+<p>O Sistema Comercial da Ludus reúne em um só lugar o custo de cada equipamento importado, a tabela de preços, os pedidos, as aprovações, os recebimentos e as comissões. Cada pedido fechado alimenta sozinho o dashboard, os recebimentos e a comissão do vendedor.</p>
+<p>O sistema funciona pelo navegador, no computador ou no celular, sem instalar nada. O endereço de acesso é informado pela Ávila Ops na entrega.</p>
+<h2 id="s2">Como os módulos se conectam</h2>
+<ol class="steps">
+<li>A diretoria lança o custo que a assessoria de importação passou em ${mp("Produtos e custos")} e ajusta impostos e política em ${mp("Parâmetros")}.</li>
+<li>O sistema calcula o preço de tabela e o desconto máximo de cada equipamento. A equipe passa a ver a tabela nova depois que a diretoria clica em ${b("Publicar")}.</li>
+<li>O vendedor monta o pedido em ${b("+ Novo pedido")}. Se o desconto ou a entrada ficarem fora da política, o pedido vai para ${mp("Aprovações")}.</li>
+<li>Com o pedido fechado, as parcelas aparecem em ${mp("Recebimentos")}. Cada valor recebido gera a comissão em ${mp("Comissões")}.</li>
+<li>O ${mp("Dashboard")} mostra vendas, funil, lucro e ranking em tempo real.</li>
+</ol>
+<h2 id="s3">Quem usa</h2>
+<p>Cada pessoa entra com o próprio e-mail e vê só o que o perfil dela permite. Os perfis estão em <a href="#acesso">Acesso e perfis de usuário</a>.</p>`},
+
+{id:"acesso", mod:"Primeiros passos", title:"Acesso e perfis de usuário",
+lead:"Como entrar no sistema e o que cada perfil pode ver e fazer.",
+toc:["Entrar no sistema","Perfis de acesso","Esqueci a senha"],
+body:`
+<h2 id="s1">Entrar no sistema</h2>
+<ol class="steps">
+<li>Abra o endereço do sistema no navegador do computador ou do celular.</li>
+<li>Informe o e-mail cadastrado e a senha, ou use ${b("Continuar com Google")} ou ${b("Continuar com Microsoft")} se o seu e-mail for dessas contas.</li>
+<li>Depois de entrar, o card ${b("Seu acesso")}, no topo do menu, mostra o seu perfil.</li>
+</ol>
+<div class="note info"><b>Observação</b>No celular, use o menu do navegador e escolha "Adicionar à tela de início". O sistema passa a abrir como um aplicativo.</div>
+<h2 id="s2">Perfis de acesso</h2>
+<div class="table-wrap"><table>
+<tr><th>Perfil</th><th>O que vê e faz</th></tr>
+<tr><td>Diretoria</td><td>Acesso completo: custos, parâmetros, lucro e margem de cada pedido, aprovações, financeiro, comissões e equipe.</td></tr>
+<tr><td>Gerente comercial</td><td>Pedidos e orçamentos de toda a equipe, aprovação de pedidos fora da política, metas e ranking. Não vê custo nem lucro.</td></tr>
+<tr><td>Vendedor</td><td>Cria e acompanha os próprios pedidos e vê as próprias comissões. Vê o percentual mínimo de entrada, mas não vê custo, China nem lucro.</td></tr>
+<tr><td>Financeiro</td><td>Recebimentos, baixa de boletos e pagamentos, contas a pagar, fornecedores e pagamento de comissões.</td></tr>
+</table></div>
+<p>O cadastro de usuários e a troca de perfil são feitos pela diretoria em <a href="#equipe">Equipe e acessos</a>.</p>
+<h2 id="s3">Esqueci a senha</h2>
+<p>Na tela de entrada, clique em "Esqueceu a senha?" e siga o link enviado para o seu e-mail. Se o e-mail não chegar, fale com a diretoria ou com a Ávila Ops.</p>`},
+
+{id:"navegacao", mod:"Primeiros passos", title:"Navegação e menu",
+lead:"Onde fica cada função no menu lateral e os atalhos comuns a todas as telas.",
+toc:["Menu lateral","Botão Novo pedido","Listas, abas e busca"],
+body:`
+<h2 id="s1">Menu lateral</h2>
+<p>O menu fica à esquerda em todas as telas. Ele mostra apenas os itens liberados para o seu perfil.</p>
+${fig("menu","Menu lateral no perfil Diretoria, com o card Seu acesso e o botão + Novo pedido")}
+<div class="table-wrap"><table>
+<tr><th>Item</th><th>Para que serve</th></tr>
+<tr><td>Dashboard</td><td>Visão geral de vendas, funil, lucro e ranking.</td></tr>
+<tr><td>Preços e metas</td><td>Metas de venda e acompanhamento da tabela.</td></tr>
+<tr><td>Aprovações</td><td>Pedidos que pediram aprovação por desconto ou entrada.</td></tr>
+<tr><td>Pedidos</td><td>Todos os pedidos e orçamentos.</td></tr>
+<tr><td>Clientes</td><td>Cadastro de clientes.</td></tr>
+<tr><td>Recebimentos</td><td>Parcelas a receber e recebidas.</td></tr>
+<tr><td>Contas a pagar</td><td>Despesas e pagamentos da empresa.</td></tr>
+<tr><td>Fornecedores</td><td>Fábricas, assessoria e prestadores.</td></tr>
+<tr><td>Comissões</td><td>Comissão de cada vendedor por mês.</td></tr>
+<tr><td>Tabela de preços</td><td>Preços publicados para a equipe.</td></tr>
+<tr><td>Produtos e custos</td><td>Equipamentos e custos da assessoria.</td></tr>
+<tr><td>Parâmetros</td><td>Impostos, canal e política comercial.</td></tr>
+<tr><td>Simulador</td><td>Simulação de preço e desconto sem criar pedido.</td></tr>
+<tr><td>Equipe e acessos</td><td>Usuários e perfis.</td></tr>
+</table></div>
+<h2 id="s2">Botão Novo pedido</h2>
+<p>O botão ${b("+ Novo pedido")} fica sempre no topo do menu. Ele abre a tela de <a href="#novo-pedido">lançamento de pedidos</a> de qualquer lugar do sistema.</p>
+<h2 id="s3">Listas, abas e busca</h2>
+<ol class="steps">
+<li>As listas têm abas no topo para filtrar por situação, por exemplo ${b("Em aberto")}, ${b("Fechados")} e ${b("Todos")}. O número ao lado de cada aba mostra quantos registros ela tem.</li>
+<li>O campo de busca procura por nome, código, CNPJ ou CPF, conforme a tela.</li>
+<li>Os números das listas e dos cards se atualizam sozinhos a cada pedido.</li>
+</ol>`},
+
+/* ---------------- COMERCIAL ---------------- */
+{id:"novo-pedido", mod:"Comercial", title:"Lançamento de pedidos",
+lead:"Como montar um orçamento, aplicar desconto, combinar a forma de pagamento e fechar o pedido.",
+toc:["Abrir um novo pedido","Equipamentos","Cliente","Entrega e condições","Desconto e resumo","Forma de pagamento","Quadro Só o diretor vê","Fechar, copiar e salvar a proposta"],
+body:`
+<h2 id="s1">Abrir um novo pedido</h2>
+<p>Para lançar um pedido, clique em ${b("+ Novo pedido")} no topo do menu ou na tela ${mp("Pedidos")}.</p>
+<p>O pedido recebe um número no formato <code>#AAMMDD-XXXX</code>, por exemplo #260930-BBMN, e fica salvo enquanto você preenche.</p>
+${fig("pedido-cabecalho","Cabeçalho do pedido com número, situação, botões Copiar proposta e Salvar PDF e a lista de equipamentos")}
+<h2 id="s2">Equipamentos</h2>
+<ol class="steps">
+<li>Busque o equipamento pelo nome ou pelo código (ex.: LD-B001) e informe a quantidade.</li>
+<li>A tabela mostra, para cada item: valor unitário sem IPI, valor do desconto, IPI unitário (13%), valor unitário com IPI e total com IPI.</li>
+<li>A linha ${b("Total")} soma as unidades e os valores do pedido.</li>
+</ol>
+<h2 id="s3">Cliente</h2>
+<p>Escolha a aba ${b("Empresa (CNPJ)")} ou ${b("Pessoa física (CPF)")}. Campos com * são exigidos para fechar o pedido, mas o orçamento pode ser salvo antes.</p>
+${fig("pedido-cliente","Bloco Cliente com a aba Empresa (CNPJ), o controle de desconto e o resumo de valores")}
+<ol class="steps">
+<li><b>Empresa:</b> CNPJ, inscrição estadual (número ou ISENTO), razão social, nome fantasia, nome do responsável, celular e e-mail.</li>
+<li><b>Pessoa física:</b> nome completo, CPF, RG, celular e e-mail.</li>
+<li><b>Endereço:</b> informe o CEP. O sistema identifica o estado; complete rua, número, bairro e cidade.</li>
+<li>Os selos ${b("Cadastrado")} e ${b("Cadastro completo")} indicam que o cliente já existe e que todos os campos obrigatórios estão preenchidos.</li>
+</ol>
+<h2 id="s4">Entrega e condições</h2>
+<ol class="steps">
+<li><b>Estado de entrega:</b> segue a UF do endereço. Troque só se a entrega for em outro estado. Ele define o ICMS e o DIFAL da venda.</li>
+<li><b>Cliente contribuinte do ICMS (tem IE)?</b> É marcado sozinho pela inscrição estadual: ISENTO ou pessoa física fica como ${b("Não")}.</li>
+<li><b>Prazo de fabricação:</b> em dias corridos, contados a partir do pagamento da entrada. O sistema mostra a previsão de conclusão.</li>
+<li><b>Frete por nossa conta (R$):</b> deixe vazio se o cliente paga ou retira.</li>
+<li><b>Observações:</b> prazo, condição de pagamento ou qualquer combinado com o cliente.</li>
+</ol>
+<h2 id="s5">Desconto e resumo</h2>
+<p>O desconto é aplicado sobre a tabela, em %, pelo campo ou pela barra deslizante. A faixa colorida mostra a situação do pedido:</p>
+<div class="table-wrap"><table>
+<tr><th>Faixa</th><th>Significado</th></tr>
+<tr><td>Na meta</td><td>O lucro líquido do pedido fica igual ou acima da meta (15%).</td></tr>
+<tr><td>Abaixo da meta</td><td>O pedido dá lucro, mas abaixo da meta. Precisa de aprovação.</td></tr>
+<tr><td>Prejuízo</td><td>O desconto passa do ponto sem lucro.</td></tr>
+</table></div>
+<p>O resumo ao lado mostra total de tabela, desconto, valor sem IPI, IPI, total da nota, entrada, saldo, prazo de fabricação e validade da proposta.</p>
+<div class="note info"><b>Observação</b>Os limites de cada faixa mudam conforme o estado de entrega e os equipamentos do pedido. O desconto livre do vendedor é definido em <a href="#parametros">Parâmetros</a>.</div>
+<h2 id="s6">Forma de pagamento</h2>
+${fig("pedido-pagamento","Forma de pagamento com entrada, saldo parcelado em boleto e a lista de recebimentos com a comissão de cada parcela")}
+<ol class="steps">
+<li>Informe a <b>entrada</b> em R$ ou em %, a <b>forma da entrada</b> (ex.: PIX) e a <b>data da entrada</b>. Vazio significa na confirmação do pedido.</li>
+<li>O sistema compara a entrada com a política:
+<ul><li>${b("Entrada OK")}: a entrada cobre o mínimo da política.</li>
+<li>${b("Entrada abaixo do mínimo")}: o pedido vai precisar de aprovação. O aviso mostra o valor mínimo.</li></ul></li>
+<li>No <b>saldo</b>, escolha a forma (ex.: boleto), o número de parcelas, quando vence a 1ª (em dias) e o intervalo entre parcelas: 7 = semanal, 15 = quinzenal, 30 = mensal.</li>
+<li>Confira a mensagem ${b("Parcelas somam R$ ... = saldo")}. Use <b>Observações do pagamento</b> para combinados como "boleto em nome da matriz".</li>
+<li>O bloco ${b("Recebimentos")} lista as parcelas com vencimento, valor e a comissão de 2,0% de cada uma.</li>
+</ol>
+${fig("pedido-entrada-minima","Aviso de entrada abaixo do mínimo: o pedido precisará de aprovação")}
+<h2 id="s7">Quadro Só o diretor vê</h2>
+<p>Este quadro aparece apenas para a diretoria. Ele abre a conta do pedido:</p>
+${fig("pedido-diretor","Quadro Só o diretor vê em uma venda para o Maranhão, com DIFAL e a entrada necessária")}
+<div class="table-wrap"><table>
+<tr><th>Linha</th><th>O que mostra</th></tr>
+<tr><td>Impostos e taxas</td><td>ICMS, PIS/COFINS, comissão, anúncios e taxas do canal, em R$ e %.</td></tr>
+<tr><td>DIFAL</td><td>Aparece nas vendas para fora de SP. Ver <a href="#regra-difal">ICMS e DIFAL</a>.</td></tr>
+<tr><td>Custo dos equipamentos</td><td>Custo real, já com a margem de segurança da importação.</td></tr>
+<tr><td>Sobra antes do IR e IRPJ + CSLL</td><td>Resultado antes do imposto de renda e o imposto sobre o lucro.</td></tr>
+<tr><td>Lucro líquido</td><td>Valor e percentual final do pedido.</td></tr>
+<tr><td>Desconto máx. na meta e sem prejuízo</td><td>Até onde o desconto pode ir mantendo a meta ou sem prejuízo.</td></tr>
+<tr><td>Entrada necessária</td><td>Valor a pagar na China, lucro da meta, comissão sobre a entrada e a entrada mínima. Ver <a href="#regra-entrada">Entrada mínima</a>.</td></tr>
+</table></div>
+<h2 id="s8">Fechar, copiar e salvar a proposta</h2>
+<ol class="steps">
+<li>Com os campos obrigatórios preenchidos e dentro da política, feche o pedido. Fora da política, ele vai para ${mp("Aprovações")}.</li>
+<li>${b("Copiar proposta")} copia o texto do orçamento para enviar ao cliente pelo WhatsApp ou e-mail.</li>
+<li>${b("Salvar PDF")} gera o orçamento em PDF com a marca da Ludus.</li>
+<li>Em um pedido fechado, ${b("Reabrir pedido")} volta o pedido para edição e ${b("Excluir")} remove o pedido.</li>
+</ol>
+<div class="note warn"><b>Atenção</b>Reabrir um pedido fechado pode alterar recebimentos e comissões já gerados. Confira o financeiro depois de reabrir.</div>`},
+
+{id:"pedidos", mod:"Comercial", title:"Lista de pedidos",
+lead:"Como acompanhar todos os pedidos e orçamentos da equipe e encontrar um pedido.",
+toc:["Indicadores do topo","Abas de situação","Buscar e abrir um pedido"],
+body:`
+<p>Acesse o menu ${mp("Pedidos")}. A tela mostra todos os pedidos da equipe em tempo real. O vendedor vê apenas os próprios.</p>
+${fig("pedidos-lista","Lista de pedidos com os indicadores do mês e a aba Fechados selecionada")}
+<h2 id="s1">Indicadores do topo</h2>
+<div class="table-wrap"><table>
+<tr><th>Card</th><th>O que mostra</th></tr>
+<tr><td>Em negociação</td><td>Valor e quantidade de pedidos em aberto.</td></tr>
+<tr><td>Fechado no mês</td><td>Total vendido no mês e número de pedidos.</td></tr>
+<tr><td>Taxa de fechamento</td><td>Fechados ÷ (fechados + perdidos).</td></tr>
+<tr><td>Desconto médio fechado</td><td>Média dos descontos dos pedidos fechados, comparada à meta da política (até 20%).</td></tr>
+</table></div>
+<h2 id="s2">Abas de situação</h2>
+<p>${b("Em aberto")}, ${b("Com aprovação")}, ${b("Fechados")}, ${b("Perdidos")} e ${b("Todos")}. Cada linha mostra cliente, número do pedido, UF, vendedor, total com IPI, desconto, situação e data da última atualização.</p>
+<h2 id="s3">Buscar e abrir um pedido</h2>
+<ol class="steps">
+<li>Digite o nome do cliente, o CNPJ/CPF ou o número do pedido no campo de busca.</li>
+<li>Clique na linha para abrir o pedido.</li>
+</ol>`},
+
+{id:"aprovacoes", mod:"Comercial", title:"Aprovações", pend:true,
+lead:"Como aprovar ou reprovar pedidos que ficaram fora da política comercial.",
+toc:["Quando um pedido pede aprovação","Aprovar ou reprovar"],
+body:`${PEND}
+<h2 id="s1">Quando um pedido pede aprovação</h2>
+<p>O pedido vai para ${mp("Aprovações")} sozinho quando:</p>
+<ol class="steps">
+<li>O desconto passa do <b>desconto livre do vendedor</b> definido em Parâmetros (hoje 20%).</li>
+<li>A <b>entrada</b> combinada fica abaixo do mínimo da política.</li>
+<li>O lucro líquido do pedido fica abaixo da meta (15%).</li>
+</ol>
+<h2 id="s2">Aprovar ou reprovar</h2>
+<ol class="steps">
+<li>Acesse o menu ${mp("Aprovações")}. A lista mostra os pedidos que aguardam decisão e o motivo de cada um.</li>
+<li>Abra o pedido para ver desconto, entrada e, para a diretoria, o lucro.</li>
+<li>Aprove para liberar o fechamento ou reprove com um comentário para o vendedor ajustar.</li>
+</ol>
+<div class="note info"><b>Observação</b>O gerente comercial aprova pedidos da equipe. Pedidos com prejuízo devem ser decididos pela diretoria.</div>`},
+
+{id:"simulador", mod:"Comercial", title:"Simulador", pend:true,
+lead:"Como simular preço, desconto e entrada de um equipamento sem criar um pedido.",
+toc:["Quando usar","Como simular"],
+body:`${PEND}
+<h2 id="s1">Quando usar</h2>
+<p>Use o simulador para responder rápido a perguntas como "quanto posso dar de desconto nessa leg press para o Maranhão?" sem abrir um pedido.</p>
+<h2 id="s2">Como simular</h2>
+<ol class="steps">
+<li>Acesse o menu ${mp("Simulador")}.</li>
+<li>Escolha o equipamento, o estado de entrega e o desconto.</li>
+<li>O simulador mostra o preço final e, para a diretoria, a mesma conta do quadro Só o diretor vê, incluindo a entrada mínima.</li>
+</ol>`},
+
+/* ---------------- CADASTROS ---------------- */
+{id:"clientes", mod:"Cadastros", title:"Cadastro de clientes", pend:true,
+lead:"Como cadastrar e consultar clientes pessoa jurídica e pessoa física.",
+toc:["Cadastrar pelo pedido","Pessoa jurídica","Pessoa física"],
+body:`${PEND}
+<h2 id="s1">Cadastrar pelo pedido</h2>
+<p>O jeito mais rápido de cadastrar um cliente é preencher o bloco Cliente ao <a href="#novo-pedido">lançar um pedido</a>. O cadastro fica salvo e aparece em ${mp("Clientes")}.</p>
+<h2 id="s2">Pessoa jurídica</h2>
+<ol class="steps">
+<li>Informe CNPJ, inscrição estadual, razão social, nome fantasia, nome do responsável, celular e e-mail.</li>
+<li>Na inscrição estadual, escreva o número ou ISENTO.
+<ul><li>Com inscrição estadual ativa, o cliente é contribuinte do ICMS.</li>
+<li>Academias e empresas sem inscrição estadual ficam como não contribuintes, e o DIFAL da venda para fora de SP fica com a Ludus.</li></ul></li>
+<li>Informe o CEP e complete o endereço.</li>
+</ol>
+<h2 id="s3">Pessoa física</h2>
+<ol class="steps">
+<li>Informe nome completo, CPF, RG, celular, e-mail e endereço.</li>
+<li>Pessoa física é sempre não contribuinte do ICMS.</li>
+</ol>`},
+
+{id:"fornecedores", mod:"Cadastros", title:"Cadastro de fornecedores",
+lead:"Como cadastrar fábricas, assessoria de importação e prestadores.",
+toc:["Abrir o cadastro","Tipos de fornecedor"],
+body:`
+<p>Acesse o menu ${mp("Fornecedores")}. Esta área é visível para a diretoria e o financeiro.</p>
+${fig("fornecedores","Tela de fornecedores antes do primeiro cadastro")}
+<h2 id="s1">Abrir o cadastro</h2>
+<ol class="steps">
+<li>Clique em ${b("+ Novo fornecedor")}.</li>
+<li>Preencha os dados e salve. Use a busca por nome, CNPJ, CPF, cidade ou país para encontrar um fornecedor depois.</li>
+</ol>
+<h2 id="s2">Tipos de fornecedor</h2>
+<div class="table-wrap"><table>
+<tr><th>Tipo</th><th>Exemplo</th></tr>
+<tr><td>Empresa (CNPJ)</td><td>Assessoria de importação, despachante, transportadora.</td></tr>
+<tr><td>Pessoa (CPF)</td><td>Montador ou prestador autônomo.</td></tr>
+<tr><td>Exterior</td><td>A fábrica na China.</td></tr>
+</table></div>`},
+
+{id:"produtos", mod:"Cadastros", title:"Produtos e custos",
+lead:"Como cadastrar equipamentos, lançar o custo da assessoria e publicar a tabela para a equipe.",
+toc:["Visão geral da tela","Cadastrar um equipamento","Lançar ou colar custos","Colunas da tabela","Publicar a tabela para a equipe","Desativar ou excluir"],
+body:`
+<p>Acesse o menu ${mp("Produtos e custos")}. Esta tela é exclusiva da diretoria.</p>
+${fig("produtos-custos","Produtos e custos com o aviso de tabela pendente e o botão Publicar")}
+<h2 id="s1">Visão geral da tela</h2>
+<p>Digite o custo que a assessoria passar. O preço de tabela e os descontos máximos recalculam na hora, mas a equipe só vê a mudança depois que você publicar.</p>
+<ol class="steps">
+<li>Abas: ${b("Ativos")}, ${b("Sem custo")}, ${b("Sem código")} e ${b("Inativos")}. Use Sem custo e Sem código para achar cadastros incompletos.</li>
+<li>Busca por nome, código ou fornecedor.</li>
+<li>O contador no canto mostra o total de itens e a margem de segurança aplicada no custo (hoje 5%).</li>
+</ol>
+<h2 id="s2">Cadastrar um equipamento</h2>
+<ol class="steps">
+<li>Clique em ${b("+ Equipamento")}.</li>
+<li>Informe o nome (ex.: MESA FLEXORA - BATERIA DE PESOS), o código Ludus (ex.: LD-B001) e a referência do fornecedor, como o modelo da fábrica e o preço em dólar.</li>
+<li>Lance o custo da assessoria e salve.</li>
+</ol>
+<h2 id="s3">Lançar ou colar custos</h2>
+<ol class="steps">
+<li>Para um item, digite direto no campo <b>Custo assessoria R$</b>.</li>
+<li>Para vários itens, clique em ${b("Colar custos da assessoria")} e cole a planilha que a assessoria enviou.</li>
+</ol>
+<h2 id="s4">Colunas da tabela</h2>
+<div class="table-wrap"><table>
+<tr><th>Coluna</th><th>O que é</th></tr>
+<tr><td>Equipamento</td><td>Nome, código Ludus e referência do fornecedor (modelo e preço em US$).</td></tr>
+<tr><td>Custo assessoria R$</td><td>Custo nacionalizado informado pela assessoria.</td></tr>
+<tr><td>Crédito imp.</td><td>Percentual de impostos que a Ludus recupera como crédito.</td></tr>
+<tr><td>Embalagem R$</td><td>Custo extra de embalagem, quando houver.</td></tr>
+<tr><td>Custo real</td><td>Custo usado no cálculo, já com créditos e margem de segurança.</td></tr>
+<tr><td>Tabela s/IPI</td><td>Preço de tabela sem IPI. O valor com IPI aparece abaixo.</td></tr>
+<tr><td>Máx. SP</td><td>Desconto máximo mantendo a meta em uma venda dentro de SP.</td></tr>
+<tr><td>Máx. c/IE</td><td>Desconto máximo mantendo a meta para cliente contribuinte (com inscrição estadual).</td></tr>
+</table></div>
+<h2 id="s5">Publicar a tabela para a equipe</h2>
+<p>Quando há alterações não publicadas, aparece o aviso "A equipe ainda vê a tabela v35" com o que está pendente.</p>
+<ol class="steps">
+<li>Confira os valores.</li>
+<li>Clique em ${b("Publicar v36")}. A equipe passa a vender com a nova tabela, e a versão anterior fica guardada.</li>
+</ol>
+<h2 id="s6">Desativar ou excluir</h2>
+<ol class="steps">
+<li>${b("Desativar")} tira o equipamento da venda, mas mantém o histórico. Ele vai para a aba Inativos.</li>
+<li>${b("Excluir")} remove o cadastro. Use só para itens lançados por engano.</li>
+</ol>`},
+
+{id:"tabela-precos", mod:"Cadastros", title:"Tabela de preços", pend:true,
+lead:"Como consultar a tabela publicada que a equipe usa para vender.",
+toc:["Consultar a tabela","Versões da tabela"],
+body:`${PEND}
+<h2 id="s1">Consultar a tabela</h2>
+<ol class="steps">
+<li>Acesse o menu ${mp("Tabela de preços")}.</li>
+<li>A tabela mostra cada equipamento com preço sem IPI e com IPI e o desconto livre do vendedor.</li>
+<li>Vendedor e gerente veem preços e descontos, sem custo nem margem.</li>
+</ol>
+<h2 id="s2">Versões da tabela</h2>
+<p>Cada publicação feita em <a href="#produtos">Produtos e custos</a> cria uma nova versão (v35, v36...). Os pedidos já fechados guardam o preço da versão em que foram feitos.</p>`},
+
+/* ---------------- FINANCEIRO ---------------- */
+{id:"recebimentos", mod:"Financeiro", title:"Recebimentos", pend:true,
+lead:"Como acompanhar e dar baixa nas parcelas recebidas dos clientes.",
+toc:["De onde vêm as parcelas","Dar baixa em um recebimento"],
+body:`${PEND}
+<h2 id="s1">De onde vêm as parcelas</h2>
+<p>Cada pedido fechado gera sozinho a entrada e as parcelas do saldo, conforme a <a href="#novo-pedido">forma de pagamento</a> combinada.</p>
+<h2 id="s2">Dar baixa em um recebimento</h2>
+<ol class="steps">
+<li>Acesse o menu ${mp("Recebimentos")} e filtre por vencimento, cliente ou situação.</li>
+<li>Abra a parcela e informe a data e o valor recebido.</li>
+<li>A baixa gera a comissão do vendedor no mês do recebimento. Ver <a href="#comissoes">Comissões</a>.</li>
+</ol>
+<div class="note warn"><b>Atenção</b>A comissão é calculada sobre o valor recebido, e não sobre o valor do pedido. Uma parcela sem baixa não gera comissão.</div>`},
+
+{id:"contas-pagar", mod:"Financeiro", title:"Contas a pagar", pend:true,
+lead:"Como lançar despesas e registrar pagamentos.",
+toc:["Lançar uma conta","Registrar o pagamento"],
+body:`${PEND}
+<h2 id="s1">Lançar uma conta</h2>
+<ol class="steps">
+<li>Acesse o menu ${mp("Contas a pagar")} e clique em novo lançamento.</li>
+<li>Informe fornecedor, descrição, valor, vencimento e, se for o caso, o pedido ou a importação a que a conta se refere, como o pagamento da fábrica na China.</li>
+</ol>
+<h2 id="s2">Registrar o pagamento</h2>
+<ol class="steps">
+<li>Abra a conta e informe a data e o valor pago.</li>
+<li>A conta passa para a situação Paga.</li>
+</ol>`},
+
+{id:"comissoes", mod:"Financeiro", title:"Comissões",
+lead:"Como conferir a comissão do mês de cada vendedor e marcar como paga.",
+toc:["Regra de comissão","Indicadores","Comissão por vendedor","Lançamentos","Baixar relatório"],
+body:`
+<p>Acesse o menu ${mp("Comissões")}. As comissões são calculadas sozinhas a partir dos recebimentos registrados.</p>
+${fig("comissoes","Comissões do mês com os indicadores, a lista por vendedor e o botão Marcar como paga")}
+<h2 id="s1">Regra de comissão</h2>
+<p>2,0% sobre cada valor recebido do cliente, descontado o IPI. Tudo o que é recebido em um mês é pago no dia 05 do mês seguinte. Detalhes em <a href="#regra-comissao">Comissão dos vendedores</a>.</p>
+<h2 id="s2">Indicadores</h2>
+<div class="table-wrap"><table>
+<tr><th>Card</th><th>O que mostra</th></tr>
+<tr><td>Recebido de clientes</td><td>Total recebido no mês selecionado.</td></tr>
+<tr><td>Comissão do mês</td><td>Comissão gerada e número de vendedores.</td></tr>
+<tr><td>Falta pagar</td><td>Comissão ainda não paga e a data de pagamento.</td></tr>
+<tr><td>Comissão futura</td><td>Comissão das parcelas que ainda não foram recebidas.</td></tr>
+</table></div>
+<h2 id="s3">Comissão por vendedor</h2>
+<ol class="steps">
+<li>Escolha o mês no seletor do topo, por exemplo "Recebido em setembro/2026 → pago 05/10/2026".</li>
+<li>A tabela mostra, por vendedor: número de recebimentos, valor recebido, comissão e situação.</li>
+<li>Depois de pagar o vendedor, clique em ${b("Marcar como paga")}.</li>
+</ol>
+<h2 id="s4">Lançamentos</h2>
+<p>Clique no vendedor para ver cada recebimento que gerou comissão: data, cliente, número do pedido, parcela, valor recebido (com o valor sem IPI abaixo) e comissão.</p>
+<h2 id="s5">Baixar relatório</h2>
+<p>${b("Baixar relatório")} gera a planilha do mês para conferência ou envio ao contador.</p>
+<div class="note info"><b>Observação</b>O vendedor vê apenas as próprias comissões.</div>`},
+
+/* ---------------- GERENCIAL ---------------- */
+{id:"dashboard", mod:"Gerencial", title:"Dashboard",
+lead:"Como ler os indicadores de vendas, o funil de orçamentos e os rankings.",
+toc:["Filtros","Indicadores","Gráficos e rankings"],
+body:`
+<p>Acesse o menu ${mp("Dashboard")}. Os números se atualizam sozinhos a cada pedido.</p>
+${fig("dashboard","Dashboard com os filtros de período, os indicadores do mês, as vendas por mês e o funil de orçamentos")}
+<h2 id="s1">Filtros</h2>
+<ol class="steps">
+<li>Período: ${b("Este mês")}, ${b("3 meses")}, ${b("Ano")} ou ${b("12 meses")}.</li>
+<li>Equipe: ${b("Toda a equipe")} ou um vendedor.</li>
+</ol>
+<h2 id="s2">Indicadores</h2>
+<div class="table-wrap"><table>
+<tr><th>Card</th><th>O que mostra</th></tr>
+<tr><td>Vendas fechadas</td><td>Total vendido com IPI. O valor sem IPI aparece abaixo.</td></tr>
+<tr><td>Pedidos fechados</td><td>Quantidade de pedidos fechados e de orçamentos criados.</td></tr>
+<tr><td>Ticket médio</td><td>Valor médio por pedido fechado.</td></tr>
+<tr><td>Taxa de fechamento</td><td>Fechados ÷ (fechados + perdidos).</td></tr>
+<tr><td>Desconto médio</td><td>Média dos descontos dos pedidos fechados.</td></tr>
+<tr><td>Lucro líquido</td><td>Lucro dos pedidos fechados, com a margem e a meta. Só para a diretoria.</td></tr>
+</table></div>
+<h2 id="s3">Gráficos e rankings</h2>
+<ol class="steps">
+<li><b>Vendas fechadas por mês:</b> últimos 12 meses, com IPI.</li>
+<li><b>Funil de orçamentos:</b> orçamentos criados, que pediram aprovação, fechados, perdidos e ainda em negociação.</li>
+<li><b>Ranking de vendedores:</b> vendas fechadas de cada vendedor no período.</li>
+<li><b>Equipamentos mais vendidos:</b> top 8, pelo valor sem IPI.</li>
+</ol>`},
+
+/* ---------------- CONFIGURAÇÕES ---------------- */
+{id:"parametros", mod:"Configurações", title:"Parâmetros",
+lead:"Como ajustar a política comercial, os impostos e os custos do canal que formam o preço de tabela.",
+toc:["Política comercial","Impostos da venda","Canal de venda","Resultado","Publicar as mudanças"],
+body:`
+<p>Acesse o menu ${mp("Parâmetros")}. Esta tela é exclusiva da diretoria. Tudo que muda aqui recalcula a tabela inteira.</p>
+${fig("parametros-1","Parâmetros: política comercial e o quadro Resultado com o multiplicador do preço de tabela")}
+<h2 id="s1">Política comercial</h2>
+<div class="table-wrap"><table>
+<tr><th>Campo</th><th>Valor atual</th><th>O que faz</th></tr>
+<tr><td>Lucro líquido que quero em cada venda</td><td>15%</td><td>Meta sobre o valor já com desconto, depois de impostos, DIFAL, taxas, equipamento e IRPJ/CSLL.</td></tr>
+<tr><td>Desconto livre do vendedor</td><td>20%</td><td>Até aqui o vendedor fecha sozinho. A tabela é calculada para manter a meta mesmo com esse desconto, no pior estado.</td></tr>
+<tr><td>Margem de segurança da importação</td><td>5%</td><td>Colchão para dólar, taxas e frete da China. Soma no custo de todos os equipamentos.</td></tr>
+<tr><td>Entrada mínima pedida ao cliente</td><td>65%</td><td>Mostrada a toda a equipe. O sistema sugere o valor que cobre o pagamento na China, a comissão e o lucro no pior pedido.</td></tr>
+<tr><td>Validade da proposta</td><td>dias</td><td>Aparece na proposta copiada para o cliente.</td></tr>
+</table></div>
+<h2 id="s2">Impostos da venda (Lucro Real)</h2>
+${fig("parametros-2","Impostos da venda e canal de venda direta ou representante")}
+<div class="table-wrap"><table>
+<tr><th>Campo</th><th>Valor atual</th><th>Observação</th></tr>
+<tr><td>ICMS dentro de SP</td><td>18%</td><td>Vendas para clientes de SP.</td></tr>
+<tr><td>PIS + COFINS</td><td>9,25%</td><td>1,65% + 7,60% no regime não cumulativo.</td></tr>
+<tr><td>IPI destacado na nota</td><td>13%</td><td>Importador equiparado a industrial. Confirme a alíquota do NCM.</td></tr>
+<tr><td>IRPJ + CSLL sobre o lucro</td><td>34%</td><td>Incide só sobre o que sobra de lucro.</td></tr>
+</table></div>
+<h2 id="s3">Canal: venda direta / representante</h2>
+<div class="table-wrap"><table>
+<tr><th>Campo</th><th>Valor atual</th></tr>
+<tr><td>Comissão</td><td>2%</td></tr>
+<tr><td>Anúncios / Ads</td><td>0,5%</td></tr>
+<tr><td>Gateway e antecipação</td><td>0%</td></tr>
+<tr><td>ICMS interestadual (importado com FCI)</td><td>4%</td></tr>
+</table></div>
+<h2 id="s4">Resultado</h2>
+<p>O quadro Resultado mostra o efeito dos parâmetros: o multiplicador do preço de tabela (ex.: custo × 3,123), o estado de pior caso (ex.: MA, com ICMS + DIFAL de 23%), os impostos e taxas no pior caso, o lucro antes do IR necessário e a entrada mínima sugerida.</p>
+<div class="formula">venda com desconto = custo ÷ (1 − impostos e taxas − lucro antes do IR)
+preço de tabela    = venda com desconto ÷ (1 − desconto livre)</div>
+<p>Clique em ${b("usar")} ao lado da entrada mínima sugerida para adotá-la como política.</p>
+<h2 id="s5">Publicar as mudanças</h2>
+<p>As mudanças recalculam a tabela na hora para a diretoria, mas a equipe só vê depois da publicação em <a href="#produtos">Produtos e custos</a>.</p>
+<div class="note warn"><b>Atenção</b>Alíquotas de impostos devem ser confirmadas com o contador da Ludus antes de qualquer alteração.</div>`},
+
+{id:"precos-metas", mod:"Configurações", title:"Preços e metas", pend:true,
+lead:"Como definir as metas de venda e acompanhar a política de preços.",
+toc:["Metas de venda","Acompanhamento"],
+body:`${PEND}
+<h2 id="s1">Metas de venda</h2>
+<ol class="steps">
+<li>Acesse o menu ${mp("Preços e metas")}.</li>
+<li>Defina a meta mensal de vendas da equipe e de cada vendedor.</li>
+</ol>
+<h2 id="s2">Acompanhamento</h2>
+<p>O ranking do <a href="#dashboard">Dashboard</a> compara as vendas fechadas de cada vendedor com a meta do mês.</p>`},
+
+{id:"equipe", mod:"Configurações", title:"Equipe e acessos", pend:true,
+lead:"Como cadastrar usuários, definir perfis e desativar acessos.",
+toc:["Cadastrar um usuário","Trocar o perfil","Desativar um acesso"],
+body:`${PEND}
+<h2 id="s1">Cadastrar um usuário</h2>
+<ol class="steps">
+<li>Acesse o menu ${mp("Equipe e acessos")} e clique em novo usuário.</li>
+<li>Informe nome, e-mail e o perfil: Diretoria, Gerente comercial, Vendedor ou Financeiro.</li>
+<li>O usuário recebe por e-mail o convite para criar a senha.</li>
+</ol>
+<h2 id="s2">Trocar o perfil</h2>
+<p>Abra o usuário e escolha o novo perfil. A mudança vale a partir do próximo acesso dele.</p>
+<h2 id="s3">Desativar um acesso</h2>
+<p>Quando alguém sair da empresa, desative o usuário. Os pedidos e comissões dele continuam no histórico.</p>
+<div class="note info"><b>Observação</b>Todas as entradas e alterações importantes ficam registradas no log de atividades, com data, hora e usuário.</div>`},
+
+/* ---------------- REGRAS ---------------- */
+{id:"regra-preco", mod:"Regras de cálculo", title:"Preço de tabela e desconto máximo",
+lead:"Como o sistema transforma o custo da assessoria no preço de tabela.",
+toc:["Passo a passo do cálculo","Por que existe um pior caso"],
+body:`
+<h2 id="s1">Passo a passo do cálculo</h2>
+<ol class="steps">
+<li><b>Custo real</b> = custo da assessoria, menos os créditos de imposto, mais embalagem e a margem de segurança da importação (5%).</li>
+<li><b>Venda com desconto</b> = custo real ÷ (1 − impostos e taxas − lucro antes do IR necessário). É o menor preço que ainda entrega a meta de 15%.</li>
+<li><b>Preço de tabela</b> = venda com desconto ÷ (1 − desconto livre do vendedor). Assim, mesmo com 20% de desconto, a venda continua na meta.</li>
+</ol>
+<div class="formula">tabela = custo real ÷ (1 − impostos e taxas − lucro antes do IR) ÷ (1 − desconto livre)</div>
+<h2 id="s2">Por que existe um pior caso</h2>
+<p>Os impostos mudam conforme o estado de entrega. O sistema calcula a tabela pelo estado mais caro (hoje o Maranhão, com ICMS + DIFAL de 23%). Em vendas para estados mais baratos, sobra mais margem, e por isso o desconto máximo do item é maior.</p>`},
+
+{id:"regra-entrada", mod:"Regras de cálculo", title:"Entrada mínima do pedido",
+lead:"Como é calculada a entrada que o cliente precisa pagar para o pedido ser aprovado.",
+toc:["Fórmula","Exemplo","Onde aparece"],
+body:`
+<h2 id="s1">Fórmula</h2>
+<p>A entrada precisa cobrir o pagamento na China, a comissão do vendedor sobre a própria entrada e o lucro líquido da meta. O lucro é garantido na entrada porque o equipamento leva de 60 a 90 dias para chegar.</p>
+<div class="formula">entrada mínima = (valor da China + lucro líquido da meta) ÷ (1 − comissão)</div>
+<p>A divisão existe porque o vendedor ganha 2% sobre o que o cliente paga (sem IPI), e isso sai da própria entrada.</p>
+<h2 id="s2">Exemplo</h2>
+<p>Mesa Flexora com 20% de desconto, venda dentro de SP:</p>
+<div class="table-wrap"><table>
+<tr><th>Item</th><th>Valor</th></tr>
+<tr><td>Pagar na China</td><td>R$ 8.553,97</td></tr>
+<tr><td>Lucro líquido da meta</td><td>R$ 2.304,55</td></tr>
+<tr><td>Comissão sobre a entrada</td><td>R$ 195,65</td></tr>
+<tr><td>Entrada mínima</td><td>R$ 11.054,17 (64% da nota)</td></tr>
+</table></div>
+<p>Conferência: tirando a comissão da entrada, sobram R$ 10.858,52, que é o valor da China mais o lucro.</p>
+<h2 id="s3">Onde aparece</h2>
+<ol class="steps">
+<li>No pedido, o quadro Só o diretor vê mostra a conta parte por parte. Se a entrada combinada for menor, aparece um aviso com quanto falta.</li>
+<li>No Simulador, a mesma conta.</li>
+<li>Em Parâmetros, a entrada mínima sugerida usa essa regra. Vendedores e gerente veem só o percentual mínimo da política.</li>
+</ol>`},
+
+{id:"regra-difal", mod:"Regras de cálculo", title:"ICMS e DIFAL nas vendas para fora de SP",
+lead:"Como o sistema calcula o ICMS quando o equipamento importado é vendido para outro estado.",
+toc:["Alíquota de 4% para importados","Quando há DIFAL","Exemplo"],
+body:`
+<h2 id="s1">Alíquota de 4% para importados</h2>
+<p>Equipamento importado vendido de SP para outro estado usa a alíquota interestadual de 4% (Resolução do Senado 13/2012, com FCI). Ela está em ${mp("Parâmetros")}, no campo ICMS interestadual.</p>
+<h2 id="s2">Quando há DIFAL</h2>
+<ol class="steps">
+<li>O DIFAL é a diferença entre a alíquota interna do estado de destino e os 4%.</li>
+<li>Quando o cliente <b>não é contribuinte</b> do ICMS (pessoa física, academia sem inscrição estadual ou ISENTO), o DIFAL fica com a Ludus e entra no custo do pedido.</li>
+<li>Quando o cliente <b>é contribuinte</b> (tem inscrição estadual ativa), o recolhimento segue a regra do estado de destino. O desconto máximo usado é o da coluna Máx. c/IE.</li>
+</ol>
+<h2 id="s3">Exemplo</h2>
+<p>Venda para o Maranhão, cliente não contribuinte: alíquota interna de 23% menos 4% interestadual dá DIFAL de 19% sobre o valor sem IPI, como aparece no quadro Só o diretor vê.</p>
+<div class="note warn"><b>Atenção</b>Alíquotas internas, fundo de pobreza (FCP) e a forma de cálculo da base são validados pelo contador da Ludus.</div>`},
+
+{id:"regra-comissao", mod:"Regras de cálculo", title:"Comissão dos vendedores",
+lead:"Como a comissão é calculada e quando ela é paga.",
+toc:["Regra","Exemplo"],
+body:`
+<h2 id="s1">Regra</h2>
+<ol class="steps">
+<li>2,0% sobre cada valor efetivamente recebido do cliente, descontado o IPI.</li>
+<li>A comissão nasce na baixa do recebimento, e não no fechamento do pedido.</li>
+<li>Tudo o que é recebido em um mês é pago ao vendedor no dia 05 do mês seguinte.</li>
+</ol>
+<h2 id="s2">Exemplo</h2>
+<p>Entrada de R$ 75.000,00 recebida em 28/09/2026, com R$ 66.371,68 sem IPI: comissão de R$ 1.327,43, paga em 05/10/2026.</p>`},
+
+/* ---------------- SUPORTE ---------------- */
+{id:"suporte", mod:"Suporte", title:"Solicitar alteração no sistema",
+lead:"Como pedir correções, mudanças ou funcionalidades novas para a Ávila Ops.",
+toc:["Como enviar","O que informar","Contato"],
+body:`
+<h2 id="s1">Como enviar</h2>
+<ol class="steps">
+<li>Descreva o pedido pelo WhatsApp da Ávila Ops ou pelo modelo de solicitação na pasta do projeto no Google Drive.</li>
+<li>Para pedidos maiores, preencha o "Modelo de solicitação de alteração ou complemento".</li>
+</ol>
+<h2 id="s2">O que informar</h2>
+<div class="table-wrap"><table>
+<tr><th>Campo</th><th>Exemplo</th></tr>
+<tr><td>Tipo</td><td>Correção, alteração ou funcionalidade nova.</td></tr>
+<tr><td>Tela</td><td>Pedidos, Comissões, Parâmetros...</td></tr>
+<tr><td>Como está hoje</td><td>O que acontece agora, com o passo a passo se for erro.</td></tr>
+<tr><td>Como deve ficar</td><td>O resultado esperado por quem usa.</td></tr>
+<tr><td>Regra de negócio</td><td>Cálculo, limite ou aprovação envolvida.</td></tr>
+<tr><td>Exemplo real</td><td>Um pedido ou valor concreto.</td></tr>
+</table></div>
+<div class="note info"><b>Observação</b>Os campos de regra de negócio e exemplo real são os que mais evitam retrabalho.</div>
+<h2 id="s3">Contato</h2>
+<p>Ávila Ops Tecnologia · WhatsApp (17) 99781-1471 · avilaops.com</p>`},
+];
+
+const MODS = [...new Set(PAGES.map(p=>p.mod))];
+const byId = Object.fromEntries(PAGES.map(p=>[p.id,p]));
+
+function treeHTML(cur){
+  return MODS.map(m=>`<h4>${m}</h4>`+PAGES.filter(p=>p.mod===m).map(p=>`<a href="#${p.id}"${p.id===cur?' aria-current="page"':''}>${p.title}${p.pend?'<span class="tag">em validação</span>':''}</a>`).join('')).join('');
+}
+function home(){
+  return `<div class="crumb">Manual do sistema</div>
+<h1>Manual do Sistema Comercial Ludus</h1>
+<p class="lead">Passo a passo de cada funcionalidade do sistema da Ludus Equipamentos: pedidos, custos, parâmetros, financeiro e comissões. Escolha um módulo ou use a busca no topo.</p>
+<div class="note info"><b>Sobre este manual</b>Os prints são do sistema com dados de teste. Páginas marcadas como <b>em validação</b> descrevem telas que estão sendo finalizadas e recebem prints na entrega.</div>
+<div class="home-grid">${MODS.map(m=>`<div class="mod"><h3>${m}</h3><ul>${PAGES.filter(p=>p.mod===m).map(p=>`<li><a href="#${p.id}">${p.title}</a></li>`).join('')}</ul></div>`).join('')}</div>
+<p class="updated">Atualizado em 04/10/2026 · Ávila Ops Tecnologia</p>`;
+}
+function pageHTML(p){
+  const i=PAGES.indexOf(p), prev=PAGES[i-1], next=PAGES[i+1];
+  const toc = p.toc ? `<div class="toc"><b>Índice</b><ol>${p.toc.map((t,k)=>`<li><a href="#${p.id}" data-sec="s${k+1}">${t}</a></li>`).join('')}</ol></div>` : '';
+  return `<div class="crumb"><a href="#inicio">Manual</a> / ${p.mod}</div><h1>${p.title}</h1><p class="lead">${p.lead}</p>${toc}${p.body}
+<div class="pn">${prev?`<a href="#${prev.id}"><small>Anterior</small>${prev.title}</a>`:'<span></span>'}${next?`<a href="#${next.id}" style="text-align:right"><small>Próxima</small>${next.title}</a>`:''}</div>
+<p class="updated">Atualizado em 04/10/2026 · Ávila Ops Tecnologia</p>`;
+}
+const pageEl=document.getElementById('page');
+function render(){
+  const id=(location.hash||'#inicio').slice(1);
+  const p=byId[id];
+  pageEl.innerHTML = p?pageHTML(p):home();
+  document.getElementById('tree').innerHTML=treeHTML(p?p.id:'');
+  document.getElementById('tree2').innerHTML=treeHTML(p?p.id:'');
+  document.getElementById('mtree').open=false;
+  window.scrollTo(0,0);
+}
+pageEl.addEventListener('click',e=>{
+  const a=e.target.closest('a[data-sec]');
+  if(a){e.preventDefault();const t=document.getElementById(a.dataset.sec);if(t)t.scrollIntoView({behavior:'smooth',block:'start'});return}
+  const img=e.target.closest('figure img');
+  if(img){document.getElementById('lbimg').src=img.src;document.getElementById('lbimg').alt=img.alt;document.getElementById('lb').hidden=false}
+});
+document.getElementById('lb').addEventListener('click',()=>{document.getElementById('lb').hidden=true});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')document.getElementById('lb').hidden=true});
+window.addEventListener('hashchange',render);
+
+/* busca */
+const strip=s=>s.replace(/<[^>]+>/g,' ').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
+const IDX=PAGES.map(p=>({p,t:strip(p.title+' '+p.lead+' '+p.body)}));
+const q=document.getElementById('q'), res=document.getElementById('results');
+q.addEventListener('input',()=>{
+  const v=strip(q.value).trim();
+  if(v.length<2){res.hidden=true;return}
+  const terms=v.split(/\s+/);
+  const hits=IDX.filter(x=>terms.every(t=>x.t.includes(t))).slice(0,8);
+  res.innerHTML=hits.length?hits.map(x=>`<a href="#${x.p.id}">${x.p.title}<span>${x.p.mod}</span></a>`).join(''):'<a href="#inicio">Nada encontrado<span>Tente outra palavra</span></a>';
+  res.hidden=false;
+});
+res.addEventListener('click',()=>{res.hidden=true;q.value=''});
+document.addEventListener('click',e=>{if(!e.target.closest('.search'))res.hidden=true});
+render();
+</script>
+</body>
+</html>
