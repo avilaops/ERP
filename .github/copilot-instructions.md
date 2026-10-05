@@ -13,6 +13,7 @@ Idioma: interface, mensagens e textos em português do Brasil. Código (variáve
 - Next.js (App Router, Server Components, Server Actions) + TypeScript strict
 - **PostgreSQL** como banco de dados, acessado com Prisma ORM (migrations versionadas; nunca editar migration já aplicada)
 - Autenticação pelo **Auth central da Ávila Ops** (identidade compartilhada do ecossistema). Toda a integração fica isolada em `src/lib/auth/`; o resto do código só usa `getSession()` e `requirePermission()`
+- **Falha fechada:** um provedor de login local com usuários de teste só existe quando `NODE_ENV` é `development` ou `test`. Em produção, se as credenciais do Auth central faltarem ou estiverem inválidas, a aplicação não sobe (erro na inicialização) e nenhum login é aceito
 - Tailwind CSS; componentes reaproveitados do protótipo sempre que possível
 - Zod para validação (mesmo schema no client e no server) + React Hook Form
 - Vitest para regras de negócio, Playwright para os fluxos críticos
@@ -39,7 +40,7 @@ Idioma: interface, mensagens e textos em português do Brasil. Código (variáve
 | Perfil | Pode |
 |---|---|
 | `DIRETORIA` | Tudo. Única que vê custo, China, lucro, margem e o quadro "Só o diretor vê". Edita Parâmetros e Produtos e custos, publica tabela. |
-| `GERENTE_COMERCIAL` | Pedidos de toda a equipe, aprovações, metas e ranking. Não vê custo nem lucro. |
+| `GERENTE_COMERCIAL` | Pedidos de toda a equipe, aprovações dentro da política (desconto e entrada), metas e ranking. Não vê custo nem lucro e não aprova pedido com prejuízo. |
 | `VENDEDOR` | Só os próprios clientes, pedidos e comissões. Vê o % mínimo de entrada, nunca custo, China ou lucro. |
 | `FINANCEIRO` | Recebimentos, baixas, contas a pagar, fornecedores, pagamento de comissões. |
 
@@ -63,7 +64,8 @@ venda_com_desconto = custo_real / (1 - impostos_e_taxas_pior_caso - lucro_antes_
 preco_tabela_sem_ipi = venda_com_desconto / (1 - desconto_livre)
 preco_com_ipi = preco_tabela_sem_ipi x (1 + ipi)
 ```
-Conferência com o protótipo: Mesa Flexora, custo assessoria R$ 8.146,64, crédito 28,1% → custo real R$ 6.148,97 → tabela sem IPI R$ 19.204,61 (custo x 3,123).
+O crédito de impostos é guardado com precisão total (`NUMERIC(7,4)` ou maior) e nunca arredondado no cálculo; a tela mostra 1 casa.
+Conferência com o protótipo: Mesa Flexora, custo assessoria R$ 8.146,64, crédito exibido 28,1% (valor exato ≈ 28,1156%) → custo real R$ 6.148,97 → tabela sem IPI R$ 19.204,61 (custo x 3,123). O teste usa o crédito exato copiado do protótipo para o seed; com 28,1% arredondado o resultado seria R$ 6.150,31.
 O pior caso é o estado com maior ICMS + DIFAL (hoje MA, 23%). `lucro_antes_IR = lucro_alvo / (1 - irpj_csll)`. Para cada equipamento, calcular também o desconto máximo na meta para SP (`Máx. SP`) e para cliente contribuinte (`Máx. c/IE`).
 
 ### Tabela de preços versionada
@@ -79,14 +81,16 @@ Mudanças em custos e parâmetros recalculam na hora só para a diretoria. A equ
 - Número `#AAMMDD-XXXX`. Status: `RASCUNHO`, `ENVIADO`, `AGUARDANDO_APROVACAO`, `APROVADO`, `FECHADO`, `PERDIDO` (com motivo), `CANCELADO`.
 - Desconto em % sobre a tabela; faixas: na meta (lucro >= 15%), abaixo da meta, prejuízo.
 - Vai para aprovação se: desconto > desconto livre, lucro < meta, ou entrada < mínimo da política.
+- Quem aprova: `GERENTE_COMERCIAL` ou `DIRETORIA` aprovam exceções de desconto e entrada com lucro >= 0. Pedido com lucro líquido negativo (faixa prejuízo) só pode ser aprovado pela `DIRETORIA`; essa checagem é feita no servidor, pelo lucro calculado, e o gerente vê apenas "requer aprovação da diretoria", sem os valores.
 - Prazo de fabricação em dias corridos a partir do pagamento da entrada; mostrar previsão de conclusão.
 - Frete por nossa conta (R$) entra no custo.
 
 ### Entrada mínima
 ```
-entrada_minima = (valor_china + lucro_liquido_meta) / (1 - comissao)
+entrada_minima = (valor_china + lucro_liquido_meta) / (1 - comissao / (1 + ipi))
 ```
-Exemplo de teste obrigatório: China R$ 8.553,97, lucro da meta R$ 2.304,55, comissão 2% → entrada mínima R$ 11.054,17; sem a comissão sobram R$ 10.858,52.
+A comissão incide só sobre a parte sem IPI do que o cliente paga, por isso o denominador divide a comissão por (1 + IPI).
+Exemplo de teste obrigatório: China R$ 8.553,97, lucro da meta R$ 2.304,55, comissão 2%, IPI 13% → entrada mínima R$ 11.054,17 (comissão sobre a entrada R$ 195,65); sem a comissão sobram R$ 10.858,52.
 
 ### Pagamento
 Entrada (R$ ou %), forma, data (vazia = na confirmação). Saldo: forma, nº de parcelas, 1ª em N dias, intervalo (7/15/30). As parcelas devem somar exatamente o saldo (diferença de centavos na última).

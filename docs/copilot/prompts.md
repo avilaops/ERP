@@ -34,8 +34,12 @@ Depois crie a base do projeto:
 4. Migration inicial e seed com os equipamentos, parâmetros e alíquotas por UF
    do protótipo.
 5. Integração com o Auth central da Ávila Ops isolada em src/lib/auth/
-   (getSession, requirePermission). Enquanto as credenciais não estiverem
-   configuradas, um provedor de desenvolvimento com um usuário por perfil.
+   (getSession, requirePermission). Para desenvolvimento e testes, um provedor
+   local com um usuário por perfil, habilitado SOMENTE quando NODE_ENV for
+   development ou test. Em produção, credenciais do Auth central ausentes ou
+   inválidas fazem a aplicação falhar na inicialização (falha fechada).
+   Teste automatizado que garante que o provedor local não existe no build de
+   produção.
 6. Layout com a sidebar do protótipo (logo, card "Seu acesso", botão
    + Novo pedido) mostrando só os itens do perfil.
 
@@ -87,12 +91,18 @@ Siga .github/copilot-instructions.md e reproduza o fluxo de pedido do protótipo
 - Quadro "Só o diretor vê" calculado no servidor e enviado só para a DIRETORIA.
 - Envio automático para aprovação pelas regras do projeto; tela Aprovações para
   GERENTE_COMERCIAL e DIRETORIA, com aprovar/reprovar e comentário.
+  Pedido com lucro negativo só é aprovado pela DIRETORIA (checagem no servidor);
+  para o gerente ele aparece como "requer aprovação da diretoria", sem valores.
+- Clientes: lista com busca por nome, CNPJ/CPF e cidade, cadastro e edição
+  PF/PJ fora do pedido (CEP preenche o endereço; IE define contribuinte),
+  histórico de pedidos do cliente. Vendedor vê só os próprios clientes.
 - Copiar proposta (texto) e Salvar PDF com a marca da Ludus.
 - Fechar pedido gera os Receivable. Reabrir pedido exige confirmação e
   recalcula recebimentos e comissões ainda não pagos.
 - Simulador: mesma conta do pedido sem gravar nada.
-Teste Playwright: vendedor cria pedido com 25% de desconto, pedido vai para
-aprovação, gerente aprova, vendedor fecha.
+Testes Playwright: (1) vendedor cria pedido com 25% de desconto, pedido vai
+para aprovação, gerente aprova, vendedor fecha; (2) pedido com prejuízo não
+pode ser aprovado pelo gerente, só pela diretoria.
 ```
 
 ### 2d. Financeiro, comissões e dashboard
@@ -104,8 +114,11 @@ Siga .github/copilot-instructions.md e reproduza:
 - Fornecedores: CNPJ, CPF ou exterior.
 - Comissões: seletor "Recebido em mês/ano -> pago 05/mês seguinte", cards,
   tabela por vendedor, "Marcar como paga", lançamentos e "Baixar relatório" (CSV).
+- Preços e metas: meta mensal da equipe e de cada vendedor (SalesGoal), com
+  edição pela DIRETORIA e GERENTE_COMERCIAL e histórico por mês.
 - Dashboard: filtros de período e equipe, cards, vendas por mês (12 meses, com
-  IPI), funil, ranking de vendedores e top 8 equipamentos (sem IPI). Todas as
+  IPI), funil, ranking de vendedores com % da meta do mês e top 8 equipamentos
+  (sem IPI). Todas as
   agregações em SQL no Postgres.
 Teste Playwright: dar baixa em uma parcela e conferir a comissão do mês.
 ```
