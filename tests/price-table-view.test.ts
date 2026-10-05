@@ -39,6 +39,10 @@ const TABLE: PublishedTable = {
   version: 1,
   publishedAt: PUBLISHED_AT,
   freeDiscount: SNAPSHOT.params.freeDiscount,
+  ipi: SNAPSHOT.params.ipi,
+  minDownPayment: SNAPSHOT.params.minDownPayment,
+  proposalValidityDays: SNAPSHOT.params.proposalValidityDays,
+  commission: SNAPSHOT.params.commission,
   items: SNAPSHOT.items.map(({ productId, code, name, table, tableWithIpi }) => ({ productId, code, name, table, tableWithIpi })),
 };
 

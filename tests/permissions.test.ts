@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { canAccess, MENU_ITEMS, menuFor, seesCosts } from "@/lib/auth/permissions";
+import { canAccess, MENU_ITEMS, menuFor, seesAllOrders, seesCosts } from "@/lib/auth/permissions";
 import type { MenuItemKey } from "@/lib/auth/permissions";
 import { ROLE_LABELS, ROLES } from "@/lib/auth/roles";
 import type { Role } from "@/lib/auth/roles";
@@ -91,6 +91,18 @@ test("custo, desconto máximo e lucro: só a Diretoria vê", () => {
     [
       ["DIRETORIA", true],
       ["GERENTE_COMERCIAL", false],
+      ["VENDEDOR", false],
+      ["FINANCEIRO", false],
+    ],
+  );
+});
+
+test("pedidos da equipe inteira: Diretoria e gerente; o vendedor vê só os dele", () => {
+  assert.deepEqual(
+    COLUMNS.map((role) => [role, seesAllOrders(role)]),
+    [
+      ["DIRETORIA", true],
+      ["GERENTE_COMERCIAL", true],
       ["VENDEDOR", false],
       ["FINANCEIRO", false],
     ],

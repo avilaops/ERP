@@ -35,6 +35,7 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "0002_parametros_iniciais.sql",
     "0003_tabela_publicada.sql",
     "0004_clientes.sql",
+    "0005_pedidos.sql",
   ]);
 
   const second = await withClient((client) => migrate(client, MIGRATIONS_DIR));
@@ -49,6 +50,8 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
   );
   assert.deepEqual(tables.rows.map((row) => row.table_name), [
     "customers",
+    "order_items",
+    "orders",
     "price_table_items",
     "price_table_versions",
     "pricing_params",

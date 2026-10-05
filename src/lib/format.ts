@@ -64,3 +64,22 @@ export function parseDays(text: string): number | null {
 export function showDate(date: Date): string {
   return date.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "numeric" });
 }
+
+const SAO_PAULO = "America/Sao_Paulo";
+
+/** The calendar day in São Paulo of a moment, as `AAAA-MM-DD`: what the engine's date functions take. */
+export function isoDate(date: Date): string {
+  return date.toLocaleDateString("sv-SE", { timeZone: SAO_PAULO });
+}
+
+/** `"2026-12-29"` → `"29/12/2026"`. */
+export function showIsoDate(date: string): string {
+  const [year, month, day] = date.split("-");
+  return `${day}/${month}/${year}`;
+}
+
+/** Day and time in São Paulo: `30/09/2026 10:06`. */
+export function showDateTime(date: Date): string {
+  const time = date.toLocaleTimeString("pt-BR", { timeZone: SAO_PAULO, hour: "2-digit", minute: "2-digit", hour12: false });
+  return `${showDate(date)} ${time}`;
+}

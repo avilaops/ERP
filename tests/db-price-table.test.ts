@@ -194,7 +194,21 @@ test("excluir depois de publicar: quem já saiu numa versão só pode ser desati
 test("a equipe não recebe custo do banco: a leitura dela só tem nome, código e preço", { skip }, async () => {
   const table = await loadPublishedTable(1, db.pool);
   assert.ok(table);
-  assert.deepEqual(Object.keys(table), ["version", "publishedAt", "freeDiscount", "items"]);
+  assert.deepEqual(Object.keys(table), [
+    "version",
+    "publishedAt",
+    "freeDiscount",
+    "ipi",
+    "minDownPayment",
+    "proposalValidityDays",
+    "commission",
+    "items",
+  ]);
+  // As condições comerciais que o vendedor já lê na proposta; nada de custo, lucro ou imposto de venda.
+  assert.deepEqual(
+    [table.ipi, table.minDownPayment, table.proposalValidityDays, table.commission],
+    [0.13, 0.65, 7, 0.02],
+  );
   for (const item of table.items) {
     assert.deepEqual(Object.keys(item), ["productId", "code", "name", "table", "tableWithIpi"]);
   }

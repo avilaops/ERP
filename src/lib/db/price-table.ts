@@ -26,8 +26,21 @@ export type PublishedSnapshot = PriceTableVersion & { params: PricingParams; ite
 /** What the team sees of one product. No cost, credit nor packaging. */
 export type PublishedPrice = { productId: number; code: string | null; name: string; table: number; tableWithIpi: number };
 
-/** What the team sees of a version. Of the parameters, only the seller's free discount. */
-export type PublishedTable = { version: number; publishedAt: Date; freeDiscount: number; items: PublishedPrice[] };
+/**
+ * What the team sees of a version. Of the parameters, only the commercial
+ * conditions a seller already reads on the proposal: none reveals cost or margin.
+ */
+export type PublishedTable = {
+  version: number;
+  publishedAt: Date;
+  freeDiscount: number;
+  ipi: number;
+  /** Down payment the policy asks for, as a rate of the invoice total. */
+  minDownPayment: number;
+  proposalValidityDays: number;
+  commission: number;
+  items: PublishedPrice[];
+};
 
 /** A refusal the user can act on. The message goes to the screen as it is. */
 export class PriceTableError extends Error {}
@@ -177,7 +190,8 @@ export async function publishPriceTable(
 export async function loadPublishedTable(version: number, conn: Queryable = db()): Promise<PublishedTable | null> {
   if (!Number.isSafeInteger(version) || version <= 0) return null;
   const { rows } = await conn.query(
-    "SELECT version, published_at, free_discount FROM price_table_versions WHERE version = $1",
+    `SELECT version, published_at, free_discount, ipi, min_down_payment, proposal_validity_days, commission
+       FROM price_table_versions WHERE version = $1`,
     [version],
   );
   if (!rows[0]) return null;
@@ -190,6 +204,10 @@ export async function loadPublishedTable(version: number, conn: Queryable = db()
     version: Number(rows[0].version),
     publishedAt: rows[0].published_at as Date,
     freeDiscount: Number(rows[0].free_discount),
+    ipi: Number(rows[0].ipi),
+    minDownPayment: Number(rows[0].min_down_payment),
+    proposalValidityDays: Number(rows[0].proposal_validity_days),
+    commission: Number(rows[0].commission),
     items: items.rows.map((row) => ({
       productId: Number(row.product_id),
       code: row.code === null ? null : String(row.code),

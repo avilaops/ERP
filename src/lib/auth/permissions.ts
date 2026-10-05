@@ -61,3 +61,11 @@ export function menuFor(role: Role): MenuItem[] {
 export function seesCosts(role: Role): boolean {
   return role === "DIRETORIA";
 }
+
+/**
+ * Who sees the orders of the whole team. A seller sees only their own. Pages and
+ * actions build the scope of the orders from this, never from the profile itself.
+ */
+export function seesAllOrders(role: Role): boolean {
+  return role === "DIRETORIA" || role === "GERENTE_COMERCIAL";
+}

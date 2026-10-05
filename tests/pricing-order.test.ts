@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { discountBand, policyCheck, quoteOrder } from "@/lib/pricing/order";
+import { discountBand, orderBand, orderMaxDiscounts, policyCheck, quoteOrder, quoteSale } from "@/lib/pricing/order";
 import type { OrderInput } from "@/lib/pricing/order";
 import { DEFAULT_PARAMS } from "@/lib/pricing/params";
 import { maxDiscounts } from "@/lib/pricing/table";
@@ -208,4 +208,76 @@ test("política: os três motivos juntos, e o desconto livre exato não pede apr
     needsApproval: false,
     reasons: [],
   });
+});
+
+test("venda sem custo: o resumo e as linhas do pedido-gabarito, só com preço de tabela e IPI", () => {
+  const items = MANUAL_ORDER.items.map(({ quantity, tableUnitPrice }) => ({ quantity, tableUnitPrice }));
+  const sale = quoteSale({ items, discount: 0 }, { ipi: P.ipi });
+
+  assert.equal(sale.tableTotal, 40023.6);
+  assert.equal(sale.netSale, 40023.6);
+  assert.equal(sale.ipi, 5203.07);
+  assert.equal(sale.invoiceTotal, 45226.67);
+  assert.deepEqual(sale.lines[0], {
+    quantity: 1,
+    unitPrice: 19204.61,
+    unitDiscount: 0,
+    unitIpi: 2496.6,
+    unitWithIpi: 21701.21,
+    totalWithIpi: 21701.21,
+  });
+  assert.deepEqual(Object.keys(sale), ["lines", "tableTotal", "discount", "netSale", "ipi", "invoiceTotal"]);
+});
+
+test("venda sem custo e conta completa dão os mesmos seis campos", () => {
+  const cases: OrderInput[] = [
+    MANUAL_ORDER,
+    { items: [{ ...FLEXORA, quantity: 2 }], discount: 0.2, destination: { uf: "SP", taxpayer: true } },
+    { items: [FLEXORA, { ...SECOND, quantity: 3 }], discount: 0.125, destination: { uf: "RS", taxpayer: false }, freight: 900 },
+  ];
+  for (const order of cases) {
+    const full = quoteOrder(order, P);
+    const sale = quoteSale(order, P);
+    assert.deepEqual(sale, {
+      lines: full.lines,
+      tableTotal: full.tableTotal,
+      discount: full.discount,
+      netSale: full.netSale,
+      ipi: full.ipi,
+      invoiceTotal: full.invoiceTotal,
+    });
+  }
+});
+
+test("venda sem custo recusa pedido vazio, quantidade, preço, desconto e IPI inválidos", () => {
+  const item = { quantity: 1, tableUnitPrice: 100 };
+  assert.throws(() => quoteSale({ items: [], discount: 0 }, P), /Pedido sem itens/);
+  assert.throws(() => quoteSale({ items: [{ ...item, quantity: 0 }], discount: 0 }, P), /Quantidade do item/);
+  assert.throws(() => quoteSale({ items: [{ ...item, quantity: 1.5 }], discount: 0 }, P), /Quantidade do item/);
+  assert.throws(() => quoteSale({ items: [{ ...item, tableUnitPrice: 0 }], discount: 0 }, P), /preço ou custo inválido/);
+  assert.throws(() => quoteSale({ items: [item], discount: 1 }, P), /Desconto precisa ser/);
+  assert.throws(() => quoteSale({ items: [item], discount: 0 }, { ipi: 1.3 }), /IPI precisa ser uma taxa/);
+});
+
+test("descontos máximos do pedido-gabarito: 20,0% na meta e 49,0% sem prejuízo", () => {
+  const max = orderMaxDiscounts(MANUAL_ORDER, P);
+  assert.equal(percent(max.atTarget, 1), "20.0");
+  assert.equal(percent(max.noLoss, 1), "49.0");
+  assert.equal(orderBand(MANUAL_ORDER, P), "na-meta");
+  assert.equal(orderBand({ ...MANUAL_ORDER, discount: 0.3 }, P), "abaixo-da-meta");
+  assert.equal(orderBand({ ...MANUAL_ORDER, discount: 0.6 }, P), "prejuizo");
+});
+
+test("descontos máximos: o frete entra no custo, e o limite da meta é onde o lucro do quadro bate a meta", () => {
+  for (const freight of [0, 1500]) {
+    const order = { ...MANUAL_ORDER, freight };
+    const max = orderMaxDiscounts(order, P);
+    const atTarget = quoteOrder({ ...order, discount: max.atTarget }, P);
+    assert.ok(Math.abs(atTarget.netProfitRate - P.targetNetProfit) < 1e-9, `frete ${freight}: ${atTarget.netProfitRate}`);
+    const noLoss = quoteOrder({ ...order, discount: max.noLoss }, P);
+    assert.ok(Math.abs(noLoss.netProfit) < 0.01, `frete ${freight}: lucro ${noLoss.netProfit}`);
+  }
+  // Com frete por nossa conta sobra menos desconto.
+  assert.ok(orderMaxDiscounts({ ...MANUAL_ORDER, freight: 1500 }, P).atTarget < orderMaxDiscounts(MANUAL_ORDER, P).atTarget);
+  assert.throws(() => orderMaxDiscounts({ ...MANUAL_ORDER, freight: -1 }, P), /Frete não pode ser negativo/);
 });
