@@ -1,4 +1,4 @@
-import { roundCents } from "@/lib/pricing/money";
+import { assertAmount, roundCents } from "@/lib/pricing/money";
 import type { PricingParams } from "@/lib/pricing/params";
 
 /**
@@ -10,6 +10,8 @@ export function requiredDownPayment(
   { chinaPayment, netSale }: { chinaPayment: number; netSale: number },
   params: PricingParams,
 ): number {
+  assertAmount(chinaPayment, "Pagamento na China");
+  assertAmount(netSale, "Venda sem IPI");
   return (chinaPayment + netSale * params.targetNetProfit) / (1 - params.commission / (1 + params.ipi));
 }
 

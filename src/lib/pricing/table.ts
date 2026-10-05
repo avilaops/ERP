@@ -1,4 +1,4 @@
-import { RATE_EPSILON } from "@/lib/pricing/money";
+import { assertAmount, RATE_EPSILON } from "@/lib/pricing/money";
 import type { PricingParams } from "@/lib/pricing/params";
 import { preTaxProfit, totalRate, worstCase } from "@/lib/pricing/taxes";
 import type { Destination } from "@/lib/pricing/taxes";
@@ -23,6 +23,7 @@ export function tableMultiplier(params: PricingParams): number {
 }
 
 export function tablePrice(realCost: number, params: PricingParams): number {
+  assertAmount(realCost, "Custo real");
   return realCost * tableMultiplier(params);
 }
 
@@ -46,7 +47,10 @@ export function maxDiscounts(
   params: PricingParams,
   destination: Destination,
 ): MaxDiscounts {
-  if (!(tableTotal > 0)) throw new Error("Total de tabela precisa ser maior que zero.");
+  if (!(Number.isFinite(tableTotal) && tableTotal > 0)) {
+    throw new Error("Total de tabela precisa ser maior que zero.");
+  }
+  assertAmount(cost, "Custo");
   const rate = totalRate(params, destination);
   return {
     atTarget: 1 - cost / (tableTotal * costShare(rate, preTaxProfit(params))),

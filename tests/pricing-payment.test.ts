@@ -100,6 +100,24 @@ test("comissão: 2% do recebido, descontado o IPI", () => {
   assert.equal(commissionOn(0, P), 0);
 });
 
+test("comissão e entrada mínima recusam valor negativo ou que não é número", () => {
+  for (const bad of [Number.NaN, Number.POSITIVE_INFINITY, -100]) {
+    assert.throws(() => commissionOn(bad, P), /Valor recebido precisa ser/, String(bad));
+    assert.throws(() => commissionBase(bad, P), /Valor recebido precisa ser/, String(bad));
+    assert.throws(
+      () => requiredDownPayment({ chinaPayment: bad, netSale: 1000 }, P),
+      /Pagamento na China precisa ser/,
+      String(bad),
+    );
+    assert.throws(
+      () => requiredDownPayment({ chinaPayment: 1000, netSale: bad }, P),
+      /Venda sem IPI precisa ser/,
+      String(bad),
+    );
+  }
+  assert.equal(requiredDownPayment({ chinaPayment: 0, netSale: 0 }, P), 0);
+});
+
 test("comissão: paga no dia 05 do mês seguinte ao recebimento", () => {
   assert.equal(commissionPaymentDate("2026-09-28"), "2026-10-05");
   assert.equal(commissionPaymentDate("2026-12-15"), "2027-01-05");

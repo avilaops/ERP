@@ -35,6 +35,8 @@ export type PricingParams = {
    * every figure in the screenshots matches.
    */
   otherSalesRate: number;
+  /** Despesas fixas por mês, in reais. The only field that is not a rate or a number of days. */
+  fixedMonthlyExpenses: number;
 };
 
 /** Current values of the prototype (docs/manual/paginas/16-parametros.md). */
@@ -53,9 +55,14 @@ export const DEFAULT_PARAMS: PricingParams = {
   gateway: 0,
   icmsInterstate: 0.04,
   otherSalesRate: 0.025,
+  fixedMonthlyExpenses: 0,
 };
 
-const RATE_LABELS: Record<Exclude<keyof PricingParams, "proposalValidityDays">, string> = {
+/** Screen label of every rate: also the order the form shows them in. */
+export const RATE_LABELS: Record<
+  Exclude<keyof PricingParams, "proposalValidityDays" | "fixedMonthlyExpenses">,
+  string
+> = {
   targetNetProfit: "Lucro líquido que quero em cada venda",
   freeDiscount: "Desconto livre do vendedor",
   safetyMargin: "Margem de segurança da importação",
@@ -71,9 +78,14 @@ const RATE_LABELS: Record<Exclude<keyof PricingParams, "proposalValidityDays">, 
   otherSalesRate: "Outras taxas da venda",
 };
 
-/** Throws when a rate is outside [0, 1) or the validity is not a positive whole number of days. */
+export type RateKey = keyof typeof RATE_LABELS;
+
+/**
+ * Throws when a rate is outside [0, 1), the validity is not a positive whole
+ * number of days or the fixed expenses are not an amount in reais.
+ */
 export function validateParams(params: PricingParams): void {
-  for (const key of Object.keys(RATE_LABELS) as (keyof typeof RATE_LABELS)[]) {
+  for (const key of Object.keys(RATE_LABELS) as RateKey[]) {
     const rate = params[key];
     if (typeof rate !== "number" || !Number.isFinite(rate) || rate < 0 || rate >= 1) {
       throw new Error(`Parâmetro inválido: "${RATE_LABELS[key]}" precisa ser uma taxa de 0% até menos de 100%.`);
@@ -81,5 +93,9 @@ export function validateParams(params: PricingParams): void {
   }
   if (!Number.isInteger(params.proposalValidityDays) || params.proposalValidityDays <= 0) {
     throw new Error('Parâmetro inválido: "Validade da proposta" precisa ser um número inteiro de dias, maior que zero.');
+  }
+  const expenses = params.fixedMonthlyExpenses;
+  if (typeof expenses !== "number" || !Number.isFinite(expenses) || expenses < 0) {
+    throw new Error('Parâmetro inválido: "Despesas fixas por mês" precisa ser um valor em reais, zero ou mais.');
   }
 }

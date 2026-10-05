@@ -20,3 +20,17 @@ export const RATE_EPSILON = 1e-9;
  * comes out as 19.99999% and must still count as inside the band.
  */
 export const BAND_SLACK = 1e-4;
+
+/** Throws unless `value` is an amount in reais: a finite number, zero or more. */
+export function assertAmount(value: number, label: string): void {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+    throw new Error(`${label} precisa ser um valor em reais, zero ou mais.`);
+  }
+}
+
+/** Throws unless `value` is a rate in [0, 1). */
+export function assertRate(value: number, label: string): void {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value >= 1) {
+    throw new Error(`${label} precisa ser uma taxa de 0% até menos de 100%.`);
+  }
+}

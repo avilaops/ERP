@@ -1,4 +1,5 @@
 import { BAND_SLACK, RATE_EPSILON, roundCents } from "@/lib/pricing/money";
+import { validateParams } from "@/lib/pricing/params";
 import type { PricingParams } from "@/lib/pricing/params";
 import { requiredDownPayment } from "@/lib/pricing/payment";
 import { chinaPayment } from "@/lib/pricing/product";
@@ -86,6 +87,7 @@ function checkOrder({ items, discount, freight = 0 }: OrderInput): void {
 }
 
 export function quoteOrder(order: OrderInput, params: PricingParams): OrderQuote {
+  validateParams(params);
   checkOrder(order);
   const { items, discount, destination, freight = 0 } = order;
   const sum = (value: (item: OrderItem) => number) =>

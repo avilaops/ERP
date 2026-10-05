@@ -1,8 +1,10 @@
+import { assertAmount } from "@/lib/pricing/money";
 import type { PricingParams } from "@/lib/pricing/params";
 import { formatDate, parseDate } from "@/lib/pricing/payment";
 
 /** What was received from the customer, without the IPI. */
 export function commissionBase(received: number, params: PricingParams): number {
+  assertAmount(received, "Valor recebido");
   return received / (1 + params.ipi);
 }
 

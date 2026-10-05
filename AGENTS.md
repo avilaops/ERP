@@ -88,6 +88,14 @@ funções puras, sem banco e sem tela, conferidas com os números dos prints do 
    argumento. `tests/pricing-purity.test.ts` falha se isso mudar.
 5. Taxas são frações (`0.15` = 15%). Valores em reais com precisão cheia;
    `roundCents` só na saída.
+6. **Entrada inválida é erro em português, nunca `NaN` nem valor negativo.** As funções
+   de base conferem o que recebem (`assertAmount`, `assertRate` em `money.ts`) e
+   `quoteOrder` chama `validateParams` antes de calcular.
+7. **Custo real não se guarda arredondado.** A tabela só fecha no centavo com o
+   protótipo quando `tablePrice` recebe o custo real em precisão cheia, vindo de
+   `realCost` com o crédito de impostos em sete casas ou mais.
+8. O quadro Resultado da tela de Parâmetros (multiplicador, pior destino, equilíbrio e
+   entrada mínima sugerida) é `paramsResult`, em `results.ts`.
 
 ## Git
 

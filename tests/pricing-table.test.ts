@@ -42,7 +42,9 @@ test("parâmetros: valores atuais do manual", () => {
     gateway: 0,
     icmsInterstate: 0.04,
     otherSalesRate: 0.025,
+    fixedMonthlyExpenses: 0,
   });
+  assert.equal(Object.keys(P).length, 15);
   assert.doesNotThrow(() => validateParams(P));
 });
 
@@ -61,7 +63,10 @@ test("parâmetros: taxa fora de [0, 1) e dias que não são inteiro positivo dã
   for (const proposalValidityDays of [0, -7, 7.5, Number.NaN]) {
     assert.throws(() => validateParams({ ...P, proposalValidityDays }), /Validade da proposta/);
   }
-  assert.doesNotThrow(() => validateParams({ ...P, gateway: 0, freeDiscount: 0.999 }));
+  for (const fixedMonthlyExpenses of [-1, Number.NaN, Number.POSITIVE_INFINITY]) {
+    assert.throws(() => validateParams({ ...P, fixedMonthlyExpenses }), /"Despesas fixas por mês" precisa ser um valor/);
+  }
+  assert.doesNotThrow(() => validateParams({ ...P, gateway: 0, freeDiscount: 0.999, fixedMonthlyExpenses: 50000 }));
 });
 
 test("estados: 27 UFs sem repetição, MA com 23% e nenhuma acima dela", () => {
@@ -82,6 +87,12 @@ test("ICMS e DIFAL por destino", () => {
   assert.deepEqual(saleTaxes(P, { uf: "MA", taxpayer: true }), { icms: 0.04, difal: 0 });
   assert.deepEqual(saleTaxes(P, { uf: "SP", taxpayer: false }), { icms: 0.18, difal: 0 });
   assert.deepEqual(saleTaxes(P, { uf: "SP", taxpayer: true }), { icms: 0.18, difal: 0 });
+});
+
+test("UF de destino fora da lista dá erro com o nome do problema", () => {
+  const destination = { uf: "XX", taxpayer: false } as unknown as Parameters<typeof saleTaxes>[1];
+  assert.throws(() => saleTaxes(P, destination), /UF de destino inválida/);
+  assert.throws(() => maxDiscounts({ tableTotal: 100, cost: 10 }, P, destination), /UF de destino inválida/);
 });
 
 test("DIFAL nunca é negativo, mesmo com interestadual acima da alíquota interna", () => {
@@ -125,6 +136,63 @@ test("preço de tabela sem e com IPI (print de Produtos e custos)", () => {
     near(tablePrice(cost, P), table, 0.02, `tabela de ${cost}`);
     near(withIpi(tablePrice(cost, P), P), tableWithIpi, 0.02, `tabela com IPI de ${cost}`);
   }
+});
+
+/** The four products of the print, with the tax credit in full precision (seven places). */
+const PRINT_PRODUCTS = [
+  { code: "LD-B001", advisoryCost: 8146.64, taxCredit: 0.2811565, realCost: 6148.97, table: 19204.61, withIpi: 21701.21 },
+  { code: "LD-B002", advisoryCost: 8738.77, taxCredit: 0.2735316, realCost: 6665.86, table: 20818.99, withIpi: 23525.46 },
+  { code: "LD-B003", advisoryCost: 11571.09, taxCredit: 0.2766628, realCost: 8788.29, table: 27447.81, withIpi: 31016.03 },
+  { code: "LD-B004", advisoryCost: 8719.03, taxCredit: 0.2737689, realCost: 6648.63, table: 20765.18, withIpi: 23464.65 },
+];
+
+test("tabela fecha no centavo com o crédito em precisão cheia (print de Produtos e custos)", () => {
+  for (const product of PRINT_PRODUCTS) {
+    const cost = realCost({ advisoryCost: product.advisoryCost, taxCredit: product.taxCredit, packaging: 0 }, P);
+    const table = tablePrice(cost, P);
+    assert.equal(roundCents(cost), product.realCost, `custo real de ${product.code}`);
+    assert.equal(roundCents(table), product.table, `tabela de ${product.code}`);
+    assert.equal(roundCents(withIpi(table, P)), product.withIpi, `tabela com IPI de ${product.code}`);
+
+    const item = { tableTotal: table, cost };
+    assert.equal(percent(maxDiscounts(item, P, { uf: "SP", taxpayer: false }).atTarget), "28.9", product.code);
+    assert.equal(percent(maxDiscounts(item, P, { uf: "MA", taxpayer: true }).atTarget), "45.8", product.code);
+  }
+});
+
+test("partir do custo real já arredondado custa um centavo na tabela: por isso ele não é guardado", () => {
+  assert.equal(roundCents(tablePrice(6148.97, P)), 19204.62);
+  const full = realCost({ advisoryCost: 8146.64, taxCredit: 0.2811565, packaging: 0 }, P);
+  assert.equal(roundCents(tablePrice(full, P)), 19204.61);
+});
+
+test("funções de base recusam entrada que não é valor em reais ou taxa, em português", () => {
+  const product = { advisoryCost: 8146.64, taxCredit: 0.28, packaging: 0 };
+  for (const bad of [Number.NaN, Number.POSITIVE_INFINITY, -1]) {
+    assert.throws(() => realCost({ ...product, advisoryCost: bad }, P), /Custo da assessoria precisa ser/, String(bad));
+    assert.throws(() => realCost({ ...product, packaging: bad }, P), /Embalagem precisa ser/, String(bad));
+    assert.throws(() => chinaPayment(bad, P), /Custo da assessoria precisa ser/, String(bad));
+    assert.throws(() => tablePrice(bad, P), /Custo real precisa ser/, String(bad));
+    assert.throws(
+      () => maxDiscounts({ tableTotal: 100, cost: bad }, P, { uf: "SP", taxpayer: true }),
+      /Custo precisa ser/,
+      String(bad),
+    );
+  }
+  for (const taxCredit of [Number.NaN, Number.POSITIVE_INFINITY, -0.1, 1, 2]) {
+    assert.throws(() => realCost({ ...product, taxCredit }, P), /Crédito de impostos precisa ser uma taxa/, String(taxCredit));
+  }
+  for (const tableTotal of [Number.NaN, Number.POSITIVE_INFINITY, 0, -5]) {
+    assert.throws(
+      () => maxDiscounts({ tableTotal, cost: 10 }, P, { uf: "SP", taxpayer: true }),
+      /Total de tabela precisa ser maior que zero/,
+      String(tableTotal),
+    );
+  }
+  // Zero continua valendo onde faz sentido.
+  assert.equal(realCost({ advisoryCost: 0, taxCredit: 0, packaging: 0 }, P), 0);
+  assert.equal(tablePrice(0, P), 0);
+  assert.equal(chinaPayment(0, P), 0);
 });
 
 test("parâmetros sem preço possível dão erro, não preço negativo nem infinito", () => {

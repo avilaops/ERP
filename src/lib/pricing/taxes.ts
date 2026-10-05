@@ -15,6 +15,7 @@ export type SaleTaxes = {
 };
 
 export function saleTaxes(params: PricingParams, destination: Destination): SaleTaxes {
+  if (!UFS.includes(destination.uf)) throw new Error(`UF de destino inválida: "${destination.uf}".`);
   if (destination.uf === ORIGIN_UF) return { icms: params.icmsSp, difal: 0 };
   const icms = params.icmsInterstate;
   if (destination.taxpayer) return { icms, difal: 0 };

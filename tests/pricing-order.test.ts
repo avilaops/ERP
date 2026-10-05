@@ -107,6 +107,17 @@ test("pedido inválido dá erro em português", () => {
   assert.throws(() => quoteOrder({ ...MANUAL_ORDER, discount: Number.NaN }, P), /Desconto/);
 });
 
+test("conta do pedido confere os parâmetros antes de calcular", () => {
+  assert.throws(() => quoteOrder(MANUAL_ORDER, { ...P, ipi: 1.3 }), /Parâmetro inválido: "IPI destacado na nota"/);
+  assert.throws(() => quoteOrder(MANUAL_ORDER, { ...P, commission: Number.NaN }), /Parâmetro inválido: "Comissão"/);
+  assert.throws(
+    () => quoteOrder(MANUAL_ORDER, { ...P, fixedMonthlyExpenses: -1 }),
+    /Parâmetro inválido: "Despesas fixas por mês"/,
+  );
+  const destination = { uf: "XX", taxpayer: false } as unknown as OrderInput["destination"];
+  assert.throws(() => quoteOrder({ ...MANUAL_ORDER, destination }, P), /UF de destino inválida/);
+});
+
 test("faixa do desconto: na meta, abaixo da meta e prejuízo", () => {
   const max = { atTarget: 0.2, noLoss: 0.49 };
   assert.equal(discountBand(0, max), "na-meta");
