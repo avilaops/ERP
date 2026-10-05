@@ -67,6 +67,28 @@ Regras que não se quebram:
 6. A decisão de acesso é a função pura `decideAccess` (`access.ts`). Regra nova de
    acesso entra lá, com teste, e não espalhada pelas páginas.
 
+## Regras de `src/lib/pricing/`
+
+Todas as contas do ERP moram nesta pasta: custo real, preço de tabela, desconto
+máximo, conta do pedido com ICMS e DIFAL, entrada mínima, parcelas e comissão. São
+funções puras, sem banco e sem tela, conferidas com os números dos prints do manual
+(`tests/pricing-*.test.ts`).
+
+1. **É a única fonte das contas.** Tela, rota e relatório chamam estas funções; não
+   refazem cálculo, nem "só uma soma". Importe sempre o arquivo
+   (`@/lib/pricing/order`), nunca a pasta.
+2. **Mudou a regra, muda a função e o teste-gabarito no mesmo commit.** Os valores
+   dos testes vêm do protótipo; número novo precisa de origem (print, manual ou
+   pedido do Rogério).
+3. **Custo, valor da China e lucro nunca vão para o navegador de quem não é
+   Diretoria.** Em `quoteOrder`, tudo de `taxes` para baixo é o quadro "Só o diretor
+   vê": a página monta no servidor só o que o perfil pode ver.
+4. **A pasta não conhece o resto do sistema.** Sem `next/*`, `react`, `@/lib/auth`,
+   `process.env`, relógio ou rede: parâmetros e datas (`AAAA-MM-DD`) entram por
+   argumento. `tests/pricing-purity.test.ts` falha se isso mudar.
+5. Taxas são frações (`0.15` = 15%). Valores em reais com precisão cheia;
+   `roundCents` só na saída.
+
 ## Git
 
 Toda alteração vai por commit direto na `main`, na mesma tarefa:
