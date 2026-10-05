@@ -24,7 +24,48 @@ test("toda rota da matriz tem page.tsx que chama requirePermission com o própri
       code.includes(`await requirePermission("${item.key}")`),
       `${item.href} não chama requirePermission("${item.key}")`,
     );
-    assert.ok(code.includes("Em construção") || code.includes("PlaceholderPage"), item.href);
+  }
+});
+
+/** Pages already ported from the prototype. The others still say "Em construção". */
+const PORTED = ["parametros"];
+
+test("páginas portadas não são mais marcador; as outras continuam Em construção", () => {
+  for (const item of MENU_ITEMS) {
+    const code = source(item.href);
+    if (PORTED.includes(item.key)) {
+      assert.ok(!code.includes("PlaceholderPage") && !code.includes("Em construção"), `${item.href} ainda é marcador`);
+    } else {
+      assert.ok(code.includes("PlaceholderPage"), `${item.href} deveria estar Em construção`);
+    }
+  }
+  assert.equal(MENU_ITEMS.filter((item) => !PORTED.includes(item.key)).length, 13);
+});
+
+/** Every source file under the protected group, relative to it. */
+const appFiles = () =>
+  readdirSync(APP_DIR, { recursive: true, encoding: "utf8" }).filter((file) => /\.tsx?$/.test(file));
+
+test("toda ação de servidor confere a permissão antes de qualquer outra coisa", () => {
+  const actions = appFiles().filter((file) => /^\s*["']use server["']/m.test(readFileSync(APP_DIR + file, "utf8")));
+  assert.ok(actions.includes("parametros/actions.ts"));
+  for (const file of actions) {
+    const code = readFileSync(APP_DIR + file, "utf8");
+    // Each exported action opens with the check: nothing is read from the form or the database before it.
+    const bodies = code.split(/export async function \w+\([^)]*\)[^{]*\{/).slice(1);
+    assert.ok(bodies.length > 0, `${file} não exporta ação`);
+    for (const body of bodies) {
+      assert.match(body.trimStart(), /^(const \w+ = )?await requirePermission\(/, `${file}: ação sem requirePermission no início`);
+    }
+  }
+});
+
+test("a página lê o banco só depois de conferir a permissão", () => {
+  const code = source("/parametros");
+  const permission = code.indexOf('await requirePermission("parametros")');
+  assert.ok(permission > 0);
+  for (const read of ["loadParams(", "listProductCosts("]) {
+    assert.ok(code.indexOf(read) > permission, `${read} antes do requirePermission`);
   }
 });
 

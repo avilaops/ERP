@@ -12,8 +12,13 @@ Node 24 e npm (não há pnpm no servidor).
 ```bash
 npm install
 cp .env.example .env.local   # ajuste os valores; nunca comite
+npm run db:migrate           # cria ou atualiza as tabelas do banco de DATABASE_URL
 npm run dev                  # http://localhost:3020
 ```
+
+O banco é PostgreSQL, próprio do ERP. No servidor `creators` já existem os bancos `erp`
+(desenvolvimento) e `erp_test` (testes), com a `DATABASE_URL` em `.env.local` e a
+`ERP_TEST_DATABASE_URL` em `.env.test.local` (os dois arquivos são ignorados pelo Git).
 
 Em desenvolvimento, com `ERP_LOCAL_LOGIN=1` no `.env.local`,
 `http://localhost:3020/dev/login` entra com um usuário de teste por perfil, sem
@@ -29,6 +34,11 @@ npm run typecheck
 npm test
 npm run build
 ```
+
+Os testes de banco (`tests/db-*.test.ts`) usam `ERP_TEST_DATABASE_URL`, lida de
+`.env.test.local`. Cada arquivo cria um esquema `test_…` só dele, aplica as migrações e
+o apaga no fim. Sem a variável eles são pulados com o motivo na saída; neste servidor
+ela existe, então `skipped` tem de ser 0.
 
 Os testes usam o executor do próprio Node (`tests/*.test.ts`). `tests/loader.mjs`
 resolve `@/` e troca `next/headers` e `next/navigation` por substitutos: os cookies da
@@ -96,6 +106,29 @@ funções puras, sem banco e sem tela, conferidas com os números dos prints do 
    `realCost` com o crédito de impostos em sete casas ou mais.
 8. O quadro Resultado da tela de Parâmetros (multiplicador, pior destino, equilíbrio e
    entrada mínima sugerida) é `paramsResult`, em `results.ts`.
+
+## Regras de `src/lib/db/`
+
+1. **O ERP tem banco próprio (`erp`) e só fala com ele.** Nada de ler ou gravar em banco
+   de outro sistema. `DATABASE_URL` é a única variável de conexão; em produção, sem
+   ela o processo não sobe (`src/instrumentation-node.ts`).
+2. **Só `src/lib/db/` fala SQL**, com `pg` direto, sem ORM. O resto do código chama as
+   funções dela (`loadParams`, `saveParams`, `createProduct`, `listProducts`, …).
+   Arquivo com `"use client"` nunca importa `@/lib/db`.
+3. **Consulta só com parâmetros (`$1`).** Valor nunca é colado no texto do SQL.
+4. **Mudança de esquema é arquivo novo em `db/migrations/`** (`NNNN_nome.sql`), aplicado
+   por `npm run db:migrate`. Migração já aplicada não se edita. O SQL não cita esquema
+   (`public.`), porque os testes aplicam as migrações em esquema próprio.
+5. **O que sai do banco passa pela validação do motor antes de ser usado.**
+   `loadParams` chama `validateParams`; linha inválida é erro, não parâmetro torto.
+   `saveParams` também confere que existe preço possível antes de gravar.
+6. **Custo real e preço de tabela não são colunas.** Saem sempre de `src/lib/pricing/`,
+   a partir do custo da assessoria, do crédito (oito casas) e da embalagem.
+7. **Teste de banco só em banco cujo nome termina em `_test`.** O apoio dos testes
+   (`tests/db-helpers.ts`) recusa qualquer outro.
+8. **Ação de servidor é endpoint público:** toda função exportada de um arquivo
+   `"use server"` começa com `await requirePermission(...)`, antes de ler o formulário
+   ou o banco. `tests/routes.test.ts` falha se faltar.
 
 ## Git
 

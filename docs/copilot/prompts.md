@@ -2,6 +2,8 @@
 
 O contexto permanente está em [`.github/copilot-instructions.md`](../../.github/copilot-instructions.md). O Copilot lê esse arquivo sozinho em toda conversa. Use os prompts abaixo no Copilot Chat em modo Agent, um por vez, na ordem do [roadmap](../roadmap.md).
 
+> **Atenção (05/10/2026):** estes prompts foram escritos para a stack planejada (Prisma, `organization_id`, `src/modules/`, Vitest, Playwright, pnpm). O desenvolvimento seguiu outra base, descrita no topo das instruções do projeto e no [`AGENTS.md`](../../AGENTS.md): `pg` com SQL direto, banco de uma empresa só, `src/lib/`, npm e o executor de testes do Node. Use os prompts como roteiro do **que** cada fase entrega; o **como** é o do `AGENTS.md`.
+
 ## 0. Preparar o protótipo (manual, antes do primeiro prompt)
 
 1. Abra o artifact do Rogério no Claude (acesso de editor para nicolas@avilaops.com).

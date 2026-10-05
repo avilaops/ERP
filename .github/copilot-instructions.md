@@ -9,15 +9,26 @@ Documentação de negócio: `docs/manual/` (uma página por funcionalidade) e `d
 
 Idioma: interface, mensagens e textos em português do Brasil. Código (variáveis, funções, tabelas) em inglês. Comentários podem ser em português.
 
+## O que vale hoje no código (decisão de 05/10/2026)
+O Nicolas decidiu seguir a base que já está na `main`, e não a stack planejada na primeira versão deste arquivo. Onde este arquivo e o [`AGENTS.md`](../AGENTS.md) divergirem, **vale o `AGENTS.md`**.
+
+- **Banco:** PostgreSQL com `pg` e SQL direto, sem Prisma nem outro ORM. Só `src/lib/db/` fala SQL; migrações são arquivos numerados em `db/migrations/`, aplicados por `npm run db:migrate`.
+- **Uma empresa só:** o banco é da Ludus. Não há `organization_id` nas tabelas nem isolamento por organização; `audit_log` e exclusão lógica (`deleted_at`) não foram adotados. Cada tabela guarda `updated_at` e `updated_by`.
+- **Cálculos:** `src/lib/pricing/`, funções puras com `number` em precisão cheia e `roundCents` só na saída (não `Prisma.Decimal`), conferidas no centavo com os prints do protótipo.
+- **Organização do código:** `src/lib/<assunto>/` e `src/app/(app)/<tela>/`, não `src/modules/`.
+- **Ferramentas:** npm (não há pnpm no servidor); testes com o executor do próprio Node (`npm test`), sem Vitest nem Playwright; validação de formulário em funções puras (`src/lib/params-form.ts`), sem Zod nem React Hook Form.
+
+As regras de negócio deste arquivo (fórmulas, perfis, fluxo do pedido, comissão) continuam valendo. Os trechos abaixo que citam Prisma, `organization_id`, `audit_log`, `src/modules/`, Vitest, Playwright ou pnpm descrevem o plano original e ficam como referência.
+
 ## Stack
 - Next.js (App Router, Server Components, Server Actions) + TypeScript strict
-- **PostgreSQL** como banco de dados, acessado com Prisma ORM (migrations versionadas; nunca editar migration já aplicada)
+- **PostgreSQL** como banco de dados, acessado com `pg` e SQL direto em `src/lib/db/` (migrações versionadas em `db/migrations/`; nunca editar migração já aplicada). O plano original previa Prisma ORM
 - Autenticação pelo **Auth central da Ávila Ops** (identidade compartilhada do ecossistema). Toda a integração fica isolada em `src/lib/auth/`; o resto do código só usa `getSession()` e `requirePermission()`
 - **Falha fechada:** um provedor de login local com usuários de teste só existe quando `NODE_ENV` é `development` ou `test`. Em produção, se as credenciais do Auth central faltarem ou estiverem inválidas, a aplicação não sobe (erro na inicialização) e nenhum login é aceito
 - Tailwind CSS; componentes reaproveitados do protótipo sempre que possível
-- Zod para validação (mesmo schema no client e no server) + React Hook Form
-- Vitest para regras de negócio, Playwright para os fluxos críticos
-- pnpm
+- Validação em funções puras testadas, no servidor (plano original: Zod + React Hook Form)
+- Executor de testes do próprio Node para regras de negócio e para o banco (plano original: Vitest e Playwright)
+- npm (plano original: pnpm)
 
 ## Arquitetura
 - Módulos de domínio em `src/modules/<modulo>/`: `schema.ts` (Zod), `service.ts` (regras puras e testáveis), `actions.ts` (Server Actions finas: validam, checam permissão, chamam o service), `queries.ts` (leituras), `components/`.
