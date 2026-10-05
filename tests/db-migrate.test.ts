@@ -30,7 +30,7 @@ async function withClient<T>(fn: (client: pg.PoolClient) => Promise<T>): Promise
 
 test("migração: aplica em ordem, registra e rodar de novo não muda nada", { skip }, async () => {
   const first = await withClient((client) => migrate(client, MIGRATIONS_DIR));
-  assert.deepEqual(first, ["0001_parametros_e_produtos.sql"]);
+  assert.deepEqual(first, ["0001_parametros_e_produtos.sql", "0002_parametros_iniciais.sql"]);
 
   const second = await withClient((client) => migrate(client, MIGRATIONS_DIR));
   assert.deepEqual(second, []);
@@ -43,6 +43,17 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     [db.schema],
   );
   assert.deepEqual(tables.rows.map((row) => row.table_name), ["pricing_params", "products", "schema_migrations"]);
+});
+
+test("migração: os parâmetros iniciais não sobrescrevem o que a diretoria já gravou", { skip }, async () => {
+  await db.pool.query("UPDATE pricing_params SET target_net_profit = 0.12, updated_by = 'diretoria@teste.local'");
+  await db.pool.query("DELETE FROM schema_migrations WHERE name = '0002_parametros_iniciais.sql'");
+  const again = await withClient((client) => migrate(client, MIGRATIONS_DIR));
+  assert.deepEqual(again, ["0002_parametros_iniciais.sql"]);
+  const { rows } = await db.pool.query("SELECT target_net_profit, updated_by FROM pricing_params");
+  assert.equal(rows.length, 1);
+  assert.equal(Number(rows[0].target_net_profit), 0.12);
+  assert.equal(rows[0].updated_by, "diretoria@teste.local");
 });
 
 test("migração: custo real e preço de tabela não são colunas; crédito guarda oito casas", { skip }, async () => {

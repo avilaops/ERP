@@ -28,9 +28,11 @@ const CHANGED: PricingParams = {
 
 const count = async () => Number((await db.pool.query("SELECT count(*) FROM pricing_params")).rows[0].count);
 
-test("parâmetros: sem linha gravada valem os padrões do motor", { skip }, async () => {
-  assert.equal(await count(), 0);
+test("parâmetros: a migração grava os valores do protótipo e é de lá que eles são lidos", { skip }, async () => {
+  assert.equal(await count(), 1);
+  // DEFAULT_PARAMS é o gabarito dos testes do motor: a linha inicial do banco tem de bater com ele.
   assert.deepEqual(await loadParams(db.pool), DEFAULT_PARAMS);
+  assert.equal((await db.pool.query("SELECT updated_by FROM pricing_params")).rows[0].updated_by, "migracao-0002");
 });
 
 test("parâmetros: gravar e reler devolve os mesmos valores", { skip }, async () => {
@@ -76,4 +78,9 @@ test("parâmetros: linha inválida no banco é erro, não parâmetro torto", { s
   await db.pool.query("ALTER TABLE pricing_params DROP CONSTRAINT pricing_params_proposal_validity_days_check");
   await db.pool.query("UPDATE pricing_params SET proposal_validity_days = 0");
   await assert.rejects(() => loadParams(db.pool), /Validade da proposta/);
+});
+
+test("parâmetros: sem a linha no banco é erro, não valor tirado do código", { skip }, async () => {
+  await db.pool.query("DELETE FROM pricing_params");
+  await assert.rejects(() => loadParams(db.pool), /Parâmetros não cadastrados no banco/);
 });

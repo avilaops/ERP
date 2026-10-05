@@ -1,6 +1,6 @@
 import { db } from "@/lib/db/pool";
 import type { Queryable } from "@/lib/db/pool";
-import { DEFAULT_PARAMS, validateParams } from "@/lib/pricing/params";
+import { validateParams } from "@/lib/pricing/params";
 import type { PricingParams } from "@/lib/pricing/params";
 import { tableMultiplier } from "@/lib/pricing/table";
 
@@ -26,14 +26,16 @@ const COLUMNS: [keyof PricingParams, string][] = [
 const COLUMN_LIST = COLUMNS.map(([, column]) => column).join(", ");
 
 /**
- * The directors' draft. Without a saved row the defaults of the engine apply.
- * What comes out of the database is validated before anyone uses it: an
- * invalid row throws instead of returning crooked parameters.
+ * The directors' draft. The database is the only source: the row is created by
+ * the migrations with the prototype's values and changed on the Parâmetros
+ * screen. Without it there is nothing to price with, so this throws instead of
+ * answering with values from the code. What comes out is validated before
+ * anyone uses it: an invalid row throws instead of returning crooked parameters.
  */
 export async function loadParams(conn: Queryable = db()): Promise<PricingParams> {
   const { rows } = await conn.query(`SELECT ${COLUMN_LIST} FROM pricing_params`);
   const row = rows[0];
-  if (!row) return DEFAULT_PARAMS;
+  if (!row) throw new Error("Parâmetros não cadastrados no banco. Rode `npm run db:migrate`.");
 
   // numeric columns arrive as text; Number() keeps the eight places stored.
   const params = Object.fromEntries(COLUMNS.map(([field, column]) => [field, Number(row[column])])) as PricingParams;

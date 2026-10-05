@@ -119,14 +119,19 @@ funções puras, sem banco e sem tela, conferidas com os números dos prints do 
 4. **Mudança de esquema é arquivo novo em `db/migrations/`** (`NNNN_nome.sql`), aplicado
    por `npm run db:migrate`. Migração já aplicada não se edita. O SQL não cita esquema
    (`public.`), porque os testes aplicam as migrações em esquema próprio.
-5. **O que sai do banco passa pela validação do motor antes de ser usado.**
+5. **Os dados vêm do banco, não do código.** Tela e ação leem parâmetros, produtos e o
+   que mais for cadastro pelas funções desta pasta; nada de valor fixo ou de exemplo na
+   página. Os parâmetros iniciais entram por migração (`0002`), e sem a linha
+   `loadParams` dá erro em vez de devolver `DEFAULT_PARAMS`, que fica só como gabarito
+   dos testes do motor. Dado de teste só dentro de `tests/`.
+6. **O que sai do banco passa pela validação do motor antes de ser usado.**
    `loadParams` chama `validateParams`; linha inválida é erro, não parâmetro torto.
    `saveParams` também confere que existe preço possível antes de gravar.
-6. **Custo real e preço de tabela não são colunas.** Saem sempre de `src/lib/pricing/`,
+7. **Custo real e preço de tabela não são colunas.** Saem sempre de `src/lib/pricing/`,
    a partir do custo da assessoria, do crédito (oito casas) e da embalagem.
-7. **Teste de banco só em banco cujo nome termina em `_test`.** O apoio dos testes
+8. **Teste de banco só em banco cujo nome termina em `_test`.** O apoio dos testes
    (`tests/db-helpers.ts`) recusa qualquer outro.
-8. **Ação de servidor é endpoint público:** toda função exportada de um arquivo
+9. **Ação de servidor é endpoint público:** toda função exportada de um arquivo
    `"use server"` começa com `await requirePermission(...)`, antes de ler o formulário
    ou o banco. `tests/routes.test.ts` falha se faltar.
 
