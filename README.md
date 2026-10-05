@@ -11,27 +11,22 @@ Sistema comercial da Ludus Equipamentos (importação e venda de equipamentos de
 
 ## Como rodar
 
-Requer Node 24 e npm.
+Requer Node 24, npm e um PostgreSQL ao alcance da máquina.
 
 ```bash
 npm install
-npm run dev                  # abra http://localhost:3020
-```
-
-Abre direto no **login local**, na própria máquina: escolha um perfil (Diretoria, Gerente comercial, Vendedor ou Financeiro) e entre. Não passa por nenhum domínio nem pelo login de produção, e o servidor de desenvolvimento só atende em `127.0.0.1`.
-
-As telas que leem dados (hoje, Parâmetros) precisam de um PostgreSQL:
-
-```bash
-cp .env.example .env.local   # ajuste DATABASE_URL para um banco vazio, só do ERP
+cp .env.example .env.local   # ajuste os valores (DATABASE_URL aponta para um banco vazio, só do ERP)
 npm run db:migrate           # cria as tabelas e os parâmetros iniciais
+npm run dev                  # http://localhost:3020
 ```
 
-O sistema ainda não está publicado em nenhum endereço.
+O login é o do **Auth central** (`auth.avilaops.com`). Depois de entrar, o Auth devolve sempre para o endereço cadastrado para o ERP, `https://erp.avilaops.com`, e nunca para `localhost`: o retorno é conferido pelo host, e o cookie de sessão só vale em `avilaops.com`. Por isso, abrindo por `localhost`, você só volta a ver o sistema se `erp.avilaops.com` estiver no ar e servindo este ERP.
+
+Para ver as telas na própria máquina sem depender disso, descomente `ERP_LOCAL_LOGIN=1` no `.env.local`: `http://localhost:3020` passa a abrir o login local (`/dev/login`), com um usuário de teste por perfil. Ele não existe em produção.
 
 | Script | O que faz |
 | --- | --- |
-| `npm run dev` | Sobe o sistema em desenvolvimento em `http://localhost:3020`, com o login local ligado. |
+| `npm run dev` | Sobe o sistema em desenvolvimento em `http://localhost:3020` (só atende em `127.0.0.1`). |
 | `npm run build` | Gera a versão de produção. |
 | `npm run start` | Serve a versão de produção (exige as variáveis do `.env.example`, com `SSO_JWT_SECRET` de 32+ caracteres e `APP_URL` em https). |
 | `npm run lint` | Confere o código com o ESLint. |

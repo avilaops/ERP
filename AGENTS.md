@@ -11,23 +11,25 @@ Node 24 e npm (não há pnpm no servidor).
 
 ```bash
 npm install
-npm run dev                  # http://localhost:3020, já com o login local
-cp .env.example .env.local   # para as telas com dados: ajuste DATABASE_URL; nunca comite
+cp .env.example .env.local   # ajuste os valores; nunca comite
 npm run db:migrate           # cria ou atualiza as tabelas do banco de DATABASE_URL
+npm run dev                  # http://localhost:3020
 ```
 
 O banco é PostgreSQL, próprio do ERP. No servidor `creators` já existem os bancos `erp`
 (desenvolvimento) e `erp_test` (testes), com a `DATABASE_URL` em `.env.local` e a
 `ERP_TEST_DATABASE_URL` em `.env.test.local` (os dois arquivos são ignorados pelo Git).
 
-`npm run dev` abre em `http://localhost:3020` e **fica no localhost**: quem chega sem
-sessão cai em `/dev/login`, que entra com um usuário de teste por perfil, sem passar
-pelo Auth central nem por domínio nenhum. Isso vem de duas coisas versionadas:
-`.env.development` liga `ERP_LOCAL_LOGIN=1` (o Next só lê esse arquivo em
-desenvolvimento) e o script `dev` escuta só em `127.0.0.1`. Não tire o `-H 127.0.0.1` do
-script: o cookie do login local não é assinado, e é esse endereço que impede o acesso de
-fora. Com `ERP_LOCAL_LOGIN=0` no `.env.local` a rota responde 404 e o sistema manda para
-o Auth central, que não devolve para `localhost` (lá o app `erp` tem host fixo).
+O login padrão é o do Auth central, também em desenvolvimento. Ele devolve sempre para
+o host cadastrado do app `erp` (`https://erp.avilaops.com`): o `returnTo` é conferido
+por igualdade de host e precisa ser `https`, e o cookie `avila_sso` só vale em
+`avilaops.com`. Abrindo por `localhost`, o fluxo só fecha se `erp.avilaops.com` estiver
+no ar servindo este ERP.
+
+O login local é opcional: com `ERP_LOCAL_LOGIN=1` no `.env.local`, quem chega sem sessão
+cai em `/dev/login`, que entra com um usuário de teste por perfil, sem o Auth central.
+Sem a variável a rota responde 404. O script `dev` escuta só em `127.0.0.1`; não tire o
+`-H 127.0.0.1`, porque o cookie do login local não é assinado.
 
 ## Como testar
 
