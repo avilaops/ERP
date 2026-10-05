@@ -11,27 +11,27 @@ Sistema comercial da Ludus Equipamentos (importação e venda de equipamentos de
 
 ## Como rodar
 
-Requer Node 24, npm e um PostgreSQL ao alcance da máquina.
+Requer Node 24 e npm.
 
 ```bash
 npm install
-cp .env.example .env.local   # depois edite o arquivo: veja abaixo
-npm run db:migrate           # cria as tabelas e os parâmetros iniciais
-npm run dev                  # http://localhost:3020
+npm run dev                  # abra http://localhost:3020
 ```
 
-No `.env.local`, antes de subir:
+Abre direto no **login local**, na própria máquina: escolha um perfil (Diretoria, Gerente comercial, Vendedor ou Financeiro) e entre. Não passa por nenhum domínio nem pelo login de produção, e o servidor de desenvolvimento só atende em `127.0.0.1`.
 
-1. **`DATABASE_URL`**: aponte para um banco PostgreSQL vazio, só do ERP. Sem ele as telas que leem dados dão erro.
-2. **`ERP_LOCAL_LOGIN=1`**: tire o `#` da linha. Com ela, `http://localhost:3020` abre o login local (`/dev/login`), com um usuário de teste por perfil.
+As telas que leem dados (hoje, Parâmetros) precisam de um PostgreSQL:
 
-Sem o `ERP_LOCAL_LOGIN=1` o sistema manda para o login de produção (`auth.avilaops.com`), que **não volta para `localhost`**: ele só devolve para o endereço cadastrado para o ERP. O login local não existe em produção.
+```bash
+cp .env.example .env.local   # ajuste DATABASE_URL para um banco vazio, só do ERP
+npm run db:migrate           # cria as tabelas e os parâmetros iniciais
+```
 
-O sistema ainda não está publicado em nenhum endereço; hoje ele roda só na máquina de quem desenvolve.
+O sistema ainda não está publicado em nenhum endereço.
 
 | Script | O que faz |
 | --- | --- |
-| `npm run dev` | Sobe o sistema em desenvolvimento na porta 3020. |
+| `npm run dev` | Sobe o sistema em desenvolvimento em `http://localhost:3020`, com o login local ligado. |
 | `npm run build` | Gera a versão de produção. |
 | `npm run start` | Serve a versão de produção (exige as variáveis do `.env.example`, com `SSO_JWT_SECRET` de 32+ caracteres e `APP_URL` em https). |
 | `npm run lint` | Confere o código com o ESLint. |

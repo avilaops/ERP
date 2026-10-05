@@ -11,6 +11,7 @@ tsconfig.tsbuildinfo
 # Env (only the example is versioned)
 .env*
 !.env.example
+!.env.development
 
 # Agent scratch space
 .work/

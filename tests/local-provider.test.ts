@@ -126,3 +126,17 @@ test("em development com ERP_LOCAL_LOGIN=1 a rota grava o cookie e cada perfil e
     assert.equal(await getSession(), null);
   });
 });
+
+test("npm run dev abre no localhost: login local ligado e servidor só em 127.0.0.1", async () => {
+  const { readFileSync } = await import("node:fs");
+  const root = new URL("../", import.meta.url);
+  const dev = JSON.parse(readFileSync(new URL("package.json", root), "utf8")).scripts.dev;
+  // O cookie do login local não é assinado: o que protege é o servidor não escutar para fora.
+  assert.match(dev, /-H 127\.0\.0\.1\b/);
+
+  const lines = readFileSync(new URL(".env.development", root), "utf8")
+    .split("\n")
+    .filter((line) => line.trim() !== "" && !line.startsWith("#"));
+  // Arquivo versionado: só a chave do login local, nenhum segredo.
+  assert.deepEqual(lines, ["ERP_LOCAL_LOGIN=1"]);
+});
