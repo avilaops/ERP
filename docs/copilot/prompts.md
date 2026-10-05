@@ -42,8 +42,16 @@ Depois crie a base do projeto:
    produção.
 6. Layout com a sidebar do protótipo (logo, card "Seu acesso", botão
    + Novo pedido) mostrando só os itens do perfil.
+7. Ambiente de produção já nesta fase: servidor em nuvem, PostgreSQL de
+   produção (separado do de desenvolvimento), domínio ludusequipamentos.com.br
+   com DNS e TLS, Auth central configurado com as credenciais reais, e um
+   pipeline mínimo no GitHub Actions (lint, typecheck, testes, build e deploy
+   na main). Documente variáveis e passos em docs/operacao.md.
 
-Ao final: o que foi criado, como rodar localmente e o que ficou pendente.
+Pronto quando: cada um dos 4 perfis entra pelo endereço de produção e vê só a
+sua parte do sistema.
+Ao final: o que foi criado, como rodar localmente, como fazer deploy e o que
+ficou pendente.
 ```
 
 ## Fase 2. Porte do protótipo (12/10 a 23/10)
@@ -97,8 +105,13 @@ Siga .github/copilot-instructions.md e reproduza o fluxo de pedido do protótipo
   PF/PJ fora do pedido (CEP preenche o endereço; IE define contribuinte),
   histórico de pedidos do cliente. Vendedor vê só os próprios clientes.
 - Copiar proposta (texto) e Salvar PDF com a marca da Ludus.
-- Fechar pedido gera os Receivable. Reabrir pedido exige confirmação e
-  recalcula recebimentos e comissões ainda não pagos.
+- O pedido grava um snapshot imutável do cliente e da entrega (dados, IE,
+  contribuinte, endereço, UF); pedido, PDF e impostos sempre leem o snapshot.
+- Fechar pedido gera os Receivable. Reabrir pedido exige confirmação e só
+  recalcula parcelas ainda não recebidas e a comissão futura. Comissão de
+  recebimento já baixado nunca muda; acertos viram lançamento novo de ajuste,
+  com motivo, no audit_log. Teste: reabrir pedido com entrada já recebida não
+  altera a comissão dessa entrada.
 - Simulador: mesma conta do pedido sem gravar nada.
 Testes Playwright: (1) vendedor cria pedido com 25% de desconto, pedido vai
 para aprovação, gerente aprova, vendedor fecha; (2) pedido com prejuízo não
@@ -117,8 +130,10 @@ Siga .github/copilot-instructions.md e reproduza:
 - Preços e metas: meta mensal da equipe e de cada vendedor (SalesGoal), com
   edição pela DIRETORIA e GERENTE_COMERCIAL e histórico por mês.
 - Dashboard: filtros de período e equipe, cards, vendas por mês (12 meses, com
-  IPI), funil, ranking de vendedores com % da meta do mês e top 8 equipamentos
-  (sem IPI). Todas as
+  IPI), funil, ranking de vendedores com % da meta e top 8 equipamentos
+  (sem IPI). O % da meta compara as vendas do período filtrado com a soma das
+  metas mensais do mesmo período (Este mês = meta do mês; 3 meses = soma das
+  3 metas; e assim por diante). Todas as
   agregações em SQL no Postgres.
 Teste Playwright: dar baixa em uma parcela e conferir a comissão do mês.
 ```
@@ -132,11 +147,14 @@ Siga .github/copilot-instructions.md.
    nome do arquivo = código do produto.
 2. Tela Equipe e acessos: convidar usuário por e-mail, definir perfil, desativar.
 3. Revisão de segurança: permissão em toda action e query, nenhum campo sensível
-   no payload de VENDEDOR/GERENTE (teste automatizado que verifica isso),
-   rate limit, headers de segurança.
+   (custo, valor China, lucro, margem) no payload de VENDEDOR, GERENTE_COMERCIAL
+   ou FINANCEIRO, com teste automatizado por perfil que chama as queries e
+   actions de pedido, produto e dashboard e verifica redação ou acesso negado;
+   rate limit; headers de segurança.
 4. Backup diário do Postgres (pg_dump) com retenção de 30 dias e procedimento de
    restauração documentado em docs/operacao.md.
-5. Pipeline GitHub Actions: lint, typecheck, testes, build e deploy.
+5. Pipeline GitHub Actions criado na fase 1: incluir os testes Playwright e a
+   checagem de campos sensíveis como etapas obrigatórias antes do deploy.
 ```
 
 ## Fase 4. Fiscal no cálculo (03/11 a 13/11)

@@ -34,7 +34,7 @@ Idioma: interface, mensagens e textos em português do Brasil. Código (variáve
 - Índices em toda chave de busca: código do produto, CNPJ/CPF, número do pedido, `(organization_id, status)`, datas de vencimento.
 - Agregações do dashboard e das comissões feitas no banco (SQL agregado ou views), nunca em memória.
 - Antes de qualquer migration que altere ou apague dados em produção: dump do banco (`pg_dump`).
-- Snapshots imutáveis em JSONB onde o histórico precisa ser preservado (versão da tabela de preços, parâmetros usados no pedido).
+- Snapshots imutáveis em JSONB onde o histórico precisa ser preservado: versão da tabela de preços, parâmetros usados no pedido e **dados do cliente e da entrega no pedido** (nome/razão social, CPF/CNPJ, IE, contribuinte, endereço, UF de entrega). Pedido, PDF e cálculo fiscal usam sempre o snapshot; editar o cadastro do cliente depois não altera pedidos existentes.
 
 ## Perfis de acesso
 | Perfil | Pode |
@@ -44,7 +44,7 @@ Idioma: interface, mensagens e textos em português do Brasil. Código (variáve
 | `VENDEDOR` | Só os próprios clientes, pedidos e comissões. Vê o % mínimo de entrada, nunca custo, China ou lucro. |
 | `FINANCEIRO` | Recebimentos, baixas, contas a pagar, fornecedores, pagamento de comissões. |
 
-Permissão checada no servidor em toda action e query. Campos sensíveis (custo, valor China, lucro, margem) **nunca** são serializados para o client de quem não tem permissão; não basta esconder na tela.
+Permissão checada no servidor em toda action e query. Campos sensíveis (custo, valor China, lucro, margem) **nunca** são serializados para o client de quem não tem permissão (`VENDEDOR`, `GERENTE_COMERCIAL` e `FINANCEIRO`); não basta esconder na tela.
 
 ## Regras de negócio (iguais ao protótipo)
 
@@ -97,6 +97,8 @@ Entrada (R$ ou %), forma, data (vazia = na confirmação). Saldo: forma, nº de 
 
 ### Comissão
 2% sobre cada valor **recebido** do cliente, sem IPI. Nasce na baixa do recebimento. Tudo recebido no mês é pago no dia 05 do mês seguinte. "Comissão futura" = parcelas ainda não recebidas.
+
+Comissão gerada por um recebimento baixado é **definitiva**, paga ou não: reabrir ou alterar o pedido nunca a altera nem apaga. Ao reabrir, só parcelas ainda não recebidas e a comissão futura são recalculadas. Se o novo total exigir acerto sobre valores já recebidos (estorno ou devolução), ele entra como lançamento novo de ajuste, com motivo, no mês em que acontece, registrado no `audit_log`.
 
 ## UI
 - Identidade visual do protótipo: títulos em Barlow Condensed caixa alta, corpo sem serifa, fundo cinza claro, cards brancos, azul #2C47A8.
