@@ -24,12 +24,15 @@ Idioma: interface, mensagens e textos em português do Brasil. Código (variáve
 - Rotas em `src/app/(app)/<modulo>/`. Layout com a mesma sidebar do protótipo.
 - **Todos os cálculos de preço, imposto, entrada e comissão ficam em `src/modules/pricing/`**, como funções puras com testes unitários. Componentes nunca calculam.
 - Toda tabela de negócio tem `organization_id`, `created_at`, `updated_at`, `created_by`. Cadastros usam exclusão lógica (`deleted_at`).
+- **Isolamento por organização:** o `organization_id` vem sempre da sessão autenticada, nunca do client, e entra em toda query e mutation (um helper de acesso ao banco aplica o filtro; nenhuma query de negócio sem ele). Há testes de isolamento entre duas organizações.
+- **Transações:** fechar pedido, baixar recebimento, reabrir pedido (com ajustes) e pagar comissão rodam cada um em uma única transação do Prisma e são idempotentes (chave de idempotência por operação; reenvio não duplica parcelas, recebimentos nem comissões).
 - `audit_log` para alterações em pedidos, custos, parâmetros, publicações de tabela, aprovações, recebimentos e permissões: quem, quando, entidade, antes e depois (JSONB).
 
 ## Regras para o PostgreSQL
 - Dinheiro em `NUMERIC(14,2)` (Prisma `Decimal @db.Decimal(14,2)`); percentuais em `NUMERIC(7,4)`; câmbio em `NUMERIC(12,6)`. Nunca `float` para valores.
 - Cálculos com `Prisma.Decimal` (decimal.js). Arredondar só no resultado final, half-up, 2 casas.
-- Datas em `timestamptz` (UTC no banco); exibição em America/Sao_Paulo, formato dd/mm/aaaa.
+- Eventos (recebimento, auditoria, publicação, aprovação) em `timestamptz` (UTC no banco), exibidos em America/Sao_Paulo. Datas de calendário (vencimento de parcela, data da entrada, validade da proposta, data de pagamento da comissão, previsão de conclusão) em `date`, sem fuso. Formato de exibição dd/mm/aaaa.
+- O mês de negócio (comissões, metas, dashboard) é sempre calculado no fuso America/Sao_Paulo: `date_trunc('month', recebido_em AT TIME ZONE 'America/Sao_Paulo')`.
 - Status como enums do Postgres.
 - Índices em toda chave de busca: código do produto, CNPJ/CPF, número do pedido, `(organization_id, status)`, datas de vencimento.
 - Agregações do dashboard e das comissões feitas no banco (SQL agregado ou views), nunca em memória.
@@ -66,6 +69,7 @@ preco_com_ipi = preco_tabela_sem_ipi x (1 + ipi)
 ```
 O crédito de impostos é guardado com precisão total (`NUMERIC(7,4)` ou maior) e nunca arredondado no cálculo; a tela mostra 1 casa.
 Conferência com o protótipo: Mesa Flexora, custo assessoria R$ 8.146,64, crédito exibido 28,1% (valor exato ≈ 28,1156%) → custo real R$ 6.148,97 → tabela sem IPI R$ 19.204,61 (custo x 3,123). O teste usa o crédito exato copiado do protótipo para o seed; com 28,1% arredondado o resultado seria R$ 6.150,31.
+**Atenção:** o protótipo mostra impostos e taxas no pior caso de 37,3%, mas os itens documentados aqui somam 34,75% (ICMS + DIFAL 23% + PIS/COFINS 9,25% + comissão 2% + anúncios 0,5%). A diferença de cerca de 2,5 pontos ainda não está identificada (pode ser base "por dentro", FCP ou outro item do protótipo). Na fase 1, o inventário do protótipo deve encontrar exatamente de onde ela vem e atualizar este arquivo; não inventar um item para fechar a conta. O teste do multiplicador 3,123 só é escrito depois disso.
 O pior caso é o estado com maior ICMS + DIFAL (hoje MA, 23%). `lucro_antes_IR = lucro_alvo / (1 - irpj_csll)`. Para cada equipamento, calcular também o desconto máximo na meta para SP (`Máx. SP`) e para cliente contribuinte (`Máx. c/IE`).
 
 ### Tabela de preços versionada
@@ -81,6 +85,7 @@ Mudanças em custos e parâmetros recalculam na hora só para a diretoria. A equ
 - Número `#AAMMDD-XXXX`. Status: `RASCUNHO`, `ENVIADO`, `AGUARDANDO_APROVACAO`, `APROVADO`, `FECHADO`, `PERDIDO` (com motivo), `CANCELADO`.
 - Desconto em % sobre a tabela; faixas: na meta (lucro >= 15%), abaixo da meta, prejuízo.
 - Vai para aprovação se: desconto > desconto livre, lucro < meta, ou entrada < mínimo da política.
+- A aprovação fica presa à revisão aprovada: grava um hash dos campos que afetam preço e política (itens, quantidades, preços, desconto, UF de entrega, contribuinte, frete, entrada e parcelas). Se qualquer um mudar depois, a aprovação perde a validade e o fechamento no servidor recusa ou reenvia o pedido para aprovação.
 - Quem aprova: `GERENTE_COMERCIAL` ou `DIRETORIA` aprovam exceções de desconto e entrada com lucro >= 0. Pedido com lucro líquido negativo (faixa prejuízo) só pode ser aprovado pela `DIRETORIA`; essa checagem é feita no servidor, pelo lucro calculado, e o gerente vê apenas "requer aprovação da diretoria", sem os valores.
 - Prazo de fabricação em dias corridos a partir do pagamento da entrada; mostrar previsão de conclusão.
 - Frete por nossa conta (R$) entra no custo.
@@ -89,7 +94,8 @@ Mudanças em custos e parâmetros recalculam na hora só para a diretoria. A equ
 ```
 entrada_minima = (valor_china + lucro_liquido_meta) / (1 - comissao / (1 + ipi))
 ```
-A comissão incide só sobre a parte sem IPI do que o cliente paga, por isso o denominador divide a comissão por (1 + IPI).
+- `valor_china` = soma, por item do pedido, de `custo_assessoria x (1 + margem_seguranca) x quantidade` (no exemplo, 8.146,64 x 1,05 = 8.553,97). Embalagem e frete ficam fora, salvo se o inventário do protótipo mostrar o contrário. É calculado no servidor e guardado no snapshot do pedido.
+- A comissão incide só sobre a parte sem IPI do que o cliente paga. Como cada item pode ter IPI diferente, o pedido usa a proporção `fator_sem_ipi = total_sem_ipi / total_com_ipi`, calculada dos itens do snapshot. A fórmula vira `entrada_minima = (valor_china + lucro_liquido_meta) / (1 - comissao x fator_sem_ipi)`; com IPI único de 13%, `fator_sem_ipi = 1/1,13`, que é a fórmula acima.
 Exemplo de teste obrigatório: China R$ 8.553,97, lucro da meta R$ 2.304,55, comissão 2%, IPI 13% → entrada mínima R$ 11.054,17 (comissão sobre a entrada R$ 195,65); sem a comissão sobram R$ 10.858,52.
 
 ### Pagamento
@@ -97,6 +103,8 @@ Entrada (R$ ou %), forma, data (vazia = na confirmação). Saldo: forma, nº de 
 
 ### Comissão
 2% sobre cada valor **recebido** do cliente, sem IPI. Nasce na baixa do recebimento. Tudo recebido no mês é pago no dia 05 do mês seguinte. "Comissão futura" = parcelas ainda não recebidas.
+
+Cada recebimento (inclusive baixa parcial) é um evento imutável próprio (`Receipt`: parcela, valor, valor sem IPI, data e hora, forma, quem registrou). A comissão referencia o `Receipt` que a gerou; o mês da comissão é o mês do `Receipt` em America/Sao_Paulo (teste obrigatório: recebimento às 23:30 de 30/09 em São Paulo cai em setembro e é pago em 05/10). O valor sem IPI de um recebimento usa o `fator_sem_ipi` do pedido. `Commission` guarda só a comissão e o seu pagamento ao vendedor; nunca é usada como registro do dinheiro recebido.
 
 Comissão gerada por um recebimento baixado é **definitiva**, paga ou não: reabrir ou alterar o pedido nunca a altera nem apaga. Ao reabrir, só parcelas ainda não recebidas e a comissão futura são recalculadas. Se o novo total exigir acerto sobre valores já recebidos (estorno ou devolução), ele entra como lançamento novo de ajuste, com motivo, no mês em que acontece, registrado no `audit_log`.
 

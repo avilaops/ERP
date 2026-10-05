@@ -108,7 +108,7 @@ Este quadro aparece apenas para a diretoria. Ele abre a conta do pedido:
 
 > **Atenção**
 >
-> Reabrir um pedido fechado pode alterar recebimentos e comissões já gerados. Confira o financeiro depois de reabrir.
+> Reabrir um pedido fechado recalcula só as parcelas ainda não recebidas. Valores já recebidos e as comissões geradas por eles não mudam; qualquer acerto sobre eles entra como um lançamento de ajuste, com o motivo.
 
 ---
 *Atualizado em 04/10/2026 · Ávila Ops Tecnologia*

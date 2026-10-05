@@ -17,6 +17,10 @@ Siga .github/copilot-instructions.md.
 Leia prototype/ inteiro e faça um inventário em docs/copilot/inventario-prototipo.md:
 telas, componentes, entidades e campos, regras e fórmulas, textos de ajuda. Aponte
 qualquer regra do protótipo que divirja das instruções do projeto.
+Responda em especial: (1) de onde vêm os cerca de 2,5 pontos que faltam para
+os impostos e taxas do pior caso chegarem a 37,3%; (2) como o protótipo calcula
+o valor a pagar na China (custo, margem, embalagem, quantidade). Atualize
+.github/copilot-instructions.md com a resposta antes de escrever código.
 
 Depois crie a base do projeto:
 1. Next.js com TypeScript strict, App Router, Tailwind, ESLint e pnpm.
@@ -30,7 +34,10 @@ Depois crie a base do projeto:
    custo assessoria, crédito de impostos, embalagem, ativo), PriceTableVersion
    (número, snapshot JSONB, publicada_em, publicada_por),
    Customer (PF/PJ, IE, contribuinte, endereço), Order, OrderItem, Approval,
-   LostReason, Receivable, Payable, Commission, SalesGoal.
+   LostReason, Receivable (parcela), Receipt (cada recebimento, imutável,
+   ligado à parcela), Payable, Commission (ligada ao Receipt que a gerou),
+   SalesGoal, IdempotencyKey. Datas de calendário em DATE e eventos em
+   TIMESTAMPTZ, conforme as instruções.
 4. Migration inicial e seed com os equipamentos, parâmetros e alíquotas por UF
    do protótipo.
 5. Integração com o Auth central da Ávila Ops isolada em src/lib/auth/
@@ -101,12 +108,19 @@ Siga .github/copilot-instructions.md e reproduza o fluxo de pedido do protótipo
   GERENTE_COMERCIAL e DIRETORIA, com aprovar/reprovar e comentário.
   Pedido com lucro negativo só é aprovado pela DIRETORIA (checagem no servidor);
   para o gerente ele aparece como "requer aprovação da diretoria", sem valores.
+  A aprovação guarda o hash da revisão aprovada; mudar itens, quantidades,
+  desconto, UF, contribuinte, frete, entrada ou parcelas invalida a aprovação.
+  Teste: alterar o desconto de um pedido aprovado e tentar fechar deve voltar
+  para aprovação.
 - Clientes: lista com busca por nome, CNPJ/CPF e cidade, cadastro e edição
   PF/PJ fora do pedido (CEP preenche o endereço; IE define contribuinte),
   histórico de pedidos do cliente. Vendedor vê só os próprios clientes.
 - Copiar proposta (texto) e Salvar PDF com a marca da Ludus.
 - O pedido grava um snapshot imutável do cliente e da entrega (dados, IE,
   contribuinte, endereço, UF); pedido, PDF e impostos sempre leem o snapshot.
+- Fechar pedido, baixar recebimento, reabrir e pagar comissão em transação
+  única e idempotente (teste: enviar o fechamento duas vezes não duplica
+  parcelas).
 - Fechar pedido gera os Receivable. Reabrir pedido exige confirmação e só
   recalcula parcelas ainda não recebidas e a comissão futura. Comissão de
   recebimento já baixado nunca muda; acertos viram lançamento novo de ajuste,
@@ -150,7 +164,9 @@ Siga .github/copilot-instructions.md.
    (custo, valor China, lucro, margem) no payload de VENDEDOR, GERENTE_COMERCIAL
    ou FINANCEIRO, com teste automatizado por perfil que chama as queries e
    actions de pedido, produto e dashboard e verifica redação ou acesso negado;
-   rate limit; headers de segurança.
+   testes de isolamento entre duas organizações (um usuário da organização A
+   não lê nem altera nada da B, mesmo forjando IDs); rate limit; headers de
+   segurança.
 4. Backup diário do Postgres (pg_dump) com retenção de 30 dias e procedimento de
    restauração documentado em docs/operacao.md.
 5. Pipeline GitHub Actions criado na fase 1: incluir os testes Playwright e a

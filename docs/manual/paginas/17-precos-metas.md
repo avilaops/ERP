@@ -20,7 +20,7 @@ Como definir as metas de venda e acompanhar a política de preços.
 
 ## Acompanhamento
 
-O ranking do [Dashboard](15-dashboard.md) compara as vendas fechadas de cada vendedor com a meta do mês.
+O ranking do [Dashboard](15-dashboard.md) compara as vendas fechadas de cada vendedor no período filtrado com a soma das metas mensais desse período (Este mês usa a meta do mês; 3 meses, a soma das 3 metas).
 
 ---
 *Atualizado em 04/10/2026 · Ávila Ops Tecnologia*
