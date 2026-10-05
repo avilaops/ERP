@@ -20,9 +20,12 @@ O banco é PostgreSQL, próprio do ERP. No servidor `creators` já existem os ba
 (desenvolvimento) e `erp_test` (testes), com a `DATABASE_URL` em `.env.local` e a
 `ERP_TEST_DATABASE_URL` em `.env.test.local` (os dois arquivos são ignorados pelo Git).
 
-Em desenvolvimento, com `ERP_LOCAL_LOGIN=1` no `.env.local`,
-`http://localhost:3020/dev/login` entra com um usuário de teste por perfil, sem
-depender do Auth central. Sem a variável a rota responde 404.
+Em desenvolvimento, com `ERP_LOCAL_LOGIN=1` no `.env.local`, quem chega sem sessão cai
+em `http://localhost:3020/dev/login`, que entra com um usuário de teste por perfil, sem
+depender do Auth central. Sem a variável a rota responde 404 e o sistema manda para o
+Auth central, que **não devolve para `localhost`**: lá o app `erp` está cadastrado com
+um host fixo (`erp.avilaops.com`) e o `returnTo` é conferido por igualdade de host. Para
+rodar na própria máquina, use sempre o login local.
 
 ## Como testar
 

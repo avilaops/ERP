@@ -6,7 +6,7 @@ import { assertAuthConfig, isProduction } from "@/lib/auth/config";
 import type { AuthEnv } from "@/lib/auth/config";
 import { createEnvDirectory } from "@/lib/auth/directory";
 import type { UserDirectory } from "@/lib/auth/directory";
-import { LOCAL_COOKIE, localProvider } from "@/lib/auth/local-provider";
+import { LOCAL_COOKIE, LOCAL_LOGIN_PATH, localProvider } from "@/lib/auth/local-provider";
 import { menuItem } from "@/lib/auth/permissions";
 import type { MenuItemKey } from "@/lib/auth/permissions";
 import { loginUrl, SSO_COOKIE, verifySsoToken } from "@/lib/auth/sso";
@@ -82,12 +82,19 @@ export async function getSession(): Promise<Session | null> {
  * Gate for a server page: returns the session or redirects (central login when
  * signed out, "sem acesso" when the e-mail or the profile is not allowed).
  * `path` is where the login sends the user back; it defaults to the item's route.
+ *
+ * With the local sign-in on (development only), signed out goes to it instead:
+ * the central auth only returns to the host registered for the ERP, never to
+ * localhost, so sending a developer there strands them on another address.
  */
 export async function requirePermission(item: MenuItemKey, path?: string): Promise<Session> {
   const { config, identity } = await currentIdentity();
   const decision = decideAccess(identity, item);
 
-  if (decision.kind === "login") redirect(loginUrl(config.appUrl, path ?? menuItem(item).href));
+  if (decision.kind === "login") {
+    if (localProvider(process.env).available) redirect(LOCAL_LOGIN_PATH);
+    redirect(loginUrl(config.appUrl, path ?? menuItem(item).href));
+  }
   if (decision.kind === "no-access") redirect(NO_ACCESS_PATH);
   return decision.session;
 }

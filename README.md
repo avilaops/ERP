@@ -11,14 +11,23 @@ Sistema comercial da Ludus Equipamentos (importação e venda de equipamentos de
 
 ## Como rodar
 
-Requer Node 24 e npm.
+Requer Node 24, npm e um PostgreSQL ao alcance da máquina.
 
 ```bash
 npm install
-cp .env.example .env.local   # ajuste os valores
-npm run db:migrate           # cria as tabelas no banco de DATABASE_URL
+cp .env.example .env.local   # depois edite o arquivo: veja abaixo
+npm run db:migrate           # cria as tabelas e os parâmetros iniciais
 npm run dev                  # http://localhost:3020
 ```
+
+No `.env.local`, antes de subir:
+
+1. **`DATABASE_URL`**: aponte para um banco PostgreSQL vazio, só do ERP. Sem ele as telas que leem dados dão erro.
+2. **`ERP_LOCAL_LOGIN=1`**: tire o `#` da linha. Com ela, `http://localhost:3020` abre o login local (`/dev/login`), com um usuário de teste por perfil.
+
+Sem o `ERP_LOCAL_LOGIN=1` o sistema manda para o login de produção (`auth.avilaops.com`), que **não volta para `localhost`**: ele só devolve para o endereço cadastrado para o ERP. O login local não existe em produção.
+
+O sistema ainda não está publicado em nenhum endereço; hoje ele roda só na máquina de quem desenvolve.
 
 | Script | O que faz |
 | --- | --- |

@@ -11,6 +11,8 @@ import type { Role } from "@/lib/auth/roles";
  * (a server started with `next dev` by mistake) must never be enough.
  */
 export const LOCAL_COOKIE = "erp_dev_session";
+/** Where the local sign-in lives. Answers 404 when the provider is off. */
+export const LOCAL_LOGIN_PATH = "/dev/login";
 /** Must be exactly "1" for the local sign-in to exist. */
 export const LOCAL_LOGIN_FLAG = "ERP_LOCAL_LOGIN";
 

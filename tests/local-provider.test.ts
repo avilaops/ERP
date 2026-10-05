@@ -68,6 +68,23 @@ test("em development sem ERP_LOCAL_LOGIN a rota responde 404 e o cookie local é
   );
 });
 
+test("sem sessão, o login local ligado recebe quem chega; desligado ou em produção vale o Auth central", async () => {
+  const base = { SSO_JWT_SECRET: undefined, APP_URL: undefined, ERP_USERS: undefined };
+  setCookies({});
+
+  await withEnv({ ...base, NODE_ENV: "development", ERP_LOCAL_LOGIN: "1" }, async () => {
+    assert.equal(await redirectOf(() => requirePermission("dashboard")), "/dev/login");
+    assert.equal(await redirectOf(() => requirePermission("pedidos", "/pedidos/novo")), "/dev/login");
+  });
+  await withEnv({ ...base, NODE_ENV: "development", ERP_LOCAL_LOGIN: undefined }, async () => {
+    assert.match((await redirectOf(() => requirePermission("dashboard"))) ?? "", /^https:\/\/auth\.avilaops\.com\/login\?/);
+  });
+  // Em produção a variável é ignorada: ninguém é mandado para uma rota que responde 404.
+  await withEnv({ ...PRODUCTION, ERP_LOCAL_LOGIN: "1" }, async () => {
+    assert.match((await redirectOf(() => requirePermission("dashboard"))) ?? "", /^https:\/\/auth\.avilaops\.com\/login\?/);
+  });
+});
+
 test("em produção a rota do login local responde 404 e não grava cookie", async () => {
   await withEnv(PRODUCTION, async () => {
     setCookies({});
