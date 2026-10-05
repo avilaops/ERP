@@ -6,6 +6,8 @@ Sistema comercial da Ludus Equipamentos (importação e venda de equipamentos de
 
 - [Manual do sistema](docs/manual/README.md): uma página por funcionalidade, com passo a passo e prints. Versão navegável em [`docs/manual/index.html`](docs/manual/index.html).
 - [Roadmap do desenvolvimento](docs/roadmap.md): fases, prazos, pagamentos e pendências.
+- [Instruções do Copilot](.github/copilot-instructions.md): stack (PostgreSQL), arquitetura e regras de negócio.
+- [Prompts por fase](docs/copilot/prompts.md): um prompt do Copilot para cada fase do roadmap.
 
 ## Contato
 
