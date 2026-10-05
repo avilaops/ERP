@@ -15,10 +15,10 @@ Como é calculada a entrada que o cliente precisa pagar para o pedido ser aprova
 A entrada precisa cobrir o pagamento na China, a comissão do vendedor sobre a própria entrada e o lucro líquido da meta. O lucro é garantido na entrada porque o equipamento leva de 60 a 90 dias para chegar.
 
 ```
-entrada mínima = (valor da China + lucro líquido da meta) ÷ (1 − comissão ÷ (1 + IPI))
+entrada mínima = (valor da China + lucro líquido da meta) ÷ (1 − comissão × fator sem IPI)
 ```
 
-A divisão existe porque o vendedor ganha 2% sobre o que o cliente paga, sem IPI, e isso sai da própria entrada. Como o valor pago inclui 13% de IPI, a comissão sobre a entrada é 2% ÷ 1,13.
+A divisão existe porque o vendedor ganha 2% sobre o que o cliente paga, sem IPI, e isso sai da própria entrada. O fator sem IPI é o total do pedido sem IPI dividido pelo total com IPI, calculado com os itens do pedido, porque cada equipamento pode ter IPI diferente. Com todos os itens a 13%, o fator é 1 ÷ 1,13.
 
 ## Exemplo
 

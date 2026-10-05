@@ -32,7 +32,7 @@ Idioma: interface, mensagens e textos em português do Brasil. Código (variáve
 - Dinheiro em `NUMERIC(14,2)` (Prisma `Decimal @db.Decimal(14,2)`); percentuais em `NUMERIC(7,4)`; câmbio em `NUMERIC(12,6)`. Nunca `float` para valores.
 - Cálculos com `Prisma.Decimal` (decimal.js). Arredondar só no resultado final, half-up, 2 casas.
 - Eventos (recebimento, auditoria, publicação, aprovação) em `timestamptz` (UTC no banco), exibidos em America/Sao_Paulo. Datas de calendário (vencimento de parcela, data da entrada, validade da proposta, data de pagamento da comissão, previsão de conclusão) em `date`, sem fuso. Formato de exibição dd/mm/aaaa.
-- O mês de negócio (comissões, metas, dashboard) é sempre calculado no fuso America/Sao_Paulo: `date_trunc('month', recebido_em AT TIME ZONE 'America/Sao_Paulo')`.
+- O mês de negócio é sempre calculado no fuso America/Sao_Paulo, com o carimbo certo para cada métrica: vendas, ranking, metas e dashboard usam `fechado_em` do pedido (`date_trunc('month', fechado_em AT TIME ZONE 'America/Sao_Paulo')`); comissões e relatórios de recebimento usam `recebido_em` do `Receipt`.
 - Status como enums do Postgres.
 - Índices em toda chave de busca: código do produto, CNPJ/CPF, número do pedido, `(organization_id, status)`, datas de vencimento.
 - Agregações do dashboard e das comissões feitas no banco (SQL agregado ou views), nunca em memória.
@@ -69,8 +69,11 @@ preco_com_ipi = preco_tabela_sem_ipi x (1 + ipi)
 ```
 O crédito de impostos é guardado com precisão total (`NUMERIC(7,4)` ou maior) e nunca arredondado no cálculo; a tela mostra 1 casa.
 Conferência com o protótipo: Mesa Flexora, custo assessoria R$ 8.146,64, crédito exibido 28,1% (valor exato ≈ 28,1156%) → custo real R$ 6.148,97 → tabela sem IPI R$ 19.204,61 (custo x 3,123). O teste usa o crédito exato copiado do protótipo para o seed; com 28,1% arredondado o resultado seria R$ 6.150,31.
-**Impostos e taxas são configuração, não código.** `impostos_e_taxas` é a soma dos encargos cadastrados em Parâmetros pela diretoria: os fixos acima e uma lista livre de encargos extras (nome, %, se incide sobre a venda ou sobre o lucro, ativo/inativo). Nenhuma alíquota fica fixa no código; a diretoria inclui, altera ou remove encargos na tela e a tabela recalcula. Os testes usam parâmetros de exemplo montados no próprio teste, não os valores de produção.
-O pior caso é o estado com maior ICMS + DIFAL (hoje MA, 23%). `lucro_antes_IR = lucro_alvo / (1 - irpj_csll)`. Para cada equipamento, calcular também o desconto máximo na meta para SP (`Máx. SP`) e para cliente contribuinte (`Máx. c/IE`).
+**Impostos e taxas são configuração, não código.** Os encargos ficam cadastrados em Parâmetros pela diretoria: os fixos acima e uma lista livre de encargos extras (nome, %, base: venda ou lucro, ativo/inativo). As duas bases entram em lugares diferentes da fórmula:
+- `impostos_e_taxas` = soma só dos encargos sobre a **venda** (ICMS/DIFAL, PIS/COFINS, comissão, anúncios, gateway e extras com base venda).
+- `encargos_sobre_lucro` = IRPJ/CSLL + extras com base lucro, e `lucro_antes_IR = lucro_alvo / (1 - encargos_sobre_lucro)`.
+Os testes cobrem um extra de cada base. Nenhuma alíquota fica fixa no código; a diretoria inclui, altera ou remove encargos na tela e a tabela recalcula. Os testes usam parâmetros de exemplo montados no próprio teste, não os valores de produção.
+O pior caso é o estado com maior ICMS + DIFAL (hoje MA, 23%). `lucro_antes_IR` como definido acima (com só IRPJ/CSLL, `lucro_alvo / (1 - irpj_csll)`). Para cada equipamento, calcular também o desconto máximo na meta para SP (`Máx. SP`) e para cliente contribuinte (`Máx. c/IE`).
 
 ### Tabela de preços versionada
 Mudanças em custos e parâmetros recalculam na hora só para a diretoria. A equipe vê a última versão **publicada** (v35, v36...). Publicar grava um snapshot imutável. Pedidos guardam a versão usada.
