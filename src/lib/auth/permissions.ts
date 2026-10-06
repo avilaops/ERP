@@ -62,6 +62,11 @@ export function seesCosts(role: Role): boolean {
   return role === "DIRETORIA";
 }
 
+/** Who may approve an order that gives a loss. Everyone else with Aprovações decides only orders with profit. */
+export function approvesAtLoss(role: Role): boolean {
+  return role === "DIRETORIA";
+}
+
 /**
  * Who sees the orders of the whole team. A seller sees only their own. Pages and
  * actions build the scope of the orders from this, never from the profile itself.

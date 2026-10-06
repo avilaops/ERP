@@ -28,7 +28,7 @@ test("toda rota da matriz tem page.tsx que chama requirePermission com o própri
 });
 
 /** Pages already ported from the prototype. The others still say "Em construção". */
-const PORTED = ["parametros", "produtos", "tabela-precos", "clientes", "pedidos"];
+const PORTED = ["parametros", "produtos", "tabela-precos", "clientes", "pedidos", "aprovacoes"];
 
 test("páginas portadas não são mais marcador; as outras continuam Em construção", () => {
   for (const item of MENU_ITEMS) {
@@ -39,7 +39,7 @@ test("páginas portadas não são mais marcador; as outras continuam Em constru�
       assert.ok(code.includes("PlaceholderPage"), `${item.href} deveria estar Em construção`);
     }
   }
-  assert.equal(MENU_ITEMS.filter((item) => !PORTED.includes(item.key)).length, 9);
+  assert.equal(MENU_ITEMS.filter((item) => !PORTED.includes(item.key)).length, 8);
 });
 
 /** Every source file under the protected group, relative to it. */
@@ -52,6 +52,7 @@ test("toda ação de servidor confere a permissão antes de qualquer outra coisa
   assert.ok(actions.includes("produtos/actions.ts"));
   assert.ok(actions.includes("clientes/actions.ts"));
   assert.ok(actions.includes("pedidos/actions.ts"));
+  assert.ok(actions.includes("aprovacoes/actions.ts"));
   for (const file of actions) {
     const code = readFileSync(APP_DIR + file, "utf8");
     // Each exported action opens with the check: nothing is read from the form or the database before it.
@@ -141,6 +142,13 @@ test("Pedido: custo só é lido para quem pode ver, e nada dele vai para compone
   }
   // E o quadro é componente de servidor.
   assert.doesNotMatch(readFileSync(`${APP_DIR}pedidos/DirectorBoard.tsx`, "utf8"), /["']use client["']/);
+  // A fila de aprovações também não: quem decide e se pode aprovar prejuízo sai da sessão.
+  const approvals = source("/aprovacoes");
+  assert.doesNotMatch(approvals, /loadPublishedSnapshot|seesCosts|directorOf|DirectorBoard|"DIRETORIA"/);
+  assert.ok(approvals.includes("approvesAtLoss(session.role)"));
+  const deciding = readFileSync(`${APP_DIR}aprovacoes/actions.ts`, "utf8");
+  assert.ok(deciding.includes("approvesAtLoss: approvesAtLoss(session.role)"));
+  assert.doesNotMatch(deciding, /formData\.get\("(role|email|approvesAtLoss)"\)|text\("(role|email|approvesAtLoss)"\)/);
   // A lista de pedidos não lê custo nenhum, e o escopo dela sai da sessão.
   const list = source("/pedidos");
   assert.doesNotMatch(list, /loadPublishedSnapshot|loadOrderStanding|seesCosts|directorOf|DirectorBoard/);

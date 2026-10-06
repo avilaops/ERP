@@ -2,11 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requirePermission } from "@/lib/auth";
 import { tenantDb } from "@/lib/db/pool";
-import { menuItem, seesAllOrders, seesCosts } from "@/lib/auth/permissions";
+import { canAccess, menuItem, seesAllOrders, seesCosts } from "@/lib/auth/permissions";
 import { ufFromCep } from "@/lib/cep";
 import { completenessText, isComplete, isRequired, normalizeDocument, taxpayerFromRegistration } from "@/lib/customer";
 import type { CustomerKind } from "@/lib/customer";
 import { CUSTOMER_FIELDS, customerToForm } from "@/lib/customer-form";
+import { lastDecision } from "@/lib/db/approvals";
 import { findCustomerByDocument } from "@/lib/db/customers";
 import { getOrder, listPaymentMethods, loadOrderStanding } from "@/lib/db/orders";
 import { latestVersion, loadPublishedSnapshot, loadPublishedTable } from "@/lib/db/price-table";
@@ -74,8 +75,10 @@ export default async function PedidoPage({
   const conn = tenantDb(session.tenant.slug);
   if (!wellFormed) notFound();
 
-  const order = await getOrder(numero, { sellerEmail: seesAllOrders(session.role) ? null : session.email }, conn);
+  const scope = { sellerEmail: seesAllOrders(session.role) ? null : session.email };
+  const order = await getOrder(numero, scope, conn);
   if (!order) notFound();
+  const decision = await lastDecision(order.number, scope, conn);
 
   // The team's account: prices of the version of the order, no cost.
   const table = await loadPublishedTable(order.priceTableVersion, conn);
@@ -135,6 +138,18 @@ export default async function PedidoPage({
       {latest && latest.version !== table.version && (
         <p className="mt-3 rounded border border-amber-300 bg-amber-50 px-4 py-2 text-sm text-amber-900">
           Este pedido usa a tabela v{table.version}; a tabela atual é a v{latest.version}. Os preços dele não mudam.
+        </p>
+      )}
+      {editable && decision && !decision.approved && (
+        <p role="status" className="mt-3 rounded border border-red-300 bg-red-50 px-4 py-2 text-sm text-red-900">
+          <strong>Aprovação recusada</strong> por {decision.decidedBy} em {showDateTime(decision.decidedAt)}: {decision.comment}
+        </p>
+      )}
+      {order.status === "aguardando_aprovacao" && canAccess(session.role, "aprovacoes") && (
+        <p className="mt-3 text-sm">
+          <Link href={menuItem("aprovacoes").href} className="font-medium text-brand underline">
+            Decidir em Aprovações
+          </Link>
         </p>
       )}
       {!editable && (

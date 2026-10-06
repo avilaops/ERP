@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { taxpayerFromRegistration } from "@/lib/customer";
 import { getCustomer } from "@/lib/db/customers";
 import type { Customer } from "@/lib/db/customers";
@@ -433,6 +434,25 @@ export type CloseResult = {
   missing: string[];
 };
 
+/**
+ * A digest of what price and policy depend on. The request for approval keeps
+ * it: an approval is about this order exactly as it was.
+ */
+export function orderSignature(
+  order: Pick<Order, "priceTableVersion" | "items" | "discount" | "deliveryUf" | "taxpayer" | "freight" | "downPayment">,
+): string {
+  const parts = [
+    order.priceTableVersion,
+    order.items.map((item) => [item.productId, item.quantity]),
+    order.discount,
+    order.deliveryUf,
+    order.taxpayer,
+    order.freight,
+    order.downPayment,
+  ];
+  return createHash("sha256").update(JSON.stringify(parts)).digest("hex");
+}
+
 const CHANGED = "O pedido foi alterado por outra pessoa enquanto você fechava. Confira e feche de novo.";
 
 /**
@@ -466,9 +486,12 @@ export async function closeOrder(number: string, who: string, scope: OrderScope,
      ), recorded AS (
        INSERT INTO order_closings (order_id, closed_by, invoice_total)
        SELECT id, $3, $6::numeric FROM closed WHERE status = 'fechado'
+     ), requested AS (
+       INSERT INTO order_approvals (order_id, requested_by, revision_hash, reasons)
+       SELECT id, $3, $7, $8::text[] FROM closed WHERE status = 'aguardando_aprovacao'
      )
      SELECT id FROM closed`,
-    [number, status, who, order.revision, scope.sellerEmail, sale.invoiceTotal],
+    [number, status, who, order.revision, scope.sellerEmail, sale.invoiceTotal, orderSignature(order), policy.reasons],
   );
   if (rows.length === 0) throw new OrderError(CHANGED);
   return { status, reasons: policy.reasons, missing: [] };
@@ -490,6 +513,9 @@ export async function reopenOrder(number: string, who: string, scope: OrderScope
      ), marked AS (
        UPDATE order_closings SET reopened_at = now(), reopened_by = $2
          FROM reopened WHERE order_id = reopened.id AND reopened_at IS NULL
+     ), withdrawn AS (
+       -- A request nobody decided leaves with the order: it is asked again at the next closing.
+       DELETE FROM order_approvals USING reopened WHERE order_id = reopened.id AND status = 'pendente'
      )
      SELECT id FROM reopened`,
     [number, who, scope.sellerEmail],
@@ -499,7 +525,7 @@ export async function reopenOrder(number: string, who: string, scope: OrderScope
 
 /**
  * Removes an order in negotiation, items and order in the same statement. An
- * order that was once closed has history and is refused by the database.
+ * order that was once closed, approved or refused has history and is refused by the database.
  * Answers with who the seller was, for the log.
  */
 export async function deleteOrder(number: string, scope: OrderScope, conn: Queryable): Promise<{ sellerEmail: string }> {
@@ -520,7 +546,7 @@ export async function deleteOrder(number: string, scope: OrderScope, conn: Query
     return { sellerEmail: String(rows[0].seller_email) };
   } catch (error) {
     if (pgErrorCode(error) === FOREIGN_KEY_VIOLATION) {
-      throw new OrderError("Este pedido já foi fechado antes e tem histórico: não pode ser excluído.");
+      throw new OrderError("Este pedido tem histórico (fechamento ou aprovação) e não pode ser excluído.");
     }
     throw error;
   }

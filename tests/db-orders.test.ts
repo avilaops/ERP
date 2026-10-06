@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { after, before, test } from "node:test";
+import { decideApproval, lastDecision, listPastDecisions, listPendingApprovals } from "@/lib/db/approvals";
 import { createCustomer } from "@/lib/db/customers";
 import {
   addOrderItem,
@@ -527,12 +528,19 @@ test("pagamento do print: entrada de 25.000 fica abaixo da política e manda o p
   });
   const waiting = await order(N);
   assert.deepEqual([waiting.status, waiting.closedAt], ["aguardando_aprovacao", null]);
+  const asked = await db.pool.query("SELECT requested_by, reasons, status, revision_hash FROM order_approvals");
+  assert.deepEqual(
+    asked.rows.map((row) => [row.requested_by, row.reasons, row.status, /^[0-9a-f]{64}$/.test(row.revision_hash)]),
+    [[SELLER.email, ["entrada-abaixo-da-politica"], "pendente", true]],
+  );
   assert.equal(Number((await db.pool.query("SELECT count(*) FROM order_closings")).rows[0].count), 0);
   // Aguardando aprovação não se altera; volta para negociação por quem vê o pedido.
   await assert.rejects(() => savePayment(N, { ...PAYMENT, downPayment: 30000 }, SELLER.email, MINE, db.pool), /Pedido não encontrado ou já fechado/);
   await assert.rejects(() => reopenOrder(N, OTHER_SELLER.email, THEIRS, db.pool), /não está fechado nem aguardando/);
   await reopenOrder(N, SELLER.email, MINE, db.pool);
   assert.equal((await order(N)).status, "em_negociacao");
+  // O pedido de aprovação que ninguém decidiu sai junto.
+  assert.equal(Number((await db.pool.query("SELECT count(*) FROM order_approvals")).rows[0].count), 0);
 });
 
 test("com entrada de 30.000 o pedido do print fecha, com data e registro do fechamento", { skip }, async () => {
@@ -564,7 +572,7 @@ test("com entrada de 30.000 o pedido do print fecha, com data e registro do fech
   const history = await db.pool.query("SELECT reopened_by, reopened_at IS NOT NULL AS reopened FROM order_closings WHERE order_id = $1", [closed.id]);
   assert.deepEqual(history.rows, [{ reopened_by: DIRECTOR, reopened: true }]);
   // Pedido que já foi fechado tem histórico: não se exclui mais, nem em negociação.
-  await assert.rejects(() => deleteOrder(N, MINE, db.pool), /já foi fechado antes e tem histórico/);
+  await assert.rejects(() => deleteOrder(N, MINE, db.pool), /tem histórico \(fechamento ou aprovação\)/);
   assert.equal((await order(N)).items.length, 2);
   // Fecha de novo: são dois fechamentos na história.
   assert.equal((await closeOrder(N, SELLER.email, MINE, db.pool)).status, "fechado");
@@ -652,6 +660,98 @@ test("lista: cada pedido com o preço da própria versão; o vendedor só recebe
   // Da mais recente para a mais antiga.
   const stamps = all.map((item) => item.updatedAt.getTime());
   assert.deepEqual(stamps, [...stamps].sort((a, b) => b - a));
+});
+
+const MANAGER = { email: "gerente@teste.local", role: "GERENTE_COMERCIAL", approvesAtLoss: false } as const;
+const BOSS = { email: DIRECTOR, role: "DIRETORIA", approvesAtLoss: true } as const;
+
+/** A new order of the print, complete, with the given discount and down payment, sent to closing. */
+const sendToClosing = async (number: string, discount: number, downPayment: number) => {
+  const N = await createOrder({ seller: SELLER, version: 1, productId: ID["LD-B001"], quantity: 1 }, numbers(number), db.pool);
+  await linkOrderCustomer(N, customerMa, SELLER.email, MINE, db.pool);
+  await saveOrderTerms(N, { ...TERMS, discount }, SELLER.email, MINE, db.pool);
+  await savePayment(N, { ...PAYMENT, downPayment }, SELLER.email, MINE, db.pool);
+  return closeOrder(N, SELLER.email, MINE, db.pool);
+};
+
+test("aprovação: a fila traz o pedido com os motivos; o gerente aprova e o pedido fecha", { skip }, async () => {
+  const sent = await sendToClosing("261004-APRV", 0, 5000);
+  assert.deepEqual([sent.status, sent.reasons], ["aguardando_aprovacao", ["entrada-abaixo-da-politica"]]);
+
+  const queue = await listPendingApprovals(db.pool);
+  const item = queue.find((entry) => entry.order.number === "261004-APRV");
+  assert.ok(item);
+  assert.deepEqual(
+    [item.requestedBy, item.reasons, item.band, item.directorOnly, item.order.customerName],
+    [SELLER.email, ["entrada-abaixo-da-politica"], "na-meta", false, "Academia MA"],
+  );
+  // Nada de custo na fila.
+  assert.doesNotMatch(JSON.stringify(queue), /cost|profit|china/i);
+
+  await decideApproval("261004-APRV", { approve: true, comment: " cliente antigo " }, MANAGER, db.pool);
+  const closed = await order("261004-APRV");
+  assert.equal(closed.status, "fechado");
+  assert.ok(closed.closedAt instanceof Date);
+  const { rows } = await db.pool.query(
+    `SELECT a.status, a.decided_by, a.decided_role, a.comment, (SELECT count(*)::int FROM order_closings c WHERE c.order_id = a.order_id) AS closings
+       FROM order_approvals a WHERE a.order_id = $1`,
+    [closed.id],
+  );
+  assert.deepEqual(rows, [{ status: "aprovado", decided_by: MANAGER.email, decided_role: "GERENTE_COMERCIAL", comment: "cliente antigo", closings: 1 }]);
+  assert.ok(!(await listPendingApprovals(db.pool)).some((entry) => entry.order.number === "261004-APRV"));
+  // Decidido, não se decide de novo.
+  await assert.rejects(() => decideApproval("261004-APRV", { approve: false, comment: "x" }, BOSS, db.pool), /não está mais aguardando/);
+});
+
+test("aprovação: recusar exige motivo, devolve o pedido à negociação e o vendedor lê o motivo", { skip }, async () => {
+  await sendToClosing("261004-RECU", 0, 5000);
+  await assert.rejects(() => decideApproval("261004-RECU", { approve: false, comment: "  " }, MANAGER, db.pool), /escreva o motivo/);
+  assert.equal((await order("261004-RECU")).status, "aguardando_aprovacao");
+
+  await decideApproval("261004-RECU", { approve: false, comment: "Entrada muito baixa: peça 65%." }, MANAGER, db.pool);
+  const back = await order("261004-RECU");
+  assert.deepEqual([back.status, back.closedAt], ["em_negociacao", null]);
+  const mine = await lastDecision("261004-RECU", MINE, db.pool);
+  assert.ok(mine);
+  assert.deepEqual([mine.approved, mine.decidedBy, mine.comment], [false, MANAGER.email, "Entrada muito baixa: peça 65%."]);
+  assert.equal(await lastDecision("261004-RECU", THEIRS, db.pool), null);
+  assert.equal(await lastDecision("261002-NADA", ALL, db.pool), null);
+  // Pedido recusado tem histórico: não se exclui. Pode ser corrigido e enviado de novo.
+  await assert.rejects(() => deleteOrder("261004-RECU", MINE, db.pool), /tem histórico/);
+  await savePayment("261004-RECU", { ...PAYMENT, downPayment: 5500 }, SELLER.email, MINE, db.pool);
+  assert.equal((await closeOrder("261004-RECU", SELLER.email, MINE, db.pool)).status, "aguardando_aprovacao");
+  const past = await listPastDecisions(10, db.pool);
+  assert.deepEqual(past.slice(0, 2).map((entry) => [entry.number, entry.approved]), [["261004-RECU", false], ["261004-APRV", true]]);
+});
+
+test("aprovação: pedido com prejuízo só a diretoria aprova; o gerente pode recusar", { skip }, async () => {
+  const sent = await sendToClosing("261004-PREJ", 0.6, 8000);
+  assert.equal(sent.status, "aguardando_aprovacao");
+  assert.ok(sent.reasons.includes("fora-da-meta"));
+  const item = (await listPendingApprovals(db.pool)).find((entry) => entry.order.number === "261004-PREJ");
+  assert.deepEqual([item?.band, item?.directorOnly], ["prejuizo", true]);
+
+  await assert.rejects(() => decideApproval("261004-PREJ", { approve: true, comment: null }, MANAGER, db.pool), /só a diretoria pode aprovar/);
+  assert.equal((await order("261004-PREJ")).status, "aguardando_aprovacao");
+  await decideApproval("261004-PREJ", { approve: true, comment: null }, BOSS, db.pool);
+  assert.equal((await order("261004-PREJ")).status, "fechado");
+});
+
+test("aprovação: se o pedido mudou entre a leitura e a decisão, nada é gravado", { skip }, async () => {
+  const racing = {
+    query: async (text: string, values?: unknown[]) => {
+      if (text.includes("WITH target AS")) {
+        await db.pool.query("UPDATE orders SET updated_at = now() + interval '1 second' WHERE number = '261004-RECU'");
+      }
+      return db.pool.query(text, values);
+    },
+  } as typeof db.pool;
+  await assert.rejects(() => decideApproval("261004-RECU", { approve: true, comment: null }, BOSS, racing), /não está mais aguardando/);
+  assert.equal((await order("261004-RECU")).status, "aguardando_aprovacao");
+  const { rows } = await db.pool.query(
+    "SELECT count(*)::int AS pending FROM order_approvals a JOIN orders o ON o.id = a.order_id WHERE o.number = '261004-RECU' AND a.status = 'pendente'",
+  );
+  assert.equal(rows[0].pending, 1);
 });
 
 test("a migração dos pedidos não tem cascata nem coluna de preço, custo ou total", () => {

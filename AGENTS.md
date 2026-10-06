@@ -207,6 +207,11 @@ funções puras, sem banco e sem tela, conferidas com os números dos prints do 
     mesma versão da tabela. Pedido que já foi fechado uma vez tem histórico
     (`order_closings`) e não se exclui. As formas de pagamento são a tabela
     `payment_methods` da empresa, nunca lista no código.
+12. **Aprovação é `decideApproval`** (`src/lib/db/approvals.ts`): aprovar fecha o pedido,
+    recusar exige motivo e devolve à negociação; pedido, pedido de aprovação e fechamento
+    mudam num comando só. Quem decide e se pode aprovar pedido com prejuízo
+    (`approvesAtLoss`, só Diretoria; a regra é `needsDirector` no motor) saem da sessão,
+    nunca do formulário. A fila não traz custo: só o nome da faixa.
 
 ## Fotos dos equipamentos
 

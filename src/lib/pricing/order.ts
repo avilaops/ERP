@@ -228,6 +228,14 @@ export function orderBand(order: OrderInput, params: PricingParams): DiscountBan
 
 export type ApprovalReason = "desconto-acima-do-livre" | "fora-da-meta" | "entrada-abaixo-da-politica";
 
+/**
+ * Who may decide an order waiting for approval: the commercial manager while the
+ * order still gives profit; at a loss, only the directors.
+ */
+export function needsDirector(band: DiscountBand): boolean {
+  return band === "prejuizo";
+}
+
 export type PolicyCheck = {
   needsApproval: boolean;
   reasons: ApprovalReason[];
