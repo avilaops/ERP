@@ -62,6 +62,16 @@ export function seesCosts(role: Role): boolean {
   return role === "DIRETORIA";
 }
 
+/** Who sees the commissions of every seller and marks them as paid. A seller sees only their own. */
+export function managesCommissions(role: Role): boolean {
+  return role === "DIRETORIA" || role === "FINANCEIRO";
+}
+
+/** Who confirms or refuses a refund asked for in Recebimentos. Whoever has the screen may ask. */
+export function confirmsRefunds(role: Role): boolean {
+  return role === "DIRETORIA";
+}
+
 /** Who may approve an order that gives a loss. Everyone else with Aprovações decides only orders with profit. */
 export function approvesAtLoss(role: Role): boolean {
   return role === "DIRETORIA";

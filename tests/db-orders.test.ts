@@ -21,7 +21,9 @@ import {
 } from "@/lib/db/orders";
 import type { OrderPayment, OrderScope, OrderTerms } from "@/lib/db/orders";
 import { loadParams, saveParams } from "@/lib/db/params";
-import { listOpenReceivables, listReceipts, recordReceipt } from "@/lib/db/receivables";
+import { listCarriedBalances, listCommissionMonths, listCommissions, payCommissions } from "@/lib/db/commissions";
+import { loadCommissionDay, saveCommissionDay } from "@/lib/db/company";
+import { decideRefund, listOpenReceivables, listPendingRefunds, listReceipts, recordReceipt, requestRefund } from "@/lib/db/receivables";
 import { latestVersion, loadPublishedSnapshot, loadPublishedTable, publishPriceTable } from "@/lib/db/price-table";
 import { createProduct, listProducts, updateProduct } from "@/lib/db/products";
 import { closingProblems, directorOf, dueDates, paymentOf, saleOf } from "@/lib/order-quote";
@@ -827,6 +829,105 @@ test("recebimentos: aprovado gera a receber; reaberto cancela o que estava em ab
     (await listOpenReceivables(db.pool)).filter((item) => item.orderNumber === "261004-APRV").map((item) => [item.label, item.amount]),
     [["Entrada", 21701.21]],
   );
+});
+
+const FINANCE = "financeiro@teste.local";
+
+test("comissões: o dia do pagamento é da empresa; cada vendedor só recebe as suas linhas", { skip }, async () => {
+  assert.equal(await loadCommissionDay(db.pool), 5);
+  await saveCommissionDay(10, DIRECTOR, db.pool);
+  for (const day of [0, 29, 1.5]) await assert.rejects(() => saveCommissionDay(day, DIRECTOR, db.pool), /de 1 a 28/);
+
+  // Parcela 1/2 do pedido do print, recebida em outubro: comissão de outubro, a pagar no dia 10 de novembro.
+  const [first] = (await listOpenReceivables(db.pool)).filter((item) => item.orderNumber === "260930-BBMN");
+  assert.deepEqual(await recordReceipt(first.id, { receivedOn: "2026-10-02", method: "Boleto", note: null }, FINANCE, "2026-10-06", db.pool), { commission: 134.75 });
+
+  assert.deepEqual(await listCommissionMonths(null, db.pool), ["2026-10", "2026-09"]);
+  assert.deepEqual(await listCommissionMonths(OTHER_SELLER.email, db.pool), []);
+  const september = await listCommissions("2026-09", null, db.pool);
+  assert.deepEqual(
+    september.map(({ sellerEmail, sellerName, orderNumber, customerName, refund, happenedOn, base, rate, amount, paymentDue, paidAt }) =>
+      [sellerEmail, sellerName, orderNumber, customerName, refund, happenedOn, base, rate, amount, paymentDue, paidAt]),
+    [[SELLER.email, SELLER.name, "260930-BBMN", "Academia MA", false, "2026-09-30", 26548.67, 0.02, 530.97, "2026-10-05", null]],
+  );
+  const october = await listCommissions("2026-10", SELLER.email, db.pool);
+  assert.deepEqual(october.map((entry) => [entry.happenedOn, entry.amount, entry.paymentDue]), [["2026-10-02", 134.75, "2026-11-10"]]);
+  assert.deepEqual(await listCommissions("2026-10", OTHER_SELLER.email, db.pool), []);
+  await assert.rejects(() => listCommissions("10/2026", null, db.pool), /Mês inválido/);
+  await assert.rejects(() => listCommissions("2026-13", null, db.pool), /Mês inválido/);
+});
+
+test("comissões: marcar como paga fecha o que está em aberto do vendedor até aquele mês", { skip }, async () => {
+  await assert.rejects(() => payCommissions(OTHER_SELLER.email, "2026-09", FINANCE, db.pool), /Não há comissão em aberto/);
+  assert.deepEqual(await payCommissions(SELLER.email, "2026-09", FINANCE, db.pool), { paid: 530.97, entries: 1 });
+  const [paid] = await listCommissions("2026-09", null, db.pool);
+  assert.ok(paid.paidAt instanceof Date);
+  assert.equal(paid.paidBy, FINANCE);
+  // Paga uma vez só; outubro continua em aberto.
+  await assert.rejects(() => payCommissions(SELLER.email, "2026-09", FINANCE, db.pool), /Não há comissão em aberto/);
+  assert.equal((await listCommissions("2026-10", null, db.pool))[0].paidAt, null);
+});
+
+test("estorno: pedido com motivo, confirmado pela diretoria; o valor volta a receber e a comissão é devolvida", { skip }, async () => {
+  const N = "260930-BBMN";
+  const receipts = (await listReceipts(10, db.pool)).filter((item) => item.orderNumber === N);
+  assert.deepEqual(receipts.map((item) => [item.label, item.amount, item.state]), [["Parcela 1", 7613.33, "valido"], ["Entrada", 30000, "valido"]]);
+  const down = receipts[1];
+
+  await assert.rejects(() => requestRefund(down.id, "  ", FINANCE, db.pool), /Escreva o motivo/);
+  await assert.rejects(() => requestRefund(999999, "x", FINANCE, db.pool), /não encontrado, ou já estornado/);
+  await requestRefund(down.id, " PIX devolvido pelo banco ", FINANCE, db.pool);
+  await assert.rejects(() => requestRefund(down.id, "de novo", FINANCE, db.pool), /já tem estorno pedido ou confirmado/);
+
+  // Pedido não muda nada ainda.
+  const [pending] = await listPendingRefunds(db.pool);
+  assert.deepEqual(
+    [pending.orderNumber, pending.label, pending.receivedOn, pending.amount, pending.reason, pending.requestedBy, pending.customerName],
+    [N, "Entrada", "2026-09-30", 30000, "PIX devolvido pelo banco", FINANCE, "Academia MA"],
+  );
+  assert.equal((await listReceipts(10, db.pool)).find((item) => item.id === down.id)?.state, "estorno-pedido");
+  assert.ok(!(await listOpenReceivables(db.pool)).some((item) => item.orderNumber === N && item.label === "Entrada"));
+
+  // Recusado: só o pedido muda, e pode ser pedido de novo.
+  await decideRefund(pending.id, false, DIRECTOR, "2026-10-06", db.pool);
+  assert.deepEqual(await listPendingRefunds(db.pool), []);
+  assert.equal((await listReceipts(10, db.pool)).find((item) => item.id === down.id)?.state, "valido");
+  await assert.rejects(() => decideRefund(pending.id, true, DIRECTOR, "2026-10-06", db.pool), /já foi decidido/);
+
+  await requestRefund(down.id, "PIX devolvido pelo banco", FINANCE, db.pool);
+  const [again] = await listPendingRefunds(db.pool);
+  await decideRefund(again.id, true, DIRECTOR, "2026-10-06", db.pool);
+  await assert.rejects(() => decideRefund(again.id, false, DIRECTOR, "2026-10-06", db.pool), /já foi decidido/);
+
+  // O recebimento continua lá, marcado; a entrada volta para a lista a receber.
+  assert.equal((await listReceipts(10, db.pool)).find((item) => item.id === down.id)?.state, "estornado");
+  assert.deepEqual(
+    (await listOpenReceivables(db.pool)).filter((item) => item.orderNumber === N).map((item) => [item.label, item.amount]),
+    [["Entrada", 30000], ["2/2", 7613.34]],
+  );
+  const { rows } = await db.pool.query(
+    "SELECT amount::float AS amount, amount_without_ipi::float AS base, reason, requested_by, confirmed_by FROM refunds",
+  );
+  assert.deepEqual(rows, [{ amount: -30000, base: -26548.67, reason: "PIX devolvido pelo banco", requested_by: FINANCE, confirmed_by: DIRECTOR }]);
+  assert.equal(Number((await db.pool.query("SELECT count(*) FROM receipts")).rows[0].count), 2);
+
+  // A comissão de setembro já tinha sido paga: a devolução entra em outubro, negativa, e desconta do próximo pagamento.
+  const october = await listCommissions("2026-10", SELLER.email, db.pool);
+  assert.deepEqual(
+    october.map((entry) => [entry.refund, entry.happenedOn.slice(0, 7), entry.base, entry.amount, entry.paymentDue]),
+    [[false, "2026-10", 6737.46, 134.75, "2026-11-10"], [true, "2026-10", -26548.67, -530.97, "2026-11-10"]],
+  );
+  await assert.rejects(() => payCommissions(SELLER.email, "2026-10", FINANCE, db.pool), /saldo em aberto não é positivo/);
+  assert.ok((await listCommissions("2026-10", null, db.pool)).every((entry) => entry.paidAt === null));
+  // Em novembro, o saldo negativo de outubro aparece como pendência.
+  assert.deepEqual([...(await listCarriedBalances("2026-11", null, db.pool))], [[SELLER.email, -396.22]]);
+  assert.deepEqual([...(await listCarriedBalances("2026-10", null, db.pool))], []);
+
+  // A entrada é recebida de novo em novembro: o pagamento de novembro já vem com o desconto.
+  const [entrada] = (await listOpenReceivables(db.pool)).filter((item) => item.orderNumber === N);
+  await recordReceipt(entrada.id, { receivedOn: "2026-11-03", method: "PIX", note: null }, FINANCE, "2026-11-04", db.pool);
+  assert.deepEqual(await payCommissions(SELLER.email, "2026-11", FINANCE, db.pool), { paid: 134.75, entries: 3 });
+  assert.deepEqual([...(await listCarriedBalances("2026-12", null, db.pool))], []);
 });
 
 test("a migração dos pedidos não tem cascata nem coluna de preço, custo ou total", () => {

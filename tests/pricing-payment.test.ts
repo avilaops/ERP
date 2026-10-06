@@ -78,7 +78,7 @@ test("datas: dias corridos, sem depender do fuso do servidor", () => {
       assert.equal(addDays("2026-09-30", 7), "2026-10-07", zone);
       assert.equal(addDays("2026-09-28", 0), "2026-09-28", zone);
       assert.equal(addDays("2024-02-28", 2), "2024-03-01", zone);
-      assert.equal(commissionPaymentDate("2026-09-28"), "2026-10-05", zone);
+      assert.equal(commissionPaymentDate("2026-09-28", 5), "2026-10-05", zone);
     }
   } finally {
     if (original === undefined) delete process.env.TZ;
@@ -119,8 +119,12 @@ test("comissão e entrada mínima recusam valor negativo ou que não é número"
 });
 
 test("comissão: paga no dia 05 do mês seguinte ao recebimento", () => {
-  assert.equal(commissionPaymentDate("2026-09-28"), "2026-10-05");
-  assert.equal(commissionPaymentDate("2026-12-15"), "2027-01-05");
-  assert.equal(commissionPaymentDate("2026-01-31"), "2026-02-05");
-  assert.equal(commissionPaymentDate("2026-10-05"), "2026-11-05");
+  assert.equal(commissionPaymentDate("2026-09-28", 5), "2026-10-05");
+  assert.equal(commissionPaymentDate("2026-12-15", 5), "2027-01-05");
+  assert.equal(commissionPaymentDate("2026-01-31", 5), "2026-02-05");
+  assert.equal(commissionPaymentDate("2026-10-05", 5), "2026-11-05");
+  // O dia é da empresa: de 1 a 28, para existir em todo mês.
+  assert.equal(commissionPaymentDate("2026-01-31", 28), "2026-02-28");
+  assert.equal(commissionPaymentDate("2026-12-01", 10), "2027-01-10");
+  for (const day of [0, 29, 31, 5.5, Number.NaN]) assert.throws(() => commissionPaymentDate("2026-10-05", day), /de 1 a 28/, String(day));
 });

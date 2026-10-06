@@ -19,8 +19,14 @@ export function commissionCompetence(receivedOn: string): string {
   return formatDate(Date.UTC(received.getUTCFullYear(), received.getUTCMonth(), 1));
 }
 
-/** Everything received in a month is paid on the 5th of the next one. */
-export function commissionPaymentDate(receivedOn: string): string {
+/**
+ * Everything received in a month is paid on one day of the next one. The day is
+ * the company's own (1 to 28, so it exists in every month), never fixed here.
+ */
+export function commissionPaymentDate(receivedOn: string, paymentDay: number): string {
+  if (!Number.isInteger(paymentDay) || paymentDay < 1 || paymentDay > 28) {
+    throw new Error("Dia do pagamento da comissão precisa ser um número inteiro de 1 a 28.");
+  }
   const received = new Date(parseDate(receivedOn));
-  return formatDate(Date.UTC(received.getUTCFullYear(), received.getUTCMonth() + 1, 5));
+  return formatDate(Date.UTC(received.getUTCFullYear(), received.getUTCMonth() + 1, paymentDay));
 }

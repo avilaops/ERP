@@ -46,3 +46,21 @@ export async function removeLogo(updatedBy: string, conn: Queryable): Promise<vo
     [updatedBy],
   );
 }
+
+/** The day of the month the commissions of the previous month are paid on. */
+export async function loadCommissionDay(conn: Queryable): Promise<number> {
+  const { rows } = await conn.query("SELECT commission_payment_day FROM company_settings");
+  if (rows.length === 0) throw new Error("Dados da empresa não cadastrados no banco. Rode `npm run db:migrate`.");
+  return Number(rows[0].commission_payment_day);
+}
+
+/** Changes the day for the commissions born from now on; the ones already written keep their date. */
+export async function saveCommissionDay(day: number, updatedBy: string, conn: Queryable): Promise<void> {
+  if (updatedBy.trim() === "") throw new Error("Falta dizer quem está alterando o dia da comissão.");
+  if (!Number.isInteger(day) || day < 1 || day > 28) throw new CompanyError("Dia do pagamento: informe um número inteiro de 1 a 28.");
+  const { rows } = await conn.query(
+    "UPDATE company_settings SET commission_payment_day = $1, updated_at = now(), updated_by = $2 RETURNING id",
+    [day, updatedBy],
+  );
+  if (rows.length === 0) throw new Error("Dados da empresa não cadastrados no banco. Rode `npm run db:migrate`.");
+}

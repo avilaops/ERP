@@ -4,8 +4,9 @@ import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/auth";
 import { tenantDb } from "@/lib/db/pool";
 import { menuItem } from "@/lib/auth/permissions";
-import { CompanyError, removeLogo, saveLogo } from "@/lib/db/company";
+import { CompanyError, removeLogo, saveCommissionDay, saveLogo } from "@/lib/db/company";
 import { loadParams, saveParams } from "@/lib/db/params";
+import type { ActionState } from "@/lib/order-form";
 import { listProductCosts } from "@/lib/db/products";
 import { paramsToForm, parseParamsForm, rawFormValues } from "@/lib/params-form";
 import type { FormKey, ParamsFormState } from "@/lib/params-form";
@@ -110,4 +111,24 @@ export async function removeLogoAction(): Promise<LogoState> {
   }
   revalidatePath("/", "layout");
   return { status: "removed", message: "Logo removida. O menu voltou a mostrar o nome da empresa." };
+}
+
+/** "Dia do pagamento da comissão": a parameter of the company, valid for the commissions born from now on. */
+export async function saveCommissionDayAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
+  const session = await requirePermission("parametros");
+  const conn = tenantDb(session.tenant.slug);
+
+  const typed = formData.get("day");
+  const text = typeof typed === "string" ? typed.trim() : "";
+  try {
+    // Anything that is not a whole number is refused by the database layer, with the message of the field.
+    await saveCommissionDay(/^\d{1,2}$/.test(text) ? Number(text) : 0, session.email, conn);
+  } catch (error) {
+    if (error instanceof CompanyError) return { error: error.message };
+    console.error("[parametros] falha ao gravar o dia da comissão:", error instanceof Error ? error.message : error);
+    return { error: "Não foi possível gravar agora. Nada foi alterado; tente de novo." };
+  }
+  revalidatePath(menuItem("parametros").href);
+  revalidatePath(menuItem("comissoes").href);
+  return { error: null };
 }
