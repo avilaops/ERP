@@ -138,6 +138,7 @@ const product = (change: Partial<Product>): Product => ({
   id: 1,
   name: "MESA FLEXORA",
   code: "LD-B001",
+  description: null,
   supplierName: null,
   supplierModel: null,
   supplierPriceUsd: null,
@@ -145,6 +146,7 @@ const product = (change: Partial<Product>): Product => ({
   taxCredit: 0.2811565,
   packaging: 0,
   active: true,
+  hasPhoto: false,
   ...change,
 });
 

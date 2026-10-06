@@ -206,3 +206,24 @@ test("o perfil não é lido de dado enviado pelo navegador", () => {
     assert.doesNotMatch(code, /"use client"|searchParams|next\/headers/);
   }
 });
+
+const API_DIR = fileURLToPath(new URL("../src/app/api/", import.meta.url));
+
+test("toda rota de src/app/api confere a sessão, e a empresa só sai dela", () => {
+  const routes = readdirSync(API_DIR, { recursive: true, encoding: "utf8" }).filter((file) => /(^|\/)route\.tsx?$/.test(file));
+  assert.ok(routes.includes("produtos/[id]/foto/route.ts"));
+  for (const file of routes) {
+    const code = readFileSync(API_DIR + file, "utf8");
+    assert.ok(code.includes("await getSession()"), `${file} não chama getSession()`);
+    // Cada método exportado começa pela sessão: nada é lido do pedido nem do banco antes dela.
+    const bodies = code.split(/export async function (?:GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\([^)]*\)[^{]*\{/).slice(1);
+    assert.ok(bodies.length > 0, `${file} não exporta método`);
+    for (const body of bodies) {
+      assert.match(body.trimStart(), /^const session = (await getSession\(\)|editor\(await getSession\(\)\));/, `${file}: método sem sessão no início`);
+    }
+    for (const [call] of code.matchAll(/tenantDb\([^)]*\)/g)) {
+      assert.equal(call, "tenantDb(session.tenant.slug)", `${file}: ${call}`);
+    }
+    assert.doesNotMatch(code, /from "pg"|new pg\.|search_path|tenant_|searchParams|formData\(/, `${file} foge da regra das rotas`);
+  }
+});

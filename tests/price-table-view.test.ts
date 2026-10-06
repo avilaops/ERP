@@ -10,6 +10,7 @@ const product = (id: number, name: string, code: string | null, advisoryCost: nu
   id,
   name,
   code,
+  description: null,
   supplierName: null,
   supplierModel: null,
   supplierPriceUsd: null,
@@ -17,6 +18,7 @@ const product = (id: number, name: string, code: string | null, advisoryCost: nu
   taxCredit,
   packaging: 0,
   active: true,
+  hasPhoto: false,
 });
 
 const PUBLISHED_AT = new Date("2026-10-05T12:00:00Z");

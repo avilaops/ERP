@@ -8,6 +8,7 @@ export type Product = {
   id: number;
   name: string;
   code: string | null;
+  description: string | null;
   supplierName: string | null;
   supplierModel: string | null;
   supplierPriceUsd: number | null;
@@ -17,11 +18,14 @@ export type Product = {
   taxCredit: number;
   packaging: number;
   active: boolean;
+  /** Whether there is a photo. The bytes never come with the product: see product-photos.ts. */
+  hasPhoto: boolean;
 };
 
 export type ProductInput = {
   name: string;
   code?: string | null;
+  description?: string | null;
   supplierName?: string | null;
   supplierModel?: string | null;
   supplierPriceUsd?: number | null;
@@ -38,7 +42,8 @@ export type ProductPatch = Partial<ProductInput>;
 export class ProductError extends Error {}
 
 const COLUMNS =
-  "id, name, code, supplier_name, supplier_model, supplier_price_usd, advisory_cost, tax_credit, packaging, active";
+  "id, name, code, description, supplier_name, supplier_model, supplier_price_usd, advisory_cost, tax_credit, packaging, active, " +
+  "EXISTS (SELECT 1 FROM product_photos WHERE product_photos.product_id = products.id) AS has_photo";
 
 const numberOrNull = (value: unknown) => (value === null ? null : Number(value));
 const textOrNull = (value: unknown) => (value === null ? null : String(value));
@@ -50,6 +55,7 @@ function toProduct(row: Record<string, unknown>): Product {
     id: Number(row.id),
     name: String(row.name),
     code: textOrNull(row.code),
+    description: textOrNull(row.description),
     supplierName: textOrNull(row.supplier_name),
     supplierModel: textOrNull(row.supplier_model),
     supplierPriceUsd: numberOrNull(row.supplier_price_usd),
@@ -57,6 +63,7 @@ function toProduct(row: Record<string, unknown>): Product {
     taxCredit: Number(row.tax_credit),
     packaging: Number(row.packaging),
     active: row.active === true,
+    hasPhoto: row.has_photo === true,
   };
 }
 
@@ -67,6 +74,7 @@ const FOREIGN_KEY_VIOLATION = "23503";
 const PATCH_COLUMNS: [keyof ProductPatch, string][] = [
   ["name", "name"],
   ["code", "code"],
+  ["description", "description"],
   ["supplierName", "supplier_name"],
   ["supplierModel", "supplier_model"],
   ["supplierPriceUsd", "supplier_price_usd"],
@@ -85,6 +93,7 @@ function patchValue(field: keyof ProductPatch, patch: ProductPatch): unknown {
       return name;
     }
     case "code":
+    case "description":
     case "supplierName":
     case "supplierModel":
       return blankToNull(patch[field]);
@@ -129,12 +138,13 @@ export async function createProduct(input: ProductInput, updatedBy: string, conn
   try {
     const { rows } = await conn.query(
       `INSERT INTO products
-         (name, code, supplier_name, supplier_model, supplier_price_usd, advisory_cost, tax_credit, packaging, active, updated_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+         (name, code, description, supplier_name, supplier_model, supplier_price_usd, advisory_cost, tax_credit, packaging, active, updated_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        RETURNING ${COLUMNS}`,
       [
         name,
         code,
+        blankToNull(input.description),
         blankToNull(input.supplierName),
         blankToNull(input.supplierModel),
         supplierPriceUsd,
@@ -188,11 +198,56 @@ export async function updateProduct(
   }
 }
 
-/** Removes the record and answers with what it was. Refused once anything else points to the product. */
+/** The text of a product: what the spreadsheet of photos and descriptions brings. */
+export type ProductText = {
+  name: string;
+  description: string | null;
+  supplierName: string | null;
+  supplierModel: string | null;
+  supplierPriceUsd: number | null;
+};
+
+/**
+ * Rewrites name, description and supplier reference. Cost, tax credit,
+ * packaging, code and `active` are never touched here.
+ */
+export async function updateProductText(
+  id: number,
+  text: ProductText,
+  updatedBy: string,
+  conn: Queryable,
+): Promise<Product> {
+  const { name, description, supplierName, supplierModel, supplierPriceUsd } = text;
+  return updateProduct(id, { name, description, supplierName, supplierModel, supplierPriceUsd }, updatedBy, conn);
+}
+
+/** Codes are compared in capitals and without spaces around: `ld-b001` finds `LD-B001`. */
+export const normalizeCode = (code: string) => code.trim().toUpperCase();
+
+/** The product with this code, whatever the case it was typed in. An exact match wins. */
+export async function findProductByCode(code: string, conn: Queryable): Promise<Product | null> {
+  const wanted = normalizeCode(code);
+  if (wanted === "") return null;
+  const { rows } = await conn.query(
+    `SELECT ${COLUMNS} FROM products WHERE upper(code) = $1 ORDER BY (code = $1) DESC, id LIMIT 1`,
+    [wanted],
+  );
+  return rows.length === 0 ? null : toProduct(rows[0]);
+}
+
+/**
+ * Removes the record and answers with what it was. Refused once anything else
+ * points to the product. The photo is not history: it goes in the same
+ * statement, and stays when the product is refused.
+ */
 export async function deleteProduct(id: number, conn: Queryable): Promise<Product> {
   if (!isId(id)) throw new ProductError("Produto não encontrado.");
   try {
-    const { rows } = await conn.query(`DELETE FROM products WHERE id = $1 RETURNING ${COLUMNS}`, [id]);
+    const { rows } = await conn.query(
+      `WITH photo AS (DELETE FROM product_photos WHERE product_id = $1)
+       DELETE FROM products WHERE id = $1 RETURNING ${COLUMNS}`,
+      [id],
+    );
     if (rows.length === 0) throw new ProductError("Produto não encontrado.");
     return toProduct(rows[0]);
   } catch (error) {

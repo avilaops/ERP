@@ -37,6 +37,7 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "0004_clientes.sql",
     "0005_pedidos.sql",
     "0006_aliquotas_por_estado.sql",
+    "0007_fotos_dos_produtos.sql",
     "0008_empresa_usuarios_e_auditoria.sql",
     "0009_aprovacoes_e_financeiro.sql",
   ]);
@@ -68,6 +69,7 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "price_table_versions",
     "pricing_params",
     "pricing_params_history",
+    "product_photos",
     "products",
     "receipts",
     "receivables",

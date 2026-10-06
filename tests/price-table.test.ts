@@ -14,6 +14,7 @@ const product = (id: number, change: Partial<Product>): Product => ({
   id,
   name: `Equipamento ${id}`,
   code: null,
+  description: null,
   supplierName: null,
   supplierModel: null,
   supplierPriceUsd: null,
@@ -21,6 +22,7 @@ const product = (id: number, change: Partial<Product>): Product => ({
   taxCredit: 0,
   packaging: 0,
   active: true,
+  hasPhoto: false,
   ...change,
 });
 
