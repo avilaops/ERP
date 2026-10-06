@@ -6,7 +6,7 @@ import { confirmsRefunds, menuItem } from "@/lib/auth/permissions";
 import { listPaymentMethods } from "@/lib/db/orders";
 import { tenantDb } from "@/lib/db/pool";
 import { decideRefund, ReceivableError, recordReceipt, requestRefund } from "@/lib/db/receivables";
-import { isoDate } from "@/lib/format";
+import { isoDate, parseMoney } from "@/lib/format";
 import type { ActionState } from "@/lib/order-form";
 
 const FAILED = "Não foi possível gravar agora. Nada foi alterado; tente de novo.";
@@ -23,9 +23,12 @@ export async function recordReceiptAction(_previous: ActionState, formData: Form
   try {
     const method = text("method");
     if (method !== "" && !(await listPaymentMethods(conn)).includes(method)) return { error: '"Forma": escolha uma forma da lista.' };
+    // Blank is everything that is open; a smaller amount is a partial receipt.
+    const amount = text("amount") === "" ? undefined : parseMoney(text("amount"));
+    if (amount === null) return { error: '"Valor recebido": informe um valor em reais maior que zero.' };
     await recordReceipt(
       Number(text("id")),
-      { receivedOn: text("receivedOn"), method: method || null, note: text("note") || null },
+      { receivedOn: text("receivedOn"), method: method || null, note: text("note") || null, amount },
       session.email,
       isoDate(new Date()),
       conn,

@@ -4,7 +4,7 @@ import { confirmsRefunds, menuItem } from "@/lib/auth/permissions";
 import { listPaymentMethods } from "@/lib/db/orders";
 import { tenantDb } from "@/lib/db/pool";
 import { listOpenReceivables, listPendingRefunds, listReceipts } from "@/lib/db/receivables";
-import { isoDate, showDateTime, showIsoDate, showMoney } from "@/lib/format";
+import { formatMoney, isoDate, showDateTime, showIsoDate, showMoney } from "@/lib/format";
 import { addDays } from "@/lib/pricing/payment";
 import { isOverdue, receivablesSummary } from "@/lib/receivables-view";
 import { ActionForm } from "../pedidos/ActionForm";
@@ -73,7 +73,8 @@ export default async function RecebimentosPage() {
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="text-lg font-bold">{showMoney(item.amount)}</p>
+                      <p className="text-lg font-bold">{showMoney(item.open)}</p>
+                      {item.open !== item.amount && <p className="text-xs text-slate-500">falta receber, de {showMoney(item.amount)}</p>}
                       <p className={`text-sm ${late ? "font-medium text-red-700" : "text-slate-600"}`}>
                         {item.dueDate === null ? "sem data" : `${late ? "venceu em" : "vence em"} ${showIsoDate(item.dueDate)}`}
                       </p>
@@ -86,6 +87,20 @@ export default async function RecebimentosPage() {
                         Recebido em
                       </label>
                       <input id={`on-${item.id}`} name="receivedOn" type="date" defaultValue={today} max={today} className={`${INPUT} mt-1`} />
+                    </div>
+                    <div>
+                      <label htmlFor={`amount-${item.id}`} className="block text-xs font-medium text-slate-600">
+                        Valor recebido
+                      </label>
+                      <input
+                        key={item.open}
+                        id={`amount-${item.id}`}
+                        name="amount"
+                        type="text"
+                        inputMode="decimal"
+                        defaultValue={formatMoney(item.open)}
+                        className={`${INPUT} mt-1 w-32 text-right`}
+                      />
                     </div>
                     <div>
                       <label htmlFor={`method-${item.id}`} className="block text-xs font-medium text-slate-600">
@@ -112,7 +127,7 @@ export default async function RecebimentosPage() {
                       <input id={`note-${item.id}`} name="note" type="text" className={`${INPUT} mt-1 w-full`} />
                     </div>
                     <button type="submit" className="rounded bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark">
-                      Dar baixa de {showMoney(item.amount)}
+                      Dar baixa
                     </button>
                   </ActionForm>
                 </li>

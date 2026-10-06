@@ -566,7 +566,10 @@ export async function reopenOrder(number: string, who: string, scope: OrderScope
   assertWho(who);
   const received = await conn.query(
     `SELECT 1 FROM receivables r JOIN orders o ON o.id = r.order_id
-      WHERE o.number = $1 AND ($2::text IS NULL OR o.seller_email = $2) AND r.status = 'recebida' LIMIT 1`,
+      WHERE o.number = $1 AND ($2::text IS NULL OR o.seller_email = $2)
+        AND EXISTS (SELECT 1 FROM receipts p WHERE p.receivable_id = r.id
+                       AND NOT EXISTS (SELECT 1 FROM refund_requests q WHERE q.receipt_id = p.id AND q.status = 'confirmada'))
+      LIMIT 1`,
     [number, scope.sellerEmail],
   );
   if (received.rows.length > 0) {
@@ -578,7 +581,9 @@ export async function reopenOrder(number: string, who: string, scope: OrderScope
           SET status = 'em_negociacao', closed_at = NULL, updated_at = now(), updated_by = $2
         WHERE number = $1 AND status IN ('fechado', 'aguardando_aprovacao')
           AND ($3::text IS NULL OR seller_email = $3)
-          AND NOT EXISTS (SELECT 1 FROM receivables r WHERE r.order_id = orders.id AND r.status = 'recebida')
+          AND NOT EXISTS (SELECT 1 FROM receivables r JOIN receipts p ON p.receivable_id = r.id
+                           WHERE r.order_id = orders.id
+                             AND NOT EXISTS (SELECT 1 FROM refund_requests q WHERE q.receipt_id = p.id AND q.status = 'confirmada'))
         RETURNING id
      ), cancelled AS (
        -- What was still to be received leaves with the closing.

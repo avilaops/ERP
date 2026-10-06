@@ -5,8 +5,8 @@ import { requirePermission } from "@/lib/auth";
 import { menuItem } from "@/lib/auth/permissions";
 import { launchFixedExpenses } from "@/lib/db/fixed-expenses";
 import { listPaymentMethods } from "@/lib/db/orders";
-import { listPayableCategories } from "@/lib/db/payable-categories";
-import { createPayable, deletePayable, PayableError, payPayable, unpayPayable } from "@/lib/db/payables";
+import { listAllPayableCategories, listPayableCategories } from "@/lib/db/payable-categories";
+import { createPayable, deletePayable, PayableError, payPayable, unpayPayable, updatePayable } from "@/lib/db/payables";
 import { tenantDb } from "@/lib/db/pool";
 import { listSuppliers } from "@/lib/db/suppliers";
 import { isoDate } from "@/lib/format";
@@ -42,6 +42,26 @@ export async function createPayableAction(_previous: ActionState, formData: Form
     await createPayable(parsed.value, session.email, conn);
   } catch (error) {
     return problem("lançar a conta", error);
+  }
+  revalidatePath(HERE);
+  return OK;
+}
+
+/** "Salvar alterações" of a bill not paid yet. A supplier turned off since stays valid for the bill that already had it. */
+export async function updatePayableAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
+  const session = await requirePermission("contas-pagar");
+  const conn = tenantDb(session.tenant.slug);
+  const read = reader(formData);
+  try {
+    const parsed = parsePayableForm(read, {
+      categories: (await listAllPayableCategories(conn)).map((category) => category.label),
+      methods: await listPaymentMethods(conn),
+      supplierIds: (await listSuppliers(conn)).map((supplier) => supplier.id),
+    });
+    if (!parsed.ok) return { error: parsed.errors.join(" ") };
+    await updatePayable(Number(read("id")), parsed.value, session.email, conn);
+  } catch (error) {
+    return problem("alterar a conta", error);
   }
   revalidatePath(HERE);
   return OK;

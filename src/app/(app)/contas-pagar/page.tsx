@@ -12,7 +12,14 @@ import { inPayableTab, PAYABLE_TABS, parsePayableTab, payablesSummary } from "@/
 import { addDays } from "@/lib/pricing/payment";
 import { ActionForm } from "../pedidos/ActionForm";
 import { ConfirmButton } from "../pedidos/ConfirmButton";
-import { createPayableAction, deletePayableAction, launchFixedExpensesAction, payPayableAction, unpayPayableAction } from "./actions";
+import {
+  createPayableAction,
+  deletePayableAction,
+  launchFixedExpensesAction,
+  payPayableAction,
+  unpayPayableAction,
+  updatePayableAction,
+} from "./actions";
 
 export const metadata = { title: `${menuItem("contas-pagar").label} · ERP` };
 export const dynamic = "force-dynamic";
@@ -258,6 +265,78 @@ export default async function ContasPagarPage({ searchParams }: { searchParams: 
                         <ConfirmButton label="Excluir" confirmLabel="Confirmar exclusão" className="rounded px-2 py-1 text-sm text-red-700 hover:bg-red-50" />
                       </ActionForm>
                     </div>
+                  ) : null}
+                  {payable.status === "aberta" ? (
+                    <details className="mt-3 text-sm">
+                      <summary className="cursor-pointer text-brand underline">Alterar esta conta</summary>
+                      <ActionForm action={updatePayableAction} className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                        <input type="hidden" name="id" value={payable.id} />
+                        <div className="sm:col-span-2 xl:col-span-3">
+                          <label htmlFor={`description-${payable.id}`} className={LABEL}>
+                            Descrição
+                          </label>
+                          <input id={`description-${payable.id}`} name="description" type="text" defaultValue={payable.description} className={INPUT} />
+                        </div>
+                        <div>
+                          <label htmlFor={`category-${payable.id}`} className={LABEL}>
+                            Categoria
+                          </label>
+                          <select id={`category-${payable.id}`} name="category" defaultValue={payable.category} className={INPUT}>
+                            {(categories.includes(payable.category) ? categories : [...categories, payable.category]).map((category) => (
+                              <option key={category} value={category}>
+                                {category}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label htmlFor={`supplier-${payable.id}`} className={LABEL}>
+                            Fornecedor
+                          </label>
+                          <select id={`supplier-${payable.id}`} name="supplierId" defaultValue={payable.supplierId ?? ""} className={INPUT}>
+                            <option value="">—</option>
+                            {payable.supplierId !== null && !suppliers.some((supplier) => supplier.id === payable.supplierId) && (
+                              <option value={payable.supplierId}>{payable.supplierName}</option>
+                            )}
+                            {suppliers.map((supplier) => (
+                              <option key={supplier.id} value={supplier.id}>
+                                {supplier.tradeName ?? supplier.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label htmlFor={`value-${payable.id}`} className={LABEL}>
+                            Valor (R$)
+                          </label>
+                          <input id={`value-${payable.id}`} name="amount" type="text" inputMode="decimal" defaultValue={formatMoney(payable.amount)} className={`${INPUT} text-right`} />
+                        </div>
+                        <div>
+                          <label htmlFor={`due-${payable.id}`} className={LABEL}>
+                            Vencimento
+                          </label>
+                          <input id={`due-${payable.id}`} name="dueDate" type="date" defaultValue={payable.dueDate} className={INPUT} />
+                        </div>
+                        <div>
+                          <label htmlFor={`form-${payable.id}`} className={LABEL}>
+                            Forma
+                          </label>
+                          <select id={`form-${payable.id}`} name="method" defaultValue={payable.method && methods.includes(payable.method) ? payable.method : ""} className={INPUT}>
+                            <option value="">—</option>
+                            {methods.map((method) => (
+                              <option key={method} value={method}>
+                                {method}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="sm:col-span-2 xl:col-span-3">
+                          <button type="submit" className="rounded border border-slate-300 bg-white px-3 py-2 font-medium hover:bg-slate-50">
+                            Salvar alterações
+                          </button>
+                        </div>
+                      </ActionForm>
+                    </details>
                   ) : (
                     <ActionForm action={unpayPayableAction} className="mt-2">
                       <input type="hidden" name="id" value={payable.id} />

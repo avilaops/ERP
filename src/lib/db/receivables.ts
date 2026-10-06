@@ -18,12 +18,16 @@ export type Receivable = {
   label: string;
   /** `AAAA-MM-DD`. */
   dueDate: string | null;
+  /** The whole amount agreed. */
   amount: number;
+  /** What is still to come in: the amount less what was received and not refunded. */
+  open: number;
   method: string | null;
 };
 
 const LIST = `SELECT r.id, o.number AS order_number, COALESCE(c.trade_name, c.name) AS customer_name, o.seller_name,
                      r.kind, r.number, to_char(r.due_date, 'YYYY-MM-DD') AS due_date, r.amount, r.method,
+                     r.amount - (SELECT COALESCE(sum(p.amount), 0) FROM receipts p WHERE p.receivable_id = r.id AND NOT EXISTS (SELECT 1 FROM refund_requests q WHERE q.receipt_id = p.id AND q.status = 'confirmada')) AS open,
                      (SELECT count(*) FROM receivables p WHERE p.order_id = r.order_id AND p.kind = 'parcela' AND p.status <> 'cancelada') AS parts
                 FROM receivables r
                 JOIN orders o ON o.id = r.order_id
@@ -42,11 +46,14 @@ export async function listOpenReceivables(conn: Queryable): Promise<Receivable[]
     label: row.kind === "entrada" ? "Entrada" : `${row.number}/${row.parts}`,
     dueDate: row.due_date === null ? null : String(row.due_date),
     amount: Number(row.amount),
+    open: Number(row.open),
     method: row.method === null ? null : String(row.method),
   }));
 }
 
 export type ReceiptInput = {
+  /** How much came in. Left out, it is everything still open. Less than that is a partial receipt. */
+  amount?: number;
   /** `AAAA-MM-DD`: the day the money came in. */
   receivedOn: string;
   method: string | null;
@@ -54,8 +61,9 @@ export type ReceiptInput = {
 };
 
 /**
- * "Dar baixa": the whole amount of one receivable came in. The receivable, the
- * receipt and the seller's commission are written in one statement. The rates
+ * "Dar baixa": money of one receivable came in, all that was open or a part of
+ * it. The receivable (settled only when nothing is left), the receipt and the
+ * seller's commission on what came in are written in one statement. The rates
  * (IPI and commission) are the ones of the table version of the order. `today`
  * is the day in São Paulo: nothing is received in the future.
  */
@@ -70,7 +78,7 @@ export async function recordReceipt(id: number, input: ReceiptInput, who: string
   if (received > parseDate(today)) throw new ReceivableError("A data do recebimento não pode ser no futuro.");
 
   const found = await conn.query(
-    `SELECT r.amount, r.status, o.status AS order_status, v.ipi, v.commission
+    `SELECT r.amount - (SELECT COALESCE(sum(p.amount), 0) FROM receipts p WHERE p.receivable_id = r.id AND NOT EXISTS (SELECT 1 FROM refund_requests q WHERE q.receipt_id = p.id AND q.status = 'confirmada')) AS open, r.status, o.status AS order_status, v.ipi, v.commission
        FROM receivables r
        JOIN orders o ON o.id = r.order_id
        JOIN price_table_versions v ON v.version = o.price_table_version
@@ -81,7 +89,11 @@ export async function recordReceipt(id: number, input: ReceiptInput, who: string
   if (!row || row.status !== "aberta" || row.order_status !== "fechado") {
     throw new ReceivableError("Este valor não está mais em aberto. Atualize a página.");
   }
-  const amount = Number(row.amount);
+  const open = roundCents(Number(row.open));
+  const amount = input.amount === undefined ? open : roundCents(input.amount);
+  if (!Number.isFinite(amount) || amount <= 0) throw new ReceivableError("Valor recebido: informe um valor maior que zero.");
+  if (amount > open) throw new ReceivableError("O valor recebido não pode ser maior que o que está em aberto.");
+  const settles = amount === open;
   const rates = { ipi: Number(row.ipi), commission: Number(row.commission) };
   const paymentDay = await loadCommissionDay(conn);
   const base = roundCents(commissionBase(amount, rates));
@@ -89,9 +101,10 @@ export async function recordReceipt(id: number, input: ReceiptInput, who: string
 
   const { rows } = await conn.query(
     `WITH settled AS (
-       UPDATE receivables SET status = 'recebida', updated_at = now(), updated_by = $2
-        WHERE id = $1 AND status = 'aberta'
-        RETURNING id, order_id
+       -- The write only happens if what is open is still what was read.
+       UPDATE receivables r SET status = CASE WHEN $12::boolean THEN 'recebida' ELSE 'aberta' END, updated_at = now(), updated_by = $2
+        WHERE r.id = $1 AND r.status = 'aberta' AND r.amount - (SELECT COALESCE(sum(p.amount), 0) FROM receipts p WHERE p.receivable_id = r.id AND NOT EXISTS (SELECT 1 FROM refund_requests q WHERE q.receipt_id = p.id AND q.status = 'confirmada')) = $13::numeric
+        RETURNING r.id, r.order_id
      ), receipt AS (
        INSERT INTO receipts (receivable_id, received_at, amount, amount_without_ipi, method, note, recorded_by)
        SELECT id, ($3::date + time '12:00') AT TIME ZONE 'America/Sao_Paulo', $4::numeric, $5::numeric, $6, $7, $2 FROM settled
@@ -114,6 +127,8 @@ export async function recordReceipt(id: number, input: ReceiptInput, who: string
       rates.commission,
       commission,
       commissionPaymentDate(input.receivedOn, paymentDay),
+      settles,
+      open,
     ],
   );
   if (rows.length === 0) throw new ReceivableError("Este valor não está mais em aberto. Atualize a página.");
@@ -184,7 +199,7 @@ export async function requestRefund(receiptId: number, reason: string, who: stri
       `INSERT INTO refund_requests (order_id, receivable_id, receipt_id, amount, reason, requested_by)
        SELECT r.order_id, r.id, p.id, p.amount, $2, $3
          FROM receipts p JOIN receivables r ON r.id = p.receivable_id
-        WHERE p.id = $1 AND r.status = 'recebida'
+        WHERE p.id = $1 AND r.status <> 'cancelada'
        RETURNING id`,
       [receiptId, reason.trim(), who],
     );

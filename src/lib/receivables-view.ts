@@ -9,7 +9,8 @@ export type ReceivablesSummary = {
   nextDays: { total: number; count: number };
 };
 
-const sum = (items: Receivable[]) => ({ total: roundCents(items.reduce((total, item) => total + item.amount, 0)), count: items.length });
+// What counts is what is still to come in, not the whole amount agreed.
+const sum = (items: Receivable[]) => ({ total: roundCents(items.reduce((total, item) => total + item.open, 0)), count: items.length });
 
 /** `AAAA-MM-DD` compares as text. A receivable without a date is never overdue. */
 export const isOverdue = (item: Pick<Receivable, "dueDate">, today: string) => item.dueDate !== null && item.dueDate < today;

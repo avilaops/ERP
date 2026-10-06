@@ -1008,6 +1008,35 @@ test("regras de aprovação da empresa: alçada do gerente, frete e diretoria qu
   await saveApprovalPolicy(initial, DIRECTOR, db.pool);
 });
 
+test("recebimento parcial: a parcela fica em aberto pelo que falta, e a comissão nasce de cada parte", { skip }, async () => {
+  const N = "261005-FRET";
+  const [down] = (await listOpenReceivables(db.pool)).filter((item) => item.orderNumber === N);
+  assert.deepEqual([down.label, down.amount, down.open], ["Entrada", 20000, 20000]);
+
+  await assert.rejects(() => recordReceipt(down.id, { receivedOn: "2026-10-05", method: null, note: null, amount: 20000.01 }, FINANCE, "2026-10-06", db.pool), /não pode ser maior que o que está em aberto/);
+  await assert.rejects(() => recordReceipt(down.id, { receivedOn: "2026-10-05", method: null, note: null, amount: 0 }, FINANCE, "2026-10-06", db.pool), /maior que zero/);
+
+  // Entram 5.000 dos 20.000: comissão sobre os 5.000, e a entrada continua na lista com 15.000.
+  assert.deepEqual(await recordReceipt(down.id, { receivedOn: "2026-10-05", method: "PIX", note: null, amount: 5000 }, FINANCE, "2026-10-06", db.pool), { commission: 88.5 });
+  const after = (await listOpenReceivables(db.pool)).find((item) => item.id === down.id);
+  assert.deepEqual([after?.amount, after?.open], [20000, 15000]);
+  // Com valor recebido, mesmo em parte, o pedido não se reabre.
+  await assert.rejects(() => reopenOrder(N, DIRECTOR, ALL, db.pool), /já tem valor recebido/);
+
+  // O resto entra sem dizer valor: é tudo o que está em aberto, e a entrada sai da lista.
+  assert.deepEqual(await recordReceipt(down.id, { receivedOn: "2026-10-06", method: "PIX", note: null }, FINANCE, "2026-10-06", db.pool), { commission: 265.49 });
+  assert.ok(!(await listOpenReceivables(db.pool)).some((item) => item.id === down.id));
+  const parts = (await listReceipts(10, db.pool)).filter((item) => item.orderNumber === N);
+  assert.deepEqual(parts.map((item) => [item.label, item.amount, item.commission]), [["Entrada", 15000, 265.49], ["Entrada", 5000, 88.5]]);
+
+  // Estornar a primeira parte devolve só ela: a entrada volta a ter 5.000 em aberto.
+  await requestRefund(parts[1].id, "PIX em duplicidade", FINANCE, db.pool);
+  const [request] = await listPendingRefunds(db.pool);
+  await decideRefund(request.id, true, DIRECTOR, "2026-10-06", db.pool);
+  const back = (await listOpenReceivables(db.pool)).find((item) => item.id === down.id);
+  assert.deepEqual([back?.amount, back?.open], [20000, 5000]);
+});
+
 test("a migração dos pedidos não tem cascata nem coluna de preço, custo ou total", () => {
   const migration = readFileSync(new URL("../db/migrations/0005_pedidos.sql", import.meta.url), "utf8");
   assert.doesNotMatch(migration, /ON DELETE/i);
