@@ -1,221 +1,144 @@
 # Prompts para o Copilot: ERP Ludus
 
-O contexto permanente está em [`.github/copilot-instructions.md`](../../.github/copilot-instructions.md). O Copilot lê esse arquivo sozinho em toda conversa. Use os prompts abaixo no Copilot Chat em modo Agent, um por vez, na ordem do [roadmap](../roadmap.md).
+O contexto permanente está em [`.github/copilot-instructions.md`](../../.github/copilot-instructions.md), que o Copilot lê sozinho em toda conversa, e as regras por pasta estão no [`AGENTS.md`](../../AGENTS.md). Use os prompts abaixo no Copilot Chat em modo Agent, um por vez, na ordem do [roadmap](../roadmap.md).
 
-> **Atenção (05/10/2026):** estes prompts foram escritos para a stack planejada (Prisma, `organization_id`, `src/modules/`, Vitest, Playwright, pnpm). O desenvolvimento seguiu outra base, descrita no topo das instruções do projeto e no [`AGENTS.md`](../../AGENTS.md): `pg` com SQL direto, banco de uma empresa só, `src/lib/`, npm e o executor de testes do Node. Use os prompts como roteiro do **que** cada fase entrega; o **como** é o do `AGENTS.md`.
+Revisto em 06/10/2026 para a stack que está no código: PostgreSQL com `pg` e SQL direto (migrações em `db/migrations/`), `src/lib/` e `src/app/(app)/`, npm, testes com o executor do Node, endereço `erp.avilaops.com`. Não há Prisma, SQLite, Vitest, Playwright, pnpm, `src/modules/`, `organization_id` nem `audit_log`.
 
-## 0. Preparar o protótipo (manual, antes do primeiro prompt)
+Todo prompt termina do mesmo jeito: `npm run lint`, `npm run typecheck`, `npm test` (nenhum teste pulado) e `npm run build`, e commit direto na `main`.
 
-> **Feito em 06/10/2026:** o artifact está em `prototype/ludus-comercial.html` e o inventário em [`inventario-prototipo.md`](inventario-prototipo.md). O protótipo não traz dados de exemplo: os números ficam no banco do próprio artifact.
+## Situação em 06/10/2026
 
-1. Abra o artifact do Rogério no Claude (acesso de editor para nicolas@avilaops.com).
-2. Copie o código completo do artifact para `prototype/app.jsx` (ou o nome original do arquivo).
-3. Se houver dados de exemplo no protótipo (equipamentos, parâmetros), salve também em `prototype/data/`.
-4. Commit: `chore: código do protótipo como referência`.
+| Parte | Situação |
+| --- | --- |
+| 0. Protótipo no repositório e inventário | Feito: `prototype/ludus-comercial.html` e [`inventario-prototipo.md`](inventario-prototipo.md) |
+| 1. Base, login com os quatro perfis, sidebar, CI | Feito, menos o ambiente de produção |
+| 1. Produção em `erp.avilaops.com` | Pendente (prompt 1) |
+| 2a. Motor de cálculo | Feito (`src/lib/pricing/`) |
+| 2b. Parâmetros, Produtos e custos, publicação, Tabela de preços | Feito |
+| 2c. Clientes e pedido em negociação | Feito |
+| 2c. Pagamento, fechar pedido, lista de pedidos, aprovações, simulador | Pendente (prompts 2c-1 e 2c-2) |
+| 2d. Financeiro, comissões e dashboard | Pendente |
+| 3 a 6 | Pendentes |
 
-## Fase 1. Infraestrutura e acessos (05/10 a 09/10)
+Antes dos prompts 2c-2 e 2d, resolver com o Nicolas as divergências da seção 7 do inventário (motivos de aprovação, alçada do gerente, provisões, taxa fixa por pedido, alíquotas por UF).
 
+## Fase 1. Infraestrutura e acessos
+
+### 1. Produção em erp.avilaops.com (pendente)
 ```text
-Siga .github/copilot-instructions.md.
+Siga .github/copilot-instructions.md, AGENTS.md e docs/operacao.md.
 
-Leia prototype/ inteiro e faça um inventário em docs/copilot/inventario-prototipo.md:
-telas, componentes, entidades e campos, regras e fórmulas, textos de ajuda. Aponte
-qualquer regra do protótipo que divirja das instruções do projeto.
-Responda em especial como o protótipo calcula o valor a pagar na China (custo,
-margem, embalagem, quantidade) e atualize .github/copilot-instructions.md com a
-resposta antes de escrever código.
+Coloque o ERP no ar em https://erp.avilaops.com:
+1. Serviço da aplicação no servidor (next build + next start), reiniciando sozinho.
+2. PostgreSQL de produção separado do de desenvolvimento, com pg_dump diário,
+   retenção de 30 dias e restauração testada.
+3. TLS válido de ponta a ponta para erp.avilaops.com.
+4. Variáveis reais só no servidor: DATABASE_URL, SSO_JWT_SECRET (o mesmo do
+   auth.avilaops.com), APP_URL=https://erp.avilaops.com e ERP_USERS. Sem elas a
+   aplicação não pode subir (falha fechada, já implementada).
+5. No .github/workflows/ci.yml, depois do build na main: aplicar as migrações
+   (npm run db:migrate) e reiniciar o serviço.
+Atualize docs/operacao.md com o que foi feito.
 
-Depois crie a base do projeto:
-1. Next.js com TypeScript strict, App Router, Tailwind, ESLint e pnpm.
-2. Prisma com PostgreSQL (DATABASE_URL no .env.example) e docker-compose com
-   postgres:16 para desenvolvimento local.
-3. Schema Prisma completo, com tipos NUMERIC para dinheiro e enums do Postgres:
-   Organization, User (role: DIRETORIA | GERENTE_COMERCIAL | VENDEDOR | FINANCEIRO),
-   AuditLog (JSONB antes/depois), Settings (parâmetros com histórico),
-   StateTaxRate (UF, alíquota interna, FCP, observação),
-   Supplier, Product (código LD-xxx, nome, ref. fornecedor, preço US$, NCM, IPI,
-   custo assessoria, crédito de impostos, embalagem, ativo), PriceTableVersion
-   (número, snapshot JSONB, publicada_em, publicada_por),
-   Customer (PF/PJ, IE, contribuinte, endereço), Order, OrderItem, Approval,
-   LostReason, Receivable (parcela), Receipt (cada recebimento, imutável,
-   ligado à parcela), Payable, Commission (origem em Receipt OU Refund: receipt_id e refund_id
-   opcionais com CHECK exigindo exatamente um; competência DATE do mês da
-   origem), Refund (estorno/devolução, imutável, negativo, estornado_em,
-   pedido por e confirmado por), RefundRequest (devolução pendente),
-   OrderClosing (histórico de fechamentos), SalesGoal, IdempotencyKey. Datas de calendário em DATE e eventos em
-   TIMESTAMPTZ, conforme as instruções.
-4. Migration inicial e seed com os equipamentos, parâmetros e alíquotas por UF
-   do protótipo.
-5. Integração com o Auth central da Ávila Ops isolada em src/lib/auth/
-   (getSession, requirePermission). Para desenvolvimento e testes, um provedor
-   local com um usuário por perfil, habilitado SOMENTE quando NODE_ENV for
-   development ou test. Em produção, credenciais do Auth central ausentes ou
-   inválidas fazem a aplicação falhar na inicialização (falha fechada).
-   Teste automatizado que garante que o provedor local não existe no build de
-   produção.
-6. Layout com a sidebar do protótipo (logo, card "Seu acesso", botão
-   + Novo pedido) mostrando só os itens do perfil.
-7. Ambiente de produção já nesta fase: servidor em nuvem, PostgreSQL de
-   produção (separado do de desenvolvimento), domínio ludusequipamentos.com.br
-   com DNS e TLS, Auth central configurado com as credenciais reais, e um
-   pipeline mínimo no GitHub Actions (lint, typecheck, testes, build e deploy
-   na main). Documente variáveis e passos em docs/operacao.md.
-
-Pronto quando: cada um dos 4 perfis entra pelo endereço de produção e vê só a
+Pronto quando: cada um dos 4 perfis entra por https://erp.avilaops.com e vê só a
 sua parte do sistema.
-Ao final: o que foi criado, como rodar localmente, como fazer deploy e o que
-ficou pendente.
 ```
 
-## Fase 2. Porte do protótipo (12/10 a 23/10)
+## Fase 2. Porte do protótipo
 
-### 2a. Motor de cálculo
+O protótipo é a referência: consulte `prototype/ludus-comercial.html` e o inventário antes de portar tela ou regra. As especificações detalhadas de cada parte já entregue estão registradas nos commits e nos testes.
+
+### 2c-1. Pagamento, fechar pedido e lista de pedidos (pendente)
 ```text
-Siga .github/copilot-instructions.md.
+Siga .github/copilot-instructions.md e AGENTS.md. O pedido em negociação já existe
+(src/lib/db/orders.ts, src/lib/order-quote.ts, src/app/(app)/pedidos/). A migração
+0005 já tem as colunas de pagamento.
 
-Porte TODAS as fórmulas do protótipo para src/modules/pricing/ como funções puras
-com Prisma.Decimal: custo real, impostos e taxas por UF e contribuinte, DIFAL,
-preço de tabela, preço com IPI, desconto máximo (Máx. SP e Máx. c/IE), faixa do
-desconto (na meta / abaixo / prejuízo), lucro líquido do pedido, entrada mínima,
-parcelas do saldo e comissão.
-
-Escreva testes Vitest que reproduzam os números do protótipo, incluindo:
-- entrada mínima: China 8.553,97 + lucro 2.304,55, comissão 2% = 11.054,17
-- multiplicador de tabela calculado a partir de parâmetros de exemplo do teste
-  (incluindo um encargo extra cadastrado), conferindo a fórmula, não um número fixo
-- venda para outro estado (não contribuinte) com alíquotas de exemplo montadas
-  no teste: DIFAL = interna do destino - 4%. As alíquotas reais por UF entram
-  no seed como configuração provisória, marcada "aguardando contador" em
-  Parâmetros, editável pela diretoria; a validação com o contador é a fase 4
-- parcelas que somam exatamente o saldo
-Compare cada resultado com o protótipo e liste divergências antes de seguir.
+- Forma de pagamento: entrada em R$ ou %, forma, data (vazia = na confirmação);
+  saldo com forma, nº de parcelas, 1ª em N dias e intervalo. As parcelas somam
+  exatamente o saldo, com a diferença de centavos na última (installments, em
+  src/lib/pricing/payment.ts). Aviso "Entrada OK" ou "Entrada abaixo do mínimo",
+  com o percentual mínimo da versão do pedido.
+- Fechar pedido: confere no servidor o que falta (cliente completo, estado de
+  entrega, prazo, pagamento) e a política (policyCheck). Dentro da política vira
+  fechado; fora, aguardando_aprovacao, com os motivos escritos.
+- Reabrir (fechado → em negociação, a versão da tabela não muda) e excluir (só em
+  negociação, pedido e itens na mesma instrução SQL).
+- Pedidos: cards (Em negociação, Fechado no mês, Taxa de fechamento, Desconto
+  médio fechado), abas por situação, busca por cliente, documento ou número. O
+  vendedor só vê os próprios (seesAllOrders decide).
+- As somas dos indicadores ficam em src/lib/pricing/, não em SQL nem na tela.
+Testes: pagamento do print (nota 114.708,28, entrada 75.000,00, 3 parcelas →
+13.236,09, 13.236,09 e 13.236,10); pedido do print com entrada de 25.000,00 vai
+para aprovação e com 30.000,00 fecha.
 ```
 
-### 2b. Produtos e custos, Parâmetros e Tabela de preços
+### 2c-2. Aprovações e simulador (pendente; depende das decisões do inventário)
 ```text
-Siga .github/copilot-instructions.md e reproduza as telas do protótipo:
-- Produtos e custos: abas Ativos / Sem custo / Sem código / Inativos, busca,
-  edição inline dos custos, "Colar custos da assessoria" (colar planilha),
-  "+ Equipamento", Desativar/Excluir, aviso "A equipe ainda vê a tabela vN"
-  e botão "Publicar vN+1" que grava o snapshot em PriceTableVersion.
-- Parâmetros: política comercial, impostos da venda, canal, lista de encargos
-  extras editável (nome, %, base, ativo) e o quadro Resultado
-  com a fórmula explicada e o botão "usar" na entrada mínima sugerida.
-- Tabela de preços: a versão publicada, sem custo nem margem para quem não é
-  diretoria.
-Só a DIRETORIA acessa Produtos e custos e Parâmetros. Registrar tudo no audit_log.
+Siga .github/copilot-instructions.md e AGENTS.md.
+
+- Aprovações, para GERENTE_COMERCIAL e DIRETORIA: fila dos pedidos aguardando
+  aprovação, aprovar ou reprovar com comentário. A aprovação fica presa ao que foi
+  aprovado (itens, quantidades, desconto, UF, contribuinte, frete, entrada e
+  parcelas); mudou, perde a validade. Pedido com prejuízo só a DIRETORIA aprova,
+  e o gerente vê apenas "requer aprovação da diretoria", sem valores.
+- Simulador: a mesma conta do pedido, sem gravar nada, com as mesmas travas de
+  quem vê custo (seesCosts).
+- Copiar proposta (texto) com a marca da Ludus.
+Tabela nova em db/migrations/, sem ON DELETE CASCADE. Testes de banco para cada
+transição e teste de que nada de custo vai para quem não é Diretoria.
 ```
 
-### 2c. Pedidos, aprovações e simulador
+### 2d. Financeiro, comissões e dashboard (pendente)
 ```text
-Siga .github/copilot-instructions.md e reproduza o fluxo de pedido do protótipo:
-- Lista de pedidos com os cards (Em negociação, Fechado no mês, Taxa de
-  fechamento, Desconto médio fechado), abas por situação e busca.
-- Pedido: equipamentos, cliente PF/PJ com CEP, entrega e condições, desconto com
-  barra e faixa colorida, resumo, forma de pagamento com parcelas e o bloco de
-  recebimentos com comissão por parcela.
-- Quadro "Só o diretor vê" calculado no servidor e enviado só para a DIRETORIA.
-- Envio automático para aprovação pelas regras do projeto; tela Aprovações para
-  GERENTE_COMERCIAL e DIRETORIA, com aprovar/reprovar e comentário.
-  Pedido com lucro negativo só é aprovado pela DIRETORIA (checagem no servidor);
-  para o gerente ele aparece como "requer aprovação da diretoria", sem valores.
-  Reprovar leva o pedido para REPROVADO, editável pelo vendedor com o
-  comentário; reenviar cria novo Approval e volta para AGUARDANDO_APROVACAO,
-  mantendo as decisões anteriores. Mínimo de entrada exigido = maior entre o
-  percentual configurado e a fórmula; teste com entrada entre 64% e 65%.
-  A aprovação guarda o hash da revisão aprovada; mudar itens, quantidades,
-  desconto, UF, contribuinte, frete, entrada ou parcelas invalida a aprovação.
-  Teste: alterar o desconto de um pedido aprovado e tentar fechar deve voltar
-  para aprovação.
-- Clientes: lista com busca por nome, CNPJ/CPF e cidade, cadastro e edição
-  PF/PJ fora do pedido (CEP preenche o endereço; IE define contribuinte),
-  histórico de pedidos do cliente. Vendedor vê só os próprios clientes.
-- Copiar proposta (texto) e Salvar PDF com a marca da Ludus.
-- O pedido grava um snapshot imutável do cliente e da entrega (dados, IE,
-  contribuinte, endereço, UF); pedido, PDF e impostos sempre leem o snapshot.
-- Fechar pedido, baixar recebimento, reabrir e pagar comissão em transação
-  única e idempotente (teste: enviar o fechamento duas vezes não duplica
-  parcelas).
-- Fechar pedido gera os Receivable e um OrderClosing. Reabrir (só FECHADO)
-  exige confirmação, volta para ENVIADO, limpa fechado_em e recalcula o saldo
-  em aberto de cada parcela, inclusive a parte não recebida de parcela
-  parcial (teste: R$ 10.000 com R$ 4.000 recebidos, pedido reduzido em
-  R$ 3.000, saldo vai de R$ 6.000 para R$ 3.000), e a comissão futura.
-  Se for preciso devolver dinheiro, cria RefundRequest; o Refund só nasce
-  quando FINANCEIRO ou DIRETORIA confirma.
-- Cancelar: parcelas em aberto viram CANCELADA na mesma transação,
-  histórico financeiro preservado, pedido cancelado não reabre. Comissão de
-  recebimento já baixado nunca muda; acertos viram lançamento novo de ajuste,
-  com motivo, no audit_log. Teste: reabrir pedido com entrada já recebida não
-  altera a comissão dessa entrada.
-- Simulador: mesma conta do pedido sem gravar nada.
-Testes Playwright: (1) vendedor cria pedido com 25% de desconto, pedido vai
-para aprovação, gerente aprova, vendedor fecha; (2) pedido com prejuízo não
-pode ser aprovado pelo gerente, só pela diretoria.
+Siga .github/copilot-instructions.md e AGENTS.md.
+
+- Recebimentos: parcelas a receber nascem do pedido fechado. Lista por vencimento
+  e situação, baixa total ou parcial. A soma das baixas nunca passa do valor da
+  parcela e a dos estornos nunca passa do recebido, garantido no banco (teste com
+  duas baixas ao mesmo tempo). Fila de devoluções pendentes para confirmar.
+- Comissão: 2% sobre cada valor recebido, sem IPI; nasce na baixa; tudo recebido
+  no mês é pago no dia 05 do mês seguinte (commissionOn e commissionPaymentDate já
+  existem em src/lib/pricing/commission.ts). Tela com seletor de mês, cards, tabela
+  por vendedor, "Marcar como paga" e relatório em CSV.
+- Contas a pagar e Fornecedores (CNPJ, CPF ou exterior).
+- Preços e metas: meta mensal da equipe e de cada vendedor.
+- Dashboard: filtros de período (Este mês, 3 meses, Ano, 12 meses) e de equipe,
+  cards, vendas por mês, funil, ranking e top equipamentos.
+- Custo, China e lucro só para a DIRETORIA (seesCosts), nunca no HTML dos outros.
+Testes de banco: baixa de uma parcela gera a comissão do mês certo, inclusive na
+virada (23:30 de 30/09 em São Paulo é setembro).
 ```
 
-### 2d. Financeiro, comissões e dashboard
-```text
-Siga .github/copilot-instructions.md e reproduza:
-- Recebimentos: lista por vencimento e situação, baixa total ou parcial com a
-  parcela travada (SELECT ... FOR UPDATE): soma das baixas nunca passa do
-  valor da parcela e soma dos estornos nunca passa do recebido. Teste com
-  duas baixas concorrentes. Fila de devoluções pendentes para confirmar.
-- Contas a pagar: lançamento, vencimento, baixa, vínculo opcional com pedido
-  (pagamento da China) e fornecedor.
-- Fornecedores: CNPJ, CPF ou exterior.
-- Comissões: seletor "Recebido em mês/ano -> pago 05/mês seguinte", cards,
-  tabela por vendedor, "Marcar como paga", lançamentos e "Baixar relatório" (CSV).
-- Preços e metas: meta mensal da equipe e de cada vendedor (SalesGoal), com
-  edição pela DIRETORIA e GERENTE_COMERCIAL e histórico por mês.
-- Dashboard: filtros de período e equipe, cards, vendas por mês (12 meses, com
-  IPI), funil, ranking de vendedores com % da meta e top 8 equipamentos
-  (sem IPI). O % da meta compara as vendas do período filtrado com a soma das
-  metas mensais do mesmo período (Este mês = meta do mês; 3 meses = soma das
-  3 metas; e assim por diante). Todas as
-  agregações em SQL no Postgres.
-Teste Playwright: dar baixa em uma parcela e conferir a comissão do mês.
-```
-
-## Fase 3. Carga e treinamento (26/10 a 30/10)
+## Fase 3. Carga e treinamento
 
 ```text
-Siga .github/copilot-instructions.md.
-1. Script de importação (CSV/planilha) de equipamentos com fotos, códigos e
-   descrições, com validação e relatório de erros. Fotos em storage de objetos
-   com chave `org/<organization_id>/produtos/<codigo>/<arquivo>`, sempre com o
-   organization_id da sessão na leitura, gravação e exclusão; o nome do
-   arquivo enviado pela Ludus continua sendo o código do produto.
-2. Tela Equipe e acessos: convidar usuário por e-mail, definir perfil, desativar.
-3. Revisão de segurança: permissão em toda action e query, nenhum campo sensível
-   (custo, valor China, lucro, margem) no payload de VENDEDOR, GERENTE_COMERCIAL
-   ou FINANCEIRO, com teste automatizado por perfil que chama as queries e
-   actions de pedido, produto e dashboard e verifica redação ou acesso negado;
-   testes de isolamento entre duas organizações (um usuário da organização A
-   não lê nem altera nada da B, mesmo forjando IDs); rate limit; headers de
-   segurança.
-4. Backup diário do Postgres (pg_dump) com retenção de 30 dias e procedimento de
-   restauração documentado em docs/operacao.md.
-5. Pipeline GitHub Actions criado na fase 1: incluir os testes Playwright e a
-   checagem de campos sensíveis como etapas obrigatórias antes do deploy.
-6. Validação com dados reais em produção: conferir a carga de equipamentos e
-   usuários, montar com o Rogério um pedido real de ponta a ponta (orçamento,
-   aprovação, fechamento, recebimento e comissão) e comparar os números com o
-   protótipo. Registrar o aceite em docs/aceite-fase3.md.
-7. Treinamento e entrada em operação: roteiro de treinamento por perfil
-   baseado no manual (docs/manual), sessão com a equipe, checklist de go-live
-   (domínio, login dos quatro perfis, backup rodando, tabela publicada,
-   usuários ativos) e plano de volta caso algo falhe no dia 30/10. A fase só
-   termina com a equipe vendendo pelo sistema.
+Siga .github/copilot-instructions.md e AGENTS.md.
+1. Importação de equipamentos (planilha) com código, nome, custo, crédito e
+   embalagem, com validação e relatório de erros; fotos por código do produto.
+2. Equipe e acessos: os usuários passam de ERP_USERS para o banco (trocar a
+   implementação de UserDirectory em src/lib/auth/directory.ts, não quem a usa).
+3. Revisão de segurança: permissão em toda página e ação; teste por perfil de que
+   custo, China, lucro e margem não chegam a VENDEDOR, GERENTE_COMERCIAL nem
+   FINANCEIRO; headers de segurança.
+4. pg_dump diário do banco do ERP com retenção de 30 dias e restauração
+   documentada em docs/operacao.md.
+5. Pedido real de ponta a ponta com o Rogério (orçamento, aprovação, fechamento,
+   recebimento e comissão), comparado com o protótipo. Aceite em
+   docs/aceite-fase3.md.
+6. Roteiro de treinamento por perfil a partir de docs/manual e checklist de
+   entrada em operação (erp.avilaops.com no ar, login dos quatro perfis, backup
+   rodando, tabela publicada, usuários ativos).
 ```
 
 ## Fase 4. Fiscal no cálculo (03/11 a 13/11)
 
 ```text
-Siga .github/copilot-instructions.md.
+Siga .github/copilot-instructions.md e AGENTS.md.
 1. Cadastro fiscal do produto: NCM, CEST, origem (1 = importação direta), IPI.
-2. Tabela StateTaxRate validada pelo contador (alíquota interna e FCP por UF);
-   tela de manutenção só para DIRETORIA.
+2. Alíquotas por UF no banco, validadas pelo contador (alíquota interna e FCP;
+   hoje são constante em src/lib/pricing/states.ts, sem FCP); tela de manutenção
+   só para DIRETORIA. As versões já publicadas da tabela não mudam.
 3. ICMS, DIFAL e FCP/FECP separados no custo, no pedido e na tabela de preços, com base de cálculo conforme o
    contador definir (simples ou "por dentro"), configurável em Parâmetros.
 4. Relatório de impostos por período.
@@ -227,7 +150,7 @@ contribuinte de outro estado.
 ## Fase 5. Orçamento e celular (16/11 a 27/11)
 
 ```text
-Siga .github/copilot-instructions.md.
+Siga .github/copilot-instructions.md e AGENTS.md.
 1. PDF do orçamento com logo da Ludus e miniatura da foto de cada equipamento.
 2. PWA instalável (manifest, ícones, service worker para o shell), com telas de
    pedido e lista otimizadas para celular.

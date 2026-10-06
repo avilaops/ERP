@@ -8,7 +8,7 @@ Como rodar, testar e o que falta para produção. Atualizado em 06/10/2026.
 | --- | --- |
 | Desenvolvimento (servidor `creators` da Ávila Ops) | No ar sob demanda: `npm run dev`, bancos `erp` e `erp_test` no PostgreSQL do servidor |
 | Integração contínua (GitHub Actions) | `.github/workflows/ci.yml`: lint, tipos, testes com banco e build, a cada push na `main` e em todo PR |
-| Produção | **Não existe ainda.** Sem servidor, sem banco de produção, sem domínio e sem deploy. Adiado por decisão do Nicolas em 06/10/2026, para focar no software |
+| Produção | **Não existe ainda.** O endereço será `https://erp.avilaops.com` (decisão de 06/10/2026; não haverá domínio próprio da Ludus). Hoje o nome aponta para o Cloudflare sem servidor atrás (erro 525). Servidor, banco de produção e deploy ficaram para depois, para focar no software |
 
 ## Variáveis de ambiente
 
@@ -80,8 +80,8 @@ Nada disto foi feito. Na ordem em que precisa acontecer:
 
 1. Servidor em nuvem para a aplicação (o `creators` tem 4 GB e já ficou sem memória).
 2. PostgreSQL de produção, separado do de desenvolvimento, com backup diário e restauração testada.
-3. Domínio `ludusequipamentos.com.br` registrado, com DNS e TLS.
-4. Aplicativo `erp` no Auth central apontando para o endereço de produção, e `SSO_JWT_SECRET`,
+3. `erp.avilaops.com` apontando para o servidor, com TLS válido de ponta a ponta (o Cloudflare já responde pelo nome).
+4. Aplicativo `erp` no Auth central (já cadastrado com `https://erp.avilaops.com`), e `SSO_JWT_SECRET`,
    `APP_URL` e `ERP_USERS` reais no servidor (nunca no repositório).
 5. Passo de deploy no pipeline, depois do build: aplicar migrações e reiniciar o serviço.
 6. Conferência final: cada um dos quatro perfis entra pelo endereço de produção e vê só a sua parte.

@@ -9,47 +9,42 @@ Documentação de negócio: `docs/manual/` (uma página por funcionalidade) e `d
 
 Idioma: interface, mensagens e textos em português do Brasil. Código (variáveis, funções, tabelas) em inglês. Comentários podem ser em português.
 
-## O que vale hoje no código (decisão de 05/10/2026)
-O Nicolas decidiu seguir a base que já está na `main`, e não a stack planejada na primeira versão deste arquivo. Onde este arquivo e o [`AGENTS.md`](../AGENTS.md) divergirem, **vale o `AGENTS.md`**.
+## Stack (a que está no código)
+A descrição detalhada e as regras por pasta estão no [`AGENTS.md`](../AGENTS.md). Se este arquivo e o `AGENTS.md` divergirem, **vale o `AGENTS.md`**.
 
-- **Banco:** PostgreSQL com `pg` e SQL direto, sem Prisma nem outro ORM. Só `src/lib/db/` fala SQL; migrações são arquivos numerados em `db/migrations/`, aplicados por `npm run db:migrate`.
-- **Uma empresa só:** o banco é da Ludus. Não há `organization_id` nas tabelas nem isolamento por organização; `audit_log` e exclusão lógica (`deleted_at`) não foram adotados. Cada tabela guarda `updated_at` e `updated_by`.
-- **Cálculos:** `src/lib/pricing/`, funções puras com `number` em precisão cheia e `roundCents` só na saída (não `Prisma.Decimal`), conferidas no centavo com os prints do protótipo.
-- **Organização do código:** `src/lib/<assunto>/` e `src/app/(app)/<tela>/`, não `src/modules/`.
-- **Ferramentas:** npm (não há pnpm no servidor); testes com o executor do próprio Node (`npm test`), sem Vitest nem Playwright; validação de formulário em funções puras (`src/lib/params-form.ts`), sem Zod nem React Hook Form.
+- **Next.js** (App Router, Server Components, Server Actions) + **TypeScript strict** + **Tailwind CSS**.
+- **PostgreSQL**, acessado com o pacote **`pg`** e **SQL direto**. Não há ORM. Só `src/lib/db/` fala SQL.
+- **Migrações** em SQL puro, numeradas em `db/migrations/` (`NNNN_nome.sql`), aplicadas por `npm run db:migrate`. Migração já aplicada não se edita.
+- **Autenticação** pelo **Auth central da Ávila Ops**, isolada em `src/lib/auth/`. O resto do código só usa `getSession()` e `requirePermission()`.
+- **Falha fechada:** o login local de teste só existe com `NODE_ENV` `development` ou `test` e `ERP_LOCAL_LOGIN=1`. Em produção, se as credenciais do Auth central faltarem ou estiverem inválidas, a aplicação não sobe.
+- **Testes** com o executor do próprio Node (`npm test`, arquivos `tests/*.test.ts`), inclusive os de banco, que usam um PostgreSQL de verdade (`ERP_TEST_DATABASE_URL`).
+- **Validação de formulário** em funções puras testadas, no servidor (`src/lib/*-form.ts`).
+- **npm** como gerenciador de pacotes.
+- **Banco de desenvolvimento:** PostgreSQL do servidor da Ávila Ops; fora dele, `docker compose up -d` sobe um PostgreSQL 16 local (só o banco, não a aplicação).
+- **Endereço do sistema:** `https://erp.avilaops.com`. Não há domínio próprio da Ludus.
 
-As regras de negócio deste arquivo (fórmulas, perfis, fluxo do pedido, comissão) continuam valendo. Os trechos abaixo que citam Prisma, `organization_id`, `audit_log`, `src/modules/`, Vitest, Playwright ou pnpm descrevem o plano original e ficam como referência.
-
-## Stack
-- Next.js (App Router, Server Components, Server Actions) + TypeScript strict
-- **PostgreSQL** como banco de dados, acessado com `pg` e SQL direto em `src/lib/db/` (migrações versionadas em `db/migrations/`; nunca editar migração já aplicada). O plano original previa Prisma ORM
-- Autenticação pelo **Auth central da Ávila Ops** (identidade compartilhada do ecossistema). Toda a integração fica isolada em `src/lib/auth/`; o resto do código só usa `getSession()` e `requirePermission()`
-- **Falha fechada:** um provedor de login local com usuários de teste só existe quando `NODE_ENV` é `development` ou `test`. Em produção, se as credenciais do Auth central faltarem ou estiverem inválidas, a aplicação não sobe (erro na inicialização) e nenhum login é aceito
-- Tailwind CSS; componentes reaproveitados do protótipo sempre que possível
-- Validação em funções puras testadas, no servidor (plano original: Zod + React Hook Form)
-- Executor de testes do próprio Node para regras de negócio e para o banco (plano original: Vitest e Playwright)
-- npm (plano original: pnpm)
+**Não use, e não sugira:** Prisma ou outro ORM, `Prisma.Decimal`, SQLite, Zod, React Hook Form, Vitest, Playwright, pnpm, `src/modules/`, `organization_id`, `audit_log`, exclusão lógica (`deleted_at`). Nada disso existe no projeto.
 
 ## Arquitetura
-- Módulos de domínio em `src/modules/<modulo>/`: `schema.ts` (Zod), `service.ts` (regras puras e testáveis), `actions.ts` (Server Actions finas: validam, checam permissão, chamam o service), `queries.ts` (leituras), `components/`.
-- Rotas em `src/app/(app)/<modulo>/`. Layout com a mesma sidebar do protótipo.
-- **Todos os cálculos de preço, imposto, entrada e comissão ficam em `src/modules/pricing/`**, como funções puras com testes unitários. Componentes nunca calculam.
-- Toda tabela de negócio tem `organization_id`, `created_at`, `updated_at`, `created_by`. Cadastros usam exclusão lógica (`deleted_at`).
-- **Isolamento por organização:** o `organization_id` vem sempre da sessão autenticada, nunca do client, e entra em toda query e mutation (um helper de acesso ao banco aplica o filtro; nenhuma query de negócio sem ele). Há testes de isolamento entre duas organizações.
-- **Transações:** fechar pedido, baixar recebimento, reabrir pedido (com ajustes) e pagar comissão rodam cada um em uma única transação do Prisma e são idempotentes (chave de idempotência por operação; reenvio não duplica parcelas, recebimentos nem comissões).
-- `audit_log` para alterações em pedidos, custos, parâmetros, publicações de tabela, aprovações, recebimentos e permissões: quem, quando, entidade, antes e depois (JSONB).
+- **Regras e cálculos** em `src/lib/<assunto>`: `src/lib/pricing/` (todas as contas), `src/lib/db/` (todo o SQL), `src/lib/auth/` (login e permissões), e os arquivos de leitura de formulário e de montagem de tela (`*-form.ts`, `*-view.ts`, `order-quote.ts`).
+- **Telas** em `src/app/(app)/<tela>/`: `page.tsx` (componente de servidor, confere a permissão antes de ler o banco), `actions.ts` (ações de servidor finas: conferem a permissão, leem o formulário, chamam `src/lib/db/`) e componentes pequenos de navegador só para enviar formulário e mostrar erro.
+- **Todos os cálculos de preço, imposto, entrada e comissão ficam em `src/lib/pricing/`**, como funções puras com testes. Tela e componente nunca calculam, e nada é calculado no navegador.
+- **Uma empresa só:** o banco é da Ludus. Não há isolamento por organização.
+- Cada tabela guarda `created_at`, `updated_at` e `updated_by` (o e-mail de quem gravou). Não há tabela de auditoria; ações sensíveis (excluir, publicar) deixam uma linha no log do servidor.
+- **Gravação de várias linhas é uma instrução só** (`WITH … INSERT/UPDATE`), porque a camada de banco não usa transação explícita. É assim que publicar a tabela e criar o pedido são atômicos.
 
 ## Regras para o PostgreSQL
-- Dinheiro em `NUMERIC(14,2)` (Prisma `Decimal @db.Decimal(14,2)`); percentuais em `NUMERIC(7,4)`; câmbio em `NUMERIC(12,6)`. Nunca `float` para valores.
-- Cálculos com `Prisma.Decimal` (decimal.js). Arredondar só no resultado final, half-up, 2 casas.
-- Eventos (recebimento, auditoria, publicação, aprovação) em `timestamptz` (UTC no banco), exibidos em America/Sao_Paulo. Datas de calendário (vencimento de parcela, data da entrada, validade da proposta, data de pagamento da comissão, previsão de conclusão) em `date`, sem fuso. Formato de exibição dd/mm/aaaa.
-- O mês de negócio é sempre calculado no fuso America/Sao_Paulo, com o carimbo certo para cada métrica: vendas, ranking, metas e dashboard usam `fechado_em` do pedido (`date_trunc('month', fechado_em AT TIME ZONE 'America/Sao_Paulo')`); recebimentos usam `recebido_em` do `Receipt`; comissões usam o carimbo do evento de origem: `recebido_em` do `Receipt` para a comissão positiva e `estornado_em` do `Refund` para a comissão de ajuste. A `Commission` grava a competência (`DATE`, primeiro dia do mês em America/Sao_Paulo) calculada desse carimbo. Teste de virada de mês também para estorno (23:30 de 31/10 em São Paulo cai em outubro).
-- Status como enums do Postgres.
-- Índices em toda chave de busca: código do produto, CNPJ/CPF, número do pedido, `(organization_id, status)`, datas de vencimento.
-- Unicidade sempre por organização, nunca global: `@@unique([organizationId, codigo])` em Product, `([organizationId, numero])` em Order e PriceTableVersion, `([organizationId, documento])` em Customer e Supplier, `([organizationId, vendedorId, mes])` em SalesGoal. Teste: duas organizações usam o mesmo código LD-001 e o mesmo número de pedido sem conflito; a mesma organização não consegue repetir.
-- Agregações do dashboard e das comissões feitas no banco (SQL agregado ou views), nunca em memória.
-- Antes de qualquer migration que altere ou apague dados em produção: dump do banco (`pg_dump`).
-- Snapshots imutáveis em JSONB onde o histórico precisa ser preservado: versão da tabela de preços, parâmetros usados no pedido e **dados do cliente e da entrega no pedido** (nome/razão social, CPF/CNPJ, IE, contribuinte, endereço, UF de entrega). Pedido, PDF e cálculo fiscal usam sempre o snapshot; editar o cadastro do cliente depois não altera pedidos existentes.
+- Dinheiro em `numeric(14,2)`; taxas em `numeric(9,8)` (o crédito de impostos em `numeric(10,8)`). Nunca `float` em coluna.
+- Nos cálculos, `number` em precisão cheia e `roundCents` só na saída (arredonda meio para cima, 2 casas). Os resultados são conferidos no centavo com os prints do protótipo.
+- Eventos em `timestamptz`, exibidos em America/Sao_Paulo. Datas de calendário (vencimento, data da entrada, validade da proposta, previsão de conclusão) em `date`, lidas como texto `AAAA-MM-DD`, sem fuso. Exibição dd/mm/aaaa.
+- O mês de negócio é sempre o de America/Sao_Paulo.
+- Situações como `text` com `CHECK` (não há `enum` do Postgres no projeto).
+- Consulta só com parâmetros (`$1`); valor nunca é colado no texto do SQL.
+- **Nenhuma chave estrangeira com `ON DELETE CASCADE`.** O que tem histórico não se apaga: desativa-se.
+- **Versão publicada da tabela é imutável**, em duas tabelas tipadas (`price_table_versions` com os parâmetros daquele momento e `price_table_items` com custo e preço de cada equipamento), não em JSONB. O pedido não tem coluna de preço, custo nem total: o preço é o da linha da versão para a qual o item aponta.
+- Custo real e preço de tabela não são colunas (saem do motor); a única exceção é o preço da tabela publicada.
+- Teste de banco só em banco cujo nome termina em `_test`.
+- Antes de qualquer migração que altere ou apague dados em produção: dump do banco (`pg_dump`).
 
 ## Perfis de acesso
 | Perfil | Pode |
@@ -92,7 +87,7 @@ Os testes cobrem um extra de cada base.
 O pior caso é o estado com maior carga fiscal completa no destino: ICMS + DIFAL + FCP/FECP, todos lidos de `StateTaxRate` (hoje MA, 23% sem FCP). A escolha do estado é recalculada sempre que a tabela de alíquotas muda; teste com um estado de ICMS/DIFAL menor mas FCP suficiente para superar o MA, que deve virar o pior caso. `lucro_antes_IR` como definido acima (com só IRPJ/CSLL, `lucro_alvo / (1 - irpj_csll)`). Para cada equipamento, calcular também o desconto máximo na meta para SP (`Máx. SP`) e para cliente contribuinte (`Máx. c/IE`).
 
 ### Tabela de preços versionada
-Mudanças em custos e parâmetros recalculam na hora só para a diretoria. A equipe vê a última versão **publicada** (v35, v36...). Publicar grava um snapshot imutável. Pedidos guardam a versão usada.
+Mudanças em custos e parâmetros recalculam só para a diretoria. A equipe vê a última versão **publicada** (v35, v36...). Publicar grava uma versão imutável. O pedido fica preso à versão em que foi feito.
 
 ### ICMS e DIFAL
 - Venda dentro de SP: ICMS 18%.
@@ -101,7 +96,7 @@ Mudanças em custos e parâmetros recalculam na hora só para a diretoria. A equ
 - Tabela de alíquotas internas por UF fica no banco (editável), validada pelo contador.
 
 ### Pedido
-- Número `#AAMMDD-XXXX`. Status: `RASCUNHO`, `ENVIADO`, `AGUARDANDO_APROVACAO`, `REPROVADO`, `APROVADO`, `FECHADO`, `PERDIDO` (com motivo), `CANCELADO`.
+- Número `#AAMMDD-XXXX`. No código as situações são `em_negociacao`, `aguardando_aprovacao`, `fechado`, `perdido` e `cancelado`. O plano original previa oito (`RASCUNHO`, `ENVIADO`, `AGUARDANDO_APROVACAO`, `REPROVADO`, `APROVADO`, `FECHADO`, `PERDIDO`, `CANCELADO`); os parágrafos abaixo ainda usam esses nomes para descrever o fluxo de aprovação, que não foi implementado.
 - Desconto em % sobre a tabela; faixas: na meta (lucro >= 15%), abaixo da meta, prejuízo.
 - Vai para aprovação se: desconto > desconto livre, lucro < meta, ou entrada < mínimo exigido.
 - Mínimo exigido = o **maior** entre o percentual mínimo de entrada configurado em Parâmetros (hoje 65%) aplicado ao total do pedido e a `entrada_minima` calculada pela fórmula abaixo. No exemplo de teste a fórmula dá cerca de 64% e o percentual configurado de 65% é quem manda. Testes na fronteira: entrada entre o valor da fórmula e 65% vai para aprovação; entrada igual ao mínimo exigido não vai.
@@ -123,17 +118,19 @@ Exemplo de teste obrigatório: China R$ 8.553,97, lucro da meta R$ 2.304,55, com
 Entrada (R$ ou %), forma, data (vazia = na confirmação). Saldo: forma, nº de parcelas, 1ª em N dias, intervalo (7/15/30). As parcelas devem somar exatamente o saldo (diferença de centavos na última).
 
 ### Comissão
+> Recebimentos, comissões, estorno, reabertura com dinheiro recebido e cancelamento **ainda não estão no código** (são a fatia financeira). Os nomes `Receipt`, `Refund`, `Commission` e `OrderClosing` abaixo dizem o que cada registro é; as tabelas seguem o padrão do projeto (SQL em `db/migrations/`, nomes em inglês minúsculo). Onde o texto fala em transação, vale a regra do projeto: uma instrução só, ou apoio de transação novo em `src/lib/db/pool.ts`.
+
 2% sobre cada valor **recebido** do cliente, sem IPI. Nasce na baixa do recebimento. Tudo recebido no mês é pago no dia 05 do mês seguinte. "Comissão futura" = parcelas ainda não recebidas.
 
 Cada recebimento (inclusive baixa parcial) é um evento imutável próprio (`Receipt`: parcela, valor, valor sem IPI, data e hora, forma, quem registrou). A comissão referencia o `Receipt` que a gerou; o mês da comissão é o mês do `Receipt` em America/Sao_Paulo (teste obrigatório: recebimento às 23:30 de 30/09 em São Paulo cai em setembro e é pago em 05/10). O valor sem IPI de um recebimento usa o `fator_sem_ipi` do pedido. `Commission` guarda só a comissão e o seu pagamento ao vendedor; nunca é usada como registro do dinheiro recebido.
 
-Comissão gerada por um recebimento baixado é **definitiva**, paga ou não: reabrir ou alterar o pedido nunca a altera nem apaga. Ao reabrir, são recalculados o saldo em aberto de cada parcela (inclusive a parte ainda não recebida de parcela com baixa parcial) e a comissão futura; o que já foi recebido fica como está. Teste: parcela de R$ 10.000 com R$ 4.000 recebidos, pedido reduzido em R$ 3.000, o saldo em aberto cai de R$ 6.000 para R$ 3.000 e o recebimento e a comissão dos R$ 4.000 não mudam. Se o novo total exigir acerto sobre valores já recebidos (estorno ou devolução), a edição do pedido não lança dinheiro: ela cria uma devolução pendente, e só `FINANCEIRO` ou `DIRETORIA` a confirmam, gerando então o registro financeiro próprio: `Refund` (evento imutável com sinal negativo, ligado ao pedido e à parcela, com valor, valor sem IPI, `estornado_em` em `timestamptz`, motivo, quem pediu e quem confirmou) e a `Commission` de ajuste correspondente (negativa, ligada ao `Refund`, no mês em que acontece). No schema, `Commission` tem `receipt_id` e `refund_id` opcionais com `CHECK` no Postgres exigindo exatamente um dos dois preenchido (e índice único em cada um); comissão de recebimento é positiva e a de `Refund` é negativa. Saldos de recebíveis, totais de comissão do mês, pagamentos e relatórios somam `Receipt`, `Refund` e ajustes. O `audit_log` registra o evento, mas não substitui esse registro.
+Comissão gerada por um recebimento baixado é **definitiva**, paga ou não: reabrir ou alterar o pedido nunca a altera nem apaga. Ao reabrir, são recalculados o saldo em aberto de cada parcela (inclusive a parte ainda não recebida de parcela com baixa parcial) e a comissão futura; o que já foi recebido fica como está. Teste: parcela de R$ 10.000 com R$ 4.000 recebidos, pedido reduzido em R$ 3.000, o saldo em aberto cai de R$ 6.000 para R$ 3.000 e o recebimento e a comissão dos R$ 4.000 não mudam. Se o novo total exigir acerto sobre valores já recebidos (estorno ou devolução), a edição do pedido não lança dinheiro: ela cria uma devolução pendente, e só `FINANCEIRO` ou `DIRETORIA` a confirmam, gerando então o registro financeiro próprio: `Refund` (evento imutável com sinal negativo, ligado ao pedido e à parcela, com valor, valor sem IPI, `estornado_em` em `timestamptz`, motivo, quem pediu e quem confirmou) e a `Commission` de ajuste correspondente (negativa, ligada ao `Refund`, no mês em que acontece). No schema, `Commission` tem `receipt_id` e `refund_id` opcionais com `CHECK` no Postgres exigindo exatamente um dos dois preenchido (e índice único em cada um); comissão de recebimento é positiva e a de `Refund` é negativa. Saldos de recebíveis, totais de comissão do mês, pagamentos e relatórios somam `Receipt`, `Refund` e ajustes.
 
 **Limites de baixa e estorno:** no servidor, dentro da mesma transação e com a parcela travada (`SELECT ... FOR UPDATE`), a soma dos `Receipt` de uma parcela nunca passa do valor dela e a soma dos `Refund` nunca passa do líquido já recebido. Pagamento a maior é recusado com mensagem clara. Teste com duas baixas concorrentes de chaves de idempotência diferentes: só uma passa quando juntas ultrapassariam o saldo.
 
-**Reabrir pedido:** só pedido `FECHADO`; ele volta para `ENVIADO` (editável, conta como em negociação), `fechado_em` é limpo e o fechamento anterior (data, valores e quem fechou) fica guardado no `audit_log` e em `OrderClosing` (histórico imutável de fechamentos). A aprovação anterior perde a validade pelo hash. Ao fechar de novo, `fechado_em` recebe a data do novo fechamento, e a venda passa a contar no mês dele. Teste: pedido fechado em setembro, reaberto e fechado de novo em outubro sai de setembro e entra em outubro.
+**Reabrir pedido:** só pedido `FECHADO`; ele volta para `ENVIADO` (editável, conta como em negociação), `fechado_em` é limpo e o fechamento anterior (data, valores e quem fechou) fica guardado em `OrderClosing` (histórico imutável de fechamentos). A aprovação anterior perde a validade pelo hash. Ao fechar de novo, `fechado_em` recebe a data do novo fechamento, e a venda passa a contar no mês dele. Teste: pedido fechado em setembro, reaberto e fechado de novo em outubro sai de setembro e entra em outubro.
 
-**Exclusão de pedido:** só pedido em `RASCUNHO` sem nenhum registro financeiro (parcela, recebimento, comissão) pode ser excluído. Qualquer outro status (enviado, em aprovação, reprovado, aprovado, fechado, perdido) ou pedido com histórico financeiro só pode ser cancelado (`CANCELADO`, com motivo), nunca apagado. Cancelar é atômico e idempotente: as parcelas com saldo em aberto viram `CANCELADA` (saem de recebimentos e da comissão futura), e recebimentos, estornos, comissões e auditoria ficam intactos; se houver valor recebido a devolver, nasce uma devolução pendente para o financeiro. Pedido cancelado não pode ser reaberto; chaves estrangeiras financeiras sem `ON DELETE CASCADE`.
+**Exclusão de pedido:** só pedido em `RASCUNHO` sem nenhum registro financeiro (parcela, recebimento, comissão) pode ser excluído. Qualquer outro status (enviado, em aprovação, reprovado, aprovado, fechado, perdido) ou pedido com histórico financeiro só pode ser cancelado (`CANCELADO`, com motivo), nunca apagado. Cancelar é atômico e idempotente: as parcelas com saldo em aberto viram `CANCELADA` (saem de recebimentos e da comissão futura), e recebimentos, estornos e comissões ficam intactos; se houver valor recebido a devolver, nasce uma devolução pendente para o financeiro. Pedido cancelado não pode ser reaberto; chaves estrangeiras financeiras sem `ON DELETE CASCADE`.
 
 ## UI
 - Identidade visual do protótipo: títulos em Barlow Condensed caixa alta, corpo sem serifa, fundo cinza claro, cards brancos, azul #2C47A8.
@@ -142,8 +139,9 @@ Comissão gerada por um recebimento baixado é **definitiva**, paga ou não: rea
 - Listas com busca, abas de situação, ordenação e paginação no servidor.
 
 ## Qualidade
-- Sem `any`. Tipos derivados do Prisma e do Zod.
-- Todo cálculo financeiro com teste unitário cobrindo arredondamento e casos-limite, incluindo os números de exemplo deste arquivo.
-- Seeds em `prisma/seed.ts` com os equipamentos e parâmetros do protótipo.
+- Sem `any` e sem `enum` do TypeScript. Importe sempre o arquivo (`@/lib/pricing/order`), nunca a pasta.
+- Todo cálculo financeiro com teste cobrindo arredondamento e casos-limite, incluindo os números de exemplo deste arquivo e os dos prints do manual.
+- Antes de enviar: `npm run lint`, `npm run typecheck`, `npm test` (nenhum teste pulado) e `npm run build`.
+- Os dados vêm do banco, não do código: sem valor de exemplo em tela. Os parâmetros iniciais entram por migração; dado de teste só dentro de `tests/`.
 - Segredos só em variáveis de ambiente, documentadas em `.env.example`.
 - Versões antigas ficam no Git: não criar pastas de backup, releases ou cópias "por segurança".

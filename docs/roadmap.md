@@ -1,8 +1,8 @@
 # Roadmap ERP Ludus Equipamentos
 
-Atualizado em 03/10/2026 · Nicolas Avila, Ávila Ops Tecnologia
+Atualizado em 06/10/2026 · Nicolas Avila, Ávila Ops Tecnologia
 
-O ERP da Ludus entra em operação em 30/10/2026, a tempo de a empresa começar a vender em outubro. O ponto de partida é o protótipo que o Rogério montou no Claude, que já tem produtos e custos, pedidos, aprovações, comissões e dashboard. O trabalho é levar esse protótipo para a infraestrutura da Ávila Ops, com login e quatro perfis de acesso no domínio da Ludus, e depois somar o cálculo fiscal, o orçamento com foto e o uso no celular. O escopo e os valores da proposta comercial seguem como foram aprovados.
+O ERP da Ludus entra em operação em 30/10/2026, a tempo de a empresa começar a vender em outubro. O ponto de partida é o protótipo que o Rogério montou no Claude, que já tem produtos e custos, pedidos, aprovações, comissões e dashboard. O trabalho é levar esse protótipo para a infraestrutura da Ávila Ops, com login e quatro perfis de acesso em erp.avilaops.com, e depois somar o cálculo fiscal, o orçamento com foto e o uso no celular. O escopo e os valores da proposta comercial seguem como foram aprovados.
 
 ## Linha do tempo
 
@@ -31,7 +31,7 @@ Cada fase termina com uma validação rápida com o Rogério. O protótipo conti
 | Fase | Período | Entregas | Pronto quando |
 | --- | --- | --- | --- |
 | 0. Kickoff | 29/09 a 03/10 | Contrato e entrada pagos, acesso de editor ao protótipo, ficha cadastral, logos, pasta de materiais no Drive | Concluída |
-| 1. Infraestrutura e acessos | 05/10 a 09/10 | Domínio ludusequipamentos.com.br, servidor em nuvem, banco de dados, login central da Ávila Ops e quatro perfis: diretoria, gerente comercial, vendedor e financeiro | Cada perfil entra e vê só a sua parte do sistema |
+| 1. Infraestrutura e acessos | 05/10 a 09/10 | Endereço erp.avilaops.com, servidor em nuvem, banco de dados, login central da Ávila Ops e quatro perfis: diretoria, gerente comercial, vendedor e financeiro | Cada perfil entra e vê só a sua parte do sistema |
 | 2. Porte do protótipo | 12/10 a 23/10 | Produtos e custos, tabela de preços, parâmetros, clientes, novo pedido, aprovações, simulador, recebimentos, contas a pagar, fornecedores, comissões e dashboard, com as regras de entrada mínima, comissão de 2% e meta de lucro de 15% | Um pedido de teste faz o caminho completo e os números batem com o protótipo |
 | 3. Carga e treinamento | 26/10 a 30/10 | Cadastro dos equipamentos com fotos, códigos e descrições, usuários da equipe, treinamento e entrada em operação | Equipe vendendo pelo sistema a partir de 30/10 |
 | 4. Fiscal no cálculo | 03/11 a 13/11 | Cadastro fiscal do produto (NCM, origem importada), ICMS e DIFAL por estado com alíquota interestadual de 4% para importados, impostos separados no custo e no pedido | Cálculo de uma venda para fora de SP confere com o contador |
@@ -57,7 +57,7 @@ Para depois, quando a empresa crescer: CRM integrado ao WhatsApp Business com um
 
 | Pendência | Quem | Afeta | Observação |
 | --- | --- | --- | --- |
-| Registrar o domínio ludusequipamentos.com.br | Ávila Ops | Fase 1 | Sem domínio, o sistema fica num endereço da Ávila Ops |
+| Colocar o sistema no ar em erp.avilaops.com | Ávila Ops | Fase 1 | Decidido em 06/10: o sistema fica no endereço da Ávila Ops, sem domínio próprio da Ludus |
 | Lista de usuários com nome, e-mail e perfil | Ludus | Fase 1 | E-mails corporativos ainda a combinar |
 | Fotos dos equipamentos com código e descrição | Ludus (videomaker) | Fase 3 | Enviar também o catálogo completo da China |
 | Entrada mínima da equipe: manter 65% ou subir para 70% | Rogério | Fase 2 | A regra nova sugere 70% no pior caso |
@@ -65,13 +65,13 @@ Para depois, quando a empresa crescer: CRM integrado ao WhatsApp Business com um
 | Regime tributário, créditos na entrada e se academia é não contribuinte | Contador da Ludus | Fase 4 | Define quando o DIFAL fica com a Ludus |
 | Certificado digital A1 e emissor de NF-e | Ludus e Ávila Ops | Fase 6 | Custos próprios, fora da mensalidade |
 
-O maior risco é o prazo de 30/10 para começar a vender. Ele depende do domínio e dos usuários na primeira semana e das fotos até 26/10. Mudanças grandes pedidas durante a fase 2 vão para os 3 meses de evolução, para não atrasar a entrada em operação.
+O maior risco é o prazo de 30/10 para começar a vender. Ele depende do servidor no ar e dos usuários na primeira semana e das fotos até 26/10. Mudanças grandes pedidas durante a fase 2 vão para os 3 meses de evolução, para não atrasar a entrada em operação.
 
 ## Checklist de acompanhamento
 
 - [x] Proposta aprovada e entrada paga
 - [x] Acesso ao protótipo, ficha cadastral e logos recebidos
-- [ ] Domínio registrado e servidor no ar
+- [ ] Servidor no ar em erp.avilaops.com
 - [x] Login com os quatro perfis funcionando
 - [ ] Protótipo portado e validado com um pedido de teste
 - [ ] Equipamentos cadastrados com fotos
