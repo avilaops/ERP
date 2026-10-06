@@ -5,7 +5,7 @@ A Ludus Equipamentos importa equipamentos de musculação da China e vende para 
 
 O dono (Rogério) montou um **protótipo funcional no Claude** (artifact React). Este repositório é a versão de produção, desenvolvida pela Ávila Ops Tecnologia. **O protótipo é a especificação de referência**: telas, textos, regras e cálculos devem se comportar igual a ele, salvo quando este arquivo disser o contrário. O código do protótipo fica em `prototype/` apenas como referência e nunca é importado pela aplicação.
 
-Documentação de negócio: `docs/manual/` (uma página por funcionalidade) e `docs/roadmap.md`.
+Documentação de negócio: `docs/manual/` (uma página por funcionalidade) e `docs/roadmap.md`. Inventário do protótipo, com as divergências entre ele, estas instruções e o código: `docs/copilot/inventario-prototipo.md`.
 
 Idioma: interface, mensagens e textos em português do Brasil. Código (variáveis, funções, tabelas) em inglês. Comentários podem ser em português.
 
@@ -74,11 +74,13 @@ Permissão checada no servidor em toda action e query. Campos sensíveis (custo,
 
 ### Custo e preço de tabela
 ```
-custo_real = (custo_assessoria x (1 - credito_impostos) + embalagem) x (1 + margem_seguranca)
+valor_china = custo_assessoria x (1 + margem_seguranca)
+custo_real = valor_china x (1 - credito_impostos) + embalagem
 venda_com_desconto = custo_real / (1 - impostos_e_taxas_pior_caso - lucro_antes_IR)
 preco_tabela_sem_ipi = venda_com_desconto / (1 - desconto_livre)
 preco_com_ipi = preco_tabela_sem_ipi x (1 + ipi)
 ```
+A embalagem soma **depois** da margem de segurança e do crédito: é custo local, não de importação (conferido no motor do protótipo em 06/10/2026, função `custo`; ver `docs/copilot/inventario-prototipo.md`). A primeira versão deste arquivo punha a embalagem dentro da margem; estava errada.
 O crédito de impostos é guardado com precisão total (`NUMERIC(7,4)` ou maior) e nunca arredondado no cálculo; a tela mostra 1 casa.
 Conferência com o protótipo: Mesa Flexora, custo assessoria R$ 8.146,64, crédito exibido 28,1% (valor exato ≈ 28,1156%) → custo real R$ 6.148,97 → tabela sem IPI R$ 19.204,61 (custo x 3,123). O teste usa o crédito exato copiado do protótipo para o seed; com 28,1% arredondado o resultado seria R$ 6.150,31.
 **Impostos e taxas são configuração, não código.** Os encargos ficam cadastrados em Parâmetros pela diretoria: os fixos acima e uma lista livre de encargos extras (nome, %, base: venda ou lucro, ativo/inativo). As duas bases entram em lugares diferentes da fórmula:
@@ -113,7 +115,7 @@ Mudanças em custos e parâmetros recalculam na hora só para a diretoria. A equ
 ```
 entrada_minima = (valor_china + lucro_liquido_meta) / (1 - comissao / (1 + ipi))
 ```
-- `valor_china` = soma, por item do pedido, de `custo_assessoria x (1 + margem_seguranca) x quantidade` (no exemplo, 8.146,64 x 1,05 = 8.553,97). Embalagem e frete ficam fora, salvo se o inventário do protótipo mostrar o contrário. É calculado no servidor e guardado no snapshot do pedido.
+- `valor_china` = soma, por item do pedido, de `custo_assessoria x (1 + margem_seguranca) x quantidade` (no exemplo, 8.146,64 x 1,05 = 8.553,97). **Confirmado no protótipo (06/10/2026):** o custo é o da assessoria, cheio (o crédito de impostos não reduz o que se paga na China); a margem de segurança entra; embalagem, frete por nossa conta e taxa fixa por pedido ficam fora; a quantidade multiplica por item. É calculado no servidor, com os custos da versão publicada em que o pedido foi feito.
 - A comissão incide só sobre a parte sem IPI do que o cliente paga. Como cada item pode ter IPI diferente, o pedido usa a proporção `fator_sem_ipi = total_sem_ipi / total_com_ipi`, calculada dos itens do snapshot. A fórmula vira `entrada_minima = (valor_china + lucro_liquido_meta) / (1 - comissao x fator_sem_ipi)`; com IPI único de 13%, `fator_sem_ipi = 1/1,13`, que é a fórmula acima.
 Exemplo de teste obrigatório: China R$ 8.553,97, lucro da meta R$ 2.304,55, comissão 2%, IPI 13% → entrada mínima R$ 11.054,17 (comissão sobre a entrada R$ 195,65); sem a comissão sobram R$ 10.858,52.
 

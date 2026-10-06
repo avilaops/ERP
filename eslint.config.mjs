@@ -10,7 +10,7 @@ const config = [
     },
   },
   {
-    ignores: [".next/**", "out/**", "next-env.d.ts", ".work/**"],
+    ignores: [".next/**", "out/**", "next-env.d.ts", ".work/**", "prototype/**"],
   },
 ];
 

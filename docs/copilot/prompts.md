@@ -6,6 +6,8 @@ O contexto permanente está em [`.github/copilot-instructions.md`](../../.github
 
 ## 0. Preparar o protótipo (manual, antes do primeiro prompt)
 
+> **Feito em 06/10/2026:** o artifact está em `prototype/ludus-comercial.html` e o inventário em [`inventario-prototipo.md`](inventario-prototipo.md). O protótipo não traz dados de exemplo: os números ficam no banco do próprio artifact.
+
 1. Abra o artifact do Rogério no Claude (acesso de editor para nicolas@avilaops.com).
 2. Copie o código completo do artifact para `prototype/app.jsx` (ou o nome original do arquivo).
 3. Se houver dados de exemplo no protótipo (equipamentos, parâmetros), salve também em `prototype/data/`.
