@@ -37,6 +37,8 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "0004_clientes.sql",
     "0005_pedidos.sql",
     "0006_aliquotas_por_estado.sql",
+    "0008_empresa_usuarios_e_auditoria.sql",
+    "0009_aprovacoes_e_financeiro.sql",
   ]);
 
   const second = await withClient((client) => migrate(client, MIGRATIONS_DIR));
@@ -50,16 +52,32 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     [db.schema],
   );
   assert.deepEqual(tables.rows.map((row) => row.table_name), [
+    "audit_log",
+    "commissions",
+    "company_settings",
     "customers",
+    "idempotency_keys",
+    "lost_reasons",
+    "order_approvals",
+    "order_closings",
     "order_items",
     "orders",
+    "payables",
     "price_table_items",
     "price_table_state_rates",
     "price_table_versions",
     "pricing_params",
+    "pricing_params_history",
     "products",
+    "receipts",
+    "receivables",
+    "refund_requests",
+    "refunds",
+    "sales_goals",
     "schema_migrations",
     "state_tax_rates",
+    "suppliers",
+    "users",
   ]);
 });
 
