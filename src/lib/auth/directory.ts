@@ -1,10 +1,13 @@
 import { isRole, ROLES } from "@/lib/auth/roles";
 import type { Role } from "@/lib/auth/roles";
+import type { Tenant } from "@/lib/auth/tenants";
 
+/** One person in one company, with the profile they have there. */
 export type DirectoryUser = {
   email: string;
   name: string;
   role: Role;
+  tenant: Tenant;
 };
 
 /**
@@ -12,7 +15,8 @@ export type DirectoryUser = {
  * the `User` table replaces this implementation when the database arrives.
  */
 export interface UserDirectory {
-  findByEmail(email: string): Promise<DirectoryUser | null>;
+  /** Every company the e-mail belongs to, in the order of the configuration. */
+  findMemberships(email: string): Promise<DirectoryUser[]>;
 }
 
 export function normalizeEmail(email: string): string {
@@ -23,11 +27,13 @@ export function normalizeEmail(email: string): string {
 const EMAIL_SHAPE = /^[^\s@:;,]+@[^\s@:;,]+$/;
 
 /**
- * Parses `email:ROLE,email:ROLE`. A malformed entry, unknown profile or
- * repeated e-mail throws: silently dropping a line would silently lock someone
+ * Parses `email:ROLE@empresa,email:ROLE@empresa`. With a single company
+ * configured the `@empresa` may be left out. The same e-mail may be in several
+ * companies, once in each. A malformed entry, unknown profile, unknown company
+ * or repeated entry throws: silently dropping a line would silently lock someone
  * out, or worse, leave a typo unnoticed.
  */
-export function parseErpUsers(raw: string | undefined): DirectoryUser[] {
+export function parseErpUsers(raw: string | undefined, tenants: Tenant[]): DirectoryUser[] {
   const users: DirectoryUser[] = [];
   const seen = new Set<string>();
 
@@ -36,33 +42,38 @@ export function parseErpUsers(raw: string | undefined): DirectoryUser[] {
 
     const separator = entry.lastIndexOf(":");
     const email = separator === -1 ? "" : normalizeEmail(entry.slice(0, separator));
-    const role = separator === -1 ? "" : entry.slice(separator + 1).trim();
+    const [role = "", slug, ...extra] = separator === -1 ? [] : entry.slice(separator + 1).trim().split("@");
 
-    if (!EMAIL_SHAPE.test(email)) {
-      throw new Error(`ERP_USERS: entrada inválida "${entry.trim()}" (esperado email:PERFIL)`);
+    if (!EMAIL_SHAPE.test(email) || extra.length > 0) {
+      throw new Error(`ERP_USERS: entrada inválida "${entry.trim()}" (esperado email:PERFIL@empresa)`);
     }
     if (!isRole(role)) {
       throw new Error(
         `ERP_USERS: perfil desconhecido "${role}" para ${email} (use ${ROLES.join(", ")})`,
       );
     }
-    if (seen.has(email)) {
-      throw new Error(`ERP_USERS: e-mail repetido ${email}`);
+    if (slug === undefined && tenants.length !== 1) {
+      throw new Error(`ERP_USERS: falta a empresa de ${email} (use email:PERFIL@empresa)`);
     }
+    const tenant = slug === undefined ? tenants[0] : tenants.find((candidate) => candidate.slug === slug.trim());
+    if (!tenant) throw new Error(`ERP_USERS: empresa desconhecida "${slug}" para ${email}`);
 
-    seen.add(email);
+    const key = `${email}@${tenant.slug}`;
+    if (seen.has(key)) throw new Error(`ERP_USERS: e-mail repetido ${email} em ${tenant.slug}`);
+    seen.add(key);
     // ERP_USERS carries no display name; the session prefers the SSO name.
-    users.push({ email, name: email, role });
+    users.push({ email, name: email, role, tenant });
   }
 
   return users;
 }
 
-export function createEnvDirectory(raw: string | undefined): UserDirectory {
-  const byEmail = new Map(parseErpUsers(raw).map((user) => [user.email, user]));
+export function createEnvDirectory(raw: string | undefined, tenants: Tenant[]): UserDirectory {
+  const users = parseErpUsers(raw, tenants);
   return {
-    async findByEmail(email) {
-      return byEmail.get(normalizeEmail(email)) ?? null;
+    async findMemberships(email) {
+      const wanted = normalizeEmail(email);
+      return users.filter((user) => user.email === wanted);
     },
   };
 }

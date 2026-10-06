@@ -51,7 +51,7 @@ export function PasteCostsForm({ action, onClose }: { action: PasteAction; onClo
       <div className="flex flex-col gap-4 p-5">
         <p id="colar-ajuda" className="max-w-3xl text-sm text-slate-600">
           Copie as linhas da planilha e cole aqui, uma por equipamento, com as colunas nesta ordem:{" "}
-          <strong>código Ludus</strong>, <strong>custo assessoria R$</strong>, crédito % (opcional) e embalagem R$
+          <strong>código do equipamento</strong>, <strong>custo assessoria R$</strong>, crédito % (opcional) e embalagem R$
           (opcional). Números com vírgula, como 8.146,64 e 28,11565. Coluna opcional em branco mantém o valor atual. O
           código precisa já estar cadastrado: a colagem não cria equipamento.
         </p>

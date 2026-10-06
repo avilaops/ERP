@@ -3,6 +3,18 @@ import jwt from "jsonwebtoken";
 /** 32+ characters: production refuses a shorter SSO_JWT_SECRET. */
 export const SECRET = "segredo-de-teste-com-mais-de-32-caracteres";
 export const APP_URL = "https://erp.teste.local";
+/** One company, as most tests need: `ERP_USERS` may then leave the company out. */
+export const TENANTS = "ludus:Ludus Equipamentos";
+export const LUDUS = { slug: "ludus", name: "Ludus Equipamentos", hosts: [] as string[] };
+
+declare global {
+  var __TEST_HEADERS__: Map<string, string> | undefined;
+}
+
+/** Headers the stubbed `next/headers` will hand to the code under test (the host, mostly). */
+export function setHeaders(headers: Record<string, string>): void {
+  globalThis.__TEST_HEADERS__ = new Map(Object.entries(headers));
+}
 
 declare global {
   var __TEST_COOKIES__: Map<string, string> | undefined;

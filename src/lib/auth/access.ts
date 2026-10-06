@@ -7,14 +7,20 @@ export type Session = {
   email: string;
   name: string;
   role: Role;
+  /** The company this request is for. Every read and write of the request happens in its database. */
+  tenant: { slug: string; name: string };
+  /** How many companies the person belongs to: with more than one they may switch. */
+  companies: number;
 };
 
 /** What we know about the visitor before looking at any permission. */
 export type Identity = {
   /** Proved who they are (valid central auth token, or local sign-in in dev). */
   authenticated: boolean;
-  /** Their ERP user, when the e-mail is in the directory. */
+  /** Their ERP user in the company of this request, when the e-mail belongs to it. */
   user: DirectoryUser | null;
+  /** How many companies the e-mail belongs to. */
+  companies?: number;
   /** Name from the sign-in, preferred over the directory's. */
   displayName?: string;
 };
@@ -26,8 +32,14 @@ export type AccessDecision =
 
 export function sessionFrom(identity: Identity): Session | null {
   if (!identity.authenticated || !identity.user) return null;
-  const { email, name, role } = identity.user;
-  return { email, name: identity.displayName ?? name, role };
+  const { email, name, role, tenant } = identity.user;
+  return {
+    email,
+    name: identity.displayName ?? name,
+    role,
+    tenant: { slug: tenant.slug, name: tenant.name },
+    companies: identity.companies ?? 1,
+  };
 }
 
 /**

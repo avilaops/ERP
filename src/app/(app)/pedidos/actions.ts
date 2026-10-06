@@ -4,6 +4,7 @@ import { randomInt } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/auth";
+import { tenantDb } from "@/lib/db/pool";
 import type { Session } from "@/lib/auth";
 import { menuItem, seesAllOrders } from "@/lib/auth/permissions";
 import { parseCustomerForm, rawCustomerValues } from "@/lib/customer-form";
@@ -54,6 +55,7 @@ const QUANTITY = "Informe a quantidade: um número inteiro maior que zero.";
  */
 export async function createOrderAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
   const session = await requirePermission("pedidos");
+  const conn = tenantDb(session.tenant.slug);
 
   const read = reader(formData);
   const quantity = parseQuantity(read("quantity"));
@@ -61,7 +63,7 @@ export async function createOrderAction(_previous: ActionState, formData: FormDa
 
   let number: string;
   try {
-    const latest = await latestVersion();
+    const latest = await latestVersion(conn);
     if (!latest) return { error: "Nenhuma tabela publicada ainda. Sem ela não há preço para vender." };
     // The prices on the screen were the ones of the version it showed.
     if (Number(read("version")) !== latest.version) {
@@ -70,6 +72,7 @@ export async function createOrderAction(_previous: ActionState, formData: FormDa
     number = await createOrder(
       { seller: { email: session.email, name: session.name }, version: latest.version, productId: Number(read("productId")), quantity },
       () => orderNumber(isoDate(new Date()), randomInt),
+      conn,
     );
   } catch (error) {
     return { error: problem("criar o pedido", error) };
@@ -81,13 +84,14 @@ export async function createOrderAction(_previous: ActionState, formData: FormDa
 
 export async function addItemAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
   const session = await requirePermission("pedidos");
+  const conn = tenantDb(session.tenant.slug);
 
   const read = reader(formData);
   const number = read("number") ?? "";
   const quantity = parseQuantity(read("quantity"));
   if (quantity === null) return { error: QUANTITY };
   try {
-    await addOrderItem(number, Number(read("productId")), quantity, session.email, scopeOf(session));
+    await addOrderItem(number, Number(read("productId")), quantity, session.email, scopeOf(session), conn);
   } catch (error) {
     return { error: problem("adicionar o equipamento", error) };
   }
@@ -97,13 +101,14 @@ export async function addItemAction(_previous: ActionState, formData: FormData):
 
 export async function setItemQuantityAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
   const session = await requirePermission("pedidos");
+  const conn = tenantDb(session.tenant.slug);
 
   const read = reader(formData);
   const number = read("number") ?? "";
   const quantity = parseQuantity(read("quantity"));
   if (quantity === null) return { error: QUANTITY };
   try {
-    await setOrderItemQuantity(number, Number(read("productId")), quantity, session.email, scopeOf(session));
+    await setOrderItemQuantity(number, Number(read("productId")), quantity, session.email, scopeOf(session), conn);
   } catch (error) {
     return { error: problem("alterar a quantidade", error) };
   }
@@ -113,11 +118,12 @@ export async function setItemQuantityAction(_previous: ActionState, formData: Fo
 
 export async function removeItemAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
   const session = await requirePermission("pedidos");
+  const conn = tenantDb(session.tenant.slug);
 
   const read = reader(formData);
   const number = read("number") ?? "";
   try {
-    await removeOrderItem(number, Number(read("productId")), session.email, scopeOf(session));
+    await removeOrderItem(number, Number(read("productId")), session.email, scopeOf(session), conn);
   } catch (error) {
     return { error: problem("remover o equipamento", error) };
   }
@@ -128,13 +134,14 @@ export async function removeItemAction(_previous: ActionState, formData: FormDat
 /** "Entrega e condições" and the discount. Nothing is calculated in the browser: the page comes back redone. */
 export async function saveTermsAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
   const session = await requirePermission("pedidos");
+  const conn = tenantDb(session.tenant.slug);
 
   const read = reader(formData);
   const number = read("number") ?? "";
   const parsed = parseOrderTerms(read);
   if (!parsed.ok) return { error: parsed.errors.join(" ") };
   try {
-    await saveOrderTerms(number, parsed.terms, session.email, scopeOf(session));
+    await saveOrderTerms(number, parsed.terms, session.email, scopeOf(session), conn);
   } catch (error) {
     return { error: problem("gravar as condições", error) };
   }
@@ -149,6 +156,7 @@ export async function saveTermsAction(_previous: ActionState, formData: FormData
  */
 export async function saveOrderCustomerAction(_previous: CustomerFormState, formData: FormData): Promise<CustomerFormState> {
   const session = await requirePermission("pedidos");
+  const conn = tenantDb(session.tenant.slug);
 
   const text = reader(formData);
   const number = text("number") ?? "";
@@ -164,23 +172,23 @@ export async function saveOrderCustomerAction(_previous: CustomerFormState, form
   });
 
   try {
-    const order = await getOrder(number, scope);
+    const order = await getOrder(number, scope, conn);
     if (!order || order.status !== "em_negociacao") {
       return refuse(["Pedido não encontrado ou já fechado. Reabra o pedido para alterar."]);
     }
 
-    const known = id === "" ? null : await getCustomer(Number(id));
+    const known = id === "" ? null : await getCustomer(Number(id), conn);
     if (id !== "" && !known) return refuse(["Cliente não encontrado."]);
     if (known) kind = known.kind;
 
     const parsed = parseCustomerForm(kind, (key) => (known && key === "document" ? known.document : text(key)));
     if (!parsed.ok) return refuse(parsed.errors, parsed.invalid);
 
-    const existing = known ?? (await findCustomerByDocument(parsed.input.document));
+    const existing = known ?? (await findCustomerByDocument(parsed.input.document, conn));
     const customer = existing
-      ? await updateCustomer(existing.id, parsed.input, session.email)
-      : await createCustomer(parsed.input, session.email);
-    await linkOrderCustomer(number, customer.id, session.email, scope);
+      ? await updateCustomer(existing.id, parsed.input, session.email, conn)
+      : await createCustomer(parsed.input, session.email, conn);
+    await linkOrderCustomer(number, customer.id, session.email, scope, conn);
   } catch (error) {
     return refuse([problem("gravar o cliente", error)]);
   }

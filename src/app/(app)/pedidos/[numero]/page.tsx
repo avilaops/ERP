@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requirePermission } from "@/lib/auth";
+import { tenantDb } from "@/lib/db/pool";
 import { menuItem, seesAllOrders, seesCosts } from "@/lib/auth/permissions";
 import { ufFromCep } from "@/lib/cep";
 import { completenessText, isComplete, isRequired, normalizeDocument, taxpayerFromRegistration } from "@/lib/customer";
@@ -26,7 +27,7 @@ import {
 } from "../actions";
 import { DirectorBoard } from "../DirectorBoard";
 
-export const metadata = { title: "Pedido · ERP Ludus" };
+export const metadata = { title: "Pedido · ERP" };
 // Never reused between profiles: what is assembled for the directors has costs.
 export const dynamic = "force-dynamic";
 
@@ -65,21 +66,22 @@ export default async function PedidoPage({
   // Only a well-formed number goes into the address the login returns to.
   const wellFormed = ORDER_NUMBER.test(numero);
   const session = await requirePermission("pedidos", wellFormed ? `/pedidos/${numero}` : undefined);
+  const conn = tenantDb(session.tenant.slug);
   if (!wellFormed) notFound();
 
-  const order = await getOrder(numero, { sellerEmail: seesAllOrders(session.role) ? null : session.email });
+  const order = await getOrder(numero, { sellerEmail: seesAllOrders(session.role) ? null : session.email }, conn);
   if (!order) notFound();
 
   // The team's account: prices of the version of the order, no cost.
-  const table = await loadPublishedTable(order.priceTableVersion);
+  const table = await loadPublishedTable(order.priceTableVersion, conn);
   if (!table) notFound();
-  const standing = await loadOrderStanding(order);
+  const standing = await loadOrderStanding(order, conn);
   // The profile comes from the session. Costs are read only for who may see them.
   const costs = seesCosts(session.role);
-  const snapshot = costs ? await loadPublishedSnapshot(order.priceTableVersion) : null;
+  const snapshot = costs ? await loadPublishedSnapshot(order.priceTableVersion, conn) : null;
   const board = snapshot ? directorOf(order, snapshot) : null;
 
-  const latest = await latestVersion();
+  const latest = await latestVersion(conn);
   const sale = saleOf(order, table);
   const dates = dueDates(order, table, isoDate(new Date()));
   const editable = order.status === "em_negociacao";
@@ -96,7 +98,7 @@ export default async function PedidoPage({
   const tab: CustomerKind = asked === "pf" ? "PF" : asked === "pj" ? "PJ" : (linked?.kind ?? "PJ");
   const typedDocument = (first(query.doc) ?? "").trim();
   const searched = normalizeDocument(typedDocument);
-  const found = searched === "" ? null : await findCustomerByDocument(searched);
+  const found = searched === "" ? null : await findCustomerByDocument(searched, conn);
   const shown = found ?? (searched === "" && linked?.kind === tab ? linked : null);
   const kind = shown?.kind ?? tab;
   const cepUf = shown?.cep ? ufFromCep(shown.cep) : null;

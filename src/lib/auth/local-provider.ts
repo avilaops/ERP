@@ -3,6 +3,8 @@ import type { AuthEnv } from "@/lib/auth/config";
 import type { DirectoryUser } from "@/lib/auth/directory";
 import { isRole, ROLES } from "@/lib/auth/roles";
 import type { Role } from "@/lib/auth/roles";
+import { parseTenants } from "@/lib/auth/tenants";
+import type { Tenant } from "@/lib/auth/tenants";
 
 /**
  * Local sign-in, one fake user per profile, so the four menus can be exercised
@@ -23,11 +25,12 @@ const LOCAL_NAMES: Record<Role, string> = {
   FINANCEIRO: "Financeiro (teste)",
 };
 
-function localUser(role: Role): DirectoryUser {
+function localUser(role: Role, tenant: Tenant): DirectoryUser {
   return {
     email: `${role.toLowerCase().replace("_", ".")}@teste.local`,
     name: LOCAL_NAMES[role],
     role,
+    tenant,
   };
 }
 
@@ -43,18 +46,30 @@ export type LocalProvider =
   | { available: false }
   | {
       available: true;
+      /** The companies configured: the local sign-in enters any of them. */
+      tenants: Tenant[];
+      /** One test user per profile, in the first company. */
       users: DirectoryUser[];
-      /** Resolves the value of the local cookie to a user. */
-      userFromCookie(value: string | undefined): DirectoryUser | null;
+      /**
+       * Resolves the value of the local cookie (`PERFIL` or `PERFIL@empresa`) to a
+       * user. On a company's own domain (`hostTenant`) only that company is valid.
+       */
+      userFromCookie(value: string | undefined, hostTenant?: Tenant | null): DirectoryUser | null;
     };
 
 export function localProvider(env: AuthEnv): LocalProvider {
   if (!isLocalProviderEnabled(env)) return { available: false };
+  const tenants = parseTenants(env.ERP_TENANTS);
   return {
     available: true,
-    users: ROLES.map(localUser),
-    userFromCookie(value) {
-      return isRole(value) ? localUser(value) : null;
+    tenants,
+    users: tenants.length === 0 ? [] : ROLES.map((role) => localUser(role, tenants[0])),
+    userFromCookie(value, hostTenant = null) {
+      const [role, slug, ...extra] = (value ?? "").split("@");
+      if (!isRole(role) || extra.length > 0) return null;
+      const asked = slug === undefined ? (hostTenant ?? tenants[0]) : tenants.find((tenant) => tenant.slug === slug);
+      if (!asked || (hostTenant && asked.slug !== hostTenant.slug)) return null;
+      return localUser(role, asked);
     },
   };
 }

@@ -145,6 +145,38 @@ test("Pedido: custo só é lido para quem pode ver, e nada dele vai para compone
   assert.ok(source("/pedidos").includes("PlaceholderPage"));
 });
 
+test("multi-empresa: toda leitura e gravação usa o banco da empresa da sessão", () => {
+  const sources = appFiles().map((file) => [file, readFileSync(APP_DIR + file, "utf8")] as const);
+  let uses = 0;
+  for (const [file, code] of sources) {
+    // A empresa só sai da sessão: nunca de campo, parâmetro do endereço ou valor fixo.
+    for (const [call] of code.matchAll(/tenantDb\([^)]*\)/g)) {
+      assert.equal(call, "tenantDb(session.tenant.slug)", `${file}: ${call}`);
+      uses += 1;
+    }
+    assert.doesNotMatch(code, /from "pg"|new pg\.|search_path|tenant_/, `${file} fala com o banco por fora da camada`);
+  }
+  assert.ok(uses >= 20, `só ${uses} usos de tenantDb`);
+
+  // Não existe conexão "do sistema": a camada de banco não tem conexão padrão.
+  const dbDir = new URL("../src/lib/db/", import.meta.url);
+  for (const file of readdirSync(dbDir).filter((name) => name.endsWith(".ts"))) {
+    const code = readFileSync(new URL(file, dbDir), "utf8");
+    assert.doesNotMatch(code, /conn: Queryable = /, `${file} tem conexão padrão`);
+  }
+  const pool = readFileSync(new URL("pool.ts", dbDir), "utf8");
+  assert.doesNotMatch(pool, /export function db\(/);
+  // Quem chama uma função de banco numa tela ou ação tem de ter a sessão antes.
+  for (const [file, code] of sources) {
+    if (!code.includes("tenantDb(")) continue;
+    for (const body of code.split(/\n(?:export )?(?:default )?async function \w+\(/).slice(1)) {
+      if (!body.includes("tenantDb(")) continue;
+      assert.ok(body.indexOf("await requirePermission(") < body.indexOf("tenantDb("), `${file}: banco antes da permissão`);
+      assert.ok(body.indexOf("await requirePermission(") >= 0, `${file}: banco sem permissão`);
+    }
+  }
+});
+
 test("/pedidos/novo é protegida pelo item Pedidos", () => {
   assert.ok(source("/pedidos/novo").includes(`await requirePermission("pedidos", "/pedidos/novo")`));
 });

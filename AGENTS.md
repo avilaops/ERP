@@ -1,7 +1,8 @@
-# ERP Ludus Equipamentos
+# ERP Ávila Ops (primeiro cliente: Ludus Equipamentos)
 
-Sistema comercial da Ludus Equipamentos, desenvolvido pela Ávila Ops. Next.js (App
-Router) + TypeScript strict + Tailwind. Código em inglês, interface em pt-BR.
+Sistema comercial multi-empresa, desenvolvido pela Ávila Ops em `erp.avilaops.com`. A
+primeira empresa é a Ludus Equipamentos. Next.js (App Router) + TypeScript strict +
+Tailwind. Código em inglês, interface em pt-BR.
 
 O que o sistema faz está em `docs/manual/`; o que falta fazer, em `docs/roadmap.md`.
 
@@ -15,6 +16,10 @@ cp .env.example .env.local   # ajuste os valores; nunca comite
 npm run db:migrate           # cria ou atualiza as tabelas do banco de DATABASE_URL
 npm run dev                  # http://localhost:3020
 ```
+
+`.env.local` precisa de `ERP_TENANTS` (ex.: `ludus:Ludus Equipamentos`): sem empresa
+configurada não há onde migrar nem em que entrar. `npm run db:migrate` cria o esquema de
+cada empresa e aplica as migrações em todos.
 
 O banco é PostgreSQL, próprio do ERP. No servidor `creators` já existem os bancos `erp`
 (desenvolvimento) e `erp_test` (testes), com a `DATABASE_URL` em `.env.local` e a
@@ -51,12 +56,34 @@ Os testes usam o executor do próprio Node (`tests/*.test.ts`). `tests/loader.mj
 resolve `@/` e troca `next/headers` e `next/navigation` por substitutos: os cookies da
 "requisição" vêm de `setCookies()` em `tests/helpers.ts`.
 
+## Multi-empresa
+
+Decisão do Nicolas em 06/10/2026. Um banco, **um esquema do PostgreSQL por empresa**
+(`tenant_<identificador>`), com as mesmas tabelas em cada um. Não há `organization_id`.
+
+1. **A empresa vem da sessão, nunca do navegador.** `requirePermission` e `getSession`
+   devolvem `session.tenant` (`{ slug, name }`). Ela sai do domínio (no domínio próprio de
+   uma empresa só entra quem é dela) e do que o diretório diz sobre o e-mail. O cookie
+   `erp_tenant` só escolhe entre as empresas a que a pessoa já pertence.
+2. **Toda função de `src/lib/db/` recebe a conexão; não existe conexão padrão.** Tela e
+   ação fazem `const conn = tenantDb(session.tenant.slug)` logo depois de
+   `requirePermission` e passam `conn` adiante. Esquecer não compila.
+   `tests/routes.test.ts` falha se `tenantDb` receber outra coisa.
+3. **Migração é a mesma para todas as empresas**, sem nome de esquema no SQL.
+   `npm run db:migrate` percorre `ERP_TENANTS`.
+4. **Nada de uma empresa fixo no código:** nome, logo (`public/logos/<identificador>.png`,
+   opcional), alíquotas, taxas e textos da marca vêm da empresa ou dos Parâmetros dela.
+5. Empresas e usuários vêm de `ERP_TENANTS` e `ERP_USERS` (`email:PERFIL@empresa`). Quando
+   forem para o banco, troca-se `parseTenants` e `UserDirectory`, não quem os usa.
+6. Testes de isolamento em `tests/db-tenants.test.ts` (banco) e `tests/access.test.ts`
+   (sessão): mexeu em login, sessão ou conexão, eles têm de continuar passando.
+
 ## Regras de `src/lib/auth/`
 
 Todo o login mora nesta pasta. O resto do código usa só duas funções, de
 `@/lib/auth`:
 
-- `getSession()` devolve `{ email, name, role }` ou `null`.
+- `getSession()` devolve `{ email, name, role, tenant, companies }` ou `null`.
 - `requirePermission(item)` devolve a sessão ou redireciona: sem sessão, para o Auth
   central; com sessão e sem permissão, para `/sem-acesso`.
 
@@ -71,7 +98,7 @@ Regras que não se quebram:
    `papel` do SSO.** Hoje o diretório lê `ERP_USERS`; quando houver banco, troca-se a
    implementação de `UserDirectory`, não quem a usa. Do token do SSO só se aceita o
    que tem `exp` numérico (`sso.ts`): sessão sem validade é recusada.
-4. **Falha fechada.** Em produção, sem `SSO_JWT_SECRET`, `APP_URL` ou `ERP_USERS`
+4. **Falha fechada.** Em produção, sem `SSO_JWT_SECRET`, `APP_URL`, `ERP_TENANTS` ou `ERP_USERS`
    válidos, o processo não sobe (`src/instrumentation.ts`) e nenhuma requisição é
    atendida. Entrada inválida em `ERP_USERS` é erro, não é ignorada. Em produção o
    `SSO_JWT_SECRET` precisa ter 32 caracteres ou mais e não pode ser o valor do
@@ -129,8 +156,8 @@ funções puras, sem banco e sem tela, conferidas com os números dos prints do 
 
 ## Regras de `src/lib/db/`
 
-1. **O ERP tem banco próprio (`erp`) e só fala com ele.** Nada de ler ou gravar em banco
-   de outro sistema. `DATABASE_URL` é a única variável de conexão; em produção, sem
+1. **O ERP tem banco próprio (`erp`) e só fala com ele**, sempre no esquema da empresa da
+   sessão (ver Multi-empresa). Nada de ler ou gravar em banco de outro sistema. `DATABASE_URL` é a única variável de conexão; em produção, sem
    ela o processo não sobe (`src/instrumentation-node.ts`).
 2. **Só `src/lib/db/` fala SQL**, com `pg` direto, sem ORM. O resto do código chama as
    funções dela (`loadParams`, `saveParams`, `createProduct`, `listProducts`,

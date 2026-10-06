@@ -1,7 +1,7 @@
 # ERP Ludus Equipamentos: instruções do projeto
 
 ## Contexto
-A Ludus Equipamentos importa equipamentos de musculação da China e vende para academias, studios e clientes finais. Empresa nova, CNPJ próprio, sem dados legados: o cadastro começa do zero.
+O sistema é multi-empresa; a primeira empresa é a Ludus Equipamentos, e as regras de negócio abaixo são as dela. A Ludus Equipamentos importa equipamentos de musculação da China e vende para academias, studios e clientes finais. Empresa nova, CNPJ próprio, sem dados legados: o cadastro começa do zero.
 
 O dono (Rogério) montou um **protótipo funcional no Claude** (artifact React). Este repositório é a versão de produção, desenvolvida pela Ávila Ops Tecnologia. **O protótipo é a especificação de referência**: telas, textos, regras e cálculos devem se comportar igual a ele, salvo quando este arquivo disser o contrário. O código do protótipo fica em `prototype/` apenas como referência e nunca é importado pela aplicação.
 
@@ -21,7 +21,7 @@ A descrição detalhada e as regras por pasta estão no [`AGENTS.md`](../AGENTS.
 - **Validação de formulário** em funções puras testadas, no servidor (`src/lib/*-form.ts`).
 - **npm** como gerenciador de pacotes.
 - **Banco de desenvolvimento:** PostgreSQL do servidor da Ávila Ops; fora dele, `docker compose up -d` sobe um PostgreSQL 16 local (só o banco, não a aplicação).
-- **Endereço do sistema:** `https://erp.avilaops.com`. Não há domínio próprio da Ludus.
+- **Endereço do sistema:** `https://erp.avilaops.com`, compartilhado por todas as empresas. Uma empresa pode ter domínio próprio (para a Ludus, `ludusequipamentos.com.br` e `.com`), declarado em `ERP_TENANTS`; nele só entra quem é daquela empresa.
 
 **Não use, e não sugira:** Prisma ou outro ORM, `Prisma.Decimal`, SQLite, Zod, React Hook Form, Vitest, Playwright, pnpm, `src/modules/`, `organization_id`, `audit_log`, exclusão lógica (`deleted_at`). Nada disso existe no projeto.
 
@@ -29,7 +29,7 @@ A descrição detalhada e as regras por pasta estão no [`AGENTS.md`](../AGENTS.
 - **Regras e cálculos** em `src/lib/<assunto>`: `src/lib/pricing/` (todas as contas), `src/lib/db/` (todo o SQL), `src/lib/auth/` (login e permissões), e os arquivos de leitura de formulário e de montagem de tela (`*-form.ts`, `*-view.ts`, `order-quote.ts`).
 - **Telas** em `src/app/(app)/<tela>/`: `page.tsx` (componente de servidor, confere a permissão antes de ler o banco), `actions.ts` (ações de servidor finas: conferem a permissão, leem o formulário, chamam `src/lib/db/`) e componentes pequenos de navegador só para enviar formulário e mostrar erro.
 - **Todos os cálculos de preço, imposto, entrada e comissão ficam em `src/lib/pricing/`**, como funções puras com testes. Tela e componente nunca calculam, e nada é calculado no navegador.
-- **Uma empresa só:** o banco é da Ludus. Não há isolamento por organização.
+- **Multi-empresa, com um esquema do PostgreSQL por empresa** (`tenant_<identificador>`), não com coluna `organization_id`. A empresa vem da sessão (`session.tenant`), nunca do navegador. Toda função de `src/lib/db/` recebe a conexão: tela e ação fazem `const conn = tenantDb(session.tenant.slug)` depois de `requirePermission` e passam `conn`. Nada de uma empresa (nome, logo, alíquota) fica fixo no código.
 - Cada tabela guarda `created_at`, `updated_at` e `updated_by` (o e-mail de quem gravou). Não há tabela de auditoria; ações sensíveis (excluir, publicar) deixam uma linha no log do servidor.
 - **Gravação de várias linhas é uma instrução só** (`WITH … INSERT/UPDATE`), porque a camada de banco não usa transação explícita. É assim que publicar a tabela e criar o pedido são atômicos.
 

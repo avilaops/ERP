@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/auth";
+import { tenantDb } from "@/lib/db/pool";
 import { menuItem } from "@/lib/auth/permissions";
 import { appliedText, ignoredText, parseAdvisoryPaste, pasteSizeProblem, previewRows } from "@/lib/advisory-paste";
 import type { InvalidLine, PasteState } from "@/lib/advisory-paste";
@@ -52,6 +53,7 @@ const SAVED: RowState = { status: "saved", errors: [], invalid: [], values: null
 /** A server action is a public endpoint: the permission is checked again, before reading anything. */
 export async function createProductAction(_previous: NewProductState, formData: FormData): Promise<NewProductState> {
   const session = await requirePermission("produtos");
+  const conn = tenantDb(session.tenant.slug);
 
   const read = reader(formData);
   const typed = rawProductValues(NEW_PRODUCT_FIELDS, read);
@@ -59,7 +61,7 @@ export async function createProductAction(_previous: NewProductState, formData: 
   if (!parsed.ok) return { status: "error", errors: parsed.errors, invalid: parsed.invalid, values: typed };
 
   try {
-    await createProduct(parsed.input, session.email);
+    await createProduct(parsed.input, session.email, conn);
   } catch (error) {
     return { status: "error", errors: [problem("cadastrar", error)], invalid: [], values: typed };
   }
@@ -71,6 +73,7 @@ export async function createProductAction(_previous: NewProductState, formData: 
 /** Saves the fields of one row. The calculated columns come back redone with the page. */
 export async function updateProductAction(_previous: RowState, formData: FormData): Promise<RowState> {
   const session = await requirePermission("produtos");
+  const conn = tenantDb(session.tenant.slug);
 
   const read = reader(formData);
   const typed = rawProductValues(ROW_FIELDS, read);
@@ -78,7 +81,7 @@ export async function updateProductAction(_previous: RowState, formData: FormDat
   if (!parsed.ok) return { status: "error", errors: parsed.errors, invalid: parsed.invalid, values: typed };
 
   try {
-    await updateProduct(Number(read("id")), parsed.input, session.email);
+    await updateProduct(Number(read("id")), parsed.input, session.email, conn);
   } catch (error) {
     return rowError(problem("alterar", error), typed);
   }
@@ -90,10 +93,11 @@ export async function updateProductAction(_previous: RowState, formData: FormDat
 /** Desativar and Reativar: the product only changes tab, with everything it has. */
 export async function setProductActiveAction(_previous: RowState, formData: FormData): Promise<RowState> {
   const session = await requirePermission("produtos");
+  const conn = tenantDb(session.tenant.slug);
 
   const read = reader(formData);
   try {
-    await updateProduct(Number(read("id")), { active: read("active") === "true" }, session.email);
+    await updateProduct(Number(read("id")), { active: read("active") === "true" }, session.email, conn);
   } catch (error) {
     return rowError(problem("desativar ou reativar", error));
   }
@@ -105,9 +109,10 @@ export async function setProductActiveAction(_previous: RowState, formData: Form
 /** Removes the record. Until there is an audit table, the server log is the only trace. */
 export async function deleteProductAction(_previous: RowState, formData: FormData): Promise<RowState> {
   const session = await requirePermission("produtos");
+  const conn = tenantDb(session.tenant.slug);
 
   try {
-    const removed = await deleteProduct(Number(reader(formData)("id")));
+    const removed = await deleteProduct(Number(reader(formData)("id")), conn);
     console.info(`[produtos] excluído: id ${removed.id}, código ${removed.code ?? "sem código"}, por ${session.email}`);
   } catch (error) {
     return rowError(problem("excluir", error));
@@ -136,6 +141,7 @@ const unixLines = (text: string | null) => (text ?? "").replaceAll("\r\n", "\n")
  */
 export async function pasteAdvisoryCostsAction(_previous: PasteState, formData: FormData): Promise<PasteState> {
   const session = await requirePermission("produtos");
+  const conn = tenantDb(session.tenant.slug);
 
   const read = (key: string) => {
     const value = formData.get(key);
@@ -148,7 +154,7 @@ export async function pasteAdvisoryCostsAction(_previous: PasteState, formData: 
 
   const checked = read("intent") === "apply" && unixLines(read("checked")) === text;
   try {
-    const products = await listProducts();
+    const products = await listProducts({}, conn);
     const known = new Set(products.flatMap((product) => (product.code === null ? [] : [product.code])));
     const parsed = parseAdvisoryPaste(text, known);
     const preview: PasteState = {
@@ -161,7 +167,7 @@ export async function pasteAdvisoryCostsAction(_previous: PasteState, formData: 
     };
     if (!checked || parsed.rows.length === 0) return preview;
 
-    const updated = new Set((await applyAdvisoryCosts(parsed.rows, session.email)).map((product) => product.code));
+    const updated = new Set((await applyAdvisoryCosts(parsed.rows, session.email, conn)).map((product) => product.code));
     // A product removed between checking and applying: its line was not written.
     const gone: InvalidLine[] = parsed.rows
       .filter((row) => !updated.has(row.code))
@@ -192,11 +198,12 @@ const publishError = (message: string): PublishState => ({ status: "error", mess
  */
 export async function publishPriceTableAction(_previous: PublishState, formData: FormData): Promise<PublishState> {
   const session = await requirePermission("produtos");
+  const conn = tenantDb(session.tenant.slug);
 
   const expected = Number(formData.get("expected"));
   try {
-    const [params, products, latest] = await Promise.all([loadParams(), listProducts({ active: true }), latestVersion()]);
-    const published = latest ? await loadPublishedSnapshot(latest.version) : null;
+    const [params, products, latest] = await Promise.all([loadParams(conn), listProducts({ active: true }, conn), latestVersion(conn)]);
+    const published = latest ? await loadPublishedSnapshot(latest.version, conn) : null;
 
     const draft = draftPriceTable(params, products);
     if (draft.items.length === 0) return publishError(NOTHING_TO_PUBLISH);
@@ -207,7 +214,7 @@ export async function publishPriceTableAction(_previous: PublishState, formData:
       return publishError("A tabela já foi publicada por outra pessoa. Confira o que está pendente e publique de novo.");
     }
 
-    const { version } = await publishPriceTable(draft, next, session.email);
+    const { version } = await publishPriceTable(draft, next, session.email, conn);
     console.info(`[produtos] tabela v${version} publicada: ${draft.items.length} equipamento(s), por ${session.email}`);
 
     revalidatePath(menuItem("produtos").href);

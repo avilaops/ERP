@@ -1,4 +1,4 @@
-import { db, pgErrorCode } from "@/lib/db/pool";
+import { pgErrorCode } from "@/lib/db/pool";
 import type { Queryable } from "@/lib/db/pool";
 import type { AdvisoryCostRow } from "@/lib/advisory-paste";
 import { assertAmount, assertRate } from "@/lib/pricing/money";
@@ -111,7 +111,7 @@ function patchValue(field: keyof ProductPatch, patch: ProductPatch): unknown {
 
 const isId = (id: number) => Number.isSafeInteger(id) && id > 0;
 
-export async function createProduct(input: ProductInput, updatedBy: string, conn: Queryable = db()): Promise<Product> {
+export async function createProduct(input: ProductInput, updatedBy: string, conn: Queryable): Promise<Product> {
   const name = input.name.trim();
   if (name === "") throw new ProductError("Produto sem nome.");
   if (updatedBy.trim() === "") throw new Error("Falta dizer quem está cadastrando o produto.");
@@ -157,7 +157,7 @@ export async function updateProduct(
   id: number,
   patch: ProductPatch,
   updatedBy: string,
-  conn: Queryable = db(),
+  conn: Queryable,
 ): Promise<Product> {
   if (updatedBy.trim() === "") throw new Error("Falta dizer quem está alterando o produto.");
   const changes = PATCH_COLUMNS.filter(([field]) => patch[field] !== undefined).map(
@@ -189,7 +189,7 @@ export async function updateProduct(
 }
 
 /** Removes the record and answers with what it was. Refused once anything else points to the product. */
-export async function deleteProduct(id: number, conn: Queryable = db()): Promise<Product> {
+export async function deleteProduct(id: number, conn: Queryable): Promise<Product> {
   if (!isId(id)) throw new ProductError("Produto não encontrado.");
   try {
     const { rows } = await conn.query(`DELETE FROM products WHERE id = $1 RETURNING ${COLUMNS}`, [id]);
@@ -211,7 +211,7 @@ export async function deleteProduct(id: number, conn: Queryable = db()): Promise
 export async function applyAdvisoryCosts(
   rows: AdvisoryCostRow[],
   updatedBy: string,
-  conn: Queryable = db(),
+  conn: Queryable,
 ): Promise<Product[]> {
   if (updatedBy.trim() === "") throw new Error("Falta dizer quem está lançando os custos.");
   const codes = new Set<string>();
@@ -248,7 +248,7 @@ export async function applyAdvisoryCosts(
 }
 
 /** Products by name. `active` filters one side; without it, all of them. */
-export async function listProducts({ active }: { active?: boolean } = {}, conn: Queryable = db()): Promise<Product[]> {
+export async function listProducts({ active }: { active?: boolean } = {}, conn: Queryable): Promise<Product[]> {
   const { rows } =
     active === undefined
       ? await conn.query(`SELECT ${COLUMNS} FROM products ORDER BY name, id`)
@@ -257,7 +257,7 @@ export async function listProducts({ active }: { active?: boolean } = {}, conn: 
 }
 
 /** What the engine needs from the active products that already have a cost. */
-export async function listProductCosts(conn: Queryable = db()): Promise<ProductCost[]> {
+export async function listProductCosts(conn: Queryable): Promise<ProductCost[]> {
   const products = await listProducts({ active: true }, conn);
   return products.flatMap(({ advisoryCost, taxCredit, packaging }) =>
     advisoryCost === null ? [] : [{ advisoryCost, taxCredit, packaging }],

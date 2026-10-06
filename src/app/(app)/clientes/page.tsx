@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requirePermission } from "@/lib/auth";
+import { tenantDb } from "@/lib/db/pool";
 import { menuItem } from "@/lib/auth/permissions";
 import {
   completenessText,
@@ -14,7 +15,7 @@ import { listCustomers } from "@/lib/db/customers";
 
 const ITEM = menuItem("clientes");
 
-export const metadata = { title: `${ITEM.label} · ERP Ludus` };
+export const metadata = { title: `${ITEM.label} · ERP` };
 export const dynamic = "force-dynamic";
 
 const NONE = "—";
@@ -28,10 +29,11 @@ export default async function ClientesPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  await requirePermission("clientes");
+  const session = await requirePermission("clientes");
+  const conn = tenantDb(session.tenant.slug);
 
   const search = (first((await searchParams).q) ?? "").trim();
-  const all = await listCustomers();
+  const all = await listCustomers(conn);
   const customers = all.filter((customer) => matchesCustomer(customer, search));
 
   return (

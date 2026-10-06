@@ -1,4 +1,5 @@
 import { requirePermission } from "@/lib/auth";
+import { tenantDb } from "@/lib/db/pool";
 import { menuItem } from "@/lib/auth/permissions";
 import { loadParams } from "@/lib/db/params";
 import { listProductCosts } from "@/lib/db/products";
@@ -9,13 +10,14 @@ import { paramsResult } from "@/lib/pricing/results";
 import { adoptSuggestedDownPaymentAction, saveParamsAction } from "./actions";
 import { ParamsForm } from "./ParamsForm";
 
-export const metadata = { title: `${menuItem("parametros").label} · ERP Ludus` };
+export const metadata = { title: `${menuItem("parametros").label} · ERP` };
 export const dynamic = "force-dynamic";
 
 export default async function ParametrosPage() {
-  await requirePermission("parametros");
+  const session = await requirePermission("parametros");
+  const conn = tenantDb(session.tenant.slug);
 
-  const [params, costs] = await Promise.all([loadParams(), listProductCosts()]);
+  const [params, costs] = await Promise.all([loadParams(conn), listProductCosts(conn)]);
   // Every figure of the board is calculated here, on the server, by the engine.
   const result = paramsResult(params, costs);
   const form = paramsToForm(params);

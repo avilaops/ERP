@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requirePermission } from "@/lib/auth";
+import { tenantDb } from "@/lib/db/pool";
 import { menuItem, seesCosts } from "@/lib/auth/permissions";
 import { latestVersion, loadPublishedTable } from "@/lib/db/price-table";
 import { showMoney } from "@/lib/format";
@@ -7,16 +8,17 @@ import { compareByCode } from "@/lib/products-view";
 import { ActionForm } from "../ActionForm";
 import { createOrderAction } from "../actions";
 
-export const metadata = { title: "Novo pedido · ERP Ludus" };
+export const metadata = { title: "Novo pedido · ERP" };
 export const dynamic = "force-dynamic";
 
 const CARD = "mt-6 rounded-lg border border-slate-200 bg-white";
 
 export default async function NovoPedidoPage() {
   const session = await requirePermission("pedidos", "/pedidos/novo");
+  const conn = tenantDb(session.tenant.slug);
 
-  const latest = await latestVersion();
-  const table = latest ? await loadPublishedTable(latest.version) : null;
+  const latest = await latestVersion(conn);
+  const table = latest ? await loadPublishedTable(latest.version, conn) : null;
 
   const heading = (
     <>

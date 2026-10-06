@@ -1,4 +1,3 @@
-import { db } from "@/lib/db/pool";
 import type { Queryable } from "@/lib/db/pool";
 import { validateParams } from "@/lib/pricing/params";
 import type { PricingParams, ScalarParams } from "@/lib/pricing/params";
@@ -64,7 +63,7 @@ export function rowToParams(row: Record<string, unknown>, stateRates: StateRates
  * answering with values from the code. What comes out is validated before
  * anyone uses it: an invalid row throws instead of returning crooked parameters.
  */
-export async function loadParams(conn: Queryable = db()): Promise<PricingParams> {
+export async function loadParams(conn: Queryable): Promise<PricingParams> {
   const { rows } = await conn.query(`SELECT ${COLUMN_LIST} FROM pricing_params`);
   const row = rows[0];
   if (!row) throw new Error("Parâmetros não cadastrados no banco. Rode `npm run db:migrate`.");
@@ -74,7 +73,7 @@ export async function loadParams(conn: Queryable = db()): Promise<PricingParams>
 }
 
 /** Validates, makes sure a table price exists for these parameters, then writes the single row and the rates by state. */
-export async function saveParams(params: PricingParams, updatedBy: string, conn: Queryable = db()): Promise<void> {
+export async function saveParams(params: PricingParams, updatedBy: string, conn: Queryable): Promise<void> {
   validateParams(params);
   tableMultiplier(params);
   if (updatedBy.trim() === "") throw new Error("Falta dizer quem está gravando os parâmetros.");

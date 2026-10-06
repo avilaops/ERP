@@ -5,7 +5,7 @@ type FieldKind = "name" | "text" | "usd" | "cost" | "rate" | "money";
 
 const FIELDS = {
   name: { label: "Nome", kind: "name" },
-  code: { label: "Código Ludus", kind: "text" },
+  code: { label: "Código", kind: "text" },
   supplierName: { label: "Fornecedor", kind: "text" },
   supplierModel: { label: "Modelo do fornecedor", kind: "text" },
   supplierPriceUsd: { label: "Preço do fornecedor US$", kind: "usd" },

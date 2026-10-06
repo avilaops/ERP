@@ -7,8 +7,8 @@ const display = Barlow_Condensed({ subsets: ["latin"], weight: ["500", "600", "7
 const body = IBM_Plex_Sans({ subsets: ["latin"], weight: ["400", "500", "600"], variable: "--font-plex-sans" });
 
 export const metadata: Metadata = {
-  title: "ERP Ludus Equipamentos",
-  description: "Sistema comercial da Ludus Equipamentos.",
+  title: "ERP · Ávila Ops",
+  description: "Sistema comercial.",
   robots: { index: false, follow: false },
 };
 

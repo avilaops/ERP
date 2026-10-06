@@ -1,6 +1,6 @@
 import { isValidDocument } from "@/lib/customer";
 import type { CustomerInput, CustomerKind } from "@/lib/customer";
-import { db, pgErrorCode } from "@/lib/db/pool";
+import { pgErrorCode } from "@/lib/db/pool";
 import type { Queryable } from "@/lib/db/pool";
 import type { Uf } from "@/lib/pricing/states";
 
@@ -72,7 +72,7 @@ function assertInput(input: CustomerInput, updatedBy: string): string {
 const duplicate = (kind: CustomerKind) => new CustomerError(`Já existe cliente com este ${kind === "PJ" ? "CNPJ" : "CPF"}.`);
 
 /** One record per CNPJ or CPF. Takes what `parseCustomerForm` returns. */
-export async function createCustomer(input: CustomerInput, updatedBy: string, conn: Queryable = db()): Promise<Customer> {
+export async function createCustomer(input: CustomerInput, updatedBy: string, conn: Queryable): Promise<Customer> {
   const name = assertInput(input, updatedBy);
   if (!isValidDocument(input.kind, input.document)) {
     throw new CustomerError(`${input.kind === "PJ" ? "CNPJ" : "CPF"} inválido.`);
@@ -102,7 +102,7 @@ export async function updateCustomer(
   id: number,
   input: CustomerInput,
   updatedBy: string,
-  conn: Queryable = db(),
+  conn: Queryable,
 ): Promise<Customer> {
   const name = assertInput(input, updatedBy);
   const current = await getCustomer(id, conn);
@@ -121,20 +121,20 @@ export async function updateCustomer(
   return toCustomer(rows[0]);
 }
 
-export async function getCustomer(id: number, conn: Queryable = db()): Promise<Customer | null> {
+export async function getCustomer(id: number, conn: Queryable): Promise<Customer | null> {
   if (!Number.isSafeInteger(id) || id <= 0) return null;
   const { rows } = await conn.query(`SELECT ${COLUMNS} FROM customers WHERE id = $1`, [id]);
   return rows[0] ? toCustomer(rows[0]) : null;
 }
 
 /** By CNPJ or CPF without punctuation, as it is stored. */
-export async function findCustomerByDocument(document: string, conn: Queryable = db()): Promise<Customer | null> {
+export async function findCustomerByDocument(document: string, conn: Queryable): Promise<Customer | null> {
   const { rows } = await conn.query(`SELECT ${COLUMNS} FROM customers WHERE document = $1`, [document]);
   return rows[0] ? toCustomer(rows[0]) : null;
 }
 
 /** Every customer, by name. The record is shared by the whole team. */
-export async function listCustomers(conn: Queryable = db()): Promise<Customer[]> {
+export async function listCustomers(conn: Queryable): Promise<Customer[]> {
   const { rows } = await conn.query(`SELECT ${COLUMNS} FROM customers ORDER BY name, id`);
   return rows.map(toCustomer);
 }

@@ -1,5 +1,5 @@
 import { PARAM_COLUMN_LIST, PARAM_COLUMNS, rowsToStateRates, rowToParams, stateRateArrays } from "@/lib/db/params";
-import { db, pgErrorCode } from "@/lib/db/pool";
+import { pgErrorCode } from "@/lib/db/pool";
 import type { Queryable } from "@/lib/db/pool";
 import type { PriceTableDraft } from "@/lib/price-table";
 import { assertAmount, assertRate } from "@/lib/pricing/money";
@@ -60,7 +60,7 @@ const toVersion = (row: Record<string, unknown>): PriceTableVersion => ({
 });
 
 /** The version the team sells with, or `null` before the first publication. */
-export async function latestVersion(conn: Queryable = db()): Promise<PriceTableVersion | null> {
+export async function latestVersion(conn: Queryable): Promise<PriceTableVersion | null> {
   const { rows } = await conn.query(
     "SELECT version, published_at, published_by FROM price_table_versions ORDER BY version DESC LIMIT 1",
   );
@@ -68,7 +68,7 @@ export async function latestVersion(conn: Queryable = db()): Promise<PriceTableV
 }
 
 /** A version with its parameters and costs. The parameters are validated on the way out. */
-export async function loadPublishedSnapshot(version: number, conn: Queryable = db()): Promise<PublishedSnapshot | null> {
+export async function loadPublishedSnapshot(version: number, conn: Queryable): Promise<PublishedSnapshot | null> {
   if (!Number.isSafeInteger(version) || version <= 0) return null;
   const { rows } = await conn.query(
     `SELECT version, published_at, published_by, ${COLUMN_LIST} FROM price_table_versions WHERE version = $1`,
@@ -134,7 +134,7 @@ export async function publishPriceTable(
   draft: PriceTableDraft,
   version: number,
   publishedBy: string,
-  conn: Queryable = db(),
+  conn: Queryable,
 ): Promise<PriceTableVersion> {
   assertDraft(draft, version, publishedBy);
 
@@ -195,7 +195,7 @@ export async function publishPriceTable(
  * the statements name only the columns of the published price, so there is
  * nothing to leak to a seller's browser.
  */
-export async function loadPublishedTable(version: number, conn: Queryable = db()): Promise<PublishedTable | null> {
+export async function loadPublishedTable(version: number, conn: Queryable): Promise<PublishedTable | null> {
   if (!Number.isSafeInteger(version) || version <= 0) return null;
   const { rows } = await conn.query(
     `SELECT version, published_at, free_discount, ipi, min_down_payment, proposal_validity_days, commission
@@ -227,7 +227,7 @@ export async function loadPublishedTable(version: number, conn: Queryable = db()
 }
 
 /** Every publication, from the newest to the oldest. */
-export async function listVersions(conn: Queryable = db()): Promise<PriceTableVersion[]> {
+export async function listVersions(conn: Queryable): Promise<PriceTableVersion[]> {
   const { rows } = await conn.query(
     "SELECT version, published_at, published_by FROM price_table_versions ORDER BY version DESC",
   );

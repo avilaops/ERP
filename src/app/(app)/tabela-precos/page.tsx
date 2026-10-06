@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requirePermission } from "@/lib/auth";
+import { tenantDb } from "@/lib/db/pool";
 import { menuItem, seesCosts } from "@/lib/auth/permissions";
 import { latestVersion, listVersions, loadPublishedSnapshot, loadPublishedTable } from "@/lib/db/price-table";
 import { showDate } from "@/lib/format";
@@ -7,7 +8,7 @@ import { chosenVersion, priceTableView } from "@/lib/price-table-view";
 
 const ITEM = menuItem("tabela-precos");
 
-export const metadata = { title: `${ITEM.label} · ERP Ludus` };
+export const metadata = { title: `${ITEM.label} · ERP` };
 // Never reused between profiles: what is assembled for the directors has costs.
 export const dynamic = "force-dynamic";
 
@@ -19,18 +20,19 @@ export default async function TabelaPrecosPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const session = await requirePermission("tabela-precos");
+  const conn = tenantDb(session.tenant.slug);
 
   const query = await searchParams;
   const search = (first(query.q) ?? "").trim();
   // The profile comes from the session. Nothing in the address turns costs on.
   const costs = seesCosts(session.role);
 
-  const latest = await latestVersion();
-  const versions = !latest ? [] : costs ? await listVersions() : [latest];
+  const latest = await latestVersion(conn);
+  const versions = !latest ? [] : costs ? await listVersions(conn) : [latest];
   const version = chosenVersion(costs, first(query.v), versions);
-  const table = version === null ? null : await loadPublishedTable(version);
+  const table = version === null ? null : await loadPublishedTable(version, conn);
   // Costs and parameters of the version are read only for who may see them.
-  const snapshot = table && costs ? await loadPublishedSnapshot(table.version) : null;
+  const snapshot = table && costs ? await loadPublishedSnapshot(table.version, conn) : null;
 
   const heading = (
     <>

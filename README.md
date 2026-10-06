@@ -1,6 +1,6 @@
-# ERP Ludus Equipamentos
+# ERP Ávila Ops
 
-Sistema comercial da Ludus Equipamentos (importação e venda de equipamentos de musculação), desenvolvido pela Ávila Ops Tecnologia.
+Sistema comercial multi-empresa, desenvolvido pela Ávila Ops Tecnologia e servido em `erp.avilaops.com`. A primeira empresa é a Ludus Equipamentos (importação e venda de equipamentos de musculação). Cada empresa tem os seus dados num esquema próprio do banco; como incluir uma está em [`docs/operacao.md`](docs/operacao.md).
 
 ## Documentação
 
@@ -32,7 +32,7 @@ Para ver as telas na própria máquina sem depender disso, descomente `ERP_LOCAL
 | `npm run lint` | Confere o código com o ESLint. |
 | `npm run typecheck` | Confere os tipos do TypeScript. |
 | `npm test` | Roda os testes automatizados (os de banco usam `ERP_TEST_DATABASE_URL`, de `.env.test.local`). |
-| `npm run db:migrate` | Aplica as migrações pendentes de `db/migrations/` no banco de `DATABASE_URL`. Rodar de novo não muda nada. |
+| `npm run db:migrate` | Cria o esquema de cada empresa de `ERP_TENANTS` e aplica as migrações pendentes de `db/migrations/` em todos. Rodar de novo não muda nada. |
 
 O login é feito pelo Auth central da Ávila Ops, e o perfil de cada pessoa (Diretoria, Gerente comercial, Vendedor ou Financeiro) é definido dentro do ERP. Em desenvolvimento, com `ERP_LOCAL_LOGIN=1` no `.env.local`, `/dev/login` entra com um usuário de teste por perfil. Detalhes e regras para quem mexe no código estão no [`AGENTS.md`](AGENTS.md).
 

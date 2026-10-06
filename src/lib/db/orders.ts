@@ -1,7 +1,7 @@
 import { taxpayerFromRegistration } from "@/lib/customer";
 import { getCustomer } from "@/lib/db/customers";
 import type { Customer } from "@/lib/db/customers";
-import { db, pgErrorCode } from "@/lib/db/pool";
+import { pgErrorCode } from "@/lib/db/pool";
 import type { Queryable } from "@/lib/db/pool";
 import { loadPublishedSnapshot } from "@/lib/db/price-table";
 import { engineOrder } from "@/lib/order-quote";
@@ -79,7 +79,7 @@ export async function createOrder(
     quantity,
   }: { seller: { email: string; name: string }; version: number; productId: number; quantity: number },
   newNumber: () => string,
-  conn: Queryable = db(),
+  conn: Queryable,
 ): Promise<string> {
   assertQuantity(quantity);
   if (seller.email.trim() === "" || seller.name.trim() === "") throw new Error("Pedido sem vendedor.");
@@ -107,7 +107,7 @@ export async function createOrder(
 }
 
 /** The order, its items and the customer linked to it. An order outside the scope does not exist. */
-export async function getOrder(number: string, scope: OrderScope, conn: Queryable = db()): Promise<Order | null> {
+export async function getOrder(number: string, scope: OrderScope, conn: Queryable): Promise<Order | null> {
   if (!ORDER_NUMBER.test(number)) return null;
   const { rows } = await conn.query(
     `SELECT ${COLUMNS} FROM orders WHERE number = $1 AND ($2::text IS NULL OR seller_email = $2)`,
@@ -148,7 +148,7 @@ export async function addOrderItem(
   quantity: number,
   who: string,
   scope: OrderScope,
-  conn: Queryable = db(),
+  conn: Queryable,
 ): Promise<void> {
   assertQuantity(quantity);
   assertWho(who);
@@ -181,7 +181,7 @@ export async function setOrderItemQuantity(
   quantity: number,
   who: string,
   scope: OrderScope,
-  conn: Queryable = db(),
+  conn: Queryable,
 ): Promise<void> {
   assertQuantity(quantity);
   assertWho(who);
@@ -206,7 +206,7 @@ export async function removeOrderItem(
   productId: number,
   who: string,
   scope: OrderScope,
-  conn: Queryable = db(),
+  conn: Queryable,
 ): Promise<void> {
   assertWho(who);
   const order = await getOrder(number, scope, conn);
@@ -250,7 +250,7 @@ export async function saveOrderTerms(
   terms: OrderTerms,
   who: string,
   scope: OrderScope,
-  conn: Queryable = db(),
+  conn: Queryable,
 ): Promise<void> {
   assertWho(who);
   if (!(terms.discount >= 0 && terms.discount < 1)) throw new OrderError("Desconto precisa ser de 0% até menos de 100%.");
@@ -295,7 +295,7 @@ export async function linkOrderCustomer(
   customerId: number,
   who: string,
   scope: OrderScope,
-  conn: Queryable = db(),
+  conn: Queryable,
 ): Promise<void> {
   assertWho(who);
   const customer = await getCustomer(customerId, conn);
@@ -319,7 +319,7 @@ export type OrderStanding = { band: DiscountBand | null };
  * costs of the version are used here, on the server, to place the discount in a
  * band, and nothing of them leaves: only the band. `null` without delivery state.
  */
-export async function loadOrderStanding(order: Order, conn: Queryable = db()): Promise<OrderStanding> {
+export async function loadOrderStanding(order: Order, conn: Queryable): Promise<OrderStanding> {
   if (order.deliveryUf === null) return { band: null };
   const snapshot = await loadPublishedSnapshot(order.priceTableVersion, conn);
   if (!snapshot) throw new Error(`Tabela v${order.priceTableVersion} não encontrada.`);

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/auth";
+import { tenantDb } from "@/lib/db/pool";
 import { menuItem } from "@/lib/auth/permissions";
 import { parseCustomerForm, rawCustomerValues } from "@/lib/customer-form";
 import type { CustomerFieldKey, CustomerFormState } from "@/lib/customer-form";
@@ -25,13 +26,14 @@ function problem(error: unknown): string {
  */
 export async function saveCustomerAction(_previous: CustomerFormState, formData: FormData): Promise<CustomerFormState> {
   const session = await requirePermission("clientes");
+  const conn = tenantDb(session.tenant.slug);
 
   const text = (key: string) => {
     const value = formData.get(key);
     return typeof value === "string" ? value : null;
   };
   const id = text("id") ?? "";
-  const current = id === "" ? null : await getCustomer(Number(id));
+  const current = id === "" ? null : await getCustomer(Number(id), conn);
   const kind = current?.kind ?? (text("kind") === "PF" ? "PF" : "PJ");
   const read = (key: CustomerFieldKey) => (current && key === "document" ? current.document : text(key));
 
@@ -49,8 +51,8 @@ export async function saveCustomerAction(_previous: CustomerFormState, formData:
 
   let created: number | null = null;
   try {
-    if (current) await updateCustomer(current.id, parsed.input, session.email);
-    else created = (await createCustomer(parsed.input, session.email)).id;
+    if (current) await updateCustomer(current.id, parsed.input, session.email, conn);
+    else created = (await createCustomer(parsed.input, session.email, conn)).id;
   } catch (error) {
     return refuse([problem(error)]);
   }

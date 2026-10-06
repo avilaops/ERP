@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requirePermission } from "@/lib/auth";
+import { tenantDb } from "@/lib/db/pool";
 import { menuItem } from "@/lib/auth/permissions";
 import { loadParams } from "@/lib/db/params";
 import { latestVersion, loadPublishedSnapshot } from "@/lib/db/price-table";
@@ -27,7 +28,7 @@ import { PublishBanner } from "./PublishBanner";
 
 const ITEM = menuItem("produtos");
 
-export const metadata = { title: `${ITEM.label} · ERP Ludus` };
+export const metadata = { title: `${ITEM.label} · ERP` };
 export const dynamic = "force-dynamic";
 
 const NONE = "—";
@@ -72,15 +73,16 @@ export default async function ProdutosPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  await requirePermission("produtos");
+  const session = await requirePermission("produtos");
+  const conn = tenantDb(session.tenant.slug);
 
   const query = await searchParams;
   const tab = parseTab(first(query.aba));
   const search = (first(query.q) ?? "").trim();
 
-  const [params, products, latest] = await Promise.all([loadParams(), listProducts(), latestVersion()]);
+  const [params, products, latest] = await Promise.all([loadParams(conn), listProducts({}, conn), latestVersion(conn)]);
   // What the team sees against what would be published now.
-  const published = latest ? await loadPublishedSnapshot(latest.version) : null;
+  const published = latest ? await loadPublishedSnapshot(latest.version, conn) : null;
   const draft = draftPriceTable(params, products);
   const notice = publishNotice(draft, latest, pendingChanges(draft, published));
   const rows = viewProducts(products, { tab, search }).map((product) => toRow(product, params));

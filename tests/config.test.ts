@@ -8,6 +8,7 @@ const VALID = {
   NODE_ENV: "production",
   SSO_JWT_SECRET: SECRET,
   APP_URL: "https://erp.teste.local/",
+  ERP_TENANTS: "ludus:Ludus Equipamentos",
   ERP_USERS: "dir@teste.local:DIRETORIA",
 };
 
@@ -18,7 +19,7 @@ test("configuração completa é aceita e normalizada", () => {
   assert.deepEqual(config.users.map((user) => user.role), ["DIRETORIA"]);
 });
 
-for (const name of ["SSO_JWT_SECRET", "APP_URL", "ERP_USERS"] as const) {
+for (const name of ["SSO_JWT_SECRET", "APP_URL", "ERP_TENANTS", "ERP_USERS"] as const) {
   test(`${name} ausente derruba a inicialização citando a variável`, () => {
     assert.throws(() => assertAuthConfig({ ...VALID, [name]: undefined }), new RegExp(`${name} ausente`));
     assert.throws(() => assertAuthConfig({ ...VALID, [name]: "   " }), new RegExp(`${name} ausente`));
@@ -78,7 +79,7 @@ test("ERP_USERS inválida é recusada", () => {
 test("o erro lista todas as variáveis com problema de uma vez", () => {
   assert.throws(
     () => assertAuthConfig({}),
-    /SSO_JWT_SECRET ausente; APP_URL ausente; ERP_USERS ausente/,
+    /SSO_JWT_SECRET ausente; APP_URL ausente; ERP_TENANTS ausente; ERP_USERS ausente/,
   );
 });
 
@@ -88,4 +89,26 @@ test("só development e test escapam das regras de produção", () => {
   assert.equal(isProduction({ NODE_ENV: "production" }), true);
   assert.equal(isProduction({ NODE_ENV: "staging" }), true);
   assert.equal(isProduction({}), true);
+});
+
+test("empresas: a configuração é lida, e erro nela derruba a inicialização", () => {
+  const config = assertAuthConfig({
+    ...VALID,
+    ERP_TENANTS: "ludus:Ludus Equipamentos:ludusequipamentos.com.br,ludusequipamentos.com; acme:Acme Fitness",
+    ERP_USERS: "dir@teste.local:DIRETORIA@ludus,ven@teste.local:VENDEDOR@acme",
+  });
+  assert.deepEqual(config.tenants, [
+    { slug: "ludus", name: "Ludus Equipamentos", hosts: ["ludusequipamentos.com.br", "ludusequipamentos.com"] },
+    { slug: "acme", name: "Acme Fitness", hosts: [] },
+  ]);
+  assert.deepEqual(config.users.map((user) => user.tenant.slug), ["ludus", "acme"]);
+
+  assert.throws(() => assertAuthConfig({ ...VALID, ERP_TENANTS: "Ludus:Ludus" }), /identificador inválido "Ludus"/);
+  assert.throws(() => assertAuthConfig({ ...VALID, ERP_TENANTS: "ludus" }), /ERP_TENANTS: entrada inválida/);
+  assert.throws(() => assertAuthConfig({ ...VALID, ERP_TENANTS: "a1:A;a1:B" }), /empresa repetida a1/);
+  assert.throws(() => assertAuthConfig({ ...VALID, ERP_TENANTS: "a1:A:x.com;b1:B:x.com" }), /domínio x.com em mais de uma empresa/);
+  assert.throws(() => assertAuthConfig({ ...VALID, ERP_TENANTS: "a1:A:não é domínio" }), /domínio inválido/);
+  assert.throws(() => assertAuthConfig({ ...VALID, ERP_TENANTS: " ; " }), /ERP_TENANTS sem nenhuma empresa|ERP_TENANTS ausente/);
+  // Duas empresas e um usuário sem empresa: não se adivinha.
+  assert.throws(() => assertAuthConfig({ ...VALID, ERP_TENANTS: "a1:A;b1:B" }), /falta a empresa de dir@teste.local/);
 });

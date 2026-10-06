@@ -19,12 +19,33 @@ Todas descritas em `.env.example`. Nenhuma tem valor real no repositório.
 | `DATABASE_URL` | Banco PostgreSQL do ERP (a única conexão do sistema) | Obrigatória: sem ela o processo não sobe |
 | `SSO_JWT_SECRET` | Segredo que confere o cookie do Auth central (`auth.avilaops.com`) | Obrigatória, 32 caracteres ou mais, diferente do valor de exemplo |
 | `APP_URL` | Endereço público do sistema, usado na volta do login | Obrigatória e em `https` |
-| `ERP_USERS` | Quem entra e com qual perfil (`email:PERFIL`, separados por vírgula) | Obrigatória; entrada inválida impede a subida |
+| `ERP_TENANTS` | As empresas do sistema (`identificador:Nome[:dominio,dominio]`, separadas por `;`). Cada uma tem um esquema próprio no banco | Obrigatória; entrada inválida impede a subida |
+| `ERP_USERS` | Quem entra, com qual perfil e em qual empresa (`email:PERFIL@empresa`, separados por vírgula) | Obrigatória; entrada inválida impede a subida |
 | `ERP_LOCAL_LOGIN` | `1` liga o login local de teste (`/dev/login`) | Ignorada: o login local não existe em produção |
 | `ERP_TEST_DATABASE_URL` | Banco dos testes; o nome tem de terminar em `_test` | Não se usa |
 
-Falha fechada: em produção, faltando ou estando inválida qualquer uma das quatro primeiras, a
+Falha fechada: em produção, faltando ou estando inválida qualquer uma das cinco primeiras, a
 aplicação não sobe e nenhuma requisição é atendida (`src/instrumentation.ts`).
+
+## Empresas (multi-empresa)
+
+O sistema atende várias empresas no mesmo endereço. Cada empresa tem os seus dados num esquema
+do PostgreSQL (`tenant_<identificador>`), com as mesmas tabelas; uma não enxerga a outra.
+
+Para incluir uma empresa:
+
+1. Acrescente-a em `ERP_TENANTS` (ex.: `ludus:Ludus Equipamentos;acme:Acme Fitness`).
+2. Acrescente os usuários dela em `ERP_USERS` (`email:PERFIL@acme`).
+3. Rode `npm run db:migrate`: ele cria o esquema e as tabelas da empresa nova e mantém as outras em dia.
+4. Opcional: logo em `public/logos/<identificador>.png` (preto sobre transparente).
+5. Reinicie a aplicação.
+
+Domínio próprio: declare-o depois do nome (`ludus:Ludus Equipamentos:ludusequipamentos.com.br,ludusequipamentos.com`).
+Nesse domínio só entra quem é daquela empresa. **Ainda não funciona com o login central:** o cookie
+do Auth central só vale em `avilaops.com`, então o domínio próprio depende de uma troca de sessão
+entre domínios no Auth, que não existe.
+
+Quem pertence a mais de uma empresa escolhe em `/empresa` ("Trocar de empresa", no menu).
 
 ## Rodar localmente
 
@@ -34,7 +55,7 @@ Node 24 e npm.
 npm install
 docker compose up -d                 # PostgreSQL 16 em 127.0.0.1:5433, com os bancos erp e erp_test
 cp .env.example .env.local           # ajuste DATABASE_URL para a porta 5433 e a senha erp-local
-npm run db:migrate                   # cria ou atualiza as tabelas
+npm run db:migrate                   # cria o esquema de cada empresa de ERP_TENANTS e as tabelas
 npm run dev                          # http://localhost:3020
 ```
 

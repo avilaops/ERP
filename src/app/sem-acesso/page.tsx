@@ -1,18 +1,18 @@
 import type { Metadata } from "next";
 
-export const metadata: Metadata = { title: "Sem acesso · ERP Ludus" };
+export const metadata: Metadata = { title: "Sem acesso · ERP" };
 
 export default function NoAccessPage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-4 p-6">
       <h1 className="text-2xl font-semibold">Sem acesso</h1>
       <p>
-        O seu e-mail não tem acesso a esta parte do ERP da Ludus Equipamentos, ou ainda não foi
-        cadastrado no sistema.
+        O seu e-mail não tem acesso a esta parte do sistema, ou ainda não foi cadastrado na empresa deste
+        endereço.
       </p>
       <p>
-        Para liberar o acesso, fale com a diretoria da Ludus ou com a Ávila Ops, pelo telefone
-        (17) 99781-1471.
+        Para liberar o acesso, fale com a diretoria da sua empresa ou com a Ávila Ops, pelo telefone (17)
+        99781-1471.
       </p>
       {/* Plain link: a full navigation re-runs the access check on the server. */}
       {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}

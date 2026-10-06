@@ -1,5 +1,5 @@
 import pg from "pg";
-import { databaseUrl } from "@/lib/db/config";
+import { databaseUrl, tenantSchema } from "@/lib/db/config";
 
 /** What a repository needs from a connection. A pool, a client and a test pool all fit. */
 export type Queryable = {
@@ -10,17 +10,33 @@ export type Queryable = {
 };
 
 declare global {
-  var __ERP_DB_POOL__: pg.Pool | undefined;
+  var __ERP_DB_POOLS__: Map<string, pg.Pool> | undefined;
 }
 
 /**
- * The application pool. Created on the first query, never at import time, so
- * `next build` runs without DATABASE_URL; kept on globalThis so the dev
- * server's reloads do not open a new pool each time.
+ * The database of one company: a pool whose connections see only that company's
+ * schema. There is no connection "of the system": every read and write names
+ * the company it is for, and the company comes from the session
+ * (`session.tenant.slug`). Created on the first query, never at import time, so
+ * `next build` runs without DATABASE_URL; kept on globalThis so the dev server's
+ * reloads do not open a new pool each time.
  */
-export function db(): Queryable {
-  globalThis.__ERP_DB_POOL__ ??= new pg.Pool({ connectionString: databaseUrl(process.env), max: 5 });
-  return globalThis.__ERP_DB_POOL__;
+export function tenantDb(slug: string): Queryable {
+  const schema = tenantSchema(slug);
+  const pools = (globalThis.__ERP_DB_POOLS__ ??= new Map());
+  let pool = pools.get(schema);
+  if (!pool) {
+    pool = new pg.Pool({ connectionString: databaseUrl(process.env), max: 5, options: `-c search_path=${schema}` });
+    pools.set(schema, pool);
+  }
+  return pool;
+}
+
+/** Closes every pool. For scripts and tests; the server keeps them open. */
+export async function closeTenantPools(): Promise<void> {
+  const pools = [...(globalThis.__ERP_DB_POOLS__?.values() ?? [])];
+  globalThis.__ERP_DB_POOLS__ = new Map();
+  await Promise.all(pools.map((pool) => pool.end()));
 }
 
 /** PostgreSQL error code, when the thrown value is a database error. */

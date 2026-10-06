@@ -41,6 +41,7 @@ test("a inicialização em produção junta os problemas de login e de banco", (
     NODE_ENV: "production",
     SSO_JWT_SECRET: SECRET,
     APP_URL: "https://erp.teste.local",
+    ERP_TENANTS: "ludus:Ludus Equipamentos",
     ERP_USERS: "dir@teste.local:DIRETORIA",
   };
   assert.deepEqual(startupProblems({ ...auth, DATABASE_URL: URL_OK }), []);

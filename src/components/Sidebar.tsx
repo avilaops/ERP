@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import Link from "next/link";
 import type { Session } from "@/lib/auth";
 import { localProvider } from "@/lib/auth/local-provider";
@@ -12,17 +14,24 @@ export function Sidebar({ session }: { session: Session }) {
 
   return (
     <aside className="flex w-64 shrink-0 flex-col gap-4 border-r border-slate-200 bg-white p-4">
-      {/* The logo is a mask, painted with the ink colour, as in the prototype. */}
-      <div
-        role="img"
-        aria-label="Ludus Equipamentos"
-        className="h-9 w-28 bg-slate-900 [mask:url(/logo-ludus.png)_left_center/contain_no-repeat]"
-      />
+      {/* The company of the session. Its logo is a mask painted with the ink colour, when it has one. */}
+      {existsSync(join(process.cwd(), "public", "logos", `${session.tenant.slug}.png`)) ? (
+        <div
+          role="img"
+          aria-label={session.tenant.name}
+          className="h-9 w-28 bg-slate-900"
+          style={{ mask: `url(/logos/${session.tenant.slug}.png) left center / contain no-repeat` }}
+        />
+      ) : (
+        <p className="font-display text-2xl font-bold uppercase leading-none">{session.tenant.name}</p>
+      )}
 
       <section className="rounded border border-slate-200 bg-slate-50 p-3" aria-label="Seu acesso">
         <p className="text-xs uppercase tracking-wide text-slate-500">Seu acesso</p>
         <p className="truncate font-display text-lg font-semibold uppercase leading-tight">{session.name}</p>
-        <p className="text-sm text-slate-600">{ROLE_LABELS[session.role]}</p>
+        <p className="text-sm text-slate-600">
+          {ROLE_LABELS[session.role]} · {session.tenant.name}
+        </p>
       </section>
 
       {canAccess(session.role, "pedidos") && (
@@ -43,6 +52,11 @@ export function Sidebar({ session }: { session: Session }) {
       </nav>
 
       <div className="mt-auto flex flex-col gap-2 text-sm">
+        {session.companies > 1 && (
+          <Link href="/empresa" className="text-slate-600 underline">
+            Trocar de empresa
+          </Link>
+        )}
         {localLogin && (
           <Link href="/dev/login" className="text-slate-600 underline">
             Trocar perfil (login local)

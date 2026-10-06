@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requirePermission } from "@/lib/auth";
+import { tenantDb } from "@/lib/db/pool";
 import { menuItem } from "@/lib/auth/permissions";
 import { ufFromCep } from "@/lib/cep";
 import { completenessText, isComplete, isRequired } from "@/lib/customer";
@@ -12,7 +13,7 @@ import { CustomerForm } from "../CustomerForm";
 
 const ITEM = menuItem("clientes");
 
-export const metadata = { title: `${ITEM.label} · ERP Ludus` };
+export const metadata = { title: `${ITEM.label} · ERP` };
 export const dynamic = "force-dynamic";
 
 const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
@@ -27,7 +28,8 @@ export default async function ClientePage({
   params: Promise<{ id: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  await requirePermission("clientes");
+  const session = await requirePermission("clientes");
+  const conn = tenantDb(session.tenant.slug);
 
   const [{ id }, query] = await Promise.all([params, searchParams]);
   const back = (
@@ -52,7 +54,7 @@ export default async function ClientePage({
     );
   }
 
-  const customer = /^\d+$/.test(id) ? await getCustomer(Number(id)) : null;
+  const customer = /^\d+$/.test(id) ? await getCustomer(Number(id), conn) : null;
   if (!customer) notFound();
 
   const uf = customer.cep ? ufFromCep(customer.cep) : null;

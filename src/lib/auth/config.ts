@@ -1,5 +1,7 @@
 import { parseErpUsers } from "@/lib/auth/directory";
 import type { DirectoryUser } from "@/lib/auth/directory";
+import { parseTenants } from "@/lib/auth/tenants";
+import type { Tenant } from "@/lib/auth/tenants";
 
 export type AuthEnv = Record<string, string | undefined>;
 
@@ -7,6 +9,7 @@ export type AuthConfig = {
   ssoSecret: string;
   /** Public origin of the ERP, without trailing slash. */
   appUrl: string;
+  tenants: Tenant[];
   users: DirectoryUser[];
 };
 
@@ -52,12 +55,24 @@ export function assertAuthConfig(env: AuthEnv): AuthConfig {
     problems.push("APP_URL sem https (obrigatório em produção)");
   }
 
+  let tenants: Tenant[] = [];
+  if ((env.ERP_TENANTS?.trim() ?? "") === "") {
+    problems.push("ERP_TENANTS ausente");
+  } else {
+    try {
+      tenants = parseTenants(env.ERP_TENANTS);
+      if (tenants.length === 0) problems.push("ERP_TENANTS sem nenhuma empresa");
+    } catch (error) {
+      problems.push(error instanceof Error ? error.message : "ERP_TENANTS inválida");
+    }
+  }
+
   let users: DirectoryUser[] = [];
   if ((env.ERP_USERS?.trim() ?? "") === "") {
     problems.push("ERP_USERS ausente");
-  } else {
+  } else if (tenants.length > 0) {
     try {
-      users = parseErpUsers(env.ERP_USERS);
+      users = parseErpUsers(env.ERP_USERS, tenants);
       if (users.length === 0) problems.push("ERP_USERS sem nenhum usuário");
     } catch (error) {
       problems.push(error instanceof Error ? error.message : "ERP_USERS inválida");
@@ -68,7 +83,7 @@ export function assertAuthConfig(env: AuthEnv): AuthConfig {
     throw new Error(`Configuração de login do ERP inválida: ${problems.join("; ")}.`);
   }
 
-  return { ssoSecret, appUrl, users };
+  return { ssoSecret, appUrl, tenants, users };
 }
 
 /**
