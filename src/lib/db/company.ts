@@ -1,4 +1,5 @@
 import type { Queryable } from "@/lib/db/pool";
+import type { ApprovalRules } from "@/lib/pricing/order";
 import { detectLogoType, logoProblem } from "@/lib/logo";
 import type { LogoType } from "@/lib/logo";
 
@@ -61,6 +62,37 @@ export async function saveCommissionDay(day: number, updatedBy: string, conn: Qu
   const { rows } = await conn.query(
     "UPDATE company_settings SET commission_payment_day = $1, updated_at = now(), updated_by = $2 RETURNING id",
     [day, updatedBy],
+  );
+  if (rows.length === 0) throw new Error("Dados da empresa não cadastrados no banco. Rode `npm run db:migrate`.");
+}
+
+/** The approval rules of the company, plus whether a director closing an order outside the policy already approves it. */
+export type ApprovalPolicy = ApprovalRules & { directorSelfApproves: boolean };
+
+export async function loadApprovalPolicy(conn: Queryable): Promise<ApprovalPolicy> {
+  const { rows } = await conn.query(
+    "SELECT approval_below_target, approval_freight, manager_limit, director_self_approves FROM company_settings",
+  );
+  const row = rows[0];
+  if (!row) throw new Error("Dados da empresa não cadastrados no banco. Rode `npm run db:migrate`.");
+  return {
+    belowTarget: row.approval_below_target === true,
+    freight: row.approval_freight === true,
+    managerLimit: row.manager_limit === "meta" ? "meta" : "lucro",
+    directorSelfApproves: row.director_self_approves === true,
+  };
+}
+
+/** Changes the rules for the orders closed from now on. Orders already waiting keep the reasons they were sent with. */
+export async function saveApprovalPolicy(policy: ApprovalPolicy, updatedBy: string, conn: Queryable): Promise<void> {
+  if (updatedBy.trim() === "") throw new Error("Falta dizer quem está alterando as regras de aprovação.");
+  if (policy.managerLimit !== "lucro" && policy.managerLimit !== "meta") throw new CompanyError("Escolha até onde o gerente aprova.");
+  const { rows } = await conn.query(
+    `UPDATE company_settings
+        SET approval_below_target = $1, approval_freight = $2, manager_limit = $3, director_self_approves = $4,
+            updated_at = now(), updated_by = $5
+      RETURNING id`,
+    [policy.belowTarget, policy.freight, policy.managerLimit, policy.directorSelfApproves, updatedBy],
   );
   if (rows.length === 0) throw new Error("Dados da empresa não cadastrados no banco. Rode `npm run db:migrate`.");
 }

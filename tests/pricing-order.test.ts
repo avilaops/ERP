@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { discountBand, orderBand, orderMaxDiscounts, policyCheck, quoteOrder, quoteSale } from "@/lib/pricing/order";
+import { DEFAULT_APPROVAL_RULES, discountBand, needsDirector, orderBand, orderMaxDiscounts, policyCheck, quoteOrder, quoteSale } from "@/lib/pricing/order";
 import type { OrderInput } from "@/lib/pricing/order";
 import { DEFAULT_PARAMS } from "@/lib/pricing/params";
 import { maxDiscounts } from "@/lib/pricing/table";
@@ -307,4 +307,25 @@ test("provisões: perdas, garantia e inadimplência somam nas taxas da venda", (
   assert.equal((more.taxRate - base.taxRate).toFixed(6), "0.020000");
   assert.ok(more.netProfit < base.netProfit);
   assert.throws(() => quoteOrder(MANUAL_ORDER, { ...P, lossProvision: 1 }), /Provisão para perdas/);
+});
+
+test("regras de aprovação: lucro abaixo da meta e frete pedem aprovação quando a empresa diz", () => {
+  const order = { discount: 0.1, downPayment: 1000, invoiceTotal: 1000 };
+  const rules = DEFAULT_APPROVAL_RULES;
+  assert.deepEqual(rules, { belowTarget: true, freight: false, managerLimit: "lucro" });
+  // Como o sistema começou: abaixo da meta pede aprovação, frete não.
+  assert.deepEqual(policyCheck({ ...order, band: "abaixo-da-meta", freight: 500 }, P).reasons, ["fora-da-meta"]);
+  // Como no protótipo: frete pede, lucro abaixo da meta não.
+  const prototype = { ...rules, belowTarget: false, freight: true };
+  assert.deepEqual(policyCheck({ ...order, band: "abaixo-da-meta", freight: 500 }, P, prototype).reasons, ["frete-por-nossa-conta"]);
+  assert.deepEqual(policyCheck({ ...order, band: "abaixo-da-meta" }, P, prototype), { needsApproval: false, reasons: [] });
+  // Prejuízo pede aprovação seja qual for a regra.
+  assert.deepEqual(policyCheck({ ...order, band: "prejuizo" }, P, prototype).reasons, ["fora-da-meta"]);
+  // Desconto acima do livre e entrada baixa não dependem das regras.
+  assert.deepEqual(policyCheck({ discount: 0.25, downPayment: 0, invoiceTotal: 1000, band: "na-meta" }, P, prototype).reasons, ["desconto-acima-do-livre", "entrada-abaixo-da-politica"]);
+});
+
+test("alçada do gerente: enquanto der lucro, ou só enquanto ficar na meta", () => {
+  assert.deepEqual(["na-meta", "abaixo-da-meta", "prejuizo"].map((band) => needsDirector(band as "na-meta")), [false, false, true]);
+  assert.deepEqual(["na-meta", "abaixo-da-meta", "prejuizo"].map((band) => needsDirector(band as "na-meta", "meta")), [false, true, true]);
 });

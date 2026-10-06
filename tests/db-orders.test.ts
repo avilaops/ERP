@@ -25,7 +25,7 @@ import type { OrderPayment, OrderScope, OrderTerms } from "@/lib/db/orders";
 import { loadParams, saveParams } from "@/lib/db/params";
 import { listCommissionsDue } from "@/lib/db/payables";
 import { listCarriedBalances, listCommissionMonths, listCommissions, payCommissions } from "@/lib/db/commissions";
-import { loadCommissionDay, saveCommissionDay } from "@/lib/db/company";
+import { loadApprovalPolicy, loadCommissionDay, saveApprovalPolicy, saveCommissionDay } from "@/lib/db/company";
 import { decideRefund, listOpenReceivables, listPendingRefunds, listReceipts, recordReceipt, requestRefund } from "@/lib/db/receivables";
 import { latestVersion, loadPublishedSnapshot, loadPublishedTable, publishPriceTable } from "@/lib/db/price-table";
 import { createProduct, listProducts, updateProduct } from "@/lib/db/products";
@@ -969,6 +969,43 @@ test("simulador: a equipe recebe só o nome da faixa, calculado no servidor", { 
   assert.equal(await simulationBand(1, { ...base, discount: 0.15, freight: 5000 }, db.pool), "prejuizo");
   assert.equal(await simulationBand(1, { ...base, discount: 0, deliveryUf: null }, db.pool), null);
   await assert.rejects(() => simulationBand(1, { ...base, productId: ID["LD-B009"], discount: 0 }, db.pool), /não está na tabela v1/);
+});
+
+test("regras de aprovação da empresa: alçada do gerente, frete e diretoria que já aprova ao fechar", { skip }, async () => {
+  const initial = await loadApprovalPolicy(db.pool);
+  assert.deepEqual(initial, { belowTarget: true, freight: false, managerLimit: "lucro", directorSelfApproves: false });
+
+  // Gerente só até a meta: um pedido abaixo da meta passa a ser só da diretoria.
+  const sent = await sendToClosing("261005-ALCA", 0.3, 12000);
+  assert.equal(sent.status, "aguardando_aprovacao");
+  const queued = async () => (await listPendingApprovals(db.pool)).find((entry) => entry.order.number === "261005-ALCA");
+  assert.deepEqual([(await queued())?.band, (await queued())?.directorOnly], ["abaixo-da-meta", false]);
+  await saveApprovalPolicy({ ...initial, managerLimit: "meta" }, DIRECTOR, db.pool);
+  assert.equal((await queued())?.directorOnly, true);
+  await assert.rejects(() => decideApproval("261005-ALCA", { approve: true, comment: null }, MANAGER, db.pool), /passa da sua alçada/);
+  await decideApproval("261005-ALCA", { approve: true, comment: null }, BOSS, db.pool);
+
+  // Frete por nossa conta vira motivo; lucro abaixo da meta deixa de ser.
+  await saveApprovalPolicy({ belowTarget: false, freight: true, managerLimit: "lucro", directorSelfApproves: true }, DIRECTOR, db.pool);
+  const N = await createOrder({ seller: SELLER, version: 1, productId: ID["LD-B001"], quantity: 1 }, numbers("261005-FRET"), db.pool);
+  await linkOrderCustomer(N, customerMa, SELLER.email, MINE, db.pool);
+  await saveOrderTerms(N, { ...TERMS, freight: 300 }, SELLER.email, MINE, db.pool);
+  await savePayment(N, { ...PAYMENT, downPayment: 20000 }, SELLER.email, MINE, db.pool);
+  assert.deepEqual((await loadOrderStanding(await order(N), db.pool)).policy, { needsApproval: true, reasons: ["frete-por-nossa-conta"] });
+
+  // O vendedor fechando: vai para aprovação. A diretoria fechando: já fica aprovado, com registro.
+  assert.equal((await closeOrder(N, SELLER.email, MINE, db.pool)).status, "aguardando_aprovacao");
+  await reopenOrder(N, SELLER.email, MINE, db.pool);
+  assert.deepEqual(await closeOrder(N, DIRECTOR, ALL, db.pool, { isDirector: true }), { status: "fechado", reasons: ["frete-por-nossa-conta"], missing: [] });
+  const { rows } = await db.pool.query(
+    "SELECT a.status, a.decided_by, a.decided_role, a.reasons FROM order_approvals a JOIN orders o ON o.id = a.order_id WHERE o.number = $1",
+    [N],
+  );
+  assert.deepEqual(rows, [{ status: "aprovado", decided_by: DIRECTOR, decided_role: "DIRETORIA", reasons: ["frete-por-nossa-conta"] }]);
+  assert.equal((await listOpenReceivables(db.pool)).filter((item) => item.orderNumber === N).length, 3);
+
+  await assert.rejects(() => saveApprovalPolicy({ ...initial, managerLimit: "tudo" as never }, DIRECTOR, db.pool), /até onde o gerente aprova/);
+  await saveApprovalPolicy(initial, DIRECTOR, db.pool);
 });
 
 test("a migração dos pedidos não tem cascata nem coluna de preço, custo ou total", () => {

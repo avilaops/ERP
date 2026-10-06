@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/auth";
 import { tenantDb } from "@/lib/db/pool";
 import type { Session } from "@/lib/auth";
-import { menuItem, seesAllOrders } from "@/lib/auth/permissions";
+import { approvesAtLoss, menuItem, seesAllOrders } from "@/lib/auth/permissions";
 import { parseCustomerForm, rawCustomerValues } from "@/lib/customer-form";
 import type { CustomerFieldKey, CustomerFormState } from "@/lib/customer-form";
 import { createCustomer, CustomerError, findCustomerByDocument, getCustomer, updateCustomer } from "@/lib/db/customers";
@@ -182,7 +182,8 @@ export async function closeOrderAction(_previous: ActionState, formData: FormDat
 
   const number = reader(formData)("number") ?? "";
   try {
-    const result = await closeOrder(number, session.email, scopeOf(session), conn);
+    // Whether the closer is a director comes from the session: the company decides what that is worth.
+    const result = await closeOrder(number, session.email, scopeOf(session), conn, { isDirector: approvesAtLoss(session.role) });
     if (result.missing.length > 0) return { error: `Para fechar: ${result.missing.join(" ")}` };
   } catch (error) {
     return { error: problem("fechar o pedido", error) };

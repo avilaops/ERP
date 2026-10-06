@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requirePermission } from "@/lib/auth";
 import { tenantDb } from "@/lib/db/pool";
 import { menuItem } from "@/lib/auth/permissions";
-import { loadCommissionDay, loadLogoVersion } from "@/lib/db/company";
+import { loadApprovalPolicy, loadCommissionDay, loadLogoVersion } from "@/lib/db/company";
 import { ActionForm } from "../pedidos/ActionForm";
 import { loadParams } from "@/lib/db/params";
 import { listProductCosts } from "@/lib/db/products";
@@ -10,7 +10,7 @@ import { showMoney, showMultiplier, showPercent } from "@/lib/format";
 import { paramsToForm } from "@/lib/params-form";
 import { roundCents } from "@/lib/pricing/money";
 import { paramsResult } from "@/lib/pricing/results";
-import { adoptSuggestedDownPaymentAction, removeLogoAction, saveLogoAction, saveParamsAction, saveCommissionDayAction } from "./actions";
+import { adoptSuggestedDownPaymentAction, removeLogoAction, saveLogoAction, saveParamsAction, saveApprovalPolicyAction, saveCommissionDayAction } from "./actions";
 import { LogoForm } from "./LogoForm";
 import { ParamsForm } from "./ParamsForm";
 
@@ -23,6 +23,7 @@ export default async function ParametrosPage() {
 
   const [params, costs, logoVersion] = await Promise.all([loadParams(conn), listProductCosts(conn), loadLogoVersion(conn)]);
   const commissionDay = await loadCommissionDay(conn);
+  const policy = await loadApprovalPolicy(conn);
   // Every figure of the board is calculated here, on the server, by the engine.
   const result = paramsResult(params, costs);
   const form = paramsToForm(params);
@@ -96,6 +97,55 @@ export default async function ParametrosPage() {
               <p className="basis-full text-xs text-slate-500">
                 De 1 a 28. O que é recebido num mês é pago neste dia do mês seguinte. Vale para as comissões geradas daqui em diante.
               </p>
+            </ActionForm>
+          </section>
+          <section className="rounded-lg border border-slate-200 bg-white p-5" aria-labelledby="regras-aprovacao">
+            <h2 id="regras-aprovacao" className="text-sm font-semibold uppercase tracking-wide">
+              Regras de aprovação
+            </h2>
+            <p className="mt-1 text-xs text-slate-500">
+              Desconto acima do livre, entrada abaixo da política e pedido com prejuízo sempre pedem aprovação. O resto é escolha da empresa.
+            </p>
+            <ActionForm action={saveApprovalPolicyAction} className="mt-3 flex flex-col gap-3 text-sm">
+              <label className="flex items-start gap-2">
+                <input key={String(policy.belowTarget)} type="checkbox" name="belowTarget" value="sim" defaultChecked={policy.belowTarget} className="mt-1" />
+                Pedido com lucro abaixo da meta precisa de aprovação
+              </label>
+              <label className="flex items-start gap-2">
+                <input key={String(policy.freight)} type="checkbox" name="freight" value="sim" defaultChecked={policy.freight} className="mt-1" />
+                Pedido com frete por nossa conta precisa de aprovação
+              </label>
+              <label className="flex items-start gap-2">
+                <input
+                  key={String(policy.directorSelfApproves)}
+                  type="checkbox"
+                  name="directorSelfApproves"
+                  value="sim"
+                  defaultChecked={policy.directorSelfApproves}
+                  className="mt-1"
+                />
+                Quando a diretoria fecha um pedido fora da política, ele já fica aprovado
+              </label>
+              <div>
+                <label htmlFor="managerLimit" className="block font-medium">
+                  O gerente comercial aprova sozinho
+                </label>
+                <select
+                  key={policy.managerLimit}
+                  id="managerLimit"
+                  name="managerLimit"
+                  defaultValue={policy.managerLimit}
+                  className="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-brand sm:w-auto"
+                >
+                  <option value="lucro">qualquer pedido que ainda dê lucro</option>
+                  <option value="meta">só pedido com lucro na meta; o resto vai para a diretoria</option>
+                </select>
+              </div>
+              <div>
+                <button type="submit" className="rounded border border-slate-300 bg-white px-3 py-2 font-medium hover:bg-slate-50">
+                  Salvar regras
+                </button>
+              </div>
             </ActionForm>
           </section>
           <ParamsForm saved={form} action={saveParamsAction} />

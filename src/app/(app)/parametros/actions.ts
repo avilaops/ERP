@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/auth";
 import { tenantDb } from "@/lib/db/pool";
 import { menuItem } from "@/lib/auth/permissions";
-import { CompanyError, removeLogo, saveCommissionDay, saveLogo } from "@/lib/db/company";
+import { CompanyError, removeLogo, saveApprovalPolicy, saveCommissionDay, saveLogo } from "@/lib/db/company";
 import { loadParams, saveParams } from "@/lib/db/params";
 import type { ActionState } from "@/lib/order-form";
 import { listProductCosts } from "@/lib/db/products";
@@ -130,5 +130,32 @@ export async function saveCommissionDayAction(_previous: ActionState, formData: 
   }
   revalidatePath(menuItem("parametros").href);
   revalidatePath(menuItem("comissoes").href);
+  return { error: null };
+}
+
+/** "Regras de aprovação": choices of the company, valid for the orders closed from now on. */
+export async function saveApprovalPolicyAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
+  const session = await requirePermission("parametros");
+  const conn = tenantDb(session.tenant.slug);
+
+  const on = (key: string) => formData.get(key) === "sim";
+  try {
+    await saveApprovalPolicy(
+      {
+        belowTarget: on("belowTarget"),
+        freight: on("freight"),
+        managerLimit: formData.get("managerLimit") === "meta" ? "meta" : "lucro",
+        directorSelfApproves: on("directorSelfApproves"),
+      },
+      session.email,
+      conn,
+    );
+  } catch (error) {
+    if (error instanceof CompanyError) return { error: error.message };
+    console.error("[parametros] falha ao gravar as regras de aprovação:", error instanceof Error ? error.message : error);
+    return { error: "Não foi possível gravar agora. Nada foi alterado; tente de novo." };
+  }
+  revalidatePath(menuItem("parametros").href);
+  revalidatePath(menuItem("aprovacoes").href);
   return { error: null };
 }

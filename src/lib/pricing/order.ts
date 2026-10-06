@@ -231,14 +231,31 @@ export function orderBand(order: OrderInput, params: PricingParams): DiscountBan
   return discountBand(order.discount, orderMaxDiscounts(order, params));
 }
 
-export type ApprovalReason = "desconto-acima-do-livre" | "fora-da-meta" | "entrada-abaixo-da-politica";
+export type ApprovalReason = "desconto-acima-do-livre" | "fora-da-meta" | "frete-por-nossa-conta" | "entrada-abaixo-da-politica";
+
+/** How far the commercial manager approves alone: while the order gives profit, or only while it stays on target. */
+export type ManagerLimit = "lucro" | "meta";
 
 /**
- * Who may decide an order waiting for approval: the commercial manager while the
- * order still gives profit; at a loss, only the directors.
+ * The approval rules of the company. They come from the database: these are
+ * only the values the system started with, and the gabarito of the tests.
  */
-export function needsDirector(band: DiscountBand): boolean {
-  return band === "prejuizo";
+export type ApprovalRules = {
+  /** Profit below the target sends the order to approval. */
+  belowTarget: boolean;
+  /** Freight paid by the company sends the order to approval. */
+  freight: boolean;
+  managerLimit: ManagerLimit;
+};
+export const DEFAULT_APPROVAL_RULES: ApprovalRules = { belowTarget: true, freight: false, managerLimit: "lucro" };
+
+/**
+ * Who may decide an order waiting for approval. At a loss, always the
+ * directors. Below the target, the manager decides only when the company lets
+ * them approve whatever still gives profit.
+ */
+export function needsDirector(band: DiscountBand, limit: ManagerLimit = DEFAULT_APPROVAL_RULES.managerLimit): boolean {
+  return band === "prejuizo" || (limit === "meta" && band !== "na-meta");
 }
 
 export type PolicyCheck = {
@@ -246,20 +263,28 @@ export type PolicyCheck = {
   reasons: ApprovalReason[];
 };
 
-/** The strictest reading: any one of the three sends the order to approval. */
+/**
+ * Whether the order closes by itself or waits for approval, and why. A discount
+ * above the free one and a down payment below the policy always ask for
+ * approval; profit below the target and freight paid by the company ask for it
+ * when the rules of the company say so. A loss always does.
+ */
 export function policyCheck(
   {
     discount,
     downPayment,
     invoiceTotal,
     band,
-  }: { discount: number; downPayment: number; invoiceTotal: number; band: DiscountBand },
+    freight = 0,
+  }: { discount: number; downPayment: number; invoiceTotal: number; band: DiscountBand; freight?: number },
   params: PricingParams,
+  rules: ApprovalRules = DEFAULT_APPROVAL_RULES,
 ): PolicyCheck {
   checkDiscount(discount);
   const reasons: ApprovalReason[] = [];
   if (discount > params.freeDiscount + RATE_EPSILON) reasons.push("desconto-acima-do-livre");
-  if (band !== "na-meta") reasons.push("fora-da-meta");
+  if (band === "prejuizo" || (rules.belowTarget && band !== "na-meta")) reasons.push("fora-da-meta");
+  if (rules.freight && freight > 0) reasons.push("frete-por-nossa-conta");
   if (roundCents(downPayment) < roundCents(params.minDownPayment * invoiceTotal)) {
     reasons.push("entrada-abaixo-da-politica");
   }

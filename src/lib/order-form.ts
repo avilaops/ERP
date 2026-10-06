@@ -118,6 +118,7 @@ export function parseOrderPayment(read: (key: PaymentField) => string | null, me
 export const REASON_TEXT: Record<ApprovalReason, string> = {
   "desconto-acima-do-livre": "o desconto passa do que a equipe pode dar sem aprovação",
   "fora-da-meta": "o lucro do pedido fica abaixo da meta",
+  "frete-por-nossa-conta": "o frete fica por conta da empresa",
   "entrada-abaixo-da-politica": "a entrada fica abaixo da política da empresa",
 };
 

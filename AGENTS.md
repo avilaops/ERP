@@ -222,6 +222,12 @@ funções puras, sem banco e sem tela, conferidas com os números dos prints do 
     (`order_closings`) e não se exclui. As formas de pagamento são a tabela
     `payment_methods` da empresa, nunca lista no código; a Diretoria as edita em
     Parâmetros → Formas de pagamento (renomear, ordenar, desligar; nunca apagar).
+16. **As regras de aprovação são da empresa** (`company_settings`, Parâmetros → Regras de
+    aprovação; `loadApprovalPolicy`): se lucro abaixo da meta e frete por nossa conta pedem
+    aprovação, até onde o gerente aprova sozinho (`needsDirector(band, limite)`) e se a
+    diretoria, ao fechar fora da política, já aprova (fica registrado em `order_approvals`).
+    Desconto acima do livre, entrada abaixo da política e prejuízo pedem aprovação sempre.
+    O motor recebe as regras por argumento (`ApprovalRules`); nada disso é fixo no código.
 12. **Aprovação é `decideApproval`** (`src/lib/db/approvals.ts`): aprovar fecha o pedido,
     recusar exige motivo e devolve à negociação; pedido, pedido de aprovação e fechamento
     mudam num comando só. Quem decide e se pode aprovar pedido com prejuízo

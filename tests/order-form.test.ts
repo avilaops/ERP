@@ -93,6 +93,6 @@ test("pagamento: forma fora da lista da empresa, data torta e parcela zero são 
 });
 
 test("motivos de aprovação: frase para cada um, sem número nenhum", () => {
-  assert.deepEqual(Object.keys(REASON_TEXT), ["desconto-acima-do-livre", "fora-da-meta", "entrada-abaixo-da-politica"]);
+  assert.deepEqual(Object.keys(REASON_TEXT), ["desconto-acima-do-livre", "fora-da-meta", "frete-por-nossa-conta", "entrada-abaixo-da-politica"]);
   for (const text of Object.values(REASON_TEXT)) assert.doesNotMatch(text, /\d|%|R\$/);
 });

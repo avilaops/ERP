@@ -74,7 +74,7 @@ export default async function AprovacoesPage() {
               </ul>
               {blocked && (
                 <p className="mt-3 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-900">
-                  Este pedido dá prejuízo: só a diretoria pode aprovar. Você pode recusar, com o motivo.
+                  Este pedido passa da sua alçada: só a diretoria pode aprovar. Você pode recusar, com o motivo.
                 </p>
               )}
               <ActionForm action={decideApprovalAction} className="mt-4 flex flex-wrap items-end gap-3">

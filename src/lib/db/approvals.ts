@@ -1,3 +1,4 @@
+import { loadApprovalPolicy } from "@/lib/db/company";
 import { getOrder, listOrders, loadOrderStanding, OrderError } from "@/lib/db/orders";
 import type { OrderSummary } from "@/lib/db/orders";
 import type { Queryable } from "@/lib/db/pool";
@@ -31,6 +32,7 @@ export async function listPendingApprovals(conn: Queryable): Promise<PendingAppr
   );
   if (rows.length === 0) return [];
   const summaries = new Map((await listOrders(ALL, conn)).map((order) => [order.number, order]));
+  const { managerLimit } = await loadApprovalPolicy(conn);
   const pending: PendingApproval[] = [];
   for (const row of rows) {
     const number = String(row.number);
@@ -44,7 +46,7 @@ export async function listPendingApprovals(conn: Queryable): Promise<PendingAppr
       requestedAt: row.requested_at as Date,
       reasons: row.reasons as ApprovalReason[],
       band,
-      directorOnly: band !== null && needsDirector(band),
+      directorOnly: band !== null && needsDirector(band, managerLimit),
     });
   }
   return pending;
@@ -74,8 +76,9 @@ export async function decideApproval(number: string, decision: Decision, who: De
   const order = await getOrder(number, ALL, conn);
   if (!order || order.status !== "aguardando_aprovacao") throw new OrderError(GONE);
   const { band } = await loadOrderStanding(order, conn);
-  if (decision.approve && (band === null || (needsDirector(band) && !who.approvesAtLoss))) {
-    throw new OrderError("Este pedido dá prejuízo: só a diretoria pode aprovar. Você pode recusar, com o motivo.");
+  const { managerLimit } = await loadApprovalPolicy(conn);
+  if (decision.approve && (band === null || (needsDirector(band, managerLimit) && !who.approvesAtLoss))) {
+    throw new OrderError("Este pedido passa da sua alçada: só a diretoria pode aprovar. Você pode recusar, com o motivo.");
   }
   const table = await loadPublishedTable(order.priceTableVersion, conn);
   if (!table) throw new Error(`Tabela v${order.priceTableVersion} não encontrada.`);

@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { taxpayerFromRegistration } from "@/lib/customer";
+import { loadApprovalPolicy } from "@/lib/db/company";
 import { getCustomer } from "@/lib/db/customers";
 import type { Customer } from "@/lib/db/customers";
 import { pgErrorCode } from "@/lib/db/pool";
@@ -359,7 +360,11 @@ export async function loadOrderStanding(order: Order, conn: Queryable): Promise<
   const { invoiceTotal } = quoteSale(input, snapshot.params);
   return {
     band,
-    policy: policyCheck({ discount: order.discount, downPayment: order.downPayment, invoiceTotal, band }, snapshot.params),
+    policy: policyCheck(
+      { discount: order.discount, downPayment: order.downPayment, invoiceTotal, band, freight: order.freight },
+      snapshot.params,
+      await loadApprovalPolicy(conn),
+    ),
   };
 }
 
@@ -476,7 +481,13 @@ const CHANGED = "O pedido foi alterado por outra pessoa enquanto você fechava. 
  * it waits for approval, with the reasons. The write only happens if the order is
  * still exactly as it was read.
  */
-export async function closeOrder(number: string, who: string, scope: OrderScope, conn: Queryable): Promise<CloseResult> {
+export async function closeOrder(
+  number: string,
+  who: string,
+  scope: OrderScope,
+  conn: Queryable,
+  { isDirector = false }: { isDirector?: boolean } = {},
+): Promise<CloseResult> {
   assertWho(who);
   const order = await getOrder(number, scope, conn);
   if (!order || order.status !== "em_negociacao") throw new OrderError(NOT_EDITABLE);
@@ -489,7 +500,9 @@ export async function closeOrder(number: string, who: string, scope: OrderScope,
   const { policy } = await loadOrderStanding(order, conn);
   if (!policy) throw new Error("Pedido sem estado de entrega chegou à política.");
 
-  const status: OrderStatus = policy.needsApproval ? "aguardando_aprovacao" : "fechado";
+  // When the company says so, a director closing an order outside the policy has already approved it.
+  const selfApproved = policy.needsApproval && isDirector && (await loadApprovalPolicy(conn)).directorSelfApproves;
+  const status: OrderStatus = policy.needsApproval && !selfApproved ? "aguardando_aprovacao" : "fechado";
   const plan = receivableColumns(paymentOf(order, sale, table, isoDate(new Date())));
   // One statement: the order changes and, when it closes, the closing is recorded with it.
   const { rows } = await conn.query(
@@ -505,6 +518,11 @@ export async function closeOrder(number: string, who: string, scope: OrderScope,
      ), requested AS (
        INSERT INTO order_approvals (order_id, requested_by, revision_hash, reasons)
        SELECT id, $3, $7, $8::text[] FROM closed WHERE status = 'aguardando_aprovacao'
+     ), self_approved AS (
+       -- The exception stays on record, with who took it.
+       INSERT INTO order_approvals (order_id, requested_by, revision_hash, reasons, status, decided_at, decided_by, decided_role, comment)
+       SELECT id, $3, $7, $8::text[], 'aprovado', now(), $3, 'DIRETORIA', 'Aprovado pela diretoria ao fechar.'
+         FROM closed WHERE status = 'fechado' AND $14::boolean
      ), receivable AS (
        -- What the order expects to receive, from the plan. Closing again after a reopening
        -- rewrites what was not received yet.
@@ -533,6 +551,7 @@ export async function closeOrder(number: string, who: string, scope: OrderScope,
       plan.dueDates,
       plan.amounts,
       plan.methods,
+      selfApproved,
     ],
   );
   if (rows.length === 0) throw new OrderError(CHANGED);
