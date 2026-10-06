@@ -219,7 +219,10 @@ guardada no banco da empresa (`product_photos`), nunca em disco nem em `public/`
    `tenantDb(session.tenant.slug)`: a empresa, o perfil e o e-mail saem só da sessão,
    nunca do corpo, de cabeçalho ou do endereço. `tests/routes.test.ts` falha se não for
    assim, e `tests/product-photo-route.test.ts` confere que uma empresa não lê nem grava
-   foto de outra.
+   foto de outra. **A única exceção é `/api/health`**, pública de propósito (é o que o
+   deploy consulta): sem sessão, sem banco e sem dado de empresa, e sem ler nada do
+   pedido. A exceção é nominal (`PUBLIC_ROUTES` em `tests/routes.test.ts`); rota pública
+   nova só entra nessa lista, e o mesmo teste falha se ela tocar em banco ou sessão.
 5. `listProducts` devolve `hasPhoto`, nunca os bytes. A chave de `product_photos` não
    apaga em cascata (nenhuma do banco apaga): `deleteProduct` apaga a foto no mesmo
    comando, e equipamento com histórico continua recusado, com a foto no lugar.

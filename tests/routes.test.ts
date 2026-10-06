@@ -209,11 +209,28 @@ test("o perfil não é lido de dado enviado pelo navegador", () => {
 
 const API_DIR = fileURLToPath(new URL("../src/app/api/", import.meta.url));
 
+/** Routes that answer without a session, by name. Anything not listed here must open with the session. */
+const PUBLIC_ROUTES = new Set(["health/route.ts"]);
+
 test("toda rota de src/app/api confere a sessão, e a empresa só sai dela", () => {
   const routes = readdirSync(API_DIR, { recursive: true, encoding: "utf8" }).filter((file) => /(^|\/)route\.tsx?$/.test(file));
   assert.ok(routes.includes("produtos/[id]/foto/route.ts"));
+  for (const file of PUBLIC_ROUTES) assert.ok(routes.includes(file), `${file} está na lista de rotas públicas e não existe`);
   for (const file of routes) {
     const code = readFileSync(API_DIR + file, "utf8");
+    if (PUBLIC_ROUTES.has(file)) {
+      // Pública de propósito: em troca, não conhece banco, sessão nem empresa, e não lê nada do pedido.
+      for (const forbidden of ["@/lib/db", "tenantDb", "getSession", "cookies", "searchParams", "next/headers", "@/lib/auth"]) {
+        assert.ok(!code.includes(forbidden), `${file} é pública e contém ${forbidden}`);
+      }
+      assert.doesNotMatch(code, /from "pg"|new pg\.|search_path|tenant_/, `${file} é pública e fala com o banco`);
+      // Método sem parâmetro não tem pedido para ler: nem corpo, nem cabeçalho, nem endereço.
+      const methods = [...code.matchAll(/export (?:async )?function (?:GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\(([^)]*)\)/g)];
+      assert.ok(methods.length > 0, `${file} não exporta método`);
+      for (const [, params] of methods) assert.equal(params.trim(), "", `${file} é pública e recebe o pedido`);
+      assert.doesNotMatch(code, /\b(?:request|req)\b|formData\(|arrayBuffer\(|\.text\(|\.body\b|\.headers\b/i, `${file} é pública e lê o pedido`);
+      continue;
+    }
     assert.ok(code.includes("await getSession()"), `${file} não chama getSession()`);
     // Cada método exportado começa pela sessão: nada é lido do pedido nem do banco antes dela.
     const bodies = code.split(/export async function (?:GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\([^)]*\)[^{]*\{/).slice(1);
