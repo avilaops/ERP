@@ -1,0 +1,22 @@
+# Produção do ERP no servidor apps-noclient, em /opt/erp. Sobe só a aplicação:
+# o banco é o PostgreSQL do próprio servidor, alcançado por host.docker.internal.
+# Publica apenas em 127.0.0.1; quem atende a internet é o Caddy (deploy/Caddyfile.snippet).
+services:
+  erp:
+    build:
+      context: .
+      args:
+        GIT_SHA: ${GIT_SHA:-dev}
+        BUILT_AT: ${BUILT_AT:-}
+    image: erp:latest
+    container_name: erp
+    restart: always
+    network_mode: bridge
+    env_file: [.env]
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    ports: ["127.0.0.1:3140:3140"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3140/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

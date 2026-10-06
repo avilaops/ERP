@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# Confere, faz o build standalone e empacota em standalone.tgz.
+# Uso: bash deploy/empacotar.sh [arquivo-de-saida]
+#
+# Armadilhas conhecidas:
+# 1. nunca gerar o .tgz dentro da pasta empacotada;
+# 2. .next/static não entra sozinho no standalone, e não pode ser de outro build;
+# 3. nenhum .env nem .git pode ir no pacote.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+echo "▸ conferindo (lint, tipos, testes)"
+npm run lint
+npm run typecheck
+npm test 2>&1 | tee /tmp/erp-testes.$$ | grep -E "^(ℹ|#) (tests|pass|fail|skipped)"
+grep -qE "^(ℹ|#) fail 0$" /tmp/erp-testes.$$ && grep -qE "^(ℹ|#) skipped 0$" /tmp/erp-testes.$$ || { echo "! testes falharam ou foram pulados"; rm -f /tmp/erp-testes.$$; exit 1; }
+rm -f /tmp/erp-testes.$$
+
+echo "▸ build"
+rm -rf .next
+npm run build >/dev/null
+
+echo "▸ montando o pacote"
+RAIZ=.next/standalone
+rm -rf "$RAIZ/.next/static" && cp -r .next/static "$RAIZ/.next/"
+[ -d public ] && cp -r public "$RAIZ/public"
+# O que `npm run db:migrate` precisa para rodar dentro do container.
+mkdir -p "$RAIZ/scripts" "$RAIZ/src/lib/auth" "$RAIZ/src/lib/db" "$RAIZ/db"
+cp scripts/db-migrate.ts "$RAIZ/scripts/"
+cp src/lib/auth/tenants.ts "$RAIZ/src/lib/auth/"
+cp src/lib/db/config.ts src/lib/db/migrate.ts "$RAIZ/src/lib/db/"
+rm -rf "$RAIZ/db/migrations" && cp -r db/migrations "$RAIZ/db/"
+
+SAIDA="${1:-$(mktemp -d)/standalone.tgz}"
+tar -czf "$SAIDA" -C "$RAIZ" \
+  --exclude='./.git' --exclude='./.env*' --exclude='./tests' --exclude='./.work' \
+  --exclude='./prototype' --exclude='./docs' --exclude='./tsconfig.tsbuildinfo' .
+
+echo "▸ conferindo o pacote"
+# Sem `grep -q` depois do tar: com pipefail, o grep fechando cedo derruba o tar.
+LISTA="$(tar -tzf "$SAIDA")"
+conta() { printf '%s\n' "$LISTA" | grep -cE "$1" || true; }
+[ "$(conta '^\./server\.js$')" = "1" ] || { echo "! sem server.js no pacote"; exit 1; }
+[ "$(conta '^\./(\.env|\.git/)')" = "0" ] || { echo "! segredo dentro do pacote"; exit 1; }
+[ "$(conta '\.css$')" != "0" ] || { echo "! sem CSS no pacote"; exit 1; }
+[ "$(conta '^\./db/migrations/[0-9]{4}_.*\.sql$')" != "0" ] || { echo "! sem migrações no pacote"; exit 1; }
+[ "$(conta '^\./node_modules/pg/package\.json$')" = "1" ] || { echo "! sem o pacote pg (a migração não rodaria)"; exit 1; }
+echo "· $(du -h "$SAIDA" | cut -f1) em $SAIDA"
+echo "$SAIDA"

@@ -8,7 +8,7 @@ Como rodar, testar e o que falta para produção. Atualizado em 06/10/2026.
 | --- | --- |
 | Desenvolvimento (servidor `creators` da Ávila Ops) | No ar sob demanda: `npm run dev`, bancos `erp` e `erp_test` no PostgreSQL do servidor |
 | Integração contínua (GitHub Actions) | `.github/workflows/ci.yml`: lint, tipos, testes com banco e build, a cada push na `main` e em todo PR |
-| Produção | **Não existe ainda.** O endereço será `https://erp.avilaops.com`, para todas as empresas (decisão de 06/10/2026). Hoje o nome aponta para o Cloudflare sem servidor atrás (erro 525). Servidor, banco de produção e deploy ficaram para depois, para focar no software |
+| Produção | **Pronta para publicar, ainda não publicada.** Vai em `https://erp.avilaops.com`, no servidor `apps-noclient`. Falta o acesso por SSH ao servidor e a preparação dele (seção Produção) |
 
 ## Variáveis de ambiente
 
@@ -92,14 +92,60 @@ A cada push na `main` e em todo PR, o GitHub Actions sobe um PostgreSQL 16, inst
 dependências e roda lint, tipos, testes (falha se algum teste de banco for pulado) e build.
 **Não faz deploy.**
 
-## O que falta para produção
+## Produção: `erp.avilaops.com` no servidor `apps-noclient`
 
-Nada disto foi feito. Na ordem em que precisa acontecer:
+O ERP roda em container no `apps-noclient` (`204.168.249.111`), em `/opt/erp`, na porta `3140`
+só em `127.0.0.1`. O Caddy do servidor atende `erp.avilaops.com` e repassa para ela. O banco é o
+PostgreSQL do próprio servidor, com um esquema por empresa.
 
-1. Servidor em nuvem para a aplicação (o `creators` tem 4 GB e já ficou sem memória).
-2. PostgreSQL de produção, separado do de desenvolvimento, com backup diário e restauração testada.
-3. `erp.avilaops.com` apontando para o servidor, com TLS válido de ponta a ponta (o Cloudflare já responde pelo nome).
-4. Aplicativo `erp` no Auth central (já cadastrado com `https://erp.avilaops.com`), e `SSO_JWT_SECRET`,
-   `APP_URL` e `ERP_USERS` reais no servidor (nunca no repositório).
-5. Passo de deploy no pipeline, depois do build: aplicar migrações e reiniciar o serviço.
-6. Conferência final: cada um dos quatro perfis entra pelo endereço de produção e vê só a sua parte.
+**Situação em 06/10/2026: tudo pronto no repositório e testado em imagem local; ainda não publicado.**
+O servidor de desenvolvimento não tem acesso por SSH ao `apps-noclient`.
+
+### Preparar o servidor (uma vez)
+
+1. **Acesso:** autorizar no `apps-noclient` a chave de quem vai publicar. Do servidor `creators`:
+   `ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHbDkUF3w3EuootG+6arm3ggYAv7rUio/p7bhzxwKaH2 avops@orc`.
+   Na máquina que publica, um apelido `apps-noclient` em `~/.ssh/config`.
+2. **Banco:** criar a role e o banco do ERP no PostgreSQL do servidor, aceitando conexão da
+   rede do Docker (`172.17.0.0/16`), e incluir o banco no backup diário.
+   ```sql
+   CREATE ROLE erp LOGIN PASSWORD '<senha forte>';
+   CREATE DATABASE erp OWNER erp ENCODING 'UTF8';
+   REVOKE CONNECT ON DATABASE erp FROM PUBLIC;
+   ```
+3. **Variáveis:** `/opt/erp/.env`, modo `600`, a partir do `.env.example`:
+   - `DATABASE_URL=postgresql://erp:<senha>@host.docker.internal:5432/erp`
+   - `SSO_JWT_SECRET`: o mesmo do `auth.avilaops.com` (está no `.env` do Auth, no servidor)
+   - `APP_URL=https://erp.avilaops.com`
+   - `ERP_TENANTS="ludus:Ludus Equipamentos"`
+   - `ERP_USERS`: os e-mails reais, como `email:PERFIL@ludus`
+   - sem `ERP_LOCAL_LOGIN` (em produção é ignorada de qualquer jeito)
+4. **Caddy:** colar `deploy/Caddyfile.snippet` em `/etc/caddy/Caddyfile`, validar e recarregar.
+5. **Cloudflare:** `erp.avilaops.com` já aponta para o Cloudflare; conferir que a origem é o
+   `204.168.249.111` e que o modo SSL é "Full (strict)". Hoje o endereço responde erro 525
+   porque não há quem atenda na origem.
+6. **Auth central:** o aplicativo `erp` já está cadastrado com `https://erp.avilaops.com`.
+
+### Publicar
+
+```bash
+bash deploy/subir.sh
+```
+
+O script recusa publicar com alteração não commitada; roda lint, tipos e testes; faz o build;
+envia o pacote; monta a imagem no servidor; **aplica as migrações de cada empresa antes de trocar
+o container**; sobe; e só termina com sucesso se `/api/health` responder com a revisão enviada.
+Se a migração falhar, a versão antiga continua no ar.
+
+### Conferir depois de publicar
+
+- `https://erp.avilaops.com/api/health` mostra a revisão no ar.
+- Cada um dos quatro perfis entra pelo login central e vê só a sua parte.
+- `https://erp.avilaops.com/dev/login` responde 404 (o login de teste não existe em produção).
+- A diretoria envia a logo em Parâmetros → Empresa.
+
+### O que ainda falta depois da primeira publicação
+
+- Deploy automático pelo GitHub Actions (hoje é o script, à mão).
+- Backup diário do banco `erp` de produção, com restauração testada.
+- Usuários e empresas em tela, em vez de variável de ambiente.

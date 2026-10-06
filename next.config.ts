@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Self-contained server for the production image (deploy/): no node_modules install on the server.
+  output: "standalone",
   turbopack: {
     root: process.cwd(),
   },

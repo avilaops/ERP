@@ -19,3 +19,4 @@ tsconfig.tsbuildinfo
 .DS_Store
 *.pem
 npm-debug.log*
+standalone.tgz

@@ -1,0 +1,8 @@
+# Colar em /etc/caddy/Caddyfile no apps-noclient; depois:
+#   caddy validate --config /etc/caddy/Caddyfile && systemctl reload caddy
+# No Cloudflare, erp.avilaops.com aponta para este servidor com o proxy ligado e
+# SSL "Full (strict)": o Caddy precisa do certificado do domínio (Let's Encrypt).
+erp.avilaops.com {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:3140
+}
