@@ -71,8 +71,10 @@ Decisão do Nicolas em 06/10/2026. Um banco, **um esquema do PostgreSQL por empr
    `tests/routes.test.ts` falha se `tenantDb` receber outra coisa.
 3. **Migração é a mesma para todas as empresas**, sem nome de esquema no SQL.
    `npm run db:migrate` percorre `ERP_TENANTS`.
-4. **Nada de uma empresa fixo no código:** nome, logo (`public/logos/<identificador>.png`,
-   opcional), alíquotas, taxas e textos da marca vêm da empresa ou dos Parâmetros dela.
+4. **Nada de uma empresa fixo no código:** nome, logo, alíquotas, taxas e textos da marca
+   vêm da empresa ou dos Parâmetros dela. A logo fica no banco (`company_settings`), é
+   trocada pela diretoria em Parâmetros e servida por `/empresa/logo`, sempre a da empresa
+   de quem está logado.
 5. Empresas e usuários vêm de `ERP_TENANTS` e `ERP_USERS` (`email:PERFIL@empresa`). Quando
    forem para o banco, troca-se `parseTenants` e `UserDirectory`, não quem os usa.
 6. Testes de isolamento em `tests/db-tenants.test.ts` (banco) e `tests/access.test.ts`
@@ -164,7 +166,7 @@ funções puras, sem banco e sem tela, conferidas com os números dos prints do 
    `updateProduct`, `deleteProduct`, `applyAdvisoryCosts`, `publishPriceTable`,
    `latestVersion`, `loadPublishedSnapshot`, `loadPublishedTable`, `listVersions`,
    `createCustomer`, `updateCustomer`, `getCustomer`, `findCustomerByDocument`,
-   `listCustomers`, `createOrder`, `getOrder`, `addOrderItem`, `setOrderItemQuantity`,
+   `listCustomers`, `loadLogo`, `saveLogo`, `createOrder`, `getOrder`, `addOrderItem`, `setOrderItemQuantity`,
    `removeOrderItem`, `saveOrderTerms`, `linkOrderCustomer`, `loadOrderStanding`, …).
    Arquivo com `"use client"` nunca importa `@/lib/db`.
 3. **Consulta só com parâmetros (`$1`).** Valor nunca é colado no texto do SQL.

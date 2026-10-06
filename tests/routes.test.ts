@@ -157,6 +157,11 @@ test("multi-empresa: toda leitura e gravação usa o banco da empresa da sessão
     assert.doesNotMatch(code, /from "pg"|new pg\.|search_path|tenant_/, `${file} fala com o banco por fora da camada`);
   }
   assert.ok(uses >= 20, `só ${uses} usos de tenantDb`);
+  // O menu e a rota da logo também: a logo é sempre a da empresa de quem está logado.
+  for (const file of ["../src/components/Sidebar.tsx", "../src/app/empresa/logo/route.ts"]) {
+    const code = readFileSync(new URL(file, import.meta.url), "utf8");
+    assert.deepEqual([...code.matchAll(/tenantDb\([^)]*\)/g)].map(([call]) => call), ["tenantDb(session.tenant.slug)"], file);
+  }
 
   // Não existe conexão "do sistema": a camada de banco não tem conexão padrão.
   const dbDir = new URL("../src/lib/db/", import.meta.url);

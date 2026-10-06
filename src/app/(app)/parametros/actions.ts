@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/auth";
 import { tenantDb } from "@/lib/db/pool";
 import { menuItem } from "@/lib/auth/permissions";
+import { CompanyError, removeLogo, saveLogo } from "@/lib/db/company";
 import { loadParams, saveParams } from "@/lib/db/params";
 import { listProductCosts } from "@/lib/db/products";
 import { paramsToForm, parseParamsForm, rawFormValues } from "@/lib/params-form";
@@ -70,4 +71,43 @@ export async function adoptSuggestedDownPaymentAction(): Promise<void> {
 
   await saveParams(next, session.email, conn);
   revalidatePath(PATH);
+}
+
+export type LogoState = { status: "idle" | "saved" | "removed" | "error"; message: string | null };
+
+const logoFailed = (error: unknown): LogoState => {
+  if (error instanceof CompanyError) return { status: "error", message: error.message };
+  console.error("[parametros] falha ao gravar a logo:", error instanceof Error ? error.message : error);
+  return { status: "error", message: "Não foi possível gravar a logo agora. Nada foi alterado; tente de novo." };
+};
+
+/** Sends the company's logo. What the file is comes from its bytes, checked on the server. */
+export async function saveLogoAction(_previous: LogoState, formData: FormData): Promise<LogoState> {
+  const session = await requirePermission("parametros");
+  const conn = tenantDb(session.tenant.slug);
+
+  const file = formData.get("logo");
+  if (!(file instanceof File) || file.size === 0) return { status: "error", message: "Escolha o arquivo da logo." };
+  // Refused by its declared size before the bytes are read into memory.
+  if (file.size > 512 * 1024) return { status: "error", message: "A logo passa de 512 KB. Envie uma imagem menor." };
+  try {
+    await saveLogo(new Uint8Array(await file.arrayBuffer()), session.email, conn);
+  } catch (error) {
+    return logoFailed(error);
+  }
+  revalidatePath("/", "layout");
+  return { status: "saved", message: "Logo gravada. Ela já aparece no menu." };
+}
+
+export async function removeLogoAction(): Promise<LogoState> {
+  const session = await requirePermission("parametros");
+  const conn = tenantDb(session.tenant.slug);
+
+  try {
+    await removeLogo(session.email, conn);
+  } catch (error) {
+    return logoFailed(error);
+  }
+  revalidatePath("/", "layout");
+  return { status: "removed", message: "Logo removida. O menu voltou a mostrar o nome da empresa." };
 }

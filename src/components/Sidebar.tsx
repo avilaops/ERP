@@ -1,26 +1,27 @@
-import { existsSync } from "node:fs";
-import { join } from "node:path";
 import Link from "next/link";
 import type { Session } from "@/lib/auth";
 import { localProvider } from "@/lib/auth/local-provider";
 import { canAccess, menuFor } from "@/lib/auth/permissions";
 import { ROLE_LABELS } from "@/lib/auth/roles";
 import { SSO_APP_ID, SSO_LOGOUT_URL } from "@/lib/auth/sso";
+import { loadLogoVersion } from "@/lib/db/company";
+import { tenantDb } from "@/lib/db/pool";
 
 /** Server component: the menu is computed from the server-side session only. */
-export function Sidebar({ session }: { session: Session }) {
+export async function Sidebar({ session }: { session: Session }) {
   const items = menuFor(session.role);
+  const logoVersion = await loadLogoVersion(tenantDb(session.tenant.slug));
   const localLogin = localProvider(process.env).available;
 
   return (
     <aside className="flex w-64 shrink-0 flex-col gap-4 border-r border-slate-200 bg-white p-4">
-      {/* The company of the session. Its logo is a mask painted with the ink colour, when it has one. */}
-      {existsSync(join(process.cwd(), "public", "logos", `${session.tenant.slug}.png`)) ? (
-        <div
-          role="img"
-          aria-label={session.tenant.name}
-          className="h-9 w-28 bg-slate-900"
-          style={{ mask: `url(/logos/${session.tenant.slug}.png) left center / contain no-repeat` }}
+      {/* The company of the session: its logo, when the directors sent one, or its name. */}
+      {logoVersion ? (
+        // eslint-disable-next-line @next/next/no-img-element -- served by the app itself, per company
+        <img
+          src={`/empresa/logo?v=${logoVersion.getTime()}`}
+          alt={session.tenant.name}
+          className="max-h-12 max-w-full self-start object-contain"
         />
       ) : (
         <p className="font-display text-2xl font-bold uppercase leading-none">{session.tenant.name}</p>

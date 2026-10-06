@@ -37,7 +37,7 @@ Para incluir uma empresa:
 1. Acrescente-a em `ERP_TENANTS` (ex.: `ludus:Ludus Equipamentos;acme:Acme Fitness`).
 2. Acrescente os usuários dela em `ERP_USERS` (`email:PERFIL@acme`).
 3. Rode `npm run db:migrate`: ele cria o esquema e as tabelas da empresa nova e mantém as outras em dia.
-4. Opcional: logo em `public/logos/<identificador>.png` (preto sobre transparente).
+4. A logo quem envia é a diretoria da empresa, em Parâmetros → Empresa (PNG, JPEG ou WebP, até 512 KB).
 5. Reinicie a aplicação.
 
 Todas as empresas usam o mesmo endereço, `erp.avilaops.com`: o que separa uma da outra é o login.

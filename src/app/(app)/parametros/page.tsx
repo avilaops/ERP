@@ -1,13 +1,15 @@
 import { requirePermission } from "@/lib/auth";
 import { tenantDb } from "@/lib/db/pool";
 import { menuItem } from "@/lib/auth/permissions";
+import { loadLogoVersion } from "@/lib/db/company";
 import { loadParams } from "@/lib/db/params";
 import { listProductCosts } from "@/lib/db/products";
 import { showMoney, showMultiplier, showPercent } from "@/lib/format";
 import { paramsToForm } from "@/lib/params-form";
 import { roundCents } from "@/lib/pricing/money";
 import { paramsResult } from "@/lib/pricing/results";
-import { adoptSuggestedDownPaymentAction, saveParamsAction } from "./actions";
+import { adoptSuggestedDownPaymentAction, removeLogoAction, saveLogoAction, saveParamsAction } from "./actions";
+import { LogoForm } from "./LogoForm";
 import { ParamsForm } from "./ParamsForm";
 
 export const metadata = { title: `${menuItem("parametros").label} · ERP` };
@@ -17,7 +19,7 @@ export default async function ParametrosPage() {
   const session = await requirePermission("parametros");
   const conn = tenantDb(session.tenant.slug);
 
-  const [params, costs] = await Promise.all([loadParams(conn), listProductCosts(conn)]);
+  const [params, costs, logoVersion] = await Promise.all([loadParams(conn), listProductCosts(conn), loadLogoVersion(conn)]);
   // Every figure of the board is calculated here, on the server, by the engine.
   const result = paramsResult(params, costs);
   const form = paramsToForm(params);
@@ -42,7 +44,15 @@ export default async function ParametrosPage() {
       <p className="mt-1 text-slate-600">Impostos, canal e política. Tudo que muda aqui recalcula a tabela inteira.</p>
 
       <div className="mt-6 grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
-        <ParamsForm saved={form} action={saveParamsAction} />
+        <div className="flex min-w-0 flex-col gap-6">
+          <LogoForm
+            company={session.tenant.name}
+            logo={logoVersion ? `/empresa/logo?v=${logoVersion.getTime()}` : null}
+            save={saveLogoAction}
+            remove={removeLogoAction}
+          />
+          <ParamsForm saved={form} action={saveParamsAction} />
+        </div>
 
         <aside className="rounded-lg border border-slate-200 bg-white" aria-labelledby="resultado">
           <h2 id="resultado" className="border-b border-slate-200 px-5 py-3 text-sm font-semibold uppercase tracking-wide">
