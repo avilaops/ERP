@@ -5,7 +5,7 @@ import { getSession, listCompanies } from "@/lib/auth";
 export const metadata: Metadata = { title: "Trocar de empresa · ERP" };
 export const dynamic = "force-dynamic";
 
-/** Only for who belongs to more than one company, on the shared address. */
+/** Only for who belongs to more than one company. */
 export default async function EmpresaPage() {
   const session = await getSession();
   if (!session) redirect("/");

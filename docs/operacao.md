@@ -8,7 +8,7 @@ Como rodar, testar e o que falta para produção. Atualizado em 06/10/2026.
 | --- | --- |
 | Desenvolvimento (servidor `creators` da Ávila Ops) | No ar sob demanda: `npm run dev`, bancos `erp` e `erp_test` no PostgreSQL do servidor |
 | Integração contínua (GitHub Actions) | `.github/workflows/ci.yml`: lint, tipos, testes com banco e build, a cada push na `main` e em todo PR |
-| Produção | **Não existe ainda.** O endereço será `https://erp.avilaops.com` (decisão de 06/10/2026; não haverá domínio próprio da Ludus). Hoje o nome aponta para o Cloudflare sem servidor atrás (erro 525). Servidor, banco de produção e deploy ficaram para depois, para focar no software |
+| Produção | **Não existe ainda.** O endereço será `https://erp.avilaops.com`, para todas as empresas (decisão de 06/10/2026). Hoje o nome aponta para o Cloudflare sem servidor atrás (erro 525). Servidor, banco de produção e deploy ficaram para depois, para focar no software |
 
 ## Variáveis de ambiente
 
@@ -19,7 +19,7 @@ Todas descritas em `.env.example`. Nenhuma tem valor real no repositório.
 | `DATABASE_URL` | Banco PostgreSQL do ERP (a única conexão do sistema) | Obrigatória: sem ela o processo não sobe |
 | `SSO_JWT_SECRET` | Segredo que confere o cookie do Auth central (`auth.avilaops.com`) | Obrigatória, 32 caracteres ou mais, diferente do valor de exemplo |
 | `APP_URL` | Endereço público do sistema, usado na volta do login | Obrigatória e em `https` |
-| `ERP_TENANTS` | As empresas do sistema (`identificador:Nome[:dominio,dominio]`, separadas por `;`). Cada uma tem um esquema próprio no banco | Obrigatória; entrada inválida impede a subida |
+| `ERP_TENANTS` | As empresas do sistema (`identificador:Nome`, separadas por `;`). Cada uma tem um esquema próprio no banco | Obrigatória; entrada inválida impede a subida |
 | `ERP_USERS` | Quem entra, com qual perfil e em qual empresa (`email:PERFIL@empresa`, separados por vírgula) | Obrigatória; entrada inválida impede a subida |
 | `ERP_LOCAL_LOGIN` | `1` liga o login local de teste (`/dev/login`) | Ignorada: o login local não existe em produção |
 | `ERP_TEST_DATABASE_URL` | Banco dos testes; o nome tem de terminar em `_test` | Não se usa |
@@ -40,10 +40,8 @@ Para incluir uma empresa:
 4. Opcional: logo em `public/logos/<identificador>.png` (preto sobre transparente).
 5. Reinicie a aplicação.
 
-Domínio próprio: declare-o depois do nome (`ludus:Ludus Equipamentos:ludusequipamentos.com.br,ludusequipamentos.com`).
-Nesse domínio só entra quem é daquela empresa. **Ainda não funciona com o login central:** o cookie
-do Auth central só vale em `avilaops.com`, então o domínio próprio depende de uma troca de sessão
-entre domínios no Auth, que não existe.
+Todas as empresas usam o mesmo endereço, `erp.avilaops.com`: o que separa uma da outra é o login.
+Os domínios `ludusequipamentos.com.br` e `.com` não são do ERP; ficam para o site institucional da Ludus.
 
 Quem pertence a mais de uma empresa escolhe em `/empresa` ("Trocar de empresa", no menu).
 

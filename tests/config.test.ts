@@ -94,20 +94,19 @@ test("só development e test escapam das regras de produção", () => {
 test("empresas: a configuração é lida, e erro nela derruba a inicialização", () => {
   const config = assertAuthConfig({
     ...VALID,
-    ERP_TENANTS: "ludus:Ludus Equipamentos:ludusequipamentos.com.br,ludusequipamentos.com; acme:Acme Fitness",
+    ERP_TENANTS: "ludus:Ludus Equipamentos; acme:Acme Fitness",
     ERP_USERS: "dir@teste.local:DIRETORIA@ludus,ven@teste.local:VENDEDOR@acme",
   });
   assert.deepEqual(config.tenants, [
-    { slug: "ludus", name: "Ludus Equipamentos", hosts: ["ludusequipamentos.com.br", "ludusequipamentos.com"] },
-    { slug: "acme", name: "Acme Fitness", hosts: [] },
+    { slug: "ludus", name: "Ludus Equipamentos" },
+    { slug: "acme", name: "Acme Fitness" },
   ]);
   assert.deepEqual(config.users.map((user) => user.tenant.slug), ["ludus", "acme"]);
 
   assert.throws(() => assertAuthConfig({ ...VALID, ERP_TENANTS: "Ludus:Ludus" }), /identificador inválido "Ludus"/);
   assert.throws(() => assertAuthConfig({ ...VALID, ERP_TENANTS: "ludus" }), /ERP_TENANTS: entrada inválida/);
+  assert.throws(() => assertAuthConfig({ ...VALID, ERP_TENANTS: "ludus:Ludus:ludus.com.br" }), /ERP_TENANTS: entrada inválida/);
   assert.throws(() => assertAuthConfig({ ...VALID, ERP_TENANTS: "a1:A;a1:B" }), /empresa repetida a1/);
-  assert.throws(() => assertAuthConfig({ ...VALID, ERP_TENANTS: "a1:A:x.com;b1:B:x.com" }), /domínio x.com em mais de uma empresa/);
-  assert.throws(() => assertAuthConfig({ ...VALID, ERP_TENANTS: "a1:A:não é domínio" }), /domínio inválido/);
   assert.throws(() => assertAuthConfig({ ...VALID, ERP_TENANTS: " ; " }), /ERP_TENANTS sem nenhuma empresa|ERP_TENANTS ausente/);
   // Duas empresas e um usuário sem empresa: não se adivinha.
   assert.throws(() => assertAuthConfig({ ...VALID, ERP_TENANTS: "a1:A;b1:B" }), /falta a empresa de dir@teste.local/);

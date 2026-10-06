@@ -4,7 +4,7 @@ import { createEnvDirectory, parseErpUsers } from "@/lib/auth/directory";
 import { LUDUS } from "./helpers.ts";
 
 const ONE = [LUDUS];
-const OTHER = { slug: "acme", name: "Acme Fitness", hosts: ["erp.acme.com.br"] };
+const OTHER = { slug: "acme", name: "Acme Fitness" };
 const TWO = [LUDUS, OTHER];
 
 const RAW = "dir@teste.local:DIRETORIA, Gerente@Teste.Local : GERENTE_COMERCIAL,ven@teste.local:VENDEDOR,fin@teste.local:FINANCEIRO";

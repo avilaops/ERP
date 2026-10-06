@@ -50,11 +50,8 @@ export type LocalProvider =
       tenants: Tenant[];
       /** One test user per profile, in the first company. */
       users: DirectoryUser[];
-      /**
-       * Resolves the value of the local cookie (`PERFIL` or `PERFIL@empresa`) to a
-       * user. On a company's own domain (`hostTenant`) only that company is valid.
-       */
-      userFromCookie(value: string | undefined, hostTenant?: Tenant | null): DirectoryUser | null;
+      /** Resolves the value of the local cookie (`PERFIL` or `PERFIL@empresa`) to a user. */
+      userFromCookie(value: string | undefined): DirectoryUser | null;
     };
 
 export function localProvider(env: AuthEnv): LocalProvider {
@@ -64,12 +61,11 @@ export function localProvider(env: AuthEnv): LocalProvider {
     available: true,
     tenants,
     users: tenants.length === 0 ? [] : ROLES.map((role) => localUser(role, tenants[0])),
-    userFromCookie(value, hostTenant = null) {
+    userFromCookie(value) {
       const [role, slug, ...extra] = (value ?? "").split("@");
       if (!isRole(role) || extra.length > 0) return null;
-      const asked = slug === undefined ? (hostTenant ?? tenants[0]) : tenants.find((tenant) => tenant.slug === slug);
-      if (!asked || (hostTenant && asked.slug !== hostTenant.slug)) return null;
-      return localUser(role, asked);
+      const tenant = slug === undefined ? tenants[0] : tenants.find((candidate) => candidate.slug === slug);
+      return tenant ? localUser(role, tenant) : null;
     },
   };
 }

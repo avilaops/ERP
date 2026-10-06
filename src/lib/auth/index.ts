@@ -1,4 +1,4 @@
-import { cookies, headers } from "next/headers";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { decideAccess, sessionFrom } from "@/lib/auth/access";
 import type { Identity, Session } from "@/lib/auth/access";
@@ -10,7 +10,7 @@ import { LOCAL_COOKIE, LOCAL_LOGIN_PATH, localProvider } from "@/lib/auth/local-
 import { menuItem } from "@/lib/auth/permissions";
 import type { MenuItemKey } from "@/lib/auth/permissions";
 import { loginUrl, SSO_COOKIE, verifySsoToken } from "@/lib/auth/sso";
-import { chooseMembership, parseTenants, tenantForHost } from "@/lib/auth/tenants";
+import { chooseMembership, parseTenants } from "@/lib/auth/tenants";
 import type { Tenant } from "@/lib/auth/tenants";
 
 export type { Session } from "@/lib/auth/access";
@@ -56,18 +56,15 @@ type CookieStore = Awaited<ReturnType<typeof cookies>>;
 
 /**
  * Who the visitor is and which company the request is for. The company comes
- * from the domain (a company's own domain reaches only that company) and from
- * what the directory says about the e-mail; never from a field, a parameter of
- * the address or anything else the browser could choose freely. The cookie only
- * picks among the companies the person already belongs to.
+ * from what the directory says about the e-mail; never from a field, a parameter
+ * of the address or anything else the browser could choose freely. The cookie
+ * only picks among the companies the person already belongs to.
  */
-async function resolveIdentity(env: AuthEnv, config: Runtime, store: CookieStore, host: string | null): Promise<Identity> {
-  const hostTenant = tenantForHost(config.tenants, host);
-
+async function resolveIdentity(env: AuthEnv, config: Runtime, store: CookieStore): Promise<Identity> {
   const local = localProvider(env);
   if (local.available) {
-    const user = local.userFromCookie(store.get(LOCAL_COOKIE)?.value, hostTenant);
-    if (user) return { authenticated: true, user, companies: hostTenant ? 1 : local.tenants.length };
+    const user = local.userFromCookie(store.get(LOCAL_COOKIE)?.value);
+    if (user) return { authenticated: true, user, companies: local.tenants.length };
   }
 
   const ssoUser = verifySsoToken(store.get(SSO_COOKIE)?.value, config.ssoSecret);
@@ -76,9 +73,9 @@ async function resolveIdentity(env: AuthEnv, config: Runtime, store: CookieStore
   const memberships = await config.directory.findMemberships(ssoUser.email);
   return {
     authenticated: true,
-    user: chooseMembership(memberships, { hostTenant, preferred: store.get(TENANT_COOKIE)?.value }),
+    user: chooseMembership(memberships, store.get(TENANT_COOKIE)?.value),
     displayName: ssoUser.name,
-    companies: hostTenant ? 1 : memberships.length,
+    companies: memberships.length,
   };
 }
 
@@ -88,21 +85,14 @@ async function resolveIdentity(env: AuthEnv, config: Runtime, store: CookieStore
  */
 async function currentIdentity(): Promise<{ config: Runtime; identity: Identity }> {
   const store = await cookies();
-  const host = (await headers()).get("host") ?? null;
   const config = runtime(process.env);
-  return { config, identity: await resolveIdentity(process.env, config, store, host) };
+  return { config, identity: await resolveIdentity(process.env, config, store) };
 }
 
-/**
- * The companies the signed-in person may switch among on this address: all the
- * ones their e-mail belongs to, or none on a company's own domain. Empty when
- * signed out.
- */
+/** Every company the signed-in person belongs to, to switch among. Empty when signed out. */
 export async function listCompanies(): Promise<{ slug: string; name: string }[]> {
   const store = await cookies();
-  const host = (await headers()).get("host") ?? null;
   const config = runtime(process.env);
-  if (tenantForHost(config.tenants, host)) return [];
 
   const local = localProvider(process.env);
   if (local.available && local.userFromCookie(store.get(LOCAL_COOKIE)?.value)) {

@@ -62,9 +62,9 @@ Decisão do Nicolas em 06/10/2026. Um banco, **um esquema do PostgreSQL por empr
 (`tenant_<identificador>`), com as mesmas tabelas em cada um. Não há `organization_id`.
 
 1. **A empresa vem da sessão, nunca do navegador.** `requirePermission` e `getSession`
-   devolvem `session.tenant` (`{ slug, name }`). Ela sai do domínio (no domínio próprio de
-   uma empresa só entra quem é dela) e do que o diretório diz sobre o e-mail. O cookie
-   `erp_tenant` só escolhe entre as empresas a que a pessoa já pertence.
+   devolvem `session.tenant` (`{ slug, name }`). Ela sai do que o diretório diz sobre o
+   e-mail. O cookie `erp_tenant` só escolhe entre as empresas a que a pessoa já pertence.
+   Todas as empresas usam o mesmo endereço (`erp.avilaops.com`); não há domínio por empresa.
 2. **Toda função de `src/lib/db/` recebe a conexão; não existe conexão padrão.** Tela e
    ação fazem `const conn = tenantDb(session.tenant.slug)` logo depois de
    `requirePermission` e passam `conn` adiante. Esquecer não compila.

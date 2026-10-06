@@ -21,7 +21,7 @@ A descrição detalhada e as regras por pasta estão no [`AGENTS.md`](../AGENTS.
 - **Validação de formulário** em funções puras testadas, no servidor (`src/lib/*-form.ts`).
 - **npm** como gerenciador de pacotes.
 - **Banco de desenvolvimento:** PostgreSQL do servidor da Ávila Ops; fora dele, `docker compose up -d` sobe um PostgreSQL 16 local (só o banco, não a aplicação).
-- **Endereço do sistema:** `https://erp.avilaops.com`, compartilhado por todas as empresas. Uma empresa pode ter domínio próprio (para a Ludus, `ludusequipamentos.com.br` e `.com`), declarado em `ERP_TENANTS`; nele só entra quem é daquela empresa.
+- **Endereço do sistema:** `https://erp.avilaops.com`, o mesmo para todas as empresas. Não há domínio por empresa no ERP (os domínios `ludusequipamentos.com.br` e `.com` são para o site institucional da Ludus, outro projeto).
 
 **Não use, e não sugira:** Prisma ou outro ORM, `Prisma.Decimal`, SQLite, Zod, React Hook Form, Vitest, Playwright, pnpm, `src/modules/`, `organization_id`, `audit_log`, exclusão lógica (`deleted_at`). Nada disso existe no projeto.
 

@@ -1,6 +1,5 @@
 import { cookies } from "next/headers";
 import { LOCAL_COOKIE, localProvider } from "@/lib/auth/local-provider";
-import { tenantForHost } from "@/lib/auth/tenants";
 
 /** Writes the local sign-in cookie. Without the local provider (see `isLocalProviderEnabled`) it does not exist. */
 export async function POST(request: Request): Promise<Response> {
@@ -14,9 +13,7 @@ export async function POST(request: Request): Promise<Response> {
   };
   // `PERFIL` or `PERFIL@empresa`: the provider checks both against what is configured.
   const value = [text("role"), text("tenant")].filter(Boolean).join("@");
-  // On a company's own domain the sign-in is for that company, whatever was asked.
-  const hostTenant = tenantForHost(provider.tenants, request.headers.get("host"));
-  const user = provider.userFromCookie(value, hostTenant);
+  const user = provider.userFromCookie(value);
   if (!user) return new Response("Perfil ou empresa inválidos", { status: 400 });
 
   const store = await cookies();

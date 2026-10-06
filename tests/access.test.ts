@@ -5,7 +5,7 @@ import { getSession, requirePermission } from "@/lib/auth/index";
 import { MENU_ITEMS } from "@/lib/auth/permissions";
 import { ROLES } from "@/lib/auth/roles";
 import type { Role } from "@/lib/auth/roles";
-import { APP_URL, LUDUS, redirectOf, SECRET, setCookies, setHeaders, ssoToken, TENANTS, withEnv } from "./helpers.ts";
+import { APP_URL, LUDUS, redirectOf, SECRET, setCookies, ssoToken, TENANTS, withEnv } from "./helpers.ts";
 
 const EMAILS: Record<Role, string> = {
   DIRETORIA: "dir@teste.local",
@@ -148,7 +148,7 @@ test("produção com configuração inválida não atende requisição (falha fe
 
 const TWO_COMPANIES = {
   ...PRODUCTION,
-  ERP_TENANTS: "ludus:Ludus Equipamentos:erp.ludus.example;acme:Acme Fitness:erp.acme.example",
+  ERP_TENANTS: "ludus:Ludus Equipamentos;acme:Acme Fitness",
   ERP_USERS: "dir@teste.local:DIRETORIA@ludus,dir@teste.local:VENDEDOR@acme,ven@teste.local:VENDEDOR@acme",
 };
 const company = async () => {
@@ -156,9 +156,8 @@ const company = async () => {
   return session && [session.tenant.slug, session.role, session.companies];
 };
 
-test("empresa da sessão: no endereço compartilhado vale a primeira do e-mail, ou a escolhida entre as dele", async () => {
+test("empresa da sessão: vale a primeira do e-mail, ou a escolhida entre as dele", async () => {
   await withEnv(TWO_COMPANIES, async () => {
-    setHeaders({ host: "erp.avilaops.com" });
     setCookies({ avila_sso: ssoToken({ email: "dir@teste.local" }) });
     assert.deepEqual(await company(), ["ludus", "DIRETORIA", 2]);
 
@@ -170,27 +169,12 @@ test("empresa da sessão: no endereço compartilhado vale a primeira do e-mail, 
     assert.deepEqual(await company(), ["acme", "VENDEDOR", 1]);
     setCookies({ avila_sso: ssoToken({ email: "dir@teste.local" }), erp_tenant: "nao-existe" });
     assert.deepEqual(await company(), ["ludus", "DIRETORIA", 2]);
-  });
-  setHeaders({});
-});
 
-test("empresa da sessão: no domínio próprio só entra quem é daquela empresa, com o perfil que tem nela", async () => {
-  await withEnv(TWO_COMPANIES, async () => {
-    setCookies({ avila_sso: ssoToken({ email: "dir@teste.local" }), erp_tenant: "ludus" });
-    setHeaders({ host: "erp.acme.example" });
-    // O cookie pede a Ludus, mas o domínio é da Acme: vale o domínio.
-    assert.deepEqual(await company(), ["acme", "VENDEDOR", 1]);
-    setHeaders({ host: "ERP.Ludus.Example:443" });
-    assert.deepEqual(await company(), ["ludus", "DIRETORIA", 1]);
-
-    // Vendedor da Acme no domínio da Ludus: autenticado, mas sem acesso.
-    setCookies({ avila_sso: ssoToken({ email: "ven@teste.local" }) });
+    // Quem não é de empresa nenhuma fica sem acesso, com ou sem cookie.
+    setCookies({ avila_sso: ssoToken({ email: "intruso@teste.local" }), erp_tenant: "ludus" });
     assert.equal(await getSession(), null);
     assert.equal(await redirectOf(() => requirePermission("pedidos")), "/sem-acesso");
-    setHeaders({ host: "erp.acme.example" });
-    assert.deepEqual(await company(), ["acme", "VENDEDOR", 1]);
   });
-  setHeaders({});
 });
 
 test("produção sem ERP_TENANTS, ou com usuário de empresa que não existe, não atende requisição", async () => {

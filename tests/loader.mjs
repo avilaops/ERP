@@ -4,8 +4,7 @@
  * 1. `@/…` is the tsconfig alias for `src/…`.
  * 2. `next/headers` only exists inside the Next server. The stand-in reads and
  *    writes cookies in `globalThis.__TEST_COOKIES__` (a Map), so a test decides
- *    which cookies the "request" carries; headers come from
- *    `globalThis.__TEST_HEADERS__` the same way.
+ *    which cookies the "request" carries.
  * 3. `next/navigation`: `redirect()` and `notFound()` throw in Next; here they
  *    throw a plain object the test can inspect.
  */
@@ -20,7 +19,7 @@ const HEADERS_STUB = inline(`
     set: (name, value) => void jar().set(name, value),
     delete: (name) => void jar().delete(name),
   });
-  export const headers = async () => (globalThis.__TEST_HEADERS__ ??= new Map());
+  export const headers = async () => new Map();
 `);
 
 const NAVIGATION_STUB = inline(`

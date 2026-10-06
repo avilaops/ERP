@@ -144,7 +144,7 @@ test("o Auth central é o padrão: o login local só liga por escolha, e o dev s
 });
 
 test("login local com várias empresas: entra na escolhida, e empresa que não existe é recusada", async () => {
-  const env = { NODE_ENV: "development", ERP_LOCAL_LOGIN: "1", ERP_TENANTS: "ludus:Ludus Equipamentos;acme:Acme Fitness:erp.acme.example" };
+  const env = { NODE_ENV: "development", ERP_LOCAL_LOGIN: "1", ERP_TENANTS: "ludus:Ludus Equipamentos;acme:Acme Fitness" };
   const provider = localProvider(env);
   assert.ok(provider.available);
   if (!provider.available) return;
@@ -153,12 +153,6 @@ test("login local com várias empresas: entra na escolhida, e empresa que não e
   assert.equal(provider.userFromCookie("VENDEDOR@acme")?.tenant.slug, "acme");
   assert.equal(provider.userFromCookie("VENDEDOR@fantasma"), null);
   assert.equal(provider.userFromCookie("VENDEDOR@acme@ludus"), null);
-  // No domínio próprio de uma empresa, o cookie de outra não vale.
-  const [ludus, acme] = provider.tenants;
-  assert.equal(provider.userFromCookie("VENDEDOR@ludus", acme), null);
-  assert.equal(provider.userFromCookie("VENDEDOR", acme)?.tenant.slug, "acme");
-  assert.equal(provider.userFromCookie("VENDEDOR@ludus", ludus)?.tenant.slug, "ludus");
-
   await withEnv({ ...env, SSO_JWT_SECRET: undefined, APP_URL: undefined, ERP_USERS: undefined }, async () => {
     setCookies({});
     const response = await POST(
@@ -168,21 +162,6 @@ test("login local com várias empresas: entra na escolhida, e empresa que não e
     assert.equal(globalThis.__TEST_COOKIES__?.get(LOCAL_COOKIE), "DIRETORIA@acme");
     const session = await getSession();
     assert.deepEqual([session?.tenant.slug, session?.tenant.name, session?.companies], ["acme", "Acme Fitness", 2]);
-
-    // No domínio próprio da Acme, entrar é entrar na Acme, e pedir outra empresa é recusado.
-    setCookies({});
-    const onHost = (tenant?: string) =>
-      POST(
-        new Request("http://erp.acme.example/dev/login/enter", {
-          method: "POST",
-          headers: { host: "erp.acme.example" },
-          body: new URLSearchParams(tenant ? { role: "VENDEDOR", tenant } : { role: "VENDEDOR" }),
-        }),
-      );
-    assert.equal((await onHost()).status, 303);
-    assert.equal(globalThis.__TEST_COOKIES__?.get(LOCAL_COOKIE), "VENDEDOR@acme");
-    setCookies({});
-    assert.equal((await onHost("ludus")).status, 400);
 
     setCookies({});
     const refused = await POST(
