@@ -86,3 +86,31 @@ export async function normalizePhoto(input: Uint8Array): Promise<NormalizedPhoto
   }
   throw new PhotoError(TOO_HEAVY_MESSAGE);
 }
+
+/**
+ * A stored photo reduced to fit `size` × `size`, for where it is shown small (the
+ * quotation in PDF): never enlarged, never distorted, JPEG without metadata. The
+ * same input gives the same output.
+ */
+export async function thumbnail(bytes: Uint8Array, size: number): Promise<Buffer> {
+  if (!Number.isSafeInteger(size) || size <= 0) throw new Error("Tamanho da miniatura precisa ser um número inteiro maior que zero.");
+  return sharp(bytes, { limitInputPixels: MAX_INPUT_PIXELS, failOn: "error" })
+    .rotate()
+    .resize({ width: size, height: size, fit: "inside", withoutEnlargement: true })
+    .flatten({ background: "#ffffff" })
+    .jpeg({ quality: 80 })
+    .toBuffer();
+}
+
+/**
+ * The company's logo (PNG, JPEG or WebP) as a PNG that fits `width` × `height`,
+ * white where it was transparent: what a PDF can embed as one image.
+ */
+export async function logoPng(bytes: Uint8Array, width: number, height: number): Promise<Buffer> {
+  return sharp(bytes, { limitInputPixels: MAX_INPUT_PIXELS })
+    .rotate()
+    .resize({ width, height, fit: "inside", withoutEnlargement: true })
+    .flatten({ background: "#ffffff" })
+    .png()
+    .toBuffer();
+}

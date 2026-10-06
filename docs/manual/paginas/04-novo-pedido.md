@@ -103,7 +103,7 @@ Este quadro aparece apenas para a diretoria. Ele abre a conta do pedido:
 
 1.  Com os campos obrigatórios preenchidos e dentro da política, feche o pedido. Fora da política, ele vai para **Aprovações**.
 2.  **Copiar proposta** copia o texto do orçamento para enviar ao cliente pelo WhatsApp ou e-mail.
-3.  **Salvar PDF** gera o orçamento em PDF com a marca da Ludus.
+3.  **Salvar PDF** abre o orçamento em PDF, pronto para enviar: traz a logo da empresa, a foto pequena de cada equipamento, a descrição, os valores e o total da nota. O PDF não mostra custo nem lucro.
 4.  Em um pedido fechado, **Reabrir pedido** volta o pedido para negociação: ele sai das vendas do mês e, ao ser fechado de novo, conta no mês do novo fechamento. Se for preciso devolver dinheiro já recebido, a devolução fica pendente até o financeiro confirmar. **Cancelar** encerra o pedido com um motivo: as parcelas em aberto são canceladas e o histórico de recebimentos e comissões é mantido. **Excluir** só aparece em rascunhos sem nenhum registro financeiro.
 
 > **Atenção**

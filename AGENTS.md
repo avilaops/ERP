@@ -171,7 +171,8 @@ funções puras, sem banco e sem tela, conferidas com os números dos prints do 
    `createCustomer`, `updateCustomer`, `getCustomer`, `findCustomerByDocument`,
    `listCustomers`, `loadLogo`, `saveLogo`, `createOrder`, `getOrder`, `addOrderItem`, `setOrderItemQuantity`,
    `removeOrderItem`, `saveOrderTerms`, `linkOrderCustomer`, `loadOrderStanding`, `savePayment`,
-   `closeOrder`, `reopenOrder`, `deleteOrder`, `listOrders`, `listPaymentMethods`, …).
+   `closeOrder`, `reopenOrder`, `deleteOrder`, `listOrders`, `listPaymentMethods`,
+   `loadQuoteProducts`, …).
    Arquivo com `"use client"` nunca importa `@/lib/db`.
 3. **Consulta só com parâmetros (`$1`).** Valor nunca é colado no texto do SQL.
 4. **Mudança de esquema é arquivo novo em `db/migrations/`** (`NNNN_nome.sql`), aplicado
@@ -276,6 +277,26 @@ Parâmetros → Categorias de contas a pagar. **A comissão devida aos vendedore
 a pagar como conta automática** (`listCommissionsDue`), calculada na hora a partir de
 `commissions`: nunca é gravada como conta, e é paga em Comissões. A planilha sai por
 `/api/contas-pagar/exportar`, só para quem tem o item, e neutraliza célula que começa como fórmula.
+
+## Orçamento em PDF
+
+O botão **Salvar PDF** do pedido abre o orçamento para o cliente, em A4.
+
+1. **O PDF só sai pela rota `/api/pedidos/[numero]/orcamento`** (`GET`), para quem tem o item
+   `pedidos`; o vendedor só alcança os pedidos dele (o mesmo escopo de `getOrder`). Vale em
+   qualquer situação do pedido; só não sai sem equipamento (409).
+2. **O conteúdo vem de `quoteDocument`** (`src/lib/quote/document.ts`), função pura que usa a
+   conta da equipe (`saleOf`) e nunca lê custo: o orçamento não mostra custo, lucro, faixa do
+   desconto, comissão nem DIFAL, nem para a Diretoria. O vendedor é o do pedido, não quem gerou.
+3. **O desenho é `renderQuotePdf`** (`src/lib/quote/pdf.ts`), com `pdf-lib` e as fontes padrão
+   do PDF: sem navegador, sem arquivo de fonte, sem ler disco. A mesma entrada gera os mesmos
+   bytes. Caractere que a fonte não tem vira `?`.
+4. **A foto entra sempre reduzida por `thumbnail`** (`src/lib/photos/normalize.ts`), uma por vez.
+   Descrição e foto são as do cadastro de hoje (`loadQuoteProducts`); nome, código e preço são
+   os da versão da tabela do pedido.
+5. **A logo e o nome são os da empresa da sessão** (`loadLogo`, passada por `logoPng`; sem logo
+   cadastrada, o nome da empresa vai no lugar). Nada de logo ou nome fixo no código.
+6. O PDF não é guardado: é gerado a cada pedido, com `Cache-Control: private, no-store`.
 
 ## Celular
 

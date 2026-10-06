@@ -4,10 +4,12 @@ import { crc32 } from "node:zlib";
 import sharp from "sharp";
 import {
   FORMAT_MESSAGE,
+  logoPng,
   MAX_UPLOAD_BYTES,
   normalizePhoto,
   PhotoError,
   sniffFormat,
+  thumbnail,
   TOO_LARGE_MESSAGE,
   TOO_MANY_PIXELS_MESSAGE,
   UNREADABLE_MESSAGE,
@@ -116,4 +118,36 @@ test("a mesma entrada dá sempre a mesma saída", async () => {
   const [first, second] = [await normalizePhoto(input), await normalizePhoto(input)];
   assert.equal(first.sha256, second.sha256);
   assert.ok(first.bytes.equals(second.bytes));
+});
+
+test("miniatura: 1200×800 sai 240×160, JPEG leve e sem metadados; a pequena não é ampliada", async () => {
+  // Uma foto com detalhe, e não uma cor só: o peso da miniatura tem de valer para foto de verdade.
+  const noise = Buffer.alloc(1200 * 800 * 3);
+  for (let index = 0; index < noise.length; index += 1) noise[index] = (index * 2654435761) % 251;
+  const stored = await normalizePhoto(await sharp(noise, { raw: { width: 1200, height: 800, channels: 3 } }).jpeg().toBuffer());
+  assert.deepEqual([stored.width, stored.height], [1200, 800]);
+
+  const small = await thumbnail(stored.bytes, 240);
+  const meta = await sharp(small).metadata();
+  assert.deepEqual([meta.format, meta.width, meta.height], ["jpeg", 240, 160]);
+  assert.equal(meta.exif, undefined);
+  assert.ok(small.length < 40 * 1024, `miniatura de ${small.length} bytes`);
+  assert.ok(small.equals(await thumbnail(stored.bytes, 240)), "a mesma entrada dá a mesma miniatura");
+
+  const tiny = await solid(100, 100, "#cc3366").jpeg().toBuffer();
+  const kept = await sharp(await thumbnail(tiny, 240)).metadata();
+  assert.deepEqual([kept.width, kept.height], [100, 100]);
+  await assert.rejects(() => thumbnail(tiny, 0), /Tamanho da miniatura/);
+});
+
+test("logo para o PDF: PNG, JPEG ou WebP saem PNG sem transparência, dentro da caixa", async () => {
+  const transparent = await solid(900, 300, { r: 0, g: 0, b: 0, alpha: 0 }, 4).png().toBuffer();
+  const inputs = [transparent, await solid(900, 300, "#222222").jpeg().toBuffer(), await solid(900, 300, "#222222").webp().toBuffer()];
+  for (const input of inputs) {
+    const meta = await sharp(await logoPng(input, 510, 144)).metadata();
+    assert.deepEqual([meta.format, meta.width, meta.height, meta.hasAlpha], ["png", 432, 144, false]);
+  }
+  const { data } = await sharp(await logoPng(transparent, 510, 144)).raw().toBuffer({ resolveWithObject: true });
+  assert.deepEqual([...data.subarray(0, 3)], [255, 255, 255]);
+  await assert.rejects(() => logoPng(Buffer.from("isto não é imagem"), 510, 144));
 });

@@ -130,9 +130,14 @@ export default async function PedidoPage({
             De {order.sellerEmail === session.email ? "Você" : order.sellerName} · atualizado {showDateTime(order.updatedAt)}
           </p>
         </div>
-        <div className="flex items-center gap-2 text-sm">
+        <div className="flex flex-wrap items-center gap-2 text-sm">
           <span className="rounded-full bg-slate-200 px-3 py-1 font-medium">{STATUS_LABELS[order.status]}</span>
           <span className="rounded-full border border-slate-300 px-3 py-1">Tabela v{table.version}</span>
+          {order.items.length > 0 && (
+            <a href={`/api/pedidos/${order.number}/orcamento`} target="_blank" rel="noopener" className={BUTTON}>
+              Salvar PDF
+            </a>
+          )}
         </div>
       </div>
       {latest && latest.version !== table.version && (

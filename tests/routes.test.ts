@@ -292,3 +292,32 @@ test("toda rota de src/app/api confere a sessão, e a empresa só sai dela", () 
     assert.doesNotMatch(code, /from "pg"|new pg\.|search_path|tenant_|searchParams|formData\(/, `${file} foge da regra das rotas`);
   }
 });
+
+test("orçamento em PDF: sai da conta da equipe, nunca lê custo, e o escopo vem da sessão", () => {
+  const route = readFileSync(`${API_DIR}pedidos/[numero]/orcamento/route.ts`, "utf8");
+  for (const forbidden of ["loadPublishedSnapshot", "directorOf", "loadOrderStanding", "seesCosts", '"DIRETORIA"', "engineOrder", "quoteOrder"]) {
+    assert.ok(!route.includes(forbidden), `a rota do orçamento contém ${forbidden}`);
+  }
+  assert.ok(route.includes('canAccess(session.role, "pedidos")'));
+  assert.ok(route.includes("getOrder(numero, { sellerEmail: seesAllOrders(session.role) ? null : session.email }, conn)"));
+  assert.doesNotMatch(route, /seesAllOrders\((?!session\.role\))|canAccess\((?!session\.role,)/);
+  // Nada do pedido HTTP é lido: nem endereço, nem cabeçalho, nem corpo. E só existe o GET.
+  assert.doesNotMatch(route, /\brequest\b|\.headers\b|\.url\b|\.json\(|arrayBuffer\(|cookies\(/);
+  assert.deepEqual([...route.matchAll(/export (?:async )?function (\w+)/g)].map(([, name]) => name), ["GET"]);
+  // A foto entra sempre reduzida, e o pedido é conferido antes de qualquer imagem ser lida.
+  assert.ok(route.includes("await thumbnail(photo, PHOTO_SIDE)"));
+  assert.ok(route.indexOf("getOrder(") < route.indexOf("loadQuoteProducts(") && route.indexOf("loadQuoteProducts(") < route.indexOf("thumbnail(photo"));
+
+  // O conteúdo e o desenho não conhecem custo nem sessão.
+  for (const file of ["document.ts", "pdf.ts"]) {
+    const code = readFileSync(new URL(`../src/lib/quote/${file}`, import.meta.url), "utf8");
+    assert.doesNotMatch(code, /loadPublishedSnapshot|directorOf|engineOrder|quoteOrder|realCost|advisoryCost|@\/lib\/auth|process\.env/, file);
+  }
+
+  // Na tela, o botão é um link comum para a rota, só com item, fora do bloco que trava em somente leitura.
+  const page = source("/pedidos/[numero]");
+  const link = page.indexOf("href={`/api/pedidos/${order.number}/orcamento`}");
+  assert.ok(link > 0 && link < page.indexOf("<fieldset disabled={!editable}"));
+  assert.ok(page.slice(link - 120, link).includes("order.items.length > 0"));
+  assert.match(page.slice(link, link + 200), /target="_blank" rel="noopener"[^>]*>\s*Salvar PDF/);
+});
