@@ -52,9 +52,14 @@ Os testes de banco (`tests/db-*.test.ts`) usam `ERP_TEST_DATABASE_URL`, lida de
 o apaga no fim. Sem a variável eles são pulados com o motivo na saída; neste servidor
 ela existe, então `skipped` tem de ser 0.
 
-Os testes usam o executor do próprio Node (`tests/*.test.ts`). `tests/loader.mjs`
-resolve `@/` e troca `next/headers` e `next/navigation` por substitutos: os cookies da
-"requisição" vêm de `setCookies()` em `tests/helpers.ts`.
+Os testes usam o executor do próprio Node (`tests/*.test.ts`). `tests/loader.mjs` fica
+só para os testes: troca `next/headers` e `next/navigation` por substitutos (os cookies
+da "requisição" vêm de `setCookies()` em `tests/helpers.ts`) e delega o `@/` a
+`scripts/loader.mjs`.
+
+Os scripts de linha de comando (`npm run db:import-products`) entram por
+`scripts/register.mjs`, que registra `scripts/loader.mjs`: ele só resolve `@/`, sem os
+substitutos do Next. A regra do `@/` existe só ali.
 
 ## Multi-empresa
 
