@@ -1,5 +1,5 @@
 import { getSession } from "@/lib/auth/index";
-import { canAccess } from "@/lib/auth/permissions";
+import { allows } from "@/lib/auth/permissions";
 import { listPayables } from "@/lib/db/payables";
 import { tenantDb } from "@/lib/db/pool";
 import { payablesCsv } from "@/lib/payables-view";
@@ -17,7 +17,7 @@ const text = (message: string, status: number) =>
 export async function GET() {
   const session = await getSession();
   if (!session) return text("Entre no sistema para continuar.", 401);
-  if (!canAccess(session.role, "contas-pagar")) return text("Seu perfil não vê as contas a pagar.", 403);
+  if (!allows(session, "contas-pagar")) return text("Seu perfil não vê as contas a pagar.", 403);
 
   const csv = payablesCsv(await listPayables(tenantDb(session.tenant.slug)));
   // The mark at the start makes Excel read the accents right.

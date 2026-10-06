@@ -1,6 +1,6 @@
 import { getSession } from "@/lib/auth/index";
 import type { Session } from "@/lib/auth/index";
-import { canAccess } from "@/lib/auth/permissions";
+import { allows } from "@/lib/auth/permissions";
 import { tenantDb } from "@/lib/db/pool";
 import { deleteProductPhoto, loadProductPhoto, saveProductPhoto } from "@/lib/db/product-photos";
 import { ProductError } from "@/lib/db/products";
@@ -33,7 +33,7 @@ async function productId({ params }: Context): Promise<number | null> {
 /** The session of who may change photos, or the refusal to answer with. */
 function editor(session: Session | null): Session | Response {
   if (!session) return UNAUTHENTICATED();
-  return canAccess(session.role, "produtos") ? session : FORBIDDEN();
+  return allows(session, "produtos") ? session : FORBIDDEN();
 }
 
 /** The body, or `null` once it passes the limit: the rest is not read. */

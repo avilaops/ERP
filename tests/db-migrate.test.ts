@@ -45,6 +45,7 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "0012_categorias_de_contas.sql",
     "0013_provisoes_taxa_fixa_e_despesas_fixas.sql",
     "0014_regras_de_aprovacao.sql",
+    "0015_telas_por_pessoa.sql",
   ]);
 
   const second = await withClient((client) => migrate(client, MIGRATIONS_DIR));

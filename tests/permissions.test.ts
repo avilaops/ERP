@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { canAccess, MENU_ITEMS, menuFor, seesAllOrders, seesCosts } from "@/lib/auth/permissions";
+import { allows, canAccess, MENU_ITEMS, menuFor, menuOf, narrowedItems, seesAllOrders, seesCosts } from "@/lib/auth/permissions";
 import type { MenuItemKey } from "@/lib/auth/permissions";
 import { ROLE_LABELS, ROLES } from "@/lib/auth/roles";
 import type { Role } from "@/lib/auth/roles";
@@ -108,4 +108,26 @@ test("pedidos da equipe inteira: Diretoria e gerente; o vendedor vê só os dele
       ["FINANCEIRO", false],
     ],
   );
+});
+
+test("telas por pessoa: a lista só tira telas do perfil, nunca dá uma que ele não tem", () => {
+  const seller = { role: "VENDEDOR", items: ["pedidos", "clientes", "produtos", "parametros"] } as const;
+  assert.deepEqual(menuOf(seller).map((item) => item.key), ["pedidos", "clientes"]);
+  assert.equal(allows(seller, "pedidos"), true);
+  // Estava no perfil, mas foi tirada desta pessoa.
+  assert.equal(allows(seller, "comissoes"), false);
+  // Está na lista, mas o perfil não tem: continua fechada.
+  assert.equal(allows(seller, "produtos"), false);
+  assert.equal(allows(seller, "parametros"), false);
+  // Sem lista, valem todas as telas do perfil.
+  for (const items of [null, undefined]) assert.equal(menuOf({ role: "VENDEDOR", items }).length, 6);
+});
+
+test("telas por pessoa: o que se guarda é só o que foi tirado do perfil", () => {
+  const all = ["dashboard", "pedidos", "clientes", "comissoes", "tabela-precos", "simulador"];
+  assert.equal(narrowedItems("VENDEDOR", all), null);
+  assert.equal(narrowedItems("VENDEDOR", [...all, "parametros"]), null);
+  // Na ordem do menu, sem o que o perfil não tem.
+  assert.deepEqual(narrowedItems("VENDEDOR", ["simulador", "parametros", "pedidos"]), ["pedidos", "simulador"]);
+  assert.deepEqual(narrowedItems("VENDEDOR", []), []);
 });

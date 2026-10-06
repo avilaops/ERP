@@ -85,6 +85,11 @@ Decisão do Nicolas em 06/10/2026. Um banco, **um esquema do PostgreSQL por empr
    digitado pela Ávila Ops nem fica em variável. `ERP_USERS` (`email:PERFIL@empresa`) é só o
    acesso de quem instala e dá suporte, e vem primeiro; o resto do login lê o cadastro de
    cada empresa (`createCombinedDirectory`). Ninguém tira o próprio acesso (`updateUser`).
+   **Telas por pessoa:** em Equipe a diretoria desmarca telas de uma pessoa
+   (`users.allowed_items`). A lista só restringe o perfil, nunca dá tela que ele não tem
+   (`allows`, `narrowedItems` em `permissions.ts`); custo, lucro e escopo de pedidos
+   continuam decididos só pelo perfil. Página, menu e rota de API perguntam por
+   `allows(session, item)`, não mais por `canAccess(session.role, item)`.
 6. Testes de isolamento em `tests/db-tenants.test.ts` (banco) e `tests/access.test.ts`
    (sessão): mexeu em login, sessão ou conexão, eles têm de continuar passando.
 

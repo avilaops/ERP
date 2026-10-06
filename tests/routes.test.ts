@@ -326,7 +326,7 @@ test("orçamento em PDF: sai da conta da equipe, nunca lê custo, e o escopo vem
   for (const forbidden of ["loadPublishedSnapshot", "directorOf", "loadOrderStanding", "seesCosts", '"DIRETORIA"', "engineOrder", "quoteOrder"]) {
     assert.ok(!route.includes(forbidden), `a rota do orçamento contém ${forbidden}`);
   }
-  assert.ok(route.includes('canAccess(session.role, "pedidos")'));
+  assert.ok(route.includes('allows(session, "pedidos")'));
   assert.ok(route.includes("getOrder(numero, { sellerEmail: seesAllOrders(session.role) ? null : session.email }, conn)"));
   assert.doesNotMatch(route, /seesAllOrders\((?!session\.role\))|canAccess\((?!session\.role,)/);
   // Nada do pedido HTTP é lido: nem endereço, nem cabeçalho, nem corpo. E só existe o GET.

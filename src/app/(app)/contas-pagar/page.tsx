@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requirePermission } from "@/lib/auth";
-import { canAccess, menuItem } from "@/lib/auth/permissions";
+import { allows, menuItem } from "@/lib/auth/permissions";
 import { monthLabel } from "@/lib/commissions-view";
 import { listPaymentMethods } from "@/lib/db/orders";
 import { listPayableCategories } from "@/lib/db/payable-categories";
@@ -183,7 +183,7 @@ export default async function ContasPagarPage({ searchParams }: { searchParams: 
                     </p>
                   </div>
                 </div>
-                {canAccess(session.role, "comissoes") && (
+                {allows(session, "comissoes") && (
                   <p className="mt-2 text-sm">
                     <Link href={`${menuItem("comissoes").href}?mes=${item.month}`} className="font-medium text-brand underline">
                       Pagar em Comissões

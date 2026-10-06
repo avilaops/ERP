@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Bars, Columns, Kpi } from "@/components/Charts";
 import { requirePermission } from "@/lib/auth";
-import { canAccess, menuItem, seesAllOrders, seesCosts } from "@/lib/auth/permissions";
+import { allows, menuItem, seesAllOrders, seesCosts } from "@/lib/auth/permissions";
 import { dashboardView, parsePeriod, PERIODS } from "@/lib/dashboard-view";
 import { listDashboardOrders, ordersProfit } from "@/lib/db/dashboard";
 import { listCommissionsDue, listPayables } from "@/lib/db/payables";
@@ -35,8 +35,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
   // Profit is read only for who may see costs.
   const profit = seesCosts(session.role) ? await ordersProfit(view.closedNumbers, conn) : null;
-  const receivables = canAccess(session.role, "recebimentos") ? receivablesSummary(await listOpenReceivables(conn), today, addDays(today, 30)) : null;
-  const payables = canAccess(session.role, "contas-pagar")
+  const receivables = allows(session, "recebimentos") ? receivablesSummary(await listOpenReceivables(conn), today, addDays(today, 30)) : null;
+  const payables = allows(session, "contas-pagar")
     ? payablesSummary(await listPayables(conn), await listCommissionsDue(conn), { today, inSevenDays: addDays(today, 7), month: today.slice(0, 7) })
     : null;
   const { funnel } = view;

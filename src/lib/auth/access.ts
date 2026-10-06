@@ -1,5 +1,5 @@
 import type { DirectoryUser } from "@/lib/auth/directory";
-import { canAccess } from "@/lib/auth/permissions";
+import { allows } from "@/lib/auth/permissions";
 import type { MenuItemKey } from "@/lib/auth/permissions";
 import type { Role } from "@/lib/auth/roles";
 
@@ -7,6 +7,8 @@ export type Session = {
   email: string;
   name: string;
   role: Role;
+  /** The screens left to this person inside the profile; `null` is all of the profile's. */
+  items: string[] | null;
   /** The company this request is for. Every read and write of the request happens in its database. */
   tenant: { slug: string; name: string };
   /** How many companies the person belongs to: with more than one they may switch. */
@@ -32,11 +34,12 @@ export type AccessDecision =
 
 export function sessionFrom(identity: Identity): Session | null {
   if (!identity.authenticated || !identity.user) return null;
-  const { email, name, role, tenant } = identity.user;
+  const { email, name, role, tenant, items } = identity.user;
   return {
     email,
     name: identity.displayName ?? name,
     role,
+    items: items ?? null,
     tenant: { slug: tenant.slug, name: tenant.name },
     companies: identity.companies ?? 1,
   };
@@ -49,6 +52,6 @@ export function sessionFrom(identity: Identity): Session | null {
 export function decideAccess(identity: Identity, item: MenuItemKey): AccessDecision {
   if (!identity.authenticated) return { kind: "login" };
   const session = sessionFrom(identity);
-  if (!session || !canAccess(session.role, item)) return { kind: "no-access" };
+  if (!session || !allows(session, item)) return { kind: "no-access" };
   return { kind: "allow", session };
 }

@@ -69,7 +69,7 @@ export default async function EquipePage() {
                     <span className="block truncate text-xs text-slate-500">{user.email}</span>
                   </span>
                   <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium ${user.active ? "bg-brand-soft text-brand" : "bg-slate-200 text-slate-600"}`}>
-                    {user.active ? ROLE_LABELS[user.role] : "Sem acesso"}
+                    {user.active ? `${ROLE_LABELS[user.role]}${user.items ? ` · ${user.items.length} telas` : ""}` : "Sem acesso"}
                   </span>
                 </Link>
               </li>

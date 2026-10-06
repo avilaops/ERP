@@ -8,6 +8,8 @@ export type DirectoryUser = {
   name: string;
   role: Role;
   tenant: Tenant;
+  /** The screens left to this person inside the profile, when the company narrowed them. */
+  items?: string[] | null;
 };
 
 /**
@@ -69,7 +71,7 @@ export function parseErpUsers(raw: string | undefined, tenants: Tenant[]): Direc
 }
 
 /** What the company's own register says about an e-mail: the active user, or `null`. */
-export type RegisteredLookup = (tenant: Tenant, email: string) => Promise<{ name: string; role: Role } | null>;
+export type RegisteredLookup = (tenant: Tenant, email: string) => Promise<{ name: string; role: Role; items?: string[] | null } | null>;
 
 /**
  * The configuration and the register of each company, together. `ERP_USERS` is
@@ -97,7 +99,7 @@ export function createCombinedDirectory(
         }
         try {
           const registered = await lookup(tenant, wanted);
-          if (registered) memberships.push({ email: wanted, name: registered.name, role: registered.role, tenant });
+          if (registered) memberships.push({ email: wanted, name: registered.name, role: registered.role, tenant, items: registered.items ?? null });
         } catch (error) {
           report(tenant, error);
         }

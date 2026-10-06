@@ -21,12 +21,14 @@ export default async function PessoaPage({ params }: { params: Promise<{ id: str
 
   return (
     <div className="mx-auto max-w-xl">
-        <Link href={menuItem("equipe").href} aria-label="Voltar para Equipe e acessos" className="inline-block rounded-lg bg-brand-soft px-4 py-2 text-xl text-brand">
+      <div className="flex items-center gap-3">
+        <Link href={menuItem("equipe").href} aria-label="Voltar para Equipe e acessos" className="shrink-0 rounded-lg bg-brand-soft px-3 py-1.5 text-xl text-brand">
           ←
         </Link>
-      <h1 className="mt-3 text-2xl font-semibold">{user.name}</h1>
+        <h1 className="min-w-0 truncate text-2xl font-semibold">{user.name}</h1>
+      </div>
       {self && <p className="mt-1 text-sm text-slate-600">Este é o seu cadastro: você não muda o próprio tipo de acesso nem tira o próprio acesso.</p>}
-      <ActionForm action={saveUserAction} className="mt-6 flex flex-col gap-5">
+      <ActionForm action={saveUserAction} className="mt-3 flex flex-col gap-3">
         <input type="hidden" name="id" value={user.id} />
         <PersonFields saved={user} />
         <label className="flex items-center gap-3 rounded-lg border border-slate-300 bg-white p-4">

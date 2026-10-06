@@ -1,5 +1,5 @@
 import { getSession } from "@/lib/auth/index";
-import { canAccess, seesAllOrders } from "@/lib/auth/permissions";
+import { allows, seesAllOrders } from "@/lib/auth/permissions";
 import { loadLogo } from "@/lib/db/company";
 import { getOrder } from "@/lib/db/orders";
 import { tenantDb } from "@/lib/db/pool";
@@ -35,7 +35,7 @@ const NOT_FOUND = () => text("Pedido não encontrado.", 404);
 export async function GET(_request: Request, context: Context): Promise<Response> {
   const session = await getSession();
   if (!session) return text("Entre no sistema para continuar.", 401);
-  if (!canAccess(session.role, "pedidos")) return text("Seu perfil não acessa pedidos.", 403);
+  if (!allows(session, "pedidos")) return text("Seu perfil não acessa pedidos.", 403);
 
   const { numero } = await context.params;
   if (!ORDER_NUMBER.test(numero)) return NOT_FOUND();

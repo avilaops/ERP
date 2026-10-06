@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requirePermission } from "@/lib/auth";
 import { tenantDb } from "@/lib/db/pool";
-import { canAccess, menuItem, seesAllOrders, seesCosts } from "@/lib/auth/permissions";
+import { allows, menuItem, seesAllOrders, seesCosts } from "@/lib/auth/permissions";
 import { ufFromCep } from "@/lib/cep";
 import { completenessText, isComplete, isRequired, normalizeDocument, taxpayerFromRegistration } from "@/lib/customer";
 import type { CustomerKind } from "@/lib/customer";
@@ -150,7 +150,7 @@ export default async function PedidoPage({
           <strong>Aprovação recusada</strong> por {decision.decidedBy} em {showDateTime(decision.decidedAt)}: {decision.comment}
         </p>
       )}
-      {order.status === "aguardando_aprovacao" && canAccess(session.role, "aprovacoes") && (
+      {order.status === "aguardando_aprovacao" && allows(session, "aprovacoes") && (
         <p className="mt-3 text-sm">
           <Link href={menuItem("aprovacoes").href} className="font-medium text-brand underline">
             Decidir em Aprovações

@@ -18,6 +18,9 @@ const reader = (formData: FormData) => (key: UserField | "id") => {
   return typeof value === "string" ? value : null;
 };
 
+/** The boxes ticked on the screen. The database layer keeps only the ones the type of access has. */
+const screensOf = (formData: FormData) => formData.getAll("items").filter((value): value is string => typeof value === "string");
+
 function problem(error: unknown): ActionState {
   if (error instanceof UserError) return { error: error.message };
   console.error("[equipe] falha ao gravar:", error instanceof Error ? error.message : error);
@@ -37,7 +40,7 @@ export async function inviteUserAction(_previous: ActionState, formData: FormDat
   const parsed = parseUserForm(reader(formData), { withEmail: true });
   if (!parsed.ok) return { error: parsed.errors.join(" ") };
   try {
-    await createUser(parsed.user, session.email, conn);
+    await createUser({ ...parsed.user, items: screensOf(formData) }, session.email, conn);
   } catch (error) {
     return problem(error);
   }
@@ -52,7 +55,7 @@ export async function saveUserAction(_previous: ActionState, formData: FormData)
   const parsed = parseUserForm(read, { withEmail: false });
   if (!parsed.ok) return { error: parsed.errors.join(" ") };
   try {
-    await updateUser(Number(read("id")), parsed.user, session.email, conn);
+    await updateUser(Number(read("id")), { ...parsed.user, items: screensOf(formData) }, session.email, conn);
   } catch (error) {
     return problem(error);
   }

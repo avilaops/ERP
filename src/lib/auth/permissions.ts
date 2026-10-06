@@ -49,6 +49,34 @@ export function canAccess(role: Role, key: MenuItemKey): boolean {
   return menuItem(key).roles.includes(role);
 }
 
+/** Who is asking: the profile and, when the company narrowed it for this person, the screens left. */
+export type Access = { role: Role; items?: readonly string[] | null };
+
+/**
+ * Whether this person opens the item. The profile decides what is possible;
+ * the list of the person, when there is one, only takes screens away from it.
+ * It never gives a screen the profile does not have.
+ */
+export function allows(access: Access, key: MenuItemKey): boolean {
+  return canAccess(access.role, key) && (access.items == null || access.items.includes(key));
+}
+
+/** The items this person sees in the sidebar, in the manual's order. */
+export function menuOf(access: Access): MenuItem[] {
+  return MENU_ITEMS.filter((item) => allows(access, item.key));
+}
+
+/**
+ * What to store for a person: the chosen screens that the profile has, in the
+ * order of the menu, or `null` when they are all of them (nothing narrowed).
+ * Choosing none is refused by who calls: a person with no screen gets nowhere.
+ */
+export function narrowedItems(role: Role, chosen: readonly string[]): MenuItemKey[] | null {
+  const own = menuFor(role).map((item) => item.key);
+  const kept = own.filter((key) => chosen.includes(key));
+  return kept.length === own.length ? null : kept;
+}
+
 /** Items the profile sees in the sidebar, in the manual's order. */
 export function menuFor(role: Role): MenuItem[] {
   return MENU_ITEMS.filter((item) => item.roles.includes(role));

@@ -11,12 +11,13 @@ export default async function NovaPessoaPage() {
   await requirePermission("equipe");
   return (
     <div className="mx-auto max-w-xl">
-        <Link href={menuItem("equipe").href} aria-label="Voltar para Equipe e acessos" className="inline-block rounded-lg bg-brand-soft px-4 py-2 text-xl text-brand">
+      <div className="flex items-center gap-3">
+        <Link href={menuItem("equipe").href} aria-label="Voltar para Equipe e acessos" className="shrink-0 rounded-lg bg-brand-soft px-3 py-1.5 text-xl text-brand">
           ←
         </Link>
-      <h1 className="mt-3 text-2xl font-semibold">Convidar pessoa</h1>
-      <p className="mt-1 text-slate-600">Nome, e-mail e o tipo de acesso. Ela entra no próximo login.</p>
-      <ActionForm action={inviteUserAction} className="mt-6 flex flex-col gap-5">
+        <h1 className="min-w-0 truncate text-2xl font-semibold">Convidar pessoa</h1>
+      </div>
+      <ActionForm action={inviteUserAction} className="mt-3 flex flex-col gap-3">
         <input type="hidden" name="active" value="sim" />
         <PersonFields saved={null} />
         <div className={BOTTOM_BAR}>

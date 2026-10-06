@@ -45,3 +45,20 @@ test("usuários: a diretoria cadastra, o e-mail fica em minúsculas e o login ac
   assert.equal((await updateUser(boss.id, { name: "Diretora Geral", role: "DIRETORIA", active: true }, BOSS, db.pool)).name, "Diretora Geral");
   assert.deepEqual((await findActiveUser(BOSS, db.pool))?.role, "DIRETORIA");
 });
+
+test("telas por pessoa: guardam-se só as do perfil; todas marcadas é sem restrição; nenhuma é recusada", { skip }, async () => {
+  const seller = await createUser({ email: "caio@teste.local", name: "Caio", role: "VENDEDOR", items: ["pedidos", "clientes", "parametros"] }, BOSS, db.pool);
+  assert.deepEqual(seller.items, ["pedidos", "clientes"]);
+  assert.deepEqual((await findActiveUser("caio@teste.local", db.pool))?.items, ["pedidos", "clientes"]);
+
+  const all = ["dashboard", "pedidos", "clientes", "comissoes", "tabela-precos", "simulador"];
+  assert.equal((await updateUser(seller.id, { name: "Caio", role: "VENDEDOR", active: true, items: all }, BOSS, db.pool)).items, null);
+  await assert.rejects(() => updateUser(seller.id, { name: "Caio", role: "VENDEDOR", active: true, items: ["parametros"] }, BOSS, db.pool), /Marque pelo menos uma tela/);
+  // Mudou de perfil: as telas marcadas valem para o perfil novo.
+  assert.deepEqual((await updateUser(seller.id, { name: "Caio", role: "FINANCEIRO", active: true, items: ["recebimentos", "pedidos"] }, BOSS, db.pool)).items, ["recebimentos"]);
+
+  // Ninguém tira telas de si mesmo: poderia ficar sem Parâmetros e sem Equipe.
+  const boss = (await listUsers(db.pool)).find((user) => user.email === BOSS);
+  assert.ok(boss);
+  await assert.rejects(() => updateUser(boss.id, { name: boss.name, role: "DIRETORIA", active: true, items: ["pedidos"] }, BOSS, db.pool), /nem tirar telas de si/);
+});

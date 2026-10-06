@@ -2,7 +2,7 @@ import Link from "next/link";
 import { MobileMenu } from "@/components/MobileMenu";
 import type { Session } from "@/lib/auth";
 import { localProvider } from "@/lib/auth/local-provider";
-import { canAccess, menuFor } from "@/lib/auth/permissions";
+import { allows, menuOf } from "@/lib/auth/permissions";
 import { ROLE_LABELS } from "@/lib/auth/roles";
 import { SSO_APP_ID, SSO_LOGOUT_URL } from "@/lib/auth/sso";
 import { loadLogoVersion } from "@/lib/db/company";
@@ -10,7 +10,7 @@ import { tenantDb } from "@/lib/db/pool";
 
 /** Server component: the menu is computed from the server-side session only. */
 export async function Sidebar({ session }: { session: Session }) {
-  const items = menuFor(session.role);
+  const items = menuOf(session);
   const logoVersion = await loadLogoVersion(tenantDb(session.tenant.slug));
   const localLogin = localProvider(process.env).available;
 
@@ -32,7 +32,7 @@ export async function Sidebar({ session }: { session: Session }) {
         </p>
       </section>
 
-      {canAccess(session.role, "pedidos") && (
+      {allows(session, "pedidos") && (
         <Link
           href="/pedidos/novo"
           className="rounded bg-brand px-3 py-2 text-center font-medium text-white hover:bg-brand-dark"
