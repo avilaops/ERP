@@ -8,7 +8,7 @@ Como rodar, testar e o que falta para produção. Atualizado em 06/10/2026.
 | --- | --- |
 | Desenvolvimento (servidor `creators` da Ávila Ops) | No ar sob demanda: `npm run dev`, bancos `erp` e `erp_test` no PostgreSQL do servidor |
 | Integração contínua (GitHub Actions) | `.github/workflows/ci.yml`: lint, tipos, testes com banco e build, a cada push na `main` e em todo PR |
-| Produção | **No ar no servidor `applications`** (`178.105.82.48`), em `/opt/erp`. Falta o registro `erp` do Cloudflare apontar para ele; até lá o endereço cai na cópia antiga do `apps-noclient` (seção Produção) |
+| Produção | **No ar em `https://erp.avilaops.com`**, no servidor `applications` (`178.105.82.48`), em `/opt/erp` (seção Produção) |
 
 ## Variáveis de ambiente
 
@@ -100,19 +100,18 @@ usa o que o servidor já tem: o Caddy atende `erp.avilaops.com` e repassa para a
 o PostgreSQL do servidor (banco e role `erp`, um esquema por empresa); o backup é o
 `/usr/local/bin/backup-todos-bancos.sh`, que já inclui o banco `erp`.
 
-**Situação em 06/10/2026:** publicado com `SERVIDOR=applications bash deploy/subir.sh` (container
-`erp` saudável, esquema `tenant_ludus` migrado, bloco no Caddy, banco no backup diário). Direto na
-origem, `/api/health` responde com certificado válido. **O endereço público ainda não chega
-aqui:** o registro `erp` no Cloudflare aponta para `204.168.249.111` (`apps-noclient`), onde ficou
-a primeira instalação, parada na revisão `5c58ebd`.
+**Situação em 06/10/2026:** publicado com `bash deploy/subir.sh` (container `erp` saudável,
+esquema `tenant_ludus` migrado, bloco no Caddy, banco no backup diário). O registro A `erp` da zona
+`avilaops.com` no Cloudflare aponta para `178.105.82.48`, somente DNS (o valor anterior está em
+`/opt/backups/dns-erp.avilaops.com-20261006-antes-applications.json`). `https://erp.avilaops.com`
+responde, e o `SSO_JWT_SECRET` é o mesmo do Auth central (conferido por resumo, no servidor).
 
-Para concluir, no painel do Cloudflare (zona `avilaops.com`), trocar o valor do registro A `erp`
-para `178.105.82.48`. Depois disso: conferir o login pelo Auth central e remover a instalação do
-`apps-noclient` (container, `/opt/erp`, bloco do Caddy, banco e a linha do backup de lá).
+A primeira instalação, no `apps-noclient`, foi removida no mesmo dia (container, `/opt/erp`, bloco
+do Caddy, banco, role e a linha do backup). O banco de lá estava vazio; ficou um dump final em
+`/var/backups/erp-removido-20261006/` naquele servidor.
 
 Quem entra hoje: só `nicolas@avilaops.com`, como Diretoria da Ludus. Os outros usuários entram em
 `ERP_USERS`, no `/opt/erp/.env`, seguido de `docker compose up -d --force-recreate` em `/opt/erp`.
-O `SSO_JWT_SECRET` veio da primeira instalação e ainda não foi conferido contra o do Auth.
 
 O `/etc/caddy/Caddyfile` do servidor foi editado direto, no lugar do comentário que marcava o
 antigo ERP em Odoo (backup `Caddyfile.bak-20261006-082120-antes-erp-novo` ao lado). O roteiro de
