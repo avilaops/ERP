@@ -58,6 +58,7 @@ test("toda ação de servidor confere a permissão antes de qualquer outra coisa
   assert.ok(actions.includes("contas-pagar/actions.ts"));
   assert.ok(actions.includes("fornecedores/actions.ts"));
   assert.ok(actions.includes("precos-metas/actions.ts"));
+  assert.ok(actions.includes("equipe/actions.ts"));
   for (const file of actions) {
     const code = readFileSync(APP_DIR + file, "utf8");
     // Each exported action opens with the check: nothing is read from the form or the database before it.
@@ -260,7 +261,7 @@ test("não existe página no grupo protegido sem requirePermission", () => {
   const all = pages();
   // The menu items, plus /pedidos/novo, one order, the record of one customer and of one supplier,
   // and the users, the forms of payment and the categories of bills of the company.
-  assert.equal(all.length, MENU_ITEMS.length + 10);
+  assert.equal(all.length, MENU_ITEMS.length + 12);
   for (const route of all) {
     assert.match(source(route), /await requirePermission\(/, route);
   }

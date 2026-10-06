@@ -7,6 +7,7 @@ import { listDashboardOrders } from "@/lib/db/dashboard";
 import { tenantDb } from "@/lib/db/pool";
 import { listUsers } from "@/lib/db/users";
 import { showMoney } from "@/lib/format";
+import { ROLE_NOTES } from "./PersonFields";
 
 export const metadata = { title: `${menuItem("equipe").label} · ERP` };
 export const dynamic = "force-dynamic";
@@ -14,60 +15,83 @@ export const dynamic = "force-dynamic";
 const CARD = "rounded-lg border border-slate-200 bg-white";
 const TITLE = "text-sm font-semibold uppercase tracking-wide";
 
-/** What each profile is for, in the words of the screen. What it opens comes from the permissions themselves. */
-const ROLE_NOTES = {
-  DIRETORIA: "Vê custo, lucro e meta. Define parâmetros, publica a tabela, cadastra a equipe e aprova qualquer pedido.",
-  GERENTE_COMERCIAL: "Vê os pedidos de toda a equipe e aprova os que ainda dão lucro. Não vê custo nem a meta de lucro.",
-  VENDEDOR: "Monta pedidos com a tabela publicada e vê só os próprios pedidos e as próprias comissões.",
-  FINANCEIRO: "Dá baixa nos recebimentos, cuida das contas a pagar e dos fornecedores e marca as comissões como pagas.",
-} as const;
-
 export default async function EquipePage() {
   const session = await requirePermission("equipe");
   const conn = tenantDb(session.tenant.slug);
   const users = await listUsers(conn);
   const selling = sellersView(await listDashboardOrders({ sellerEmail: null }, conn));
 
+  const NEW = `${menuItem("equipe").href}/nova`;
+  if (users.length === 0 && selling.length === 0) {
+    // Nobody yet: the screen says what it is for and offers the one thing to do.
+    return (
+      <div className="mx-auto flex min-h-[70vh] max-w-xl flex-col">
+        <h1 className="text-2xl font-semibold">{menuItem("equipe").label}</h1>
+        <div className="flex flex-1 flex-col items-center justify-center text-center">
+          <p className="text-xl font-semibold">Ainda não há pessoas cadastradas</p>
+          <p className="mt-2 text-slate-600">Aqui você convida quem trabalha em {session.tenant.name} e escolhe o que cada pessoa pode ver e fazer.</p>
+        </div>
+        <Link href={NEW} className="rounded-lg bg-brand px-4 py-3.5 text-center text-base font-semibold text-white hover:bg-brand-dark">
+          Convidar pessoa
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">{menuItem("equipe").label}</h1>
-          <p className="mt-1 text-slate-600">Quem entra em {session.tenant.name}, o que cada perfil vê e quem está vendendo.</p>
+          <p className="mt-1 text-slate-600">Quem entra em {session.tenant.name}, o que cada tipo de acesso vê e quem está vendendo.</p>
         </div>
-        <Link href="/parametros/usuarios" className="rounded bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark">
-          Cadastrar ou alterar pessoas
+        <Link href={NEW} className="w-full rounded-lg bg-brand px-4 py-3 text-center font-semibold text-white hover:bg-brand-dark sm:w-auto">
+          Convidar pessoa
         </Link>
       </div>
 
-      <div className="mt-6 grid grid-cols-[minmax(0,1fr)] gap-4 md:grid-cols-2">
-        {ROLES.map((role) => {
-          const people = users.filter((user) => user.role === role && user.active);
-          return (
-            <section key={role} className={`${CARD} p-5`} aria-label={ROLE_LABELS[role]}>
-              <div className="flex items-baseline justify-between gap-3">
-                <h2 className="text-lg font-semibold">{ROLE_LABELS[role]}</h2>
-                <span className="text-xs text-slate-600">
-                  {people.length} {people.length === 1 ? "pessoa" : "pessoas"}
-                </span>
-              </div>
+      <section className={`${CARD} mt-6`} aria-labelledby="pessoas">
+        <h2 id="pessoas" className={`${TITLE} border-b border-slate-200 px-5 py-3`}>
+          Pessoas ({users.length})
+        </h2>
+        {users.length === 0 ? (
+          <p className="p-5 text-sm text-slate-600">Ninguém cadastrado ainda. Toque em “Convidar pessoa”.</p>
+        ) : (
+          <ul>
+            {users.map((user) => (
+              <li key={user.id} className="border-t border-slate-200 first:border-t-0">
+                <Link href={`${menuItem("equipe").href}/${user.id}`} className="flex items-center justify-between gap-3 px-5 py-3 active:bg-slate-50">
+                  <span className="min-w-0">
+                    <span className="block truncate font-medium">
+                      {user.name}
+                      {user.email === session.email ? " (você)" : ""}
+                    </span>
+                    <span className="block truncate text-xs text-slate-500">{user.email}</span>
+                  </span>
+                  <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium ${user.active ? "bg-brand-soft text-brand" : "bg-slate-200 text-slate-600"}`}>
+                    {user.active ? ROLE_LABELS[user.role] : "Sem acesso"}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <details className={`${CARD} mt-6`}>
+        <summary className={`${TITLE} cursor-pointer px-5 py-3`}>O que cada tipo de acesso vê</summary>
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-4 border-t border-slate-200 p-5 md:grid-cols-2">
+          {ROLES.map((role) => (
+            <div key={role}>
+              <h3 className="font-semibold">{ROLE_LABELS[role]}</h3>
               <p className="mt-1 text-sm text-slate-700">{ROLE_NOTES[role]}</p>
-              <p className="mt-3 text-xs text-slate-500">
+              <p className="mt-1 text-xs text-slate-500">
                 Abre: {MENU_ITEMS.filter((item) => item.roles.includes(role)).map((item) => item.label).join(", ")}.
               </p>
-              {people.length > 0 && (
-                <ul className="mt-3 flex flex-col gap-1 text-sm">
-                  {people.map((user) => (
-                    <li key={user.id} className="truncate">
-                      {user.name} <span className="text-slate-500">· {user.email}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-          );
-        })}
-      </div>
+            </div>
+          ))}
+        </div>
+      </details>
 
       <section className={`${CARD} mt-6`} aria-labelledby="vendendo">
         <h2 id="vendendo" className={`${TITLE} border-b border-slate-200 px-5 py-3`}>
@@ -109,9 +133,6 @@ export default async function EquipePage() {
         )}
       </section>
 
-      <p className="mt-4 text-sm text-slate-600">
-        A pessoa entra pelo login da Ávila Ops com o e-mail cadastrado. Para tirar o acesso, desmarque “Pode entrar” no cadastro.
-      </p>
     </>
   );
 }
