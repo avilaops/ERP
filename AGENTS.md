@@ -266,6 +266,17 @@ guardada no banco da empresa (`product_photos`), nunca em disco nem em `public/`
    custo, e nunca toca em custo, crédito, embalagem nem `active`. O formato da pasta está
    no `README.md`.
 
+## Contas a pagar e fornecedores
+
+Diretoria e Financeiro. Fornecedor (`src/lib/db/suppliers.ts`) é empresa, pessoa ou exterior
+(país no lugar de CNPJ/CPF) e nunca se apaga: desliga-se. Conta (`src/lib/db/payables.ts`) é
+lançada, paga com o valor que de fato saiu, e o pagamento pode ser desfeito; conta paga não se
+altera nem se exclui. As categorias são a tabela `payable_categories` da empresa, editada em
+Parâmetros → Categorias de contas a pagar. **A comissão devida aos vendedores aparece em Contas
+a pagar como conta automática** (`listCommissionsDue`), calculada na hora a partir de
+`commissions`: nunca é gravada como conta, e é paga em Comissões. A planilha sai por
+`/api/contas-pagar/exportar`, só para quem tem o item, e neutraliza célula que começa como fórmula.
+
 ## Celular
 
 O sistema é usado no celular: toda tela tem de caber em 390 px de largura sem rolagem lateral

@@ -21,6 +21,7 @@ import {
 } from "@/lib/db/orders";
 import type { OrderPayment, OrderScope, OrderTerms } from "@/lib/db/orders";
 import { loadParams, saveParams } from "@/lib/db/params";
+import { listCommissionsDue } from "@/lib/db/payables";
 import { listCarriedBalances, listCommissionMonths, listCommissions, payCommissions } from "@/lib/db/commissions";
 import { loadCommissionDay, saveCommissionDay } from "@/lib/db/company";
 import { decideRefund, listOpenReceivables, listPendingRefunds, listReceipts, recordReceipt, requestRefund } from "@/lib/db/receivables";
@@ -919,6 +920,10 @@ test("estorno: pedido com motivo, confirmado pela diretoria; o valor volta a rec
   );
   await assert.rejects(() => payCommissions(SELLER.email, "2026-10", FINANCE, db.pool), /saldo em aberto não é positivo/);
   assert.ok((await listCommissions("2026-10", null, db.pool)).every((entry) => entry.paidAt === null));
+  // Em Contas a pagar a comissão devida aparece por vendedor e mês: aqui, o saldo negativo de outubro.
+  assert.deepEqual(await listCommissionsDue(db.pool), [
+    { sellerEmail: SELLER.email, sellerName: SELLER.name, month: "2026-10", dueDate: "2026-11-10", amount: -396.22 },
+  ]);
   // Em novembro, o saldo negativo de outubro aparece como pendência.
   assert.deepEqual([...(await listCarriedBalances("2026-11", null, db.pool))], [[SELLER.email, -396.22]]);
   assert.deepEqual([...(await listCarriedBalances("2026-10", null, db.pool))], []);
