@@ -93,7 +93,8 @@ Mudanças em custos e parâmetros recalculam só para a diretoria. A equipe vê 
 - Venda dentro de SP: ICMS 18%.
 - Venda para outro estado: interestadual de 4% para importado. Cliente não contribuinte (PF, ISENTO, sem IE): DIFAL = alíquota interna do destino − 4%, custo da Ludus.
 - "Contribuinte do ICMS" é marcado automaticamente pela inscrição estadual (ISENTO ou PF = não).
-- Tabela de alíquotas internas por UF fica no banco (editável), validada pelo contador.
+- A tabela de alíquotas por UF (ICMS interno e FCP) fica no banco, em `state_tax_rates`, editável pela diretoria em Parâmetros; cada versão publicada da tabela de preços guarda as alíquotas com que foi calculada. Os valores iniciais são provisórios, a validar com o contador.
+- **Nenhuma alíquota, taxa ou tabela de regra fica fixa no código.** Tudo que pode mudar por lei ou por decisão do cliente é parâmetro editável na tela e entra no cálculo por argumento. Se for escrever um número de negócio numa constante, falta uma tabela.
 
 ### Pedido
 - Número `#AAMMDD-XXXX`. No código as situações são `em_negociacao`, `aguardando_aprovacao`, `fechado`, `perdido` e `cancelado`. O plano original previa oito (`RASCUNHO`, `ENVIADO`, `AGUARDANDO_APROVACAO`, `REPROVADO`, `APROVADO`, `FECHADO`, `PERDIDO`, `CANCELADO`); os parágrafos abaixo ainda usam esses nomes para descrever o fluxo de aprovação, que não foi implementado.

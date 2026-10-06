@@ -1,4 +1,4 @@
-import { PARAM_COLUMN_LIST, PARAM_COLUMNS, rowToParams } from "@/lib/db/params";
+import { PARAM_COLUMN_LIST, PARAM_COLUMNS, rowsToStateRates, rowToParams, stateRateArrays } from "@/lib/db/params";
 import { db, pgErrorCode } from "@/lib/db/pool";
 import type { Queryable } from "@/lib/db/pool";
 import type { PriceTableDraft } from "@/lib/price-table";
@@ -81,9 +81,10 @@ export async function loadPublishedSnapshot(version: number, conn: Queryable = d
        FROM price_table_items WHERE version = $1 ORDER BY product_id`,
     [version],
   );
+  const rates = await conn.query("SELECT uf, internal_icms, fcp FROM price_table_state_rates WHERE version = $1", [version]);
   return {
     ...toVersion(rows[0]),
-    params: rowToParams(rows[0]),
+    params: rowToParams(rows[0], rowsToStateRates(rates.rows)),
     items: items.rows.map((row) => ({
       productId: Number(row.product_id),
       code: row.code === null ? null : String(row.code),
@@ -138,8 +139,8 @@ export async function publishPriceTable(
   assertDraft(draft, version, publishedBy);
 
   const items = draft.items;
-  // $1 to $10 are the version, who publishes and the items; the fifteen parameters come after.
-  const placeholders = PARAM_COLUMNS.map((_, index) => `$${index + 11}::numeric`).join(", ");
+  // $1 to $13 are the version, who publishes, the items and the rates by state; the fifteen parameters come after.
+  const placeholders = PARAM_COLUMNS.map((_, index) => `$${index + 14}::numeric`).join(", ");
   try {
     const { rows } = await conn.query(
       `WITH published AS (
@@ -156,8 +157,14 @@ export async function publishPriceTable(
                 unnest($3::integer[], $4::text[], $5::text[], $6::numeric[], $7::numeric[], $8::numeric[], $9::numeric[], $10::numeric[])
                   AS item (product_id, code, name, advisory_cost, tax_credit, packaging, table_price, table_price_with_ipi)
          RETURNING version
+       ), rates AS (
+         INSERT INTO price_table_state_rates (version, uf, internal_icms, fcp)
+         SELECT published.version, rate.uf, rate.internal_icms, rate.fcp
+           FROM published, unnest($11::text[], $12::numeric[], $13::numeric[]) AS rate (uf, internal_icms, fcp)
+         RETURNING version
        )
-       SELECT version, published_at, published_by FROM published WHERE EXISTS (SELECT 1 FROM written)`,
+       SELECT version, published_at, published_by FROM published
+        WHERE EXISTS (SELECT 1 FROM written) AND EXISTS (SELECT 1 FROM rates)`,
       [
         version,
         publishedBy,
@@ -169,6 +176,7 @@ export async function publishPriceTable(
         items.map((item) => item.packaging),
         items.map((item) => item.table),
         items.map((item) => item.tableWithIpi),
+        ...stateRateArrays(draft.params.stateRates),
         ...PARAM_COLUMNS.map(([field]) => draft.params[field]),
       ],
     );

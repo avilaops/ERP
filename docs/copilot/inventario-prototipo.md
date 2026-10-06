@@ -218,7 +218,7 @@ Os demais textos de ajuda (pedido, cliente, entrega) já estão no manual e nas 
 | --- | --- | --- | --- |
 | A | Provisões | um campo só, "Outras taxas da venda" (2,5%), sem origem no manual | três campos: perdas, garantia e inadimplência. Provavelmente é de onde vêm os 2,5% (os valores não estão no código para confirmar) |
 | B | Taxa fixa por pedido | não existe | R$ por pedido, entra no custo junto com o frete |
-| C | Alíquotas por UF | constante no código, sem FCP | tabela editável nos Parâmetros, com alíquota interna, de saída e FCP |
+| C | Alíquotas por UF | **resolvido em 06/10:** tabela no banco, editável nos Parâmetros, com ICMS interno e FCP por estado; cada versão publicada guarda as suas | tabela editável nos Parâmetros, com alíquota interna, de saída e FCP |
 | D | Motivos de aprovação no motor | inclui "fora da meta", não inclui frete | ver 7.1, item 2 |
 | E | Despesas fixas | um valor | lista de despesas |
 | F | Colar custos | código Ludus + custo + crédito e embalagem opcionais | chave livre (código, código do fornecedor ou nome) + custo |
@@ -227,5 +227,10 @@ Os demais textos de ajuda (pedido, cliente, entrega) já estão no manual e nas 
 | I | Formas de pagamento | cinco (especificação da 3c) | nove, com "Na entrega" sem data |
 | J | Menu | Simulador para os três perfis comerciais; Preços e metas também para o gerente | os dois só para o diretor |
 
-Os itens A a E mudam número ou regra e precisam de decisão antes de mexer no motor. F a J são
+**Decisão do Nicolas em 06/10/2026:** toda tabela de regra tem de ser editável nos Parâmetros, nada
+fixo no código. Vale para A, B, C e E: o C já foi feito; A (provisões), B (taxa fixa por pedido) e
+E (despesas fixas em lista) entram como parâmetros editáveis. Faltam os valores, que só o Rogério
+vê no protótipo. O D (motivos de aprovação) segue esperando decisão.
+
+Os itens A a E mudam número ou regra. F a J são
 escolhas de tela já registradas nas especificações.

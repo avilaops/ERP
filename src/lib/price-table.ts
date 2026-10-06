@@ -3,6 +3,7 @@ import type { Product } from "@/lib/db/products";
 import { showDate } from "@/lib/format";
 import { roundCents } from "@/lib/pricing/money";
 import type { PricingParams } from "@/lib/pricing/params";
+import { UFS } from "@/lib/pricing/states";
 import { productPrices } from "@/lib/pricing/table";
 import { hasCost } from "@/lib/products-view";
 
@@ -36,6 +37,15 @@ export function draftPriceTable(params: PricingParams, products: Product[]): Pri
   return { params, items };
 }
 
+/** Whether two sets of parameters are the same, the rates of every state included. */
+function sameParams(a: PricingParams, b: PricingParams): boolean {
+  const { stateRates: ratesA, ...scalarsA } = a;
+  const { stateRates: ratesB, ...scalarsB } = b;
+  const keys = Object.keys(scalarsA) as (keyof typeof scalarsA)[];
+  if (keys.some((key) => scalarsA[key] !== scalarsB[key])) return false;
+  return UFS.every((uf) => ratesA[uf].internalIcms === ratesB[uf].internalIcms && ratesA[uf].fcp === ratesB[uf].fcp);
+}
+
 export type PendingChanges = {
   /** Some parameter differs from the published ones. */
   rules: boolean;
@@ -57,9 +67,8 @@ export type PendingChanges = {
 export function pendingChanges(draft: PriceTableDraft, published: PublishedSnapshot | null): PendingChanges | null {
   if (!published) return { rules: false, costs: 0, added: draft.items.length, removed: 0, renamed: 0 };
 
-  const keys = Object.keys(draft.params) as (keyof PricingParams)[];
   const pending: PendingChanges = {
-    rules: keys.some((key) => draft.params[key] !== published.params[key]),
+    rules: !sameParams(draft.params, published.params),
     costs: 0,
     added: 0,
     removed: 0,

@@ -1,5 +1,5 @@
 import type { PricingParams } from "@/lib/pricing/params";
-import { INTERNAL_ICMS, ORIGIN_UF, UFS } from "@/lib/pricing/states";
+import { ORIGIN_UF, UFS } from "@/lib/pricing/states";
 import type { Uf } from "@/lib/pricing/states";
 
 export type Destination = {
@@ -10,7 +10,10 @@ export type Destination = {
 
 export type SaleTaxes = {
   icms: number;
-  /** Only when the DIFAL stays with Ludus: outside SP, non-taxpayer customer. */
+  /**
+   * Only when it stays with Ludus: outside SP, non-taxpayer customer. It is what
+   * the state's internal rate has above the interstate one, plus the state's FCP.
+   */
   difal: number;
 };
 
@@ -19,7 +22,8 @@ export function saleTaxes(params: PricingParams, destination: Destination): Sale
   if (destination.uf === ORIGIN_UF) return { icms: params.icmsSp, difal: 0 };
   const icms = params.icmsInterstate;
   if (destination.taxpayer) return { icms, difal: 0 };
-  return { icms, difal: Math.max(0, INTERNAL_ICMS[destination.uf] - icms) };
+  const state = params.stateRates[destination.uf];
+  return { icms, difal: Math.max(0, state.internalIcms - icms) + state.fcp };
 }
 
 /** What every sale pays over the value without IPI, whatever the destination. */

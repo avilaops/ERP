@@ -1,8 +1,9 @@
 "use client";
 
 import { useActionState } from "react";
-import { IDLE_FORM_STATE, PARAM_SECTIONS } from "@/lib/params-form";
-import type { ParamField, ParamsFormState, ParamsFormValues } from "@/lib/params-form";
+import { IDLE_FORM_STATE, PARAM_SECTIONS, STATE_RATE_COLUMNS } from "@/lib/params-form";
+import type { ParamField, ParamsFormState, ParamsFormValues, StateRateKey } from "@/lib/params-form";
+import { UFS } from "@/lib/pricing/states";
 
 const UNIT: Record<ParamField["kind"], string> = { rate: "%", days: "dias", money: "R$" };
 
@@ -80,6 +81,54 @@ export function ParamsForm({ saved, action }: { saved: ParamsFormValues; action:
           </div>
         </fieldset>
       ))}
+
+      <fieldset className="rounded-lg border border-slate-200 bg-white">
+        <legend className="sr-only">ICMS por estado de destino</legend>
+        <h2 className="border-b border-slate-200 px-5 py-3 text-sm font-semibold uppercase tracking-wide">
+          ICMS por estado de destino
+        </h2>
+        <div className="p-5">
+          <p className="max-w-3xl text-xs text-slate-500">
+            Alíquota interna de cada estado e o Fundo de Combate à Pobreza (FCP). Na venda para cliente não contribuinte
+            de outro estado, o DIFAL que fica com a empresa é a alíquota interna do destino menos a interestadual, mais o
+            FCP. Confirme os números com o contador; se a lei mudar, é aqui que se altera.
+          </p>
+          <div className="mt-4 grid gap-x-10 gap-y-2 md:grid-cols-2">
+            {UFS.map((uf) => (
+              <div key={uf} className="flex items-center gap-2">
+                <span className="w-8 font-semibold">{uf}</span>
+                {STATE_RATE_COLUMNS.map(({ prefix, label }) => {
+                  const key = `${prefix}-${uf}` as StateRateKey;
+                  const invalid = state.invalid.includes(key);
+                  return (
+                    <label key={key} className="flex items-center gap-1 whitespace-nowrap text-xs text-slate-500">
+                      {label}
+                      <span
+                        className={`flex items-center rounded border bg-white focus-within:ring-2 focus-within:ring-brand ${
+                          invalid ? "border-red-500" : "border-slate-300"
+                        }`}
+                      >
+                        <input
+                          name={key}
+                          type="text"
+                          inputMode="decimal"
+                          autoComplete="off"
+                          size={1}
+                          defaultValue={values[key]}
+                          aria-label={`${label} de ${uf}`}
+                          aria-invalid={invalid || undefined}
+                          className="w-14 min-w-0 bg-transparent px-2 py-1 text-right text-sm text-slate-900 outline-none"
+                        />
+                        <span className="pr-2">%</span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        </div>
+      </fieldset>
 
       <div>
         <button

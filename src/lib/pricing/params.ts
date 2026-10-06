@@ -1,8 +1,11 @@
+import { DEFAULT_STATE_RATES, UFS } from "@/lib/pricing/states";
+import type { StateRates } from "@/lib/pricing/states";
+
 /**
  * The commercial policy, the sale taxes and the channel costs that form the
- * table price. Rates are fractions (0.15 = 15%).
+ * table price: the fields that are one number each. Rates are fractions (0.15 = 15%).
  */
-export type PricingParams = {
+export type ScalarParams = {
   /** Lucro líquido que quero em cada venda. */
   targetNetProfit: number;
   /** Desconto livre do vendedor. */
@@ -39,7 +42,16 @@ export type PricingParams = {
   fixedMonthlyExpenses: number;
 };
 
-/** Current values of the prototype (docs/manual/paginas/16-parametros.md). */
+/**
+ * Everything the engine calculates with. Nothing about taxes is fixed in the
+ * code: the rates of each state come here too, from the database.
+ */
+export type PricingParams = ScalarParams & {
+  /** Internal ICMS and FCP of each of the 27 states. */
+  stateRates: StateRates;
+};
+
+/** Current values of the prototype (docs/manual/paginas/16-parametros.md). Only the gabarito of the tests. */
 export const DEFAULT_PARAMS: PricingParams = {
   targetNetProfit: 0.15,
   freeDiscount: 0.2,
@@ -56,11 +68,12 @@ export const DEFAULT_PARAMS: PricingParams = {
   icmsInterstate: 0.04,
   otherSalesRate: 0.025,
   fixedMonthlyExpenses: 0,
+  stateRates: DEFAULT_STATE_RATES,
 };
 
 /** Screen label of every rate: also the order the form shows them in. */
 export const RATE_LABELS: Record<
-  Exclude<keyof PricingParams, "proposalValidityDays" | "fixedMonthlyExpenses">,
+  Exclude<keyof ScalarParams, "proposalValidityDays" | "fixedMonthlyExpenses">,
   string
 > = {
   targetNetProfit: "Lucro líquido que quero em cada venda",
@@ -82,7 +95,8 @@ export type RateKey = keyof typeof RATE_LABELS;
 
 /**
  * Throws when a rate is outside [0, 1), the validity is not a positive whole
- * number of days or the fixed expenses are not an amount in reais.
+ * number of days, the fixed expenses are not an amount in reais, or a state has
+ * no rate.
  */
 export function validateParams(params: PricingParams): void {
   for (const key of Object.keys(RATE_LABELS) as RateKey[]) {
@@ -93,6 +107,17 @@ export function validateParams(params: PricingParams): void {
   }
   if (!Number.isInteger(params.proposalValidityDays) || params.proposalValidityDays <= 0) {
     throw new Error('Parâmetro inválido: "Validade da proposta" precisa ser um número inteiro de dias, maior que zero.');
+  }
+  const isRate = (rate: unknown) => typeof rate === "number" && Number.isFinite(rate) && rate >= 0 && rate < 1;
+  for (const uf of UFS) {
+    const state = params.stateRates?.[uf];
+    if (!state) throw new Error(`Parâmetro inválido: falta a alíquota do estado ${uf}.`);
+    if (!isRate(state.internalIcms)) {
+      throw new Error(`Parâmetro inválido: "ICMS interno de ${uf}" precisa ser uma taxa de 0% até menos de 100%.`);
+    }
+    if (!isRate(state.fcp)) {
+      throw new Error(`Parâmetro inválido: "FCP de ${uf}" precisa ser uma taxa de 0% até menos de 100%.`);
+    }
   }
   const expenses = params.fixedMonthlyExpenses;
   if (typeof expenses !== "number" || !Number.isFinite(expenses) || expenses < 0) {

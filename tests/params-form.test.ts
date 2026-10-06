@@ -11,10 +11,10 @@ import {
   showPercent,
 } from "@/lib/format";
 import { PARAM_FIELDS, paramsToForm, parseParamsForm, rawFormValues } from "@/lib/params-form";
-import type { ParamKey, ParamsFormValues } from "@/lib/params-form";
+import type { FormKey, ParamsFormValues } from "@/lib/params-form";
 import { DEFAULT_PARAMS } from "@/lib/pricing/params";
 
-const reader = (values: Partial<ParamsFormValues>) => (key: ParamKey) => values[key] ?? null;
+const reader = (values: Partial<ParamsFormValues>) => (key: FormKey) => values[key] ?? null;
 
 test("percentual: vírgula decimal vira fração exata", () => {
   assert.equal(parsePercent("9,25"), 0.0925);
@@ -70,7 +70,11 @@ test("dias: só inteiro maior que zero", () => {
 
 test("formulário: formatar e reler os 15 parâmetros atuais devolve os mesmos valores", () => {
   assert.equal(PARAM_FIELDS.length, 15);
-  assert.deepEqual(PARAM_FIELDS.map((field) => field.key).sort(), Object.keys(DEFAULT_PARAMS).sort());
+  // Os quinze campos de um número só; a tabela por estado tem os campos dela.
+  assert.deepEqual(
+    PARAM_FIELDS.map((field) => field.key).sort(),
+    Object.keys(DEFAULT_PARAMS).filter((key) => key !== "stateRates").sort(),
+  );
 
   const form = paramsToForm(DEFAULT_PARAMS);
   assert.equal(form.pisCofins, "9,25");
@@ -107,11 +111,41 @@ test("formulário: campo ausente, negativo ou dias zerados dão erro", () => {
   }
   const missing = parseParamsForm(() => null);
   assert.equal(missing.ok, false);
-  if (!missing.ok) assert.equal(missing.errors.length, 15);
+  // Os 15 campos e o ICMS interno dos 27 estados; FCP em branco vale zero.
+  if (!missing.ok) assert.equal(missing.errors.length, 15 + 27);
 });
 
 test("formulário: o texto digitado é devolvido como veio, para a tela repetir", () => {
   const typed = { ...paramsToForm(DEFAULT_PARAMS), ipi: "abc" };
   assert.equal(rawFormValues(reader(typed)).ipi, "abc");
   assert.equal(rawFormValues(() => null).ipi, "");
+});
+
+test("tabela por estado: vai para o formulário, volta igual, e FCP em branco é zero", () => {
+  const params = {
+    ...DEFAULT_PARAMS,
+    stateRates: { ...DEFAULT_PARAMS.stateRates, RJ: { internalIcms: 0.22, fcp: 0.02 }, BA: { internalIcms: 0.205, fcp: 0 } },
+  };
+  const form = paramsToForm(params);
+  assert.equal(form["icms-MA"], "23");
+  assert.equal(form["icms-BA"], "20,5");
+  assert.equal(form["icms-RJ"], "22");
+  assert.equal(form["fcp-RJ"], "2");
+  assert.equal(form["fcp-MA"], "0");
+  assert.deepEqual(parseParamsForm(reader(form)), { ok: true, params });
+
+  const blankFcp = parseParamsForm(reader({ ...form, "fcp-RJ": "  " }));
+  assert.ok(blankFcp.ok && blankFcp.params.stateRates.RJ.fcp === 0);
+});
+
+test("tabela por estado: célula inválida vira erro com o nome do estado", () => {
+  const form = { ...paramsToForm(DEFAULT_PARAMS), "icms-MA": "abc", "fcp-RJ": "100", "icms-SP": "" };
+  const parsed = parseParamsForm(reader(form));
+  assert.equal(parsed.ok, false);
+  if (parsed.ok) return;
+  assert.deepEqual(parsed.invalid.sort(), ["fcp-RJ", "icms-MA", "icms-SP"]);
+  assert.ok(parsed.errors.some((error) => error.startsWith('"ICMS interno de MA": informe um percentual')));
+  assert.ok(parsed.errors.some((error) => error.startsWith('"FCP de RJ": informe um percentual')));
+  assert.ok(parsed.errors.some((error) => error.startsWith('"ICMS interno de SP"')));
+  assert.equal(rawFormValues(reader(form))["icms-MA"], "abc");
 });

@@ -36,6 +36,7 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "0003_tabela_publicada.sql",
     "0004_clientes.sql",
     "0005_pedidos.sql",
+    "0006_aliquotas_por_estado.sql",
   ]);
 
   const second = await withClient((client) => migrate(client, MIGRATIONS_DIR));
@@ -53,10 +54,12 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "order_items",
     "orders",
     "price_table_items",
+    "price_table_state_rates",
     "price_table_versions",
     "pricing_params",
     "products",
     "schema_migrations",
+    "state_tax_rates",
   ]);
 });
 

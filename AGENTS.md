@@ -119,6 +119,14 @@ funções puras, sem banco e sem tela, conferidas com os números dos prints do 
 8. O quadro Resultado da tela de Parâmetros (multiplicador, pior destino, equilíbrio e
    entrada mínima sugerida) é `paramsResult`, em `results.ts`.
 
+9. **Nenhuma alíquota, taxa ou tabela de regra fica fixa no código** (decisão do Nicolas em
+   06/10/2026). Se a lei mudar, quem altera o número é o cliente, na tela de Parâmetros; e
+   o que é parâmetro serve para outro cliente sem mexer no código. O motor recebe tudo
+   por argumento, dentro de `PricingParams`: os quinze campos e as alíquotas de ICMS e FCP
+   dos 27 estados (`stateRates`). `DEFAULT_PARAMS` e `DEFAULT_STATE_RATES` são só o
+   gabarito dos testes e a origem dos valores iniciais das migrações. Regra nova com
+   número dentro: o número entra como parâmetro, com tela de edição e teste que o altera.
+
 ## Regras de `src/lib/db/`
 
 1. **O ERP tem banco próprio (`erp`) e só fala com ele.** Nada de ler ou gravar em banco
@@ -140,7 +148,9 @@ funções puras, sem banco e sem tela, conferidas com os números dos prints do 
    que mais for cadastro pelas funções desta pasta; nada de valor fixo ou de exemplo na
    página. Os parâmetros iniciais entram por migração (`0002`), e sem a linha
    `loadParams` dá erro em vez de devolver `DEFAULT_PARAMS`, que fica só como gabarito
-   dos testes do motor. Dado de teste só dentro de `tests/`.
+   dos testes do motor. Dado de teste só dentro de `tests/`. As alíquotas por estado ficam em
+   `state_tax_rates` (migração `0006`), gravadas junto com os parâmetros; cada versão
+   publicada guarda as suas em `price_table_state_rates`.
 6. **O que sai do banco passa pela validação do motor antes de ser usado.**
    `loadParams` chama `validateParams`; linha inválida é erro, não parâmetro torto.
    `saveParams` também confere que existe preço possível antes de gravar.

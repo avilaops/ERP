@@ -4,7 +4,7 @@ import { roundCents } from "@/lib/pricing/money";
 import { DEFAULT_PARAMS, validateParams } from "@/lib/pricing/params";
 import type { PricingParams } from "@/lib/pricing/params";
 import { chinaPayment, realCost } from "@/lib/pricing/product";
-import { INTERNAL_ICMS, UFS } from "@/lib/pricing/states";
+import { DEFAULT_STATE_RATES, UFS } from "@/lib/pricing/states";
 import { discountedMultiplier, maxDiscounts, productPrices, tableMultiplier, tablePrice, withIpi } from "@/lib/pricing/table";
 import { channelRate, preTaxProfit, saleTaxes, worstCase } from "@/lib/pricing/taxes";
 
@@ -43,8 +43,10 @@ test("parâmetros: valores atuais do manual", () => {
     icmsInterstate: 0.04,
     otherSalesRate: 0.025,
     fixedMonthlyExpenses: 0,
+    stateRates: DEFAULT_STATE_RATES,
   });
-  assert.equal(Object.keys(P).length, 15);
+  // Quinze campos de um número só, mais a tabela de alíquotas por estado.
+  assert.equal(Object.keys(P).length, 16);
   assert.doesNotThrow(() => validateParams(P));
 });
 
@@ -69,15 +71,51 @@ test("parâmetros: taxa fora de [0, 1) e dias que não são inteiro positivo dã
   assert.doesNotThrow(() => validateParams({ ...P, gateway: 0, freeDiscount: 0.999, fixedMonthlyExpenses: 50000 }));
 });
 
-test("estados: 27 UFs sem repetição, MA com 23% e nenhuma acima dela", () => {
+test("estados: 27 UFs sem repetição; na tabela inicial, MA com 23% e nenhuma acima dela", () => {
   assert.equal(UFS.length, 27);
   assert.equal(new Set(UFS).size, 27);
-  assert.deepEqual(Object.keys(INTERNAL_ICMS).sort(), [...UFS].sort());
-  assert.equal(INTERNAL_ICMS.MA, 0.23);
-  assert.equal(INTERNAL_ICMS.SP, 0.18);
+  assert.deepEqual(Object.keys(DEFAULT_STATE_RATES).sort(), [...UFS].sort());
+  assert.deepEqual(DEFAULT_STATE_RATES.MA, { internalIcms: 0.23, fcp: 0 });
+  assert.deepEqual(DEFAULT_STATE_RATES.SP, { internalIcms: 0.18, fcp: 0 });
   for (const uf of UFS) {
-    assert.ok(INTERNAL_ICMS[uf] > 0 && INTERNAL_ICMS[uf] <= INTERNAL_ICMS.MA, uf);
+    const { internalIcms } = DEFAULT_STATE_RATES[uf];
+    assert.ok(internalIcms > 0 && internalIcms <= DEFAULT_STATE_RATES.MA.internalIcms, uf);
   }
+  assert.equal(P.stateRates, DEFAULT_STATE_RATES);
+});
+
+test("alíquotas por estado vêm dos parâmetros: mudar a tabela muda o DIFAL, o pior destino e o preço", () => {
+  const withRate = (uf: (typeof UFS)[number], rate: { internalIcms: number; fcp: number }): PricingParams => ({
+    ...P,
+    stateRates: { ...P.stateRates, [uf]: rate },
+  });
+
+  // Reforma: o RS passa a 25%. Vira o pior destino sem tocar no código.
+  const reform = withRate("RS", { internalIcms: 0.25, fcp: 0 });
+  near(saleTaxes(reform, { uf: "RS", taxpayer: false }).difal, 0.21, 1e-12);
+  assert.equal(worstCase(reform).uf, "RS");
+  assert.ok(tableMultiplier(reform) > tableMultiplier(P));
+  // E o MA, que não mudou, continua com 19%.
+  near(saleTaxes(reform, { uf: "MA", taxpayer: false }).difal, 0.19, 1e-12);
+
+  // FCP soma no que fica com a empresa: RJ com 22% + 2% supera o MA (23%, sem FCP).
+  const fcp = withRate("RJ", { internalIcms: 0.22, fcp: 0.02 });
+  near(saleTaxes(fcp, { uf: "RJ", taxpayer: false }).difal, 0.2, 1e-12);
+  assert.equal(worstCase(fcp).uf, "RJ");
+  // Contribuinte e venda dentro de SP não pagam DIFAL nem FCP.
+  assert.deepEqual(saleTaxes(fcp, { uf: "RJ", taxpayer: true }), { icms: 0.04, difal: 0 });
+  assert.deepEqual(saleTaxes(withRate("SP", { internalIcms: 0.3, fcp: 0.02 }), { uf: "SP", taxpayer: false }), { icms: 0.18, difal: 0 });
+  // Interna abaixo da interestadual: o DIFAL é zero, mas o FCP continua.
+  near(saleTaxes(withRate("AC", { internalIcms: 0.03, fcp: 0.01 }), { uf: "AC", taxpayer: false }).difal, 0.01, 1e-12);
+});
+
+test("parâmetros: estado sem alíquota ou com taxa inválida é recusado", () => {
+  const missing = Object.fromEntries(Object.entries(P.stateRates).filter(([uf]) => uf !== "MA")) as PricingParams["stateRates"];
+  assert.throws(() => validateParams({ ...P, stateRates: missing }), /falta a alíquota do estado MA/);
+  for (const bad of [{ internalIcms: 1, fcp: 0 }, { internalIcms: -0.1, fcp: 0 }, { internalIcms: Number.NaN, fcp: 0 }]) {
+    assert.throws(() => validateParams({ ...P, stateRates: { ...P.stateRates, MA: bad } }), /"ICMS interno de MA"/);
+  }
+  assert.throws(() => validateParams({ ...P, stateRates: { ...P.stateRates, MA: { internalIcms: 0.23, fcp: 1.5 } } }), /"FCP de MA"/);
 });
 
 test("ICMS e DIFAL por destino", () => {

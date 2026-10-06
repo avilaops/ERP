@@ -237,3 +237,25 @@ test("versões: da mais nova para a mais antiga", { skip }, async () => {
   assert.deepEqual(versions[0], await latestVersion(db.pool));
   assert.equal(versions[2].publishedBy, WHO);
 });
+
+test("cada versão guarda as alíquotas por estado com que foi calculada", { skip }, async () => {
+  const before = await loadPublishedSnapshot(3, db.pool);
+  assert.ok(before);
+  const params = await loadParams(db.pool);
+  const reform = { ...params, stateRates: { ...params.stateRates, RS: { internalIcms: 0.25, fcp: 0.02 } } };
+  await saveParams(reform, WHO, db.pool);
+
+  // A v3 não muda com a alteração da tabela de estados…
+  assert.deepEqual(await loadPublishedSnapshot(3, db.pool), before);
+  // …e a v4 sai com as alíquotas novas, as 27.
+  const published = await publishPriceTable(await draftNow(), 4, WHO, db.pool);
+  assert.equal(published.version, 4);
+  const after = await loadPublishedSnapshot(4, db.pool);
+  assert.deepEqual(after?.params.stateRates, reform.stateRates);
+  assert.deepEqual(after?.params.stateRates.RS, { internalIcms: 0.25, fcp: 0.02 });
+  const { rows } = await db.pool.query("SELECT version, count(*)::int AS states FROM price_table_state_rates GROUP BY version ORDER BY version");
+  assert.deepEqual(rows, [1, 2, 3, 4].map((version) => ({ version, states: 27 })));
+  // O RS virou o pior destino: o preço de tabela da v4 é maior que o da v3 para o mesmo custo.
+  const item = (snapshot: typeof after) => snapshot?.items.find((entry) => entry.code === "LD-B001");
+  assert.ok((item(after)?.table ?? 0) > (item(before)?.table ?? 0));
+});

@@ -6,7 +6,7 @@ import { menuItem } from "@/lib/auth/permissions";
 import { loadParams, saveParams } from "@/lib/db/params";
 import { listProductCosts } from "@/lib/db/products";
 import { paramsToForm, parseParamsForm, rawFormValues } from "@/lib/params-form";
-import type { ParamKey, ParamsFormState } from "@/lib/params-form";
+import type { FormKey, ParamsFormState } from "@/lib/params-form";
 import { validateParams } from "@/lib/pricing/params";
 import type { PricingParams } from "@/lib/pricing/params";
 import { suggestedDownPayment } from "@/lib/pricing/results";
@@ -30,7 +30,7 @@ function policyProblem(params: PricingParams): string | null {
 export async function saveParamsAction(_previous: ParamsFormState, formData: FormData): Promise<ParamsFormState> {
   const session = await requirePermission("parametros");
 
-  const read = (key: ParamKey) => {
+  const read = (key: FormKey) => {
     const value = formData.get(key);
     return typeof value === "string" ? value : null;
   };

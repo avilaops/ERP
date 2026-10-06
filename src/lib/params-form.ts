@@ -1,7 +1,23 @@
 import { formatMoney, formatPercent, parseDays, parseMoney, parsePercent } from "@/lib/format";
-import type { PricingParams } from "@/lib/pricing/params";
+import type { PricingParams, ScalarParams } from "@/lib/pricing/params";
+import { UFS } from "@/lib/pricing/states";
+import type { StateRates, Uf } from "@/lib/pricing/states";
 
-export type ParamKey = keyof PricingParams;
+/** A field that is one number of the parameters. */
+export type ParamKey = keyof ScalarParams;
+
+/** A cell of the table of rates by state: `icms-MA` or `fcp-MA`. */
+export type StateRateKey = `icms-${Uf}` | `fcp-${Uf}`;
+
+/** Any field of the form. */
+export type FormKey = ParamKey | StateRateKey;
+
+export const STATE_RATE_COLUMNS = [
+  { prefix: "icms", label: "ICMS interno", field: "internalIcms" },
+  { prefix: "fcp", label: "FCP", field: "fcp" },
+] as const;
+
+const stateKey = (prefix: "icms" | "fcp", uf: Uf) => `${prefix}-${uf}` as StateRateKey;
 type FieldKind = "rate" | "days" | "money";
 
 export type ParamField = {
@@ -86,7 +102,7 @@ export const PARAM_SECTIONS: { title: string; fields: ParamField[] }[] = [
 
 export const PARAM_FIELDS: ParamField[] = PARAM_SECTIONS.flatMap((section) => section.fields);
 
-export type ParamsFormValues = Record<ParamKey, string>;
+export type ParamsFormValues = Record<FormKey, string>;
 
 const FORMATTERS: Record<FieldKind, (value: number) => string> = {
   rate: formatPercent,
@@ -106,47 +122,74 @@ const EXPECTED: Record<FieldKind, string> = {
   money: "informe um valor em reais, zero ou mais (ex.: 1.234,56)",
 };
 
-/** What each field shows for these parameters. */
+/** What each field shows for these parameters, the table of rates by state included. */
 export function paramsToForm(params: PricingParams): ParamsFormValues {
-  return Object.fromEntries(
-    PARAM_FIELDS.map((field) => [field.key, FORMATTERS[field.kind](params[field.key])]),
-  ) as ParamsFormValues;
+  const values: Partial<ParamsFormValues> = {};
+  for (const field of PARAM_FIELDS) values[field.key] = FORMATTERS[field.kind](params[field.key]);
+  for (const uf of UFS) {
+    for (const { prefix, field } of STATE_RATE_COLUMNS) values[stateKey(prefix, uf)] = formatPercent(params.stateRates[uf][field]);
+  }
+  return values as ParamsFormValues;
 }
 
 export type ParsedParamsForm =
   | { ok: true; params: PricingParams }
-  | { ok: false; errors: string[]; invalid: ParamKey[] };
+  | { ok: false; errors: string[]; invalid: FormKey[] };
 
 /**
  * Reads what was typed. Every problem is reported at once, each with the label
- * of its field. `read` returns the raw text of a field (`null` when absent).
+ * of its field. `read` returns the raw text of a field (`null` when absent). In
+ * the table of states a blank FCP is zero; a blank ICMS is an error.
  */
-export function parseParamsForm(read: (key: ParamKey) => string | null): ParsedParamsForm {
+export function parseParamsForm(read: (key: FormKey) => string | null): ParsedParamsForm {
   const errors: string[] = [];
-  const invalid: ParamKey[] = [];
-  const values: Partial<PricingParams> = {};
+  const invalid: FormKey[] = [];
+  const scalars: Partial<ScalarParams> = {};
   for (const field of PARAM_FIELDS) {
     const value = PARSERS[field.kind](read(field.key) ?? "");
     if (value === null) {
       errors.push(`"${field.label}": ${EXPECTED[field.kind]}.`);
       invalid.push(field.key);
     } else {
-      values[field.key] = value;
+      scalars[field.key] = value;
     }
   }
-  return errors.length > 0 ? { ok: false, errors, invalid } : { ok: true, params: values as PricingParams };
+
+  const stateRates: Partial<StateRates> = {};
+  for (const uf of UFS) {
+    const rate = { internalIcms: 0, fcp: 0 };
+    for (const { prefix, label, field } of STATE_RATE_COLUMNS) {
+      const key = stateKey(prefix, uf);
+      const text = (read(key) ?? "").trim();
+      const value = text === "" && field === "fcp" ? 0 : parsePercent(text);
+      if (value === null) {
+        errors.push(`"${label} de ${uf}": ${EXPECTED.rate}.`);
+        invalid.push(key);
+      } else {
+        rate[field] = value;
+      }
+    }
+    stateRates[uf] = rate;
+  }
+
+  if (errors.length > 0) return { ok: false, errors, invalid };
+  return { ok: true, params: { ...(scalars as ScalarParams), stateRates: stateRates as StateRates } };
 }
 
 /** The raw text of every field, to show the form again as it was typed. */
-export function rawFormValues(read: (key: ParamKey) => string | null): ParamsFormValues {
-  return Object.fromEntries(PARAM_FIELDS.map((field) => [field.key, read(field.key) ?? ""])) as ParamsFormValues;
+export function rawFormValues(read: (key: FormKey) => string | null): ParamsFormValues {
+  const keys: FormKey[] = [
+    ...PARAM_FIELDS.map((field) => field.key),
+    ...UFS.flatMap((uf) => STATE_RATE_COLUMNS.map(({ prefix }) => stateKey(prefix, uf))),
+  ];
+  return Object.fromEntries(keys.map((key) => [key, read(key) ?? ""])) as ParamsFormValues;
 }
 
 /** What the save action answers to the form. */
 export type ParamsFormState = {
   status: "idle" | "saved" | "error";
   errors: string[];
-  invalid: ParamKey[];
+  invalid: FormKey[];
   /** Text to show in the fields: what was typed, or what was saved. `null` before the first save. */
   values: ParamsFormValues | null;
 };
