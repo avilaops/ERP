@@ -8,7 +8,7 @@ Como rodar, testar e o que falta para produção. Atualizado em 06/10/2026.
 | --- | --- |
 | Desenvolvimento (servidor `creators` da Ávila Ops) | No ar sob demanda: `npm run dev`, bancos `erp` e `erp_test` no PostgreSQL do servidor |
 | Integração contínua (GitHub Actions) | `.github/workflows/ci.yml`: lint, tipos, testes com banco e build, a cada push na `main` e em todo PR |
-| Produção | **Pronta para publicar, ainda não publicada.** Vai em `https://erp.avilaops.com`, no servidor `apps-noclient`. Falta o acesso por SSH ao servidor e a preparação dele (seção Produção) |
+| Produção | **No ar no servidor, ainda não acessível pela internet.** Container em `/opt/erp` no `apps-noclient`, banco `erp` criado, migrações aplicadas. Falta o Cloudflare apontar `erp.avilaops.com` para `204.168.249.111` (seção Produção) |
 
 ## Variáveis de ambiente
 
@@ -98,14 +98,29 @@ O ERP roda em container no `apps-noclient` (`204.168.249.111`), em `/opt/erp`, n
 só em `127.0.0.1`. O Caddy do servidor atende `erp.avilaops.com` e repassa para ela. O banco é o
 PostgreSQL do próprio servidor, com um esquema por empresa.
 
-**Situação em 06/10/2026: tudo pronto no repositório e testado em imagem local; ainda não publicado.**
-O servidor de desenvolvimento não tem acesso por SSH ao `apps-noclient`.
+**Situação em 06/10/2026:** publicado no servidor com `deploy/subir.sh` (container `erp` saudável,
+banco `erp` com o esquema `tenant_ludus` migrado, bloco no Caddy, banco incluído no backup diário
+das 03:30). **Ainda não abre em `https://erp.avilaops.com`:** o endereço responde erro 525 do
+Cloudflare, porque o registro DNS dele lá não aponta para este servidor. Enquanto isso o Caddy não
+consegue emitir o certificado.
+
+Para destravar, no painel do Cloudflare (zona `avilaops.com`), o registro `erp` tem de ser:
+tipo A, valor `204.168.249.111`, **somente DNS** (nuvem cinza), como o `engops`. Em um ou dois
+minutos o Caddy emite o certificado sozinho. Se for para manter o proxy laranja, o desafio HTTP-01
+não passa ("Always Use HTTPS") e é preciso um certificado Origin CA em `/etc/caddy/certs`, como o
+da `partsagricola.com.br`.
+
+Quem entra hoje: só `nicolas@avilaops.com`, como Diretoria da Ludus. Os outros usuários entram em
+`ERP_USERS`, no `/opt/erp/.env`, seguido de `docker compose up -d --force-recreate` em `/opt/erp`.
+
+O `/etc/caddy/Caddyfile` do servidor foi editado direto (backups `Caddyfile.bak-20261006-*` ao
+lado). O arquivo que o cabeçalho dele chama de fonte, no repositório do ArxisVR, já estava bem
+diferente do servidor e não foi alterado.
 
 ### Preparar o servidor (uma vez)
 
-1. **Acesso:** autorizar no `apps-noclient` a chave de quem vai publicar. Do servidor `creators`:
-   `ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHbDkUF3w3EuootG+6arm3ggYAv7rUio/p7bhzxwKaH2 avops@orc`.
-   Na máquina que publica, um apelido `apps-noclient` em `~/.ssh/config`.
+1. **Acesso:** a chave de quem publica autorizada no `apps-noclient` e um apelido `apps-noclient`
+   em `~/.ssh/config`. O servidor `creators` já tem os dois (usuário `root`), desde 06/10/2026.
 2. **Banco:** criar a role e o banco do ERP no PostgreSQL do servidor, aceitando conexão da
    rede do Docker (`172.17.0.0/16`), e incluir o banco no backup diário.
    ```sql
