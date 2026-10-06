@@ -1,6 +1,6 @@
-import type { OrderTerms } from "@/lib/db/orders";
+import type { OrderPayment, OrderTerms } from "@/lib/db/orders";
 import { parseDays, parseMoney, parsePercent } from "@/lib/format";
-import type { DiscountBand } from "@/lib/pricing/order";
+import type { ApprovalReason, DiscountBand } from "@/lib/pricing/order";
 import { UFS } from "@/lib/pricing/states";
 import type { Uf } from "@/lib/pricing/states";
 
@@ -43,6 +43,83 @@ export function parseOrderTerms(read: (key: TermsField) => string | null): Parse
     terms: { discount, deliveryUf, taxpayer: text("taxpayer") === "sim", productionDays, freight, notes: text("notes") || null },
   };
 }
+
+export type PaymentField =
+  | "downPayment"
+  | "downPaymentMethod"
+  | "downPaymentDate"
+  | "balanceMethod"
+  | "installmentCount"
+  | "firstInstallmentDays"
+  | "installmentIntervalDays"
+  | "paymentNotes";
+
+export type ParsedPayment = { ok: true; payment: OrderPayment } | { ok: false; errors: string[] };
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const WHOLE = /^\d{1,4}$/;
+
+/**
+ * Reads "Forma de pagamento". Blank down payment is zero; blank date is "on
+ * confirmation of the order"; blank installments are "not agreed yet". The
+ * forms of payment are the ones of the company (`methods`), never a fixed list.
+ */
+export function parseOrderPayment(read: (key: PaymentField) => string | null, methods: readonly string[]): ParsedPayment {
+  const errors: string[] = [];
+  const text = (key: PaymentField) => (read(key) ?? "").trim();
+
+  const downPayment = text("downPayment") === "" ? 0 : parseMoney(text("downPayment"));
+  if (downPayment === null) errors.push('"Entrada": informe um valor em reais, zero ou mais (ex.: 25.000,00).');
+
+  const method = (key: "downPaymentMethod" | "balanceMethod", label: string) => {
+    const value = text(key);
+    if (value === "") return null;
+    if (!methods.includes(value)) errors.push(`"${label}": escolha uma forma da lista.`);
+    return value;
+  };
+  const downPaymentMethod = method("downPaymentMethod", "Forma da entrada");
+  const balanceMethod = method("balanceMethod", "Forma do saldo");
+
+  const downPaymentDate = text("downPaymentDate") === "" ? null : text("downPaymentDate");
+  if (downPaymentDate !== null && (!ISO_DATE.test(downPaymentDate) || Number.isNaN(Date.parse(`${downPaymentDate}T00:00:00Z`)))) {
+    errors.push('"Data da entrada": informe uma data válida.');
+  }
+
+  const whole = (key: PaymentField, label: string, minimum: number) => {
+    const value = text(key);
+    if (value === "") return null;
+    if (!WHOLE.test(value) || Number(value) < minimum) {
+      errors.push(`"${label}": informe um número inteiro${minimum > 0 ? " maior que zero" : ", zero ou mais"}.`);
+      return null;
+    }
+    return Number(value);
+  };
+  const installmentCount = whole("installmentCount", "Parcelas do saldo", 1);
+  const firstInstallmentDays = whole("firstInstallmentDays", "1ª parcela em (dias)", 0);
+  const installmentIntervalDays = whole("installmentIntervalDays", "Intervalo entre parcelas (dias)", 0);
+
+  if (errors.length > 0 || downPayment === null) return { ok: false, errors };
+  return {
+    ok: true,
+    payment: {
+      downPayment,
+      downPaymentMethod,
+      downPaymentDate,
+      balanceMethod,
+      installmentCount,
+      firstInstallmentDays,
+      installmentIntervalDays,
+      paymentNotes: text("paymentNotes") || null,
+    },
+  };
+}
+
+/** Why an order waits for approval, in the words of the screen. No limit and no profit here. */
+export const REASON_TEXT: Record<ApprovalReason, string> = {
+  "desconto-acima-do-livre": "o desconto passa do que a equipe pode dar sem aprovação",
+  "fora-da-meta": "o lucro do pedido fica abaixo da meta",
+  "entrada-abaixo-da-politica": "a entrada fica abaixo da política da empresa",
+};
 
 /** `"3"` → `3`. `null` unless it is a whole number greater than zero. */
 export const parseQuantity = (text: string | null) => parseDays(text ?? "");

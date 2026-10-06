@@ -167,7 +167,8 @@ funções puras, sem banco e sem tela, conferidas com os números dos prints do 
    `latestVersion`, `loadPublishedSnapshot`, `loadPublishedTable`, `listVersions`,
    `createCustomer`, `updateCustomer`, `getCustomer`, `findCustomerByDocument`,
    `listCustomers`, `loadLogo`, `saveLogo`, `createOrder`, `getOrder`, `addOrderItem`, `setOrderItemQuantity`,
-   `removeOrderItem`, `saveOrderTerms`, `linkOrderCustomer`, `loadOrderStanding`, …).
+   `removeOrderItem`, `saveOrderTerms`, `linkOrderCustomer`, `loadOrderStanding`, `savePayment`,
+   `closeOrder`, `reopenOrder`, `deleteOrder`, `listOrders`, `listPaymentMethods`, …).
    Arquivo com `"use client"` nunca importa `@/lib/db`.
 3. **Consulta só com parâmetros (`$1`).** Valor nunca é colado no texto do SQL.
 4. **Mudança de esquema é arquivo novo em `db/migrations/`** (`NNNN_nome.sql`), aplicado
@@ -199,6 +200,13 @@ funções puras, sem banco e sem tela, conferidas com os números dos prints do 
     qual o item aponta (`order_items` → `price_table_items`): pedido não tem coluna de
     preço, custo nem total. Equipamento que já saiu numa versão só pode ser desativado. `src/lib/db/price-table.ts` não tem `UPDATE`,
     `DELETE` nem `TRUNCATE`; erro de publicação se resolve publicando outra versão.
+11. **Fechar pedido é decisão do servidor.** `closeOrder` relê o pedido, confere o que falta
+    (`closingProblems`) e a política (`loadOrderStanding`), e grava num comando só, e só se o
+    pedido ainda estiver como foi lido. Fora da política ele vai para `aguardando_aprovacao`.
+    Pedido fechado ou aguardando não se altera: volta para negociação por `reopenOrder`, na
+    mesma versão da tabela. Pedido que já foi fechado uma vez tem histórico
+    (`order_closings`) e não se exclui. As formas de pagamento são a tabela
+    `payment_methods` da empresa, nunca lista no código.
 
 ## Fotos dos equipamentos
 

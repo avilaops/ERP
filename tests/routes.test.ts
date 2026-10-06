@@ -28,7 +28,7 @@ test("toda rota da matriz tem page.tsx que chama requirePermission com o própri
 });
 
 /** Pages already ported from the prototype. The others still say "Em construção". */
-const PORTED = ["parametros", "produtos", "tabela-precos", "clientes"];
+const PORTED = ["parametros", "produtos", "tabela-precos", "clientes", "pedidos"];
 
 test("páginas portadas não são mais marcador; as outras continuam Em construção", () => {
   for (const item of MENU_ITEMS) {
@@ -39,7 +39,7 @@ test("páginas portadas não são mais marcador; as outras continuam Em constru�
       assert.ok(code.includes("PlaceholderPage"), `${item.href} deveria estar Em construção`);
     }
   }
-  assert.equal(MENU_ITEMS.filter((item) => !PORTED.includes(item.key)).length, 10);
+  assert.equal(MENU_ITEMS.filter((item) => !PORTED.includes(item.key)).length, 9);
 });
 
 /** Every source file under the protected group, relative to it. */
@@ -141,8 +141,11 @@ test("Pedido: custo só é lido para quem pode ver, e nada dele vai para compone
   }
   // E o quadro é componente de servidor.
   assert.doesNotMatch(readFileSync(`${APP_DIR}pedidos/DirectorBoard.tsx`, "utf8"), /["']use client["']/);
-  // A lista de pedidos ainda é marcador: entra na parte seguinte.
-  assert.ok(source("/pedidos").includes("PlaceholderPage"));
+  // A lista de pedidos não lê custo nenhum, e o escopo dela sai da sessão.
+  const list = source("/pedidos");
+  assert.doesNotMatch(list, /loadPublishedSnapshot|loadOrderStanding|seesCosts|directorOf|DirectorBoard/);
+  assert.ok(list.includes("seesAllOrders(session.role)"));
+  assert.ok(list.includes("listOrders({ sellerEmail: everyone ? null : session.email }, conn)"));
 });
 
 test("multi-empresa: toda leitura e gravação usa o banco da empresa da sessão", () => {

@@ -12,18 +12,23 @@ import type { CustomerFieldKey, CustomerFormState } from "@/lib/customer-form";
 import { createCustomer, CustomerError, findCustomerByDocument, getCustomer, updateCustomer } from "@/lib/db/customers";
 import {
   addOrderItem,
+  closeOrder,
   createOrder,
+  deleteOrder,
   getOrder,
   linkOrderCustomer,
+  listPaymentMethods,
   OrderError,
   removeOrderItem,
+  reopenOrder,
   saveOrderTerms,
+  savePayment,
   setOrderItemQuantity,
 } from "@/lib/db/orders";
 import type { OrderScope } from "@/lib/db/orders";
 import { latestVersion } from "@/lib/db/price-table";
 import { isoDate } from "@/lib/format";
-import { parseOrderTerms, parseQuantity } from "@/lib/order-form";
+import { parseOrderPayment, parseOrderTerms, parseQuantity } from "@/lib/order-form";
 import type { ActionState } from "@/lib/order-form";
 import { orderNumber } from "@/lib/order-number";
 
@@ -147,6 +152,75 @@ export async function saveTermsAction(_previous: ActionState, formData: FormData
   }
   revalidatePath(`${ORDERS}/${number}`);
   return OK;
+}
+
+/** "Forma de pagamento". The forms accepted are the ones of the company, read here. */
+export async function savePaymentAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
+  const session = await requirePermission("pedidos");
+  const conn = tenantDb(session.tenant.slug);
+
+  const read = reader(formData);
+  const number = read("number") ?? "";
+  try {
+    const parsed = parseOrderPayment(read, await listPaymentMethods(conn));
+    if (!parsed.ok) return { error: parsed.errors.join(" ") };
+    await savePayment(number, parsed.payment, session.email, scopeOf(session), conn);
+  } catch (error) {
+    return { error: problem("gravar o pagamento", error) };
+  }
+  revalidatePath(`${ORDERS}/${number}`);
+  return OK;
+}
+
+/**
+ * "Fechar pedido". The server decides everything: what is missing, and whether
+ * the order closes or waits for approval. The page comes back with the new status.
+ */
+export async function closeOrderAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
+  const session = await requirePermission("pedidos");
+  const conn = tenantDb(session.tenant.slug);
+
+  const number = reader(formData)("number") ?? "";
+  try {
+    const result = await closeOrder(number, session.email, scopeOf(session), conn);
+    if (result.missing.length > 0) return { error: `Para fechar: ${result.missing.join(" ")}` };
+  } catch (error) {
+    return { error: problem("fechar o pedido", error) };
+  }
+  revalidatePath(ORDERS);
+  revalidatePath(`${ORDERS}/${number}`);
+  return OK;
+}
+
+export async function reopenOrderAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
+  const session = await requirePermission("pedidos");
+  const conn = tenantDb(session.tenant.slug);
+
+  const number = reader(formData)("number") ?? "";
+  try {
+    await reopenOrder(number, session.email, scopeOf(session), conn);
+  } catch (error) {
+    return { error: problem("reabrir o pedido", error) };
+  }
+  revalidatePath(ORDERS);
+  revalidatePath(`${ORDERS}/${number}`);
+  return OK;
+}
+
+/** "Excluir pedido": only in negotiation and never closed before. Leaves a line in the log. */
+export async function deleteOrderAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
+  const session = await requirePermission("pedidos");
+  const conn = tenantDb(session.tenant.slug);
+
+  const number = reader(formData)("number") ?? "";
+  try {
+    const { sellerEmail } = await deleteOrder(number, scopeOf(session), conn);
+    console.info(`[pedidos] ${session.email} excluiu o pedido ${number} (de ${sellerEmail}) em ${session.tenant.slug}`);
+  } catch (error) {
+    return { error: problem("excluir o pedido", error) };
+  }
+  revalidatePath(ORDERS);
+  redirect(ORDERS);
 }
 
 /**

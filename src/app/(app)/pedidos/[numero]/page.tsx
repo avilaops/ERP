@@ -8,23 +8,28 @@ import { completenessText, isComplete, isRequired, normalizeDocument, taxpayerFr
 import type { CustomerKind } from "@/lib/customer";
 import { CUSTOMER_FIELDS, customerToForm } from "@/lib/customer-form";
 import { findCustomerByDocument } from "@/lib/db/customers";
-import { getOrder, loadOrderStanding } from "@/lib/db/orders";
+import { getOrder, listPaymentMethods, loadOrderStanding } from "@/lib/db/orders";
 import { latestVersion, loadPublishedSnapshot, loadPublishedTable } from "@/lib/db/price-table";
 import { formatMoney, formatPercent, isoDate, showDateTime, showIsoDate, showMoney, showPercent } from "@/lib/format";
-import { BAND_TEXT, STATUS_LABELS, UF_NAMES } from "@/lib/order-form";
+import { BAND_TEXT, REASON_TEXT, STATUS_LABELS, UF_NAMES } from "@/lib/order-form";
 import { ORDER_NUMBER } from "@/lib/order-number";
-import { directorOf, dueDates, saleOf } from "@/lib/order-quote";
+import { closingProblems, directorOf, dueDates, paymentOf, saleOf } from "@/lib/order-quote";
 import { UFS } from "@/lib/pricing/states";
 import { compareByCode } from "@/lib/products-view";
 import { CustomerForm } from "../../clientes/CustomerForm";
 import { ActionForm } from "../ActionForm";
 import {
   addItemAction,
+  closeOrderAction,
+  deleteOrderAction,
   removeItemAction,
+  reopenOrderAction,
   saveOrderCustomerAction,
+  savePaymentAction,
   saveTermsAction,
   setItemQuantityAction,
 } from "../actions";
+import { ConfirmButton } from "../ConfirmButton";
 import { DirectorBoard } from "../DirectorBoard";
 
 export const metadata = { title: "Pedido · ERP" };
@@ -83,8 +88,16 @@ export default async function PedidoPage({
 
   const latest = await latestVersion(conn);
   const sale = saleOf(order, table);
-  const dates = dueDates(order, table, isoDate(new Date()));
+  const today = isoDate(new Date());
+  const dates = dueDates(order, table, today);
   const editable = order.status === "em_negociacao";
+  const plan = paymentOf(order, sale, table, today);
+  const missing = editable ? closingProblems(order, sale) : [];
+  // The forms of payment are the company's own list; one already used and since turned off still shows.
+  const methods = await listPaymentMethods(conn);
+  const methodsWith = (used: string | null) => (used && !methods.includes(used) ? [...methods, used] : methods);
+  const reasons = standing.policy?.reasons ?? [];
+  const shortOfRequired = board ? Math.max(0, board.quote.requiredDownPayment - plan.downPayment) : 0;
   const ipi = `${formatPercent(table.ipi)}%`;
 
   const products = new Map(table.items.map((item) => [item.productId, item]));
@@ -125,9 +138,22 @@ export default async function PedidoPage({
         </p>
       )}
       {!editable && (
-        <p className="mt-3 rounded border border-slate-300 bg-slate-100 px-4 py-2 text-sm text-slate-700">
-          Pedido fora de negociação: somente leitura.
-        </p>
+        <div className="mt-3 rounded border border-slate-300 bg-slate-100 px-4 py-3 text-sm text-slate-700">
+          <p>
+            {order.status === "aguardando_aprovacao"
+              ? `Aguardando aprovação${reasons.length > 0 ? `: ${reasons.map((reason) => REASON_TEXT[reason]).join("; ")}` : ""}. Somente leitura.`
+              : order.status === "fechado" && order.closedAt
+                ? `Pedido fechado em ${showDateTime(order.closedAt)}. Somente leitura.`
+                : "Pedido fora de negociação: somente leitura."}
+          </p>
+          {(order.status === "fechado" || order.status === "aguardando_aprovacao") && (
+            <ActionForm action={reopenOrderAction} className="mt-2">
+              <input type="hidden" name="number" value={order.number} />
+              <ConfirmButton label="Reabrir para alterar" confirmLabel="Confirmar: voltar para negociação" className={BUTTON} />
+              <span className="ml-3 text-xs text-slate-600">Os preços continuam os da tabela v{table.version}.</span>
+            </ActionForm>
+          )}
+        </div>
       )}
 
       <fieldset disabled={!editable} className="mt-6 flex min-w-0 flex-col gap-6">
@@ -437,6 +463,192 @@ export default async function PedidoPage({
                 )}
               </ActionForm>
             </section>
+
+            <section className={CARD} aria-labelledby="pagamento">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-5 py-3">
+                <h2 id="pagamento" className={TITLE}>
+                  Forma de pagamento
+                </h2>
+                <p className="text-xs text-slate-600">
+                  Política: entrada de pelo menos {showPercent(table.minDownPayment, 0)} da nota ({showMoney(plan.policyDownPayment)})
+                </p>
+              </div>
+              <ActionForm action={savePaymentAction} className="grid gap-5 p-5 sm:grid-cols-3">
+                <input type="hidden" name="number" value={order.number} />
+                <div>
+                  <label htmlFor="downPayment" className="block text-sm font-medium">
+                    Entrada (R$)
+                  </label>
+                  <input
+                    id="downPayment"
+                    name="downPayment"
+                    type="text"
+                    inputMode="decimal"
+                    defaultValue={order.downPayment === 0 ? "" : formatMoney(order.downPayment)}
+                    placeholder="0,00"
+                    className={`${INPUT} mt-1 w-full text-right`}
+                  />
+                  <p className={HELP}>
+                    {showPercent(plan.downPaymentRate)} da nota ·{" "}
+                    {plan.meetsPolicy ? "dentro da política" : "abaixo da política: precisa de aprovação"}
+                  </p>
+                </div>
+                <div>
+                  <label htmlFor="downPaymentMethod" className="block text-sm font-medium">
+                    Forma da entrada
+                  </label>
+                  <select
+                    key={order.downPaymentMethod ?? ""}
+                    id="downPaymentMethod"
+                    name="downPaymentMethod"
+                    defaultValue={order.downPaymentMethod ?? ""}
+                    className={`${INPUT} mt-1 w-full`}
+                  >
+                    <option value="">—</option>
+                    {methodsWith(order.downPaymentMethod).map((method) => (
+                      <option key={method} value={method}>
+                        {method}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="downPaymentDate" className="block text-sm font-medium">
+                    Data da entrada
+                  </label>
+                  <input
+                    id="downPaymentDate"
+                    name="downPaymentDate"
+                    type="date"
+                    defaultValue={order.downPaymentDate ?? ""}
+                    className={`${INPUT} mt-1 w-full`}
+                  />
+                  <p className={HELP}>Vazio: na confirmação do pedido.</p>
+                </div>
+                <div>
+                  <label htmlFor="installmentCount" className="block text-sm font-medium">
+                    Parcelas do saldo
+                  </label>
+                  <input
+                    id="installmentCount"
+                    name="installmentCount"
+                    type="text"
+                    inputMode="numeric"
+                    defaultValue={order.installmentCount ?? ""}
+                    className={`${INPUT} mt-1 w-24 text-right`}
+                  />
+                  <p className={HELP}>Saldo: {showMoney(plan.balance)}</p>
+                </div>
+                <div>
+                  <label htmlFor="balanceMethod" className="block text-sm font-medium">
+                    Forma do saldo
+                  </label>
+                  <select
+                    key={order.balanceMethod ?? ""}
+                    id="balanceMethod"
+                    name="balanceMethod"
+                    defaultValue={order.balanceMethod ?? ""}
+                    className={`${INPUT} mt-1 w-full`}
+                  >
+                    <option value="">—</option>
+                    {methodsWith(order.balanceMethod).map((method) => (
+                      <option key={method} value={method}>
+                        {method}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex gap-3">
+                  <div>
+                    <label htmlFor="firstInstallmentDays" className="block text-sm font-medium">
+                      1ª parcela em
+                    </label>
+                    <div className="mt-1 flex items-center gap-1">
+                      <input
+                        id="firstInstallmentDays"
+                        name="firstInstallmentDays"
+                        type="text"
+                        inputMode="numeric"
+                        size={1}
+                        defaultValue={order.firstInstallmentDays ?? ""}
+                        className={`${INPUT} w-16 text-right`}
+                      />
+                      <span className="text-xs text-slate-600">dias</span>
+                    </div>
+                  </div>
+                  <div>
+                    <label htmlFor="installmentIntervalDays" className="block text-sm font-medium">
+                      Intervalo
+                    </label>
+                    <div className="mt-1 flex items-center gap-1">
+                      <input
+                        id="installmentIntervalDays"
+                        name="installmentIntervalDays"
+                        type="text"
+                        inputMode="numeric"
+                        size={1}
+                        defaultValue={order.installmentIntervalDays ?? ""}
+                        className={`${INPUT} w-16 text-right`}
+                      />
+                      <span className="text-xs text-slate-600">dias</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="sm:col-span-3">
+                  <label htmlFor="paymentNotes" className="block text-sm font-medium">
+                    Observações do pagamento
+                  </label>
+                  <input
+                    id="paymentNotes"
+                    name="paymentNotes"
+                    type="text"
+                    defaultValue={order.paymentNotes ?? ""}
+                    className={`${INPUT} mt-1 w-full`}
+                  />
+                </div>
+                {editable && (
+                  <div className="sm:col-span-3">
+                    <button type="submit" className={PRIMARY}>
+                      Salvar pagamento
+                    </button>
+                  </div>
+                )}
+              </ActionForm>
+              {plan.receipts.length > 0 && (
+                <div className="overflow-x-auto border-t border-slate-200">
+                  <table className="w-full text-sm">
+                    <caption className="px-5 py-2 text-left text-xs text-slate-600">
+                      Recebimentos previstos. A comissão é uma previsão: só vale quando o valor entra.
+                    </caption>
+                    <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                      <tr>
+                        {["Parcela", "Vencimento", "Forma"].map((column) => (
+                          <th key={column} scope="col" className="px-5 py-2 text-left font-semibold">
+                            {column}
+                          </th>
+                        ))}
+                        {["Valor", "Comissão"].map((column) => (
+                          <th key={column} scope="col" className="px-5 py-2 text-right font-semibold">
+                            {column}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {plan.receipts.map((receipt) => (
+                        <tr key={receipt.label} className="border-t border-slate-200">
+                          <td className="px-5 py-2 font-medium">{receipt.label}</td>
+                          <td className="px-5 py-2">{showIsoDate(receipt.dueDate)}</td>
+                          <td className="px-5 py-2">{receipt.method ?? NONE}</td>
+                          <td className="whitespace-nowrap px-5 py-2 text-right">{showMoney(receipt.amount)}</td>
+                          <td className="whitespace-nowrap px-5 py-2 text-right">{showMoney(receipt.commission)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
           </div>
 
           <div className="flex min-w-0 flex-col gap-6">
@@ -506,6 +718,12 @@ export default async function PedidoPage({
                   <dt className="border-t border-slate-200 pt-3 font-medium">Total da nota</dt>
                   <dd className="border-t border-slate-200 pt-3 text-right text-2xl font-bold">{showMoney(sale.invoiceTotal)}</dd>
                 </div>
+                <div className="contents">
+                  <dt className="text-slate-600">Entrada ({showPercent(plan.downPaymentRate)})</dt>
+                  <dd className="text-right font-medium">{showMoney(plan.downPayment)}</dd>
+                  <dt className="text-slate-600">Saldo</dt>
+                  <dd className="text-right font-medium">{showMoney(plan.balance)}</dd>
+                </div>
                 <div className="contents text-xs">
                   <dt className="text-slate-600">Prazo de fabricação</dt>
                   <dd className="text-right">{order.productionDays === null ? NONE : `${order.productionDays} dias corridos`}</dd>
@@ -516,9 +734,51 @@ export default async function PedidoPage({
             </section>
 
             {board && <DirectorBoard board={board} />}
+            {board && shortOfRequired > 0 && (
+              <p className="rounded-lg border border-dashed border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                Faltam <strong>{showMoney(shortOfRequired)}</strong> de entrada para cobrir a China, o lucro da meta e a comissão.
+              </p>
+            )}
           </div>
         </div>
       </fieldset>
+
+      {editable && (
+        <section className={`${CARD} mt-6 p-5`} aria-labelledby="fechar">
+          <h2 id="fechar" className={TITLE}>
+            Fechar pedido
+          </h2>
+          {missing.length > 0 ? (
+            <ul className="mt-3 list-disc pl-5 text-sm text-slate-700">
+              {missing.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-3 text-sm text-slate-700">
+              {reasons.length > 0
+                ? `Vai para aprovação, porque ${reasons.map((reason) => REASON_TEXT[reason]).join(" e ")}.`
+                : "Dentro da política: fecha na hora."}
+            </p>
+          )}
+          <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
+            <ActionForm action={closeOrderAction}>
+              <input type="hidden" name="number" value={order.number} />
+              <button type="submit" disabled={missing.length > 0} className={`${PRIMARY} disabled:cursor-not-allowed disabled:opacity-50`}>
+                {reasons.length > 0 && missing.length === 0 ? "Enviar para aprovação" : "Fechar pedido"}
+              </button>
+            </ActionForm>
+            <ActionForm action={deleteOrderAction}>
+              <input type="hidden" name="number" value={order.number} />
+              <ConfirmButton
+                label="Excluir pedido"
+                confirmLabel="Confirmar exclusão"
+                className="rounded border border-red-300 bg-white px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
+              />
+            </ActionForm>
+          </div>
+        </section>
+      )}
     </>
   );
 }

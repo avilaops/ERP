@@ -3,7 +3,10 @@ import type { PublishedSnapshot, PublishedTable } from "@/lib/db/price-table";
 import { isoDate } from "@/lib/format";
 import { orderMaxDiscounts, quoteOrder, quoteSale } from "@/lib/pricing/order";
 import type { OrderInput, OrderQuote, SaleQuote } from "@/lib/pricing/order";
-import { addDays } from "@/lib/pricing/payment";
+import { completenessText, isComplete, missingFields } from "@/lib/customer";
+import { commissionOn } from "@/lib/pricing/commission";
+import { roundCents } from "@/lib/pricing/money";
+import { addDays, installments } from "@/lib/pricing/payment";
 import { realCost } from "@/lib/pricing/product";
 import type { MaxDiscounts } from "@/lib/pricing/table";
 
@@ -84,4 +87,113 @@ export function dueDates(order: OrderData, table: PublishedTable, today: string)
     proposalValidUntil: addDays(isoDate(order.updatedAt), table.proposalValidityDays),
     completion: order.productionDays === null ? null : addDays(base, order.productionDays),
   };
+}
+
+/** One amount the order expects to receive: the down payment or one installment. */
+export type ExpectedReceipt = {
+  /** `Entrada`, `1/3`, `2/3`… */
+  label: string;
+  /** `AAAA-MM-DD`. For the down payment without a date, the day production counts from. */
+  dueDate: string;
+  method: string | null;
+  amount: number;
+  /** Commission the seller gets when this amount is received. A forecast, not an entry. */
+  commission: number;
+};
+
+export type PaymentPlan = {
+  downPayment: number;
+  /** Down payment over the invoice total. */
+  downPaymentRate: number;
+  balance: number;
+  /** What the policy of the version asks for, in reais. */
+  policyDownPayment: number;
+  /** Whether the down payment reaches the policy. Below it the order needs approval. */
+  meetsPolicy: boolean;
+  receipts: ExpectedReceipt[];
+  /** Sum of the installments: equal to the balance when there are any. */
+  installmentsTotal: number;
+};
+
+type PaymentData = Pick<
+  Order,
+  | "downPayment"
+  | "downPaymentMethod"
+  | "downPaymentDate"
+  | "balanceMethod"
+  | "installmentCount"
+  | "firstInstallmentDays"
+  | "installmentIntervalDays"
+  | "closedAt"
+>;
+
+/**
+ * The payment as agreed: down payment, balance, installments and the commission
+ * each receipt will bring. Dates count from the day of the down payment; without
+ * it, from the closing; without it, from `today`. Rates are the ones of the
+ * version of the order.
+ */
+export function paymentOf(order: PaymentData, sale: SaleQuote, table: PublishedTable, today: string): PaymentPlan {
+  const base = order.downPaymentDate ?? (order.closedAt ? isoDate(order.closedAt) : today);
+  const downPayment = roundCents(order.downPayment);
+  const balance = roundCents(Math.max(0, sale.invoiceTotal - downPayment));
+  const commission = (amount: number) => roundCents(commissionOn(amount, table));
+  const policyDownPayment = roundCents(table.minDownPayment * sale.invoiceTotal);
+
+  const receipts: ExpectedReceipt[] = [];
+  if (downPayment > 0) {
+    receipts.push({ label: "Entrada", dueDate: base, method: order.downPaymentMethod, amount: downPayment, commission: commission(downPayment) });
+  }
+  const parts =
+    balance > 0 && order.installmentCount
+      ? installments({
+          balance,
+          count: order.installmentCount,
+          firstInDays: order.firstInstallmentDays ?? 0,
+          intervalDays: order.installmentIntervalDays ?? 0,
+          from: base,
+        })
+      : [];
+  for (const part of parts) {
+    receipts.push({
+      label: `${part.number}/${parts.length}`,
+      dueDate: part.dueDate,
+      method: order.balanceMethod,
+      amount: part.amount,
+      commission: commission(part.amount),
+    });
+  }
+
+  return {
+    downPayment,
+    downPaymentRate: sale.invoiceTotal > 0 ? downPayment / sale.invoiceTotal : 0,
+    balance,
+    policyDownPayment,
+    meetsPolicy: downPayment >= policyDownPayment,
+    receipts,
+    installmentsTotal: roundCents(parts.reduce((total, part) => total + part.amount, 0)),
+  };
+}
+
+/** What is missing for the order to be closed, in the words of the screen. Empty when it can go on to the policy. */
+export function closingProblems(
+  order: Pick<Order, "customer" | "deliveryUf" | "productionDays" | "downPayment" | "downPaymentMethod" | "balanceMethod" | "installmentCount">,
+  sale: SaleQuote,
+): string[] {
+  const problems: string[] = [];
+  if (!order.customer) problems.push("Informe o cliente.");
+  else if (!isComplete(order.customer)) {
+    problems.push(`${completenessText(order.customer)} no cadastro do cliente: ${missingFields(order.customer).join(", ")}.`);
+  }
+  if (order.deliveryUf === null) problems.push("Informe o estado de entrega.");
+  if (order.productionDays === null) problems.push("Informe o prazo de fabricação.");
+
+  if (order.downPayment > sale.invoiceTotal) problems.push("A entrada é maior que o total da nota.");
+  if (order.downPayment > 0 && !order.downPaymentMethod) problems.push("Informe a forma da entrada.");
+  const balance = roundCents(sale.invoiceTotal - order.downPayment);
+  if (balance > 0) {
+    if (!order.installmentCount) problems.push("Informe em quantas parcelas o saldo será pago.");
+    if (!order.balanceMethod) problems.push("Informe a forma de pagamento do saldo.");
+  }
+  return problems;
 }

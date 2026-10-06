@@ -4,19 +4,25 @@ import { after, before, test } from "node:test";
 import { createCustomer } from "@/lib/db/customers";
 import {
   addOrderItem,
+  closeOrder,
   createOrder,
+  deleteOrder,
   getOrder,
   linkOrderCustomer,
+  listOrders,
+  listPaymentMethods,
   loadOrderStanding,
   removeOrderItem,
+  reopenOrder,
   saveOrderTerms,
+  savePayment,
   setOrderItemQuantity,
 } from "@/lib/db/orders";
-import type { OrderScope, OrderTerms } from "@/lib/db/orders";
+import type { OrderPayment, OrderScope, OrderTerms } from "@/lib/db/orders";
 import { loadParams, saveParams } from "@/lib/db/params";
 import { latestVersion, loadPublishedSnapshot, loadPublishedTable, publishPriceTable } from "@/lib/db/price-table";
 import { createProduct, listProducts, updateProduct } from "@/lib/db/products";
-import { directorOf, dueDates, saleOf } from "@/lib/order-quote";
+import { closingProblems, directorOf, dueDates, paymentOf, saleOf } from "@/lib/order-quote";
 import { draftPriceTable } from "@/lib/price-table";
 import { openTestDb, SKIP_WITHOUT_DB } from "./db-helpers.ts";
 import type { TestDb } from "./db-helpers.ts";
@@ -323,21 +329,21 @@ test("gabarito do print pelo banco: resumo, quadro do diretor e faixa", { skip }
   assert.deepEqual([quote.tableTotal, quote.invoiceTotal, quote.lines], [sale.tableTotal, sale.invoiceTotal, sale.lines]);
 
   // Para a equipe, só o nome da faixa sai da leitura de custo.
-  assert.deepEqual(await loadOrderStanding(printed, db.pool), { band: "na-meta" });
+  assert.equal((await loadOrderStanding(printed, db.pool)).band, "na-meta");
 });
 
 test("faixa: sem estado de entrega não há; com desconto alto muda", { skip }, async () => {
   const fresh = await order("260930-536F");
-  assert.deepEqual(await loadOrderStanding(fresh, db.pool), { band: null });
+  assert.deepEqual(await loadOrderStanding(fresh, db.pool), { band: null, policy: null });
   const snapshot = await loadPublishedSnapshot(1, db.pool);
   assert.ok(snapshot);
   assert.equal(directorOf(fresh, snapshot), null);
 
   const printed = await order("260930-BBMN");
-  assert.deepEqual(await loadOrderStanding({ ...printed, discount: 0.3 }, db.pool), { band: "abaixo-da-meta" });
-  assert.deepEqual(await loadOrderStanding({ ...printed, discount: 0.6 }, db.pool), { band: "prejuizo" });
+  assert.equal((await loadOrderStanding({ ...printed, discount: 0.3 }, db.pool)).band, "abaixo-da-meta");
+  assert.equal((await loadOrderStanding({ ...printed, discount: 0.6 }, db.pool)).band, "prejuizo");
   // 20% é o limite da meta no MA sem inscrição: ainda está nela.
-  assert.deepEqual(await loadOrderStanding({ ...printed, discount: 0.2 }, db.pool), { band: "na-meta" });
+  assert.equal((await loadOrderStanding({ ...printed, discount: 0.2 }, db.pool)).band, "na-meta");
 });
 
 test("datas: validade conta da última alteração; fabricação, da entrada, do fechamento ou de hoje", { skip }, async () => {
@@ -419,7 +425,7 @@ test("o pedido guarda o preço da versão em que foi feito", { skip }, async () 
   assert.deepEqual(after, before);
   assert.deepEqual(after.lines.map((line) => line.unitPrice), [19204.61, 20818.99]);
   assert.equal(after.invoiceTotal, 45226.67);
-  assert.deepEqual(await loadOrderStanding(kept, db.pool), { band: "na-meta" });
+  assert.equal((await loadOrderStanding(kept, db.pool)).band, "na-meta");
 
   // Pedido novo sai na v2, com o preço novo e o equipamento que só existe nela.
   const fresh = await createOrder({ seller: SELLER, version: 2, productId: ID["LD-B001"], quantity: 1 }, numbers("261002-NOVA"), db.pool);
@@ -461,6 +467,191 @@ test("o banco prende o pedido à versão e não deixa apagar o que ele usa", { s
   await assert.rejects(() => db.pool.query("DELETE FROM products WHERE id = $1", [ID["LD-B001"]]), FOREIGN_KEY);
   await assert.rejects(() => db.pool.query("DELETE FROM customers WHERE id = $1", [customerMa]), FOREIGN_KEY);
   await assert.rejects(() => db.pool.query("DELETE FROM orders WHERE id = $1", [id]), FOREIGN_KEY);
+});
+
+const PAYMENT: OrderPayment = {
+  downPayment: 25000,
+  downPaymentMethod: "PIX",
+  downPaymentDate: "2026-09-30",
+  balanceMethod: "Boleto",
+  installmentCount: 2,
+  firstInstallmentDays: 30,
+  installmentIntervalDays: 30,
+  paymentNotes: null,
+};
+
+test("formas de pagamento vêm do banco da empresa", { skip }, async () => {
+  const methods = await listPaymentMethods(db.pool);
+  assert.deepEqual(methods.slice(0, 3), ["PIX", "Boleto", "Transferência"]);
+  assert.equal(methods.length, 8);
+  await db.pool.query("UPDATE payment_methods SET active = false WHERE label = 'Cheque'");
+  await db.pool.query("INSERT INTO payment_methods (label, position, updated_by) VALUES ('Consórcio', 0, 'x')");
+  const changed = await listPaymentMethods(db.pool);
+  assert.equal(changed[0], "Consórcio");
+  assert.ok(!changed.includes("Cheque"));
+});
+
+test("pagamento do print: entrada de 25.000 fica abaixo da política e manda o pedido para aprovação", { skip }, async () => {
+  const N = "260930-BBMN";
+  await savePayment(N, PAYMENT, SELLER.email, MINE, db.pool);
+  const saved = await order(N);
+  assert.deepEqual(
+    [saved.downPayment, saved.downPaymentMethod, saved.downPaymentDate, saved.balanceMethod, saved.installmentCount, saved.firstInstallmentDays, saved.installmentIntervalDays],
+    [25000, "PIX", "2026-09-30", "Boleto", 2, 30, 30],
+  );
+
+  const table = await loadPublishedTable(1, db.pool);
+  assert.ok(table);
+  const sale = saleOf(saved, table);
+  const plan = paymentOf(saved, sale, table, "2026-10-06");
+  assert.equal((plan.downPaymentRate * 100).toFixed(1), "55.3");
+  assert.deepEqual([plan.downPayment, plan.balance, plan.policyDownPayment, plan.meetsPolicy], [25000, 20226.67, 29397.34, false]);
+  assert.deepEqual(
+    plan.receipts.map(({ label, dueDate, method, amount }) => [label, dueDate, method, amount]),
+    [
+      ["Entrada", "2026-09-30", "PIX", 25000],
+      ["1/2", "2026-10-30", "Boleto", 10113.33],
+      ["2/2", "2026-11-29", "Boleto", 10113.34],
+    ],
+  );
+  assert.equal(plan.installmentsTotal, plan.balance);
+  assert.deepEqual(closingProblems(saved, sale), []);
+
+  const standing = await loadOrderStanding(saved, db.pool);
+  assert.deepEqual(standing, { band: "na-meta", policy: { needsApproval: true, reasons: ["entrada-abaixo-da-politica"] } });
+
+  assert.deepEqual(await closeOrder(N, SELLER.email, MINE, db.pool), {
+    status: "aguardando_aprovacao",
+    reasons: ["entrada-abaixo-da-politica"],
+    missing: [],
+  });
+  const waiting = await order(N);
+  assert.deepEqual([waiting.status, waiting.closedAt], ["aguardando_aprovacao", null]);
+  assert.equal(Number((await db.pool.query("SELECT count(*) FROM order_closings")).rows[0].count), 0);
+  // Aguardando aprovação não se altera; volta para negociação por quem vê o pedido.
+  await assert.rejects(() => savePayment(N, { ...PAYMENT, downPayment: 30000 }, SELLER.email, MINE, db.pool), /Pedido não encontrado ou já fechado/);
+  await assert.rejects(() => reopenOrder(N, OTHER_SELLER.email, THEIRS, db.pool), /não está fechado nem aguardando/);
+  await reopenOrder(N, SELLER.email, MINE, db.pool);
+  assert.equal((await order(N)).status, "em_negociacao");
+});
+
+test("com entrada de 30.000 o pedido do print fecha, com data e registro do fechamento", { skip }, async () => {
+  const N = "260930-BBMN";
+  await savePayment(N, { ...PAYMENT, downPayment: 30000 }, SELLER.email, MINE, db.pool);
+  assert.deepEqual(await closeOrder(N, SELLER.email, MINE, db.pool), { status: "fechado", reasons: [], missing: [] });
+  const closed = await order(N);
+  assert.equal(closed.status, "fechado");
+  assert.ok(closed.closedAt instanceof Date);
+  assert.equal(closed.priceTableVersion, 1);
+  const { rows } = await db.pool.query(
+    "SELECT closed_by, invoice_total::float AS total, reopened_at FROM order_closings WHERE order_id = $1",
+    [closed.id],
+  );
+  assert.deepEqual(rows, [{ closed_by: SELLER.email, total: 45226.67, reopened_at: null }]);
+
+  // Fechado não se altera nem se exclui.
+  const refused = /Pedido não encontrado ou já fechado/;
+  await assert.rejects(() => saveOrderTerms(N, TERMS, SELLER.email, MINE, db.pool), refused);
+  await assert.rejects(() => addOrderItem(N, ID["LD-B003"], 1, SELLER.email, MINE, db.pool), refused);
+  await assert.rejects(() => savePayment(N, PAYMENT, SELLER.email, MINE, db.pool), refused);
+  await assert.rejects(() => closeOrder(N, SELLER.email, MINE, db.pool), refused);
+  await assert.rejects(() => deleteOrder(N, MINE, db.pool), /só pedido em negociação pode ser excluído/);
+
+  // Reabrir: volta para negociação, sem data, na mesma versão; o fechamento anterior fica guardado.
+  await reopenOrder(N, DIRECTOR, ALL, db.pool);
+  const reopened = await order(N);
+  assert.deepEqual([reopened.status, reopened.closedAt, reopened.priceTableVersion], ["em_negociacao", null, 1]);
+  const history = await db.pool.query("SELECT reopened_by, reopened_at IS NOT NULL AS reopened FROM order_closings WHERE order_id = $1", [closed.id]);
+  assert.deepEqual(history.rows, [{ reopened_by: DIRECTOR, reopened: true }]);
+  // Pedido que já foi fechado tem histórico: não se exclui mais, nem em negociação.
+  await assert.rejects(() => deleteOrder(N, MINE, db.pool), /já foi fechado antes e tem histórico/);
+  assert.equal((await order(N)).items.length, 2);
+  // Fecha de novo: são dois fechamentos na história.
+  assert.equal((await closeOrder(N, SELLER.email, MINE, db.pool)).status, "fechado");
+  assert.equal(Number((await db.pool.query("SELECT count(*) FROM order_closings WHERE order_id = $1", [closed.id])).rows[0].count), 2);
+});
+
+test("fechar: faltando cliente, prazo ou parcelas, nada muda e a resposta diz o que falta", { skip }, async () => {
+  const N = "260930-536F";
+  const result = await closeOrder(N, OTHER_SELLER.email, THEIRS, db.pool);
+  assert.equal(result.status, "em_negociacao");
+  assert.deepEqual(result.missing, [
+    "Informe o cliente.",
+    "Informe o estado de entrega.",
+    "Informe o prazo de fabricação.",
+    "Informe em quantas parcelas o saldo será pago.",
+    "Informe a forma de pagamento do saldo.",
+  ]);
+  assert.equal((await order(N)).status, "em_negociacao");
+
+  // Cliente com cadastro incompleto também segura o fechamento.
+  const blank = { tradeName: null, contactName: null, stateRegistration: null, rg: null, phone: null, email: null, cep: null, street: null, streetNumber: null, complement: null, district: null, city: null, uf: null };
+  const incomplete = await createCustomer({ ...blank, kind: "PF", document: "52998224725", name: "Maria" }, SELLER.email, db.pool);
+  await linkOrderCustomer(N, incomplete.id, OTHER_SELLER.email, THEIRS, db.pool);
+  const second = await closeOrder(N, OTHER_SELLER.email, THEIRS, db.pool);
+  assert.match(second.missing[0], /^Faltam 8 campos no cadastro do cliente: Celular, E-mail, CEP/);
+
+  // Entrada maior que a nota é recusada ao gravar.
+  await assert.rejects(() => savePayment(N, { ...PAYMENT, downPayment: 999999 }, OTHER_SELLER.email, THEIRS, db.pool), /não pode ser maior que o total da nota/);
+  await assert.rejects(() => savePayment(N, { ...PAYMENT, downPayment: -1 }, OTHER_SELLER.email, THEIRS, db.pool), /Entrada/);
+  await assert.rejects(() => savePayment(N, { ...PAYMENT, installmentCount: 0 }, OTHER_SELLER.email, THEIRS, db.pool), /Parcelas/);
+  await assert.rejects(() => savePayment(N, { ...PAYMENT, downPaymentDate: "30/09/2026" }, OTHER_SELLER.email, THEIRS, db.pool), /Data inválida/);
+});
+
+test("fechar: se o pedido mudou entre a leitura e a gravação, nada é gravado", { skip }, async () => {
+  const N = await createOrder({ seller: SELLER, version: 1, productId: ID["LD-B001"], quantity: 1 }, numbers("261003-CORR"), db.pool);
+  await linkOrderCustomer(N, customerMa, SELLER.email, MINE, db.pool);
+  await saveOrderTerms(N, TERMS, SELLER.email, MINE, db.pool);
+  await savePayment(N, { ...PAYMENT, downPayment: 20000 }, SELLER.email, MINE, db.pool);
+
+  // Outra pessoa altera o pedido logo antes da gravação do fechamento.
+  const racing = {
+    query: async (text: string, values?: unknown[]) => {
+      if (text.includes("WITH closed AS")) {
+        await db.pool.query("UPDATE orders SET discount = 0.5, updated_at = now() + interval '1 second' WHERE number = $1", [N]);
+      }
+      return db.pool.query(text, values);
+    },
+  } as typeof db.pool;
+  await assert.rejects(() => closeOrder(N, SELLER.email, MINE, racing), /foi alterado por outra pessoa/);
+  const after = await order(N);
+  assert.deepEqual([after.status, after.closedAt, after.discount], ["em_negociacao", null, 0.5]);
+});
+
+test("excluir: pedido em negociação sai com os itens, e a tabela publicada fica como estava", { skip }, async () => {
+  const before = Number((await db.pool.query("SELECT count(*) FROM price_table_items")).rows[0].count);
+  const N = "261002-NOVA";
+  await assert.rejects(() => deleteOrder(N, THEIRS, db.pool), /Pedido não encontrado/);
+  assert.deepEqual(await deleteOrder(N, MINE, db.pool), { sellerEmail: SELLER.email });
+  assert.equal(await getOrder(N, ALL, db.pool), null);
+  assert.equal(Number((await db.pool.query("SELECT count(*) FROM order_items i JOIN orders o ON o.id = i.order_id WHERE o.number = $1", [N])).rows[0].count), 0);
+  assert.equal(Number((await db.pool.query("SELECT count(*) FROM price_table_items")).rows[0].count), before);
+  await assert.rejects(() => deleteOrder(N, MINE, db.pool), /Pedido não encontrado/);
+});
+
+test("lista: cada pedido com o preço da própria versão; o vendedor só recebe os dele", { skip }, async () => {
+  const all = await listOrders(ALL, db.pool);
+  const mine = await listOrders(MINE, db.pool);
+  const theirs = await listOrders(THEIRS, db.pool);
+  assert.ok(all.length >= 4);
+  assert.ok(mine.every((item) => item.sellerEmail === SELLER.email));
+  assert.deepEqual(theirs.map((item) => item.number), ["260930-536F"]);
+  assert.equal(all.length, mine.length + theirs.length);
+
+  const printed = all.find((item) => item.number === "260930-BBMN");
+  assert.ok(printed);
+  assert.deepEqual(
+    [printed.status, printed.customerName, printed.customerDocument, printed.deliveryUf, printed.taxpayer, printed.discount, printed.ipi],
+    ["fechado", "Academia MA", "48240052000161", "MA", false, 0, 0.13],
+  );
+  assert.deepEqual(printed.items, [
+    { quantity: 1, tableUnitPrice: 19204.61 },
+    { quantity: 1, tableUnitPrice: 20818.99 },
+  ]);
+  assert.ok(printed.closedAt instanceof Date);
+  // Da mais recente para a mais antiga.
+  const stamps = all.map((item) => item.updatedAt.getTime());
+  assert.deepEqual(stamps, [...stamps].sort((a, b) => b - a));
 });
 
 test("a migração dos pedidos não tem cascata nem coluna de preço, custo ou total", () => {

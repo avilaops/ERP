@@ -80,3 +80,10 @@ export function installments({
     dueDate: addDays(from, firstInDays + index * intervalDays),
   }));
 }
+
+/** A down payment given as a share of the invoice total, in cents. */
+export function downPaymentFromRate(rate: number, invoiceTotal: number): number {
+  if (!(rate >= 0 && rate <= 1)) throw new Error("Entrada em percentual precisa ser de 0% a 100%.");
+  assertAmount(invoiceTotal, "Total da nota");
+  return roundCents(rate * invoiceTotal);
+}
