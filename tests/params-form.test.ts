@@ -68,8 +68,8 @@ test("dias: só inteiro maior que zero", () => {
   for (const text of ["", "0", "7,5", "7.5", "-7", "sete"]) assert.equal(parseDays(text), null, JSON.stringify(text));
 });
 
-test("formulário: formatar e reler os 15 parâmetros atuais devolve os mesmos valores", () => {
-  assert.equal(PARAM_FIELDS.length, 15);
+test("formulário: formatar e reler os 19 parâmetros atuais devolve os mesmos valores", () => {
+  assert.equal(PARAM_FIELDS.length, 19);
   // Os quinze campos de um número só; a tabela por estado tem os campos dela.
   assert.deepEqual(
     PARAM_FIELDS.map((field) => field.key).sort(),
@@ -111,8 +111,8 @@ test("formulário: campo ausente, negativo ou dias zerados dão erro", () => {
   }
   const missing = parseParamsForm(() => null);
   assert.equal(missing.ok, false);
-  // Os 15 campos e o ICMS interno dos 27 estados; FCP em branco vale zero.
-  if (!missing.ok) assert.equal(missing.errors.length, 15 + 27);
+  // Os 19 campos e o ICMS interno dos 27 estados; FCP em branco vale zero.
+  if (!missing.ok) assert.equal(missing.errors.length, 19 + 27);
 });
 
 test("formulário: o texto digitado é devolvido como veio, para a tela repetir", () => {

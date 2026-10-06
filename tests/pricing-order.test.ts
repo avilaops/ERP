@@ -281,3 +281,30 @@ test("descontos máximos: o frete entra no custo, e o limite da meta é onde o l
   assert.ok(orderMaxDiscounts({ ...MANUAL_ORDER, freight: 1500 }, P).atTarget < orderMaxDiscounts(MANUAL_ORDER, P).atTarget);
   assert.throws(() => orderMaxDiscounts({ ...MANUAL_ORDER, freight: -1 }, P), /Frete não pode ser negativo/);
 });
+
+test("taxa fixa por pedido: sai do lucro uma vez, como o frete, e aperta os descontos máximos", () => {
+  const base = quoteOrder(MANUAL_ORDER, P);
+  const withFee = quoteOrder(MANUAL_ORDER, { ...P, fixedFeePerOrder: 1000 });
+  const withFreight = quoteOrder({ ...MANUAL_ORDER, freight: 1000 }, P);
+  assert.equal(base.fixedFee, 0);
+  assert.equal(withFee.fixedFee, 1000);
+  // O mesmo efeito de mil reais de frete: no lucro e nos limites de desconto.
+  assert.deepEqual([withFee.netProfit, withFee.profitBeforeIncomeTax], [withFreight.netProfit, withFreight.profitBeforeIncomeTax]);
+  assert.deepEqual(orderMaxDiscounts(MANUAL_ORDER, { ...P, fixedFeePerOrder: 1000 }), orderMaxDiscounts({ ...MANUAL_ORDER, freight: 1000 }, P));
+  assert.ok(withFee.netProfit < base.netProfit);
+  // Não mexe no que o cliente paga.
+  assert.deepEqual([withFee.invoiceTotal, withFee.netSale], [base.invoiceTotal, base.netSale]);
+  assert.throws(() => quoteOrder(MANUAL_ORDER, { ...P, fixedFeePerOrder: -1 }), /Taxa fixa por pedido/);
+});
+
+test("provisões: perdas, garantia e inadimplência somam nas taxas da venda", () => {
+  const base = quoteOrder(MANUAL_ORDER, P);
+  // Os mesmos 2,5% de "Outras taxas", agora repartidos nas três provisões: nenhum número muda.
+  const split = quoteOrder(MANUAL_ORDER, { ...P, otherSalesRate: 0, lossProvision: 0.01, warrantyProvision: 0.01, defaultProvision: 0.005 });
+  assert.deepEqual([split.taxRate.toFixed(6), split.taxes, split.netProfit], [base.taxRate.toFixed(6), base.taxes, base.netProfit]);
+  // Uma provisão a mais pesa como imposto.
+  const more = quoteOrder(MANUAL_ORDER, { ...P, warrantyProvision: 0.02 });
+  assert.equal((more.taxRate - base.taxRate).toFixed(6), "0.020000");
+  assert.ok(more.netProfit < base.netProfit);
+  assert.throws(() => quoteOrder(MANUAL_ORDER, { ...P, lossProvision: 1 }), /Provisão para perdas/);
+});

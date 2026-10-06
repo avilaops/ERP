@@ -38,7 +38,15 @@ export type ScalarParams = {
    * every figure in the screenshots matches.
    */
   otherSalesRate: number;
-  /** Despesas fixas por mês, in reais. The only field that is not a rate or a number of days. */
+  /** Provisão para perdas, over the value without IPI. */
+  lossProvision: number;
+  /** Provisão para garantia. */
+  warrantyProvision: number;
+  /** Provisão para inadimplência. */
+  defaultProvision: number;
+  /** Taxa fixa por pedido, in reais: leaves the order together with the freight. */
+  fixedFeePerOrder: number;
+  /** Despesas fixas por mês, in reais. */
   fixedMonthlyExpenses: number;
 };
 
@@ -67,13 +75,17 @@ export const DEFAULT_PARAMS: PricingParams = {
   gateway: 0,
   icmsInterstate: 0.04,
   otherSalesRate: 0.025,
+  lossProvision: 0,
+  warrantyProvision: 0,
+  defaultProvision: 0,
+  fixedFeePerOrder: 0,
   fixedMonthlyExpenses: 0,
   stateRates: DEFAULT_STATE_RATES,
 };
 
 /** Screen label of every rate: also the order the form shows them in. */
 export const RATE_LABELS: Record<
-  Exclude<keyof ScalarParams, "proposalValidityDays" | "fixedMonthlyExpenses">,
+  Exclude<keyof ScalarParams, "proposalValidityDays" | "fixedMonthlyExpenses" | "fixedFeePerOrder">,
   string
 > = {
   targetNetProfit: "Lucro líquido que quero em cada venda",
@@ -89,6 +101,9 @@ export const RATE_LABELS: Record<
   gateway: "Gateway e antecipação",
   icmsInterstate: "ICMS interestadual",
   otherSalesRate: "Outras taxas da venda",
+  lossProvision: "Provisão para perdas",
+  warrantyProvision: "Provisão para garantia",
+  defaultProvision: "Provisão para inadimplência",
 };
 
 export type RateKey = keyof typeof RATE_LABELS;
@@ -122,5 +137,9 @@ export function validateParams(params: PricingParams): void {
   const expenses = params.fixedMonthlyExpenses;
   if (typeof expenses !== "number" || !Number.isFinite(expenses) || expenses < 0) {
     throw new Error('Parâmetro inválido: "Despesas fixas por mês" precisa ser um valor em reais, zero ou mais.');
+  }
+  const fee = params.fixedFeePerOrder;
+  if (typeof fee !== "number" || !Number.isFinite(fee) || fee < 0) {
+    throw new Error('Parâmetro inválido: "Taxa fixa por pedido" precisa ser um valor em reais, zero ou mais.');
   }
 }

@@ -34,6 +34,7 @@ export function DirectorBoard({ board }: { board: Board }) {
     ...(quote.difalRate > 0 ? [[`DIFAL (${showPercent(quote.difalRate)})`, minus(quote.difal)] as Row] : []),
     ["Custo dos equipamentos", minus(quote.equipmentCost)],
     ...(quote.freight > 0 ? [["Frete", minus(quote.freight)] as Row] : []),
+    ...(quote.fixedFee > 0 ? [["Taxa fixa do pedido", minus(quote.fixedFee)] as Row] : []),
     ["Sobra antes do IR", showMoney(quote.profitBeforeIncomeTax), true],
     ["IRPJ + CSLL", minus(quote.incomeTax)],
   ];

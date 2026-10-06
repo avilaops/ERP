@@ -28,7 +28,8 @@ export function saleTaxes(params: PricingParams, destination: Destination): Sale
 
 /** What every sale pays over the value without IPI, whatever the destination. */
 export function channelRate(params: PricingParams): number {
-  return params.pisCofins + params.commission + params.ads + params.gateway + params.otherSalesRate;
+  const provisions = params.lossProvision + params.warrantyProvision + params.defaultProvision;
+  return params.pisCofins + params.commission + params.ads + params.gateway + params.otherSalesRate + provisions;
 }
 
 /** Channel + ICMS + DIFAL of one destination. */

@@ -156,6 +156,11 @@ funções puras, sem banco e sem tela, conferidas com os números dos prints do 
 8. O quadro Resultado da tela de Parâmetros (multiplicador, pior destino, equilíbrio e
    entrada mínima sugerida) é `paramsResult`, em `results.ts`.
 
+10. **Provisões e taxa fixa por pedido são parâmetros** (migração `0013`): perdas, garantia e
+    inadimplência somam em `channelRate`; a taxa fixa sai do lucro do pedido uma vez, junto com o
+    frete (`quoteOrder`, `orderMaxDiscounts`). Entram com zero, e "Outras taxas da venda" segue
+    com o valor que tinha, de modo que nenhum preço mudou: a diretoria reparte quando souber.
+
 9. **Nenhuma alíquota, taxa ou tabela de regra fica fixa no código** (decisão do Nicolas em
    06/10/2026). Se a lei mudar, quem altera o número é o cliente, na tela de Parâmetros; e
    o que é parâmetro serve para outro cliente sem mexer no código. O motor recebe tudo
@@ -285,6 +290,11 @@ Diretoria (`setsGoals`), sempre para o mês corrente. Os gráficos são `src/com
 componentes de servidor em CSS, sem biblioteca.
 
 ## Contas a pagar e fornecedores
+
+As **despesas fixas** são lista da empresa (`fixed_expenses`, Parâmetros → Despesas fixas). A
+soma das que estão em uso é o parâmetro "Despesas fixas por mês", atualizado junto com a lista
+(`src/lib/db/fixed-expenses.ts`). "Lançar despesas fixas do mês", em Contas a pagar, cria uma
+conta por despesa em uso; cada despesa é lançada uma vez por mês (índice único no banco).
 
 Diretoria e Financeiro. Fornecedor (`src/lib/db/suppliers.ts`) é empresa, pessoa ou exterior
 (país no lugar de CNPJ/CPF) e nunca se apaga: desliga-se. Conta (`src/lib/db/payables.ts`) é

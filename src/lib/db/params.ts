@@ -21,6 +21,10 @@ export const PARAM_COLUMNS: [keyof ScalarParams, string][] = [
   ["gateway", "gateway"],
   ["icmsInterstate", "icms_interstate"],
   ["otherSalesRate", "other_sales_rate"],
+  ["lossProvision", "loss_provision"],
+  ["warrantyProvision", "warranty_provision"],
+  ["defaultProvision", "default_provision"],
+  ["fixedFeePerOrder", "fixed_fee_per_order"],
   ["fixedMonthlyExpenses", "fixed_monthly_expenses"],
 ];
 

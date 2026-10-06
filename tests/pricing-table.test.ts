@@ -42,11 +42,15 @@ test("parâmetros: valores atuais do manual", () => {
     gateway: 0,
     icmsInterstate: 0.04,
     otherSalesRate: 0.025,
+    lossProvision: 0,
+    warrantyProvision: 0,
+    defaultProvision: 0,
+    fixedFeePerOrder: 0,
     fixedMonthlyExpenses: 0,
     stateRates: DEFAULT_STATE_RATES,
   });
-  // Quinze campos de um número só, mais a tabela de alíquotas por estado.
-  assert.equal(Object.keys(P).length, 16);
+  // Dezenove campos de um número só, mais a tabela de alíquotas por estado.
+  assert.equal(Object.keys(P).length, 20);
   assert.doesNotThrow(() => validateParams(P));
 });
 

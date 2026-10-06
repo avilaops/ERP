@@ -76,6 +76,8 @@ export type DirectorQuote = {
   difal: number;
   equipmentCost: number;
   freight: number;
+  /** Taxa fixa por pedido, from the parameters of the version. */
+  fixedFee: number;
   profitBeforeIncomeTax: number;
   incomeTax: number;
   netProfit: number;
@@ -170,7 +172,9 @@ export function quoteOrder(order: OrderInput, params: PricingParams): OrderQuote
   const taxes = netSale * taxRate;
   const difal = netSale * difalRate;
   const equipmentCost = sum((item) => item.unitRealCost);
-  const profitBeforeIncomeTax = netSale - taxes - difal - equipmentCost - freight;
+  // The fixed fee is charged once per order and leaves it together with the freight.
+  const fixedFee = params.fixedFeePerOrder;
+  const profitBeforeIncomeTax = netSale - taxes - difal - equipmentCost - freight - fixedFee;
   const incomeTax = profitBeforeIncomeTax > 0 ? profitBeforeIncomeTax * params.incomeTax : 0;
   const netProfit = profitBeforeIncomeTax - incomeTax;
 
@@ -186,6 +190,7 @@ export function quoteOrder(order: OrderInput, params: PricingParams): OrderQuote
     difal: roundCents(difal),
     equipmentCost: roundCents(equipmentCost),
     freight: roundCents(freight),
+    fixedFee: roundCents(fixedFee),
     profitBeforeIncomeTax: roundCents(profitBeforeIncomeTax),
     incomeTax: roundCents(incomeTax),
     netProfit: roundCents(netProfit),
@@ -217,7 +222,7 @@ export function orderMaxDiscounts(order: OrderInput, params: PricingParams): Max
   checkOrder(order);
   const { items, destination, freight = 0 } = order;
   const tableTotal = items.reduce((total, item) => total + item.quantity * item.tableUnitPrice, 0);
-  const cost = items.reduce((total, item) => total + item.quantity * item.unitRealCost, 0) + freight;
+  const cost = items.reduce((total, item) => total + item.quantity * item.unitRealCost, 0) + freight + params.fixedFeePerOrder;
   return maxDiscounts({ tableTotal, cost }, params, destination);
 }
 

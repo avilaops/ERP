@@ -92,11 +92,32 @@ export const PARAM_SECTIONS: { title: string; fields: ParamField[] }[] = [
       { key: "gateway", label: "Gateway e antecipação", kind: "rate" },
       { key: "icmsInterstate", label: "ICMS interestadual (importado com FCI)", kind: "rate" },
       { key: "otherSalesRate", label: "Outras taxas da venda", kind: "rate" },
+      {
+        key: "fixedFeePerOrder",
+        label: "Taxa fixa por pedido",
+        kind: "money",
+        help: "Em reais, uma vez por pedido. Sai do lucro do pedido junto com o frete por nossa conta.",
+      },
+    ],
+  },
+  {
+    title: "Provisões",
+    fields: [
+      { key: "lossProvision", label: "Perdas", kind: "rate", help: "Sobre o valor sem IPI. Entra no preço de tabela como os impostos." },
+      { key: "warrantyProvision", label: "Garantia", kind: "rate" },
+      { key: "defaultProvision", label: "Inadimplência", kind: "rate" },
     ],
   },
   {
     title: "Despesas fixas",
-    fields: [{ key: "fixedMonthlyExpenses", label: "Despesas fixas por mês", kind: "money" }],
+    fields: [
+      {
+        key: "fixedMonthlyExpenses",
+        label: "Despesas fixas por mês",
+        kind: "money",
+        help: "Com despesas cadastradas em Parâmetros → Despesas fixas, este valor passa a ser a soma delas.",
+      },
+    ],
   },
 ];
 

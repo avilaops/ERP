@@ -12,7 +12,7 @@ import { inPayableTab, PAYABLE_TABS, parsePayableTab, payablesSummary } from "@/
 import { addDays } from "@/lib/pricing/payment";
 import { ActionForm } from "../pedidos/ActionForm";
 import { ConfirmButton } from "../pedidos/ConfirmButton";
-import { createPayableAction, deletePayableAction, payPayableAction, unpayPayableAction } from "./actions";
+import { createPayableAction, deletePayableAction, launchFixedExpensesAction, payPayableAction, unpayPayableAction } from "./actions";
 
 export const metadata = { title: `${menuItem("contas-pagar").label} · ERP` };
 export const dynamic = "force-dynamic";
@@ -54,9 +54,16 @@ export default async function ContasPagarPage({ searchParams }: { searchParams: 
           <h1 className="text-2xl font-semibold">{menuItem("contas-pagar").label}</h1>
           <p className="mt-1 text-slate-600">Tudo o que a empresa tem a pagar, com as comissões devidas aos vendedores.</p>
         </div>
-        <a href="/api/contas-pagar/exportar" className="rounded border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50">
-          Baixar planilha (CSV)
-        </a>
+        <div className="flex flex-wrap items-start gap-2">
+          <ActionForm action={launchFixedExpensesAction}>
+            <button type="submit" className="rounded border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50">
+              Lançar despesas fixas do mês
+            </button>
+          </ActionForm>
+          <a href="/api/contas-pagar/exportar" className="rounded border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50">
+            Baixar planilha (CSV)
+          </a>
+        </div>
       </div>
 
       <dl className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">

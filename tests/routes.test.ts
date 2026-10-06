@@ -257,7 +257,7 @@ test("não existe página no grupo protegido sem requirePermission", () => {
   const all = pages();
   // The menu items, plus /pedidos/novo, one order, the record of one customer and of one supplier,
   // and the users, the forms of payment and the categories of bills of the company.
-  assert.equal(all.length, MENU_ITEMS.length + 7);
+  assert.equal(all.length, MENU_ITEMS.length + 8);
   for (const route of all) {
     assert.match(source(route), /await requirePermission\(/, route);
   }

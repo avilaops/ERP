@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
+import { createFixedExpense, launchFixedExpenses, listFixedExpenses, updateFixedExpense } from "@/lib/db/fixed-expenses";
+import { loadParams } from "@/lib/db/params";
 import { createPayableCategory, listAllPayableCategories, listPayableCategories, updatePayableCategory } from "@/lib/db/payable-categories";
 import { createPayable, deletePayable, listCommissionsDue, listPayables, payPayable, unpayPayable, updatePayable } from "@/lib/db/payables";
 import type { PayableInput } from "@/lib/db/payables";
@@ -96,4 +98,45 @@ test("contas: lançar, alterar, pagar com o valor que saiu, desfazer e excluir",
   assert.equal((await listPayables(db.pool)).length, 1);
   // Sem comissão em aberto, não há linha automática.
   assert.deepEqual(await listCommissionsDue(db.pool), []);
+});
+
+test("despesas fixas: a soma das que estão em uso é o parâmetro, e o lançamento do mês não se repete", { skip }, async () => {
+  assert.equal((await loadParams(db.pool)).fixedMonthlyExpenses, 0);
+  await createFixedExpense({ label: " Aluguel ", category: "Aluguel e condomínio", amount: 3500, dueDay: 10, active: true }, WHO, db.pool);
+  await createFixedExpense({ label: "Internet", category: "Energia, água e internet", amount: 199.9, dueDay: 5, active: true }, WHO, db.pool);
+  await createFixedExpense({ label: "Contador", category: "Serviços e assessorias", amount: 1200, dueDay: 28, active: false }, WHO, db.pool);
+  assert.equal((await loadParams(db.pool)).fixedMonthlyExpenses, 3699.9);
+  const list = await listFixedExpenses(db.pool);
+  assert.deepEqual(list.map((item) => [item.label, item.dueDay, item.active]), [["Internet", 5, true], ["Aluguel", 10, true], ["Contador", 28, false]]);
+
+  await assert.rejects(() => createFixedExpense({ label: "Aluguel", category: "Outros", amount: 1, dueDay: 1, active: true }, WHO, db.pool), /Já existe uma despesa fixa/);
+  await assert.rejects(() => createFixedExpense({ label: "X", category: "Outros", amount: 0, dueDay: 1, active: true }, WHO, db.pool), /maior que zero/);
+  await assert.rejects(() => createFixedExpense({ label: "X", category: "Outros", amount: 1, dueDay: 29, active: true }, WHO, db.pool), /de 1 a 28/);
+  await assert.rejects(() => createFixedExpense({ label: " ", category: "Outros", amount: 1, dueDay: 1, active: true }, WHO, db.pool), /Informe o nome/);
+
+  // Ligar o contador e reajustar o aluguel: o parâmetro acompanha.
+  const accountant = list[2];
+  await updateFixedExpense(accountant.id, { ...accountant, active: true }, WHO, db.pool);
+  await updateFixedExpense(list[1].id, { ...list[1], amount: 3800 }, WHO, db.pool);
+  assert.equal((await loadParams(db.pool)).fixedMonthlyExpenses, 5199.9);
+  await assert.rejects(() => updateFixedExpense(999999, list[0], WHO, db.pool), /não encontrada/);
+
+  // Lançar novembro: uma conta por despesa em uso, no dia de cada uma.
+  const before = (await listPayables(db.pool)).length;
+  assert.deepEqual(await launchFixedExpenses("2026-11", WHO, db.pool), { launched: 3 });
+  const launched = (await listPayables(db.pool)).filter((item) => item.description.endsWith("(11/2026)"));
+  assert.deepEqual(
+    launched.map((item) => [item.description, item.category, item.amount, item.dueDate, item.status]),
+    [
+      ["Internet (11/2026)", "Energia, água e internet", 199.9, "2026-11-05", "aberta"],
+      ["Aluguel (11/2026)", "Aluguel e condomínio", 3800, "2026-11-10", "aberta"],
+      ["Contador (11/2026)", "Serviços e assessorias", 1200, "2026-11-28", "aberta"],
+    ],
+  );
+  // De novo no mesmo mês não grava nada; em dezembro, sim. Despesa desligada fica de fora.
+  assert.deepEqual(await launchFixedExpenses("2026-11", WHO, db.pool), { launched: 0 });
+  await updateFixedExpense(accountant.id, { ...accountant, active: false }, WHO, db.pool);
+  assert.deepEqual(await launchFixedExpenses("2026-12", WHO, db.pool), { launched: 2 });
+  assert.equal((await listPayables(db.pool)).length, before + 5);
+  await assert.rejects(() => launchFixedExpenses("11/2026", WHO, db.pool), /Mês inválido/);
 });

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/auth";
 import { menuItem } from "@/lib/auth/permissions";
+import { launchFixedExpenses } from "@/lib/db/fixed-expenses";
 import { listPaymentMethods } from "@/lib/db/orders";
 import { listPayableCategories } from "@/lib/db/payable-categories";
 import { createPayable, deletePayable, PayableError, payPayable, unpayPayable } from "@/lib/db/payables";
@@ -82,6 +83,21 @@ export async function deletePayableAction(_previous: ActionState, formData: Form
     console.info(`[contas-pagar] ${session.email} excluiu a conta "${description}" em ${session.tenant.slug}`);
   } catch (error) {
     return problem("excluir a conta", error);
+  }
+  revalidatePath(HERE);
+  return OK;
+}
+
+/** "Lançar despesas fixas do mês": the current month, in São Paulo. Launching again writes nothing new. */
+export async function launchFixedExpensesAction(previous: ActionState): Promise<ActionState> {
+  const session = await requirePermission("contas-pagar");
+  const conn = tenantDb(session.tenant.slug);
+  void previous;
+  try {
+    const { launched } = await launchFixedExpenses(isoDate(new Date()).slice(0, 7), session.email, conn);
+    if (launched === 0) return { error: "Nenhuma conta nova: as despesas fixas deste mês já foram lançadas, ou não há despesa fixa em uso." };
+  } catch (error) {
+    return problem("lançar as despesas fixas", error);
   }
   revalidatePath(HERE);
   return OK;
