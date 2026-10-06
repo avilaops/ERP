@@ -339,6 +339,9 @@ abre e fecha): coluna à esquerda a partir de `md`, barra no topo com o botão "
 Tabela larga rola dentro do próprio cartão (`relative overflow-x-auto`; o `relative` segura os
 rótulos `sr-only`, que senão alargam a página). Campo com largura fixa só a partir de `sm`
 (`min-w-0 flex-1 sm:w-64 sm:flex-none`), e grade de uma coluna usa `grid-cols-[minmax(0,1fr)]`.
+A lista de pedidos vira cartões abaixo de `md`. O sistema é instalável na tela de início
+(`src/app/manifest.ts`, ícones em `public/icons/` e `src/app/*.png`); o manifesto é público e
+igual para todas as empresas, sem nome nem dado de nenhuma.
 
 ## Git
 

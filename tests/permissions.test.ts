@@ -8,7 +8,7 @@ import type { Role } from "@/lib/auth/roles";
 
 // Columns: Diretoria, Gerente comercial, Vendedor, Financeiro.
 const MATRIX: [MenuItemKey, string, string, [boolean, boolean, boolean, boolean]][] = [
-  ["dashboard", "Dashboard", "/dashboard", [true, true, false, false]],
+  ["dashboard", "Dashboard", "/dashboard", [true, true, true, false]],
   ["precos-metas", "Preços e metas", "/precos-metas", [true, true, false, false]],
   ["aprovacoes", "Aprovações", "/aprovacoes", [true, true, false, false]],
   ["pedidos", "Pedidos", "/pedidos", [true, true, true, false]],
@@ -77,6 +77,7 @@ test("menuFor devolve só os itens do perfil, na ordem do manual", () => {
     "Comissões",
   ]);
   assert.deepEqual(menuFor("VENDEDOR").map((item) => item.href), [
+    "/dashboard",
     "/pedidos",
     "/clientes",
     "/comissoes",

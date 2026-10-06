@@ -221,6 +221,9 @@ test("Dashboard, Preços e metas e Simulador: custo e lucro só para quem pode v
     }
   }
   assert.ok(source("/dashboard").indexOf("ordersProfit(") > source("/dashboard").indexOf("seesCosts(session.role)"));
+  // O vendedor tem o dashboard, mas só com os pedidos dele: o escopo sai da sessão.
+  assert.ok(source("/dashboard").includes("listDashboardOrders({ sellerEmail: everyone ? null : session.email }, conn)"));
+  assert.ok(source("/dashboard").includes("const everyone = seesAllOrders(session.role);"));
   // No simulador a equipe recebe só o nome da faixa.
   assert.ok(source("/simulador").includes("simulationBand(latest.version, simulation, conn)"));
   const goals = readFileSync(`${APP_DIR}precos-metas/actions.ts`, "utf8");

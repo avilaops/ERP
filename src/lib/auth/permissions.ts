@@ -7,7 +7,7 @@ import type { Role } from "@/lib/auth/roles";
  * manual does not say a profile sees an item, the profile does not get it.
  */
 const MENU = [
-  { key: "dashboard", label: "Dashboard", href: "/dashboard", roles: ["DIRETORIA", "GERENTE_COMERCIAL"] },
+  { key: "dashboard", label: "Dashboard", href: "/dashboard", roles: ["DIRETORIA", "GERENTE_COMERCIAL", "VENDEDOR"] },
   { key: "precos-metas", label: "Preços e metas", href: "/precos-metas", roles: ["DIRETORIA", "GERENTE_COMERCIAL"] },
   { key: "aprovacoes", label: "Aprovações", href: "/aprovacoes", roles: ["DIRETORIA", "GERENTE_COMERCIAL"] },
   { key: "pedidos", label: "Pedidos", href: "/pedidos", roles: ["DIRETORIA", "GERENTE_COMERCIAL", "VENDEDOR"] },

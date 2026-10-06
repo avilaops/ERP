@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Bars, Columns, Kpi } from "@/components/Charts";
 import { requirePermission } from "@/lib/auth";
-import { canAccess, menuItem, seesCosts } from "@/lib/auth/permissions";
+import { canAccess, menuItem, seesAllOrders, seesCosts } from "@/lib/auth/permissions";
 import { dashboardView, parsePeriod, PERIODS } from "@/lib/dashboard-view";
 import { listDashboardOrders, ordersProfit } from "@/lib/db/dashboard";
 import { listCommissionsDue, listPayables } from "@/lib/db/payables";
@@ -28,8 +28,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const period = parsePeriod(first((await searchParams).periodo));
 
   const today = isoDate(new Date());
-  // Who has the dashboard sees the orders of the whole team.
-  const view = dashboardView(await listDashboardOrders({ sellerEmail: null }, conn), period, today);
+  // A seller receives only their own orders from the database; the others, the whole team's.
+  const everyone = seesAllOrders(session.role);
+  const view = dashboardView(await listDashboardOrders({ sellerEmail: everyone ? null : session.email }, conn), period, today);
   const periodLabel = PERIODS.find((item) => item.key === period)?.label.toLowerCase() ?? "";
 
   // Profit is read only for who may see costs.
@@ -45,7 +46,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">{menuItem("dashboard").label}</h1>
-          <p className="mt-1 text-slate-600">Vendas de toda a equipe.</p>
+          <p className="mt-1 text-slate-600">{everyone ? "Vendas de toda a equipe." : "Os seus números."}</p>
         </div>
         <nav aria-label="Período" className="flex flex-wrap rounded-lg border border-slate-200 bg-white p-0.5 text-sm">
           {PERIODS.map((item) => (
@@ -100,13 +101,15 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             empty=""
           />
         </section>
-        <section className={CARD} aria-labelledby="ranking">
-          <h2 id="ranking" className={TITLE}>
-            Ranking de vendedores
-          </h2>
-          <p className="mb-4 text-xs text-slate-600">vendas fechadas · com IPI</p>
-          <Bars bars={view.bySeller} format={showMoney} empty="Nenhum pedido fechado no período." />
-        </section>
+        {everyone && (
+          <section className={CARD} aria-labelledby="ranking">
+            <h2 id="ranking" className={TITLE}>
+              Ranking de vendedores
+            </h2>
+            <p className="mb-4 text-xs text-slate-600">vendas fechadas · com IPI</p>
+            <Bars bars={view.bySeller} format={showMoney} empty="Nenhum pedido fechado no período." />
+          </section>
+        )}
         <section className={CARD} aria-labelledby="equipamentos">
           <h2 id="equipamentos" className={TITLE}>
             Equipamentos mais vendidos

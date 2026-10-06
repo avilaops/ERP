@@ -110,53 +110,75 @@ export default async function PedidosPage({ searchParams }: { searchParams: Prom
                 : "Nenhum pedido nesta aba."}
           </p>
         ) : (
-          <div className="relative overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                <tr>
-                  <th scope="col" className="px-4 py-2 text-left font-semibold">
-                    Cliente
-                  </th>
-                  {everyone && (
+          <>
+            {/* On a phone each order is a card; the table is for wider screens. */}
+            <ul className="md:hidden">
+              {rows.map((row) => (
+                <li key={row.number} className="border-t border-slate-200 first:border-t-0">
+                  <Link href={`${HERE}/${row.number}`} className="block px-4 py-3 active:bg-slate-50">
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="min-w-0 font-medium text-brand">{row.customer}</span>
+                      <span className="whitespace-nowrap font-semibold">{row.total}</span>
+                    </div>
+                    <p className="mt-0.5 text-xs text-slate-500">{[row.detail, everyone ? row.seller : null].filter(Boolean).join(" · ")}</p>
+                    <div className="mt-2 flex items-center justify-between gap-3 text-xs">
+                      <span className={`rounded-full px-2.5 py-0.5 font-medium ${STATUS_COLORS[row.status]}`}>{row.statusLabel}</span>
+                      <span className="text-slate-600">
+                        desconto {row.discount} · {row.updated}
+                      </span>
+                    </div>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+            <div className="relative hidden overflow-x-auto md:block">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                  <tr>
                     <th scope="col" className="px-4 py-2 text-left font-semibold">
-                      Vendedor
+                      Cliente
                     </th>
-                  )}
-                  <th scope="col" className="px-4 py-2 text-right font-semibold">
-                    Desconto
-                  </th>
-                  <th scope="col" className="whitespace-nowrap px-4 py-2 text-right font-semibold">
-                    Total da nota
-                  </th>
-                  <th scope="col" className="px-4 py-2 text-left font-semibold">
-                    Situação
-                  </th>
-                  <th scope="col" className="px-4 py-2 text-left font-semibold">
-                    Atualizado
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => (
-                  <tr key={row.number} className="border-t border-slate-200 align-top hover:bg-slate-50">
-                    <td className="px-4 py-3">
-                      <Link href={`${HERE}/${row.number}`} className="font-medium text-brand underline-offset-2 hover:underline">
-                        {row.customer}
-                      </Link>
-                      <span className="block text-xs text-slate-500">{[row.detail, row.document].filter(Boolean).join(" · ")}</span>
-                    </td>
-                    {everyone && <td className="px-4 py-3">{row.seller}</td>}
-                    <td className="whitespace-nowrap px-4 py-3 text-right">{row.discount}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right font-semibold">{row.total}</td>
-                    <td className="px-4 py-3">
-                      <span className={`whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium ${STATUS_COLORS[row.status]}`}>{row.statusLabel}</span>
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-slate-600">{row.updated}</td>
+                    {everyone && (
+                      <th scope="col" className="px-4 py-2 text-left font-semibold">
+                        Vendedor
+                      </th>
+                    )}
+                    <th scope="col" className="px-4 py-2 text-right font-semibold">
+                      Desconto
+                    </th>
+                    <th scope="col" className="whitespace-nowrap px-4 py-2 text-right font-semibold">
+                      Total da nota
+                    </th>
+                    <th scope="col" className="px-4 py-2 text-left font-semibold">
+                      Situação
+                    </th>
+                    <th scope="col" className="px-4 py-2 text-left font-semibold">
+                      Atualizado
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {rows.map((row) => (
+                    <tr key={row.number} className="border-t border-slate-200 align-top hover:bg-slate-50">
+                      <td className="px-4 py-3">
+                        <Link href={`${HERE}/${row.number}`} className="font-medium text-brand underline-offset-2 hover:underline">
+                          {row.customer}
+                        </Link>
+                        <span className="block text-xs text-slate-500">{[row.detail, row.document].filter(Boolean).join(" · ")}</span>
+                      </td>
+                      {everyone && <td className="px-4 py-3">{row.seller}</td>}
+                      <td className="whitespace-nowrap px-4 py-3 text-right">{row.discount}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right font-semibold">{row.total}</td>
+                      <td className="px-4 py-3">
+                        <span className={`whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium ${STATUS_COLORS[row.status]}`}>{row.statusLabel}</span>
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-slate-600">{row.updated}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </section>
     </>

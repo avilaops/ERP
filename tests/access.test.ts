@@ -61,7 +61,8 @@ test("decisão: exemplos da matriz por perfil", () => {
   assert.equal(kind("GERENTE_COMERCIAL", "aprovacoes"), "allow");
   assert.equal(kind("GERENTE_COMERCIAL", "comissoes"), "no-access");
   assert.equal(kind("VENDEDOR", "pedidos"), "allow");
-  assert.equal(kind("VENDEDOR", "dashboard"), "no-access");
+  assert.equal(kind("VENDEDOR", "dashboard"), "allow");
+  assert.equal(kind("VENDEDOR", "precos-metas"), "no-access");
   assert.equal(kind("FINANCEIRO", "recebimentos"), "allow");
   assert.equal(kind("FINANCEIRO", "pedidos"), "no-access");
 });

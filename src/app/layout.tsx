@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Barlow_Condensed, IBM_Plex_Sans } from "next/font/google";
 import "./globals.css";
 
@@ -10,7 +10,11 @@ export const metadata: Metadata = {
   title: "ERP · Ávila Ops",
   description: "Sistema comercial.",
   robots: { index: false, follow: false },
+  // Installed on the phone, it opens without the browser's bars and with a short name under the icon.
+  appleWebApp: { capable: true, title: "ERP", statusBarStyle: "default" },
 };
+
+export const viewport: Viewport = { themeColor: "#2c49a8" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
