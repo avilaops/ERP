@@ -114,7 +114,7 @@ export default async function AprovacoesPage() {
           <h2 id="decididos" className="border-b border-slate-200 px-5 py-3 text-sm font-semibold uppercase tracking-wide">
             Últimas decisões
           </h2>
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>

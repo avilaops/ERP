@@ -179,7 +179,7 @@ export default async function PedidoPage({
             </h2>
             <p className="text-xs text-slate-600">{units} un.</p>
           </div>
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>
@@ -293,7 +293,7 @@ export default async function PedidoPage({
           )}
         </section>
 
-        <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
+        <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
           <div className="flex min-w-0 flex-col gap-6">
             <section className={CARD} aria-labelledby="cliente">
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-5 py-3">
@@ -344,7 +344,7 @@ export default async function PedidoPage({
                         </Link>
                       ))}
                     </nav>
-                    <form method="get" action={here} role="search" className="flex gap-2">
+                    <form method="get" action={here} role="search" className="flex w-full gap-2 sm:w-auto">
                       <input type="hidden" name="cliente" value={kind === "PF" ? "pf" : "pj"} />
                       <input
                         type="search"
@@ -352,7 +352,7 @@ export default async function PedidoPage({
                         defaultValue={typedDocument}
                         placeholder={kind === "PJ" ? "CNPJ já cadastrado" : "CPF já cadastrado"}
                         aria-label={kind === "PJ" ? "Buscar cliente pelo CNPJ" : "Buscar cliente pelo CPF"}
-                        className={`${INPUT} w-56 text-sm`}
+                        className={`${INPUT} min-w-0 flex-1 text-sm sm:w-56 sm:flex-none`}
                       />
                       <button type="submit" className={BUTTON}>
                         Buscar
@@ -630,7 +630,7 @@ export default async function PedidoPage({
                 )}
               </ActionForm>
               {plan.receipts.length > 0 && (
-                <div className="overflow-x-auto border-t border-slate-200">
+                <div className="relative overflow-x-auto border-t border-slate-200">
                   <table className="w-full text-sm">
                     <caption className="px-5 py-2 text-left text-xs text-slate-600">
                       Recebimentos previstos. A comissão é uma previsão: só vale quando o valor entra.

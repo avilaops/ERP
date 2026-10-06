@@ -8,9 +8,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!session) return children;
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen flex-col md:flex-row">
       <Sidebar session={session} />
-      <main className="min-w-0 flex-1 p-8">{children}</main>
+      <main className="min-w-0 flex-1 p-4 md:p-8">{children}</main>
     </div>
   );
 }

@@ -221,7 +221,17 @@ funções puras, sem banco e sem tela, conferidas com os números dos prints do 
     valor já recebido não se reabre. **A baixa é `recordReceipt`** (`src/lib/db/receivables.ts`):
     valor inteiro, recebível, recebimento e comissão do vendedor num comando só, com o IPI e
     a comissão da versão da tabela do pedido. Recebimento é evento: não se edita nem se apaga
-    (o estorno, quando vier, é lançamento próprio).
+    Erro se corrige com estorno.
+14. **Estorno é pedido e confirmação** (`requestRefund`, `decideRefund`): quem tem
+    Recebimentos pede, com motivo; só a Diretoria confirma (`confirmsRefunds`). Confirmado, num
+    comando só: o estorno (negativo), o valor de volta a receber e a comissão devolvida com
+    lançamento negativo no mês da confirmação. O recebimento original fica como está.
+15. **Comissão** (`src/lib/db/commissions.ts`): nasce na baixa, some no estorno, nunca é
+    editada. O vendedor recebe do banco só as linhas dele; Diretoria e Financeiro veem todas
+    e marcam como paga (`managesCommissions`). `payCommissions` paga o que está em aberto do
+    vendedor até o mês, de modo que o estorno desconta do pagamento seguinte, e não paga saldo
+    que não seja positivo. O dia do pagamento é da empresa (`company_settings`, de 1 a 28,
+    editado em Parâmetros), nunca fixo no código.
 
 ## Fotos dos equipamentos
 
@@ -255,6 +265,15 @@ guardada no banco da empresa (`product_photos`), nunca em disco nem em `public/`
    (`importProducts`, com uma conexão de `withTenantConnection`), cria equipamento sem
    custo, e nunca toca em custo, crédito, embalagem nem `active`. O formato da pasta está
    no `README.md`.
+
+## Celular
+
+O sistema é usado no celular: toda tela tem de caber em 390 px de largura sem rolagem lateral
+da página. O menu é `Sidebar` (servidor) dentro de `MobileMenu` (a única parte de navegador, só
+abre e fecha): coluna à esquerda a partir de `md`, barra no topo com o botão "Menu" abaixo disso.
+Tabela larga rola dentro do próprio cartão (`relative overflow-x-auto`; o `relative` segura os
+rótulos `sr-only`, que senão alargam a página). Campo com largura fixa só a partir de `sm`
+(`min-w-0 flex-1 sm:w-64 sm:flex-none`), e grade de uma coluna usa `grid-cols-[minmax(0,1fr)]`.
 
 ## Git
 

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { MobileMenu } from "@/components/MobileMenu";
 import type { Session } from "@/lib/auth";
 import { localProvider } from "@/lib/auth/local-provider";
 import { canAccess, menuFor } from "@/lib/auth/permissions";
@@ -13,20 +14,16 @@ export async function Sidebar({ session }: { session: Session }) {
   const logoVersion = await loadLogoVersion(tenantDb(session.tenant.slug));
   const localLogin = localProvider(process.env).available;
 
-  return (
-    <aside className="flex w-64 shrink-0 flex-col gap-4 border-r border-slate-200 bg-white p-4">
-      {/* The company of the session: its logo, when the directors sent one, or its name. */}
-      {logoVersion ? (
-        // eslint-disable-next-line @next/next/no-img-element -- served by the app itself, per company
-        <img
-          src={`/empresa/logo?v=${logoVersion.getTime()}`}
-          alt={session.tenant.name}
-          className="max-h-12 max-w-full self-start object-contain"
-        />
-      ) : (
-        <p className="font-display text-2xl font-bold uppercase leading-none">{session.tenant.name}</p>
-      )}
+  // The company of the session: its logo, when the directors sent one, or its name.
+  const brand = logoVersion ? (
+    // eslint-disable-next-line @next/next/no-img-element -- served by the app itself, per company
+    <img src={`/empresa/logo?v=${logoVersion.getTime()}`} alt={session.tenant.name} className="max-h-10 max-w-full object-contain md:max-h-12" />
+  ) : (
+    <p className="truncate font-display text-xl font-bold uppercase leading-none md:whitespace-normal md:text-2xl">{session.tenant.name}</p>
+  );
 
+  return (
+    <MobileMenu brand={brand}>
       <section className="rounded border border-slate-200 bg-slate-50 p-3" aria-label="Seu acesso">
         <p className="text-xs uppercase tracking-wide text-slate-500">Seu acesso</p>
         <p className="truncate font-display text-lg font-semibold uppercase leading-tight">{session.name}</p>
@@ -46,7 +43,7 @@ export async function Sidebar({ session }: { session: Session }) {
 
       <nav aria-label="Menu principal" className="flex flex-col">
         {items.map((item) => (
-          <Link key={item.key} href={item.href} className="rounded-lg px-3 py-2 font-medium text-slate-700 hover:bg-slate-100 hover:text-slate-900">
+          <Link key={item.key} href={item.href} className="rounded-lg px-3 py-2.5 font-medium text-slate-700 hover:bg-slate-100 hover:text-slate-900 md:py-2">
             {item.label}
           </Link>
         ))}
@@ -70,6 +67,6 @@ export async function Sidebar({ session }: { session: Session }) {
           </button>
         </form>
       </div>
-    </aside>
+    </MobileMenu>
   );
 }

@@ -2,14 +2,15 @@ import Link from "next/link";
 import { requirePermission } from "@/lib/auth";
 import { tenantDb } from "@/lib/db/pool";
 import { menuItem } from "@/lib/auth/permissions";
-import { loadLogoVersion } from "@/lib/db/company";
+import { loadCommissionDay, loadLogoVersion } from "@/lib/db/company";
+import { ActionForm } from "../pedidos/ActionForm";
 import { loadParams } from "@/lib/db/params";
 import { listProductCosts } from "@/lib/db/products";
 import { showMoney, showMultiplier, showPercent } from "@/lib/format";
 import { paramsToForm } from "@/lib/params-form";
 import { roundCents } from "@/lib/pricing/money";
 import { paramsResult } from "@/lib/pricing/results";
-import { adoptSuggestedDownPaymentAction, removeLogoAction, saveLogoAction, saveParamsAction } from "./actions";
+import { adoptSuggestedDownPaymentAction, removeLogoAction, saveLogoAction, saveParamsAction, saveCommissionDayAction } from "./actions";
 import { LogoForm } from "./LogoForm";
 import { ParamsForm } from "./ParamsForm";
 
@@ -21,6 +22,7 @@ export default async function ParametrosPage() {
   const conn = tenantDb(session.tenant.slug);
 
   const [params, costs, logoVersion] = await Promise.all([loadParams(conn), listProductCosts(conn), loadLogoVersion(conn)]);
+  const commissionDay = await loadCommissionDay(conn);
   // Every figure of the board is calculated here, on the server, by the engine.
   const result = paramsResult(params, costs);
   const form = paramsToForm(params);
@@ -61,6 +63,33 @@ export default async function ParametrosPage() {
             save={saveLogoAction}
             remove={removeLogoAction}
           />
+          <section className="rounded-lg border border-slate-200 bg-white p-5" aria-labelledby="dia-comissao">
+            <h2 id="dia-comissao" className="text-sm font-semibold uppercase tracking-wide">
+              Pagamento da comissão
+            </h2>
+            <ActionForm action={saveCommissionDayAction} className="mt-3 flex flex-wrap items-end gap-3">
+              <div>
+                <label htmlFor="commission-day" className="block text-sm font-medium">
+                  Dia do mês seguinte
+                </label>
+                <input
+                  key={commissionDay}
+                  id="commission-day"
+                  name="day"
+                  type="text"
+                  inputMode="numeric"
+                  defaultValue={commissionDay}
+                  className="mt-1 w-20 rounded border border-slate-300 bg-white px-3 py-2 text-right outline-none focus:ring-2 focus:ring-brand"
+                />
+              </div>
+              <button type="submit" className="rounded border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50">
+                Salvar dia
+              </button>
+              <p className="basis-full text-xs text-slate-500">
+                De 1 a 28. O que é recebido num mês é pago neste dia do mês seguinte. Vale para as comissões geradas daqui em diante.
+              </p>
+            </ActionForm>
+          </section>
           <ParamsForm saved={form} action={saveParamsAction} />
         </div>
 

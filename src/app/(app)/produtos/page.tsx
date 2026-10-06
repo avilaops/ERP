@@ -122,7 +122,7 @@ export default async function ProdutosPage({
                 </Link>
               ))}
             </nav>
-            <form method="get" action={ITEM.href} role="search" className="flex gap-2">
+            <form method="get" action={ITEM.href} role="search" className="flex w-full gap-2 sm:w-auto">
               {tab !== "ativos" && <input type="hidden" name="aba" value={tab} />}
               <input
                 type="search"
@@ -130,7 +130,7 @@ export default async function ProdutosPage({
                 defaultValue={search}
                 placeholder="Buscar nome, código ou fornecedor"
                 aria-label="Buscar nome, código ou fornecedor"
-                className="w-72 rounded border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand"
+                className="min-w-0 flex-1 rounded border border-slate-300 px-3 py-2 text-sm sm:w-72 sm:flex-none outline-none focus:ring-2 focus:ring-brand"
               />
               <button type="submit" className="rounded border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50">
                 Buscar
@@ -145,7 +145,7 @@ export default async function ProdutosPage({
             {search === "" ? "Nenhum equipamento nesta aba." : `Nenhum equipamento encontrado para "${search}".`}
           </p>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="border-t border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>

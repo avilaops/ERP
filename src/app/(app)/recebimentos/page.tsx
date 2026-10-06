@@ -1,14 +1,14 @@
 import Link from "next/link";
 import { requirePermission } from "@/lib/auth";
-import { menuItem } from "@/lib/auth/permissions";
+import { confirmsRefunds, menuItem } from "@/lib/auth/permissions";
 import { listPaymentMethods } from "@/lib/db/orders";
 import { tenantDb } from "@/lib/db/pool";
-import { listOpenReceivables, listReceipts } from "@/lib/db/receivables";
-import { isoDate, showIsoDate, showMoney } from "@/lib/format";
+import { listOpenReceivables, listPendingRefunds, listReceipts } from "@/lib/db/receivables";
+import { isoDate, showDateTime, showIsoDate, showMoney } from "@/lib/format";
 import { addDays } from "@/lib/pricing/payment";
 import { isOverdue, receivablesSummary } from "@/lib/receivables-view";
 import { ActionForm } from "../pedidos/ActionForm";
-import { recordReceiptAction } from "./actions";
+import { decideRefundAction, recordReceiptAction, requestRefundAction } from "./actions";
 
 export const metadata = { title: `${menuItem("recebimentos").label} · ERP` };
 export const dynamic = "force-dynamic";
@@ -26,6 +26,8 @@ export default async function RecebimentosPage() {
   const open = await listOpenReceivables(conn);
   const receipts = await listReceipts(20, conn);
   const methods = await listPaymentMethods(conn);
+  const refunds = await listPendingRefunds(conn);
+  const decides = confirmsRefunds(session.role);
   const summary = receivablesSummary(open, today, addDays(today, 7));
 
   const cards = [
@@ -103,7 +105,7 @@ export default async function RecebimentosPage() {
                         ))}
                       </select>
                     </div>
-                    <div className="min-w-0 flex-1">
+                    <div className="min-w-40 flex-1">
                       <label htmlFor={`note-${item.id}`} className="block text-xs font-medium text-slate-600">
                         Observação
                       </label>
@@ -120,12 +122,56 @@ export default async function RecebimentosPage() {
         )}
       </section>
 
+      {refunds.length > 0 && (
+        <section className={`${CARD} mt-8 border-amber-300`} aria-labelledby="estornos">
+          <h2 id="estornos" className="border-b border-slate-200 px-5 py-3 text-sm font-semibold uppercase tracking-wide">
+            Estornos aguardando a diretoria ({refunds.length})
+          </h2>
+          <ul>
+            {refunds.map((refund) => (
+              <li key={refund.id} className="border-t border-slate-200 px-5 py-4 first:border-t-0">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <Link href={`${ORDERS}/${refund.orderNumber}`} className="font-medium text-brand underline-offset-2 hover:underline">
+                      {refund.customerName ?? "sem cliente"}
+                    </Link>
+                    <p className="text-xs text-slate-500">
+                      #{refund.orderNumber} · {refund.label} · recebido em {showIsoDate(refund.receivedOn)} · vendedor: {refund.sellerName}
+                    </p>
+                    <p className="mt-1 text-sm">
+                      <strong>Motivo:</strong> {refund.reason}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      Pedido por {refund.requestedBy === session.email ? "você" : refund.requestedBy} em {showDateTime(refund.requestedAt)}
+                    </p>
+                  </div>
+                  <p className="text-lg font-bold text-red-700">– {showMoney(refund.amount)}</p>
+                </div>
+                {decides ? (
+                  <ActionForm action={decideRefundAction} className="mt-3 flex flex-wrap gap-3">
+                    <input type="hidden" name="id" value={refund.id} />
+                    <button type="submit" name="decision" value="confirmar" className="rounded bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark">
+                      Confirmar estorno
+                    </button>
+                    <button type="submit" name="decision" value="recusar" className="rounded border border-slate-300 bg-white px-4 py-2 text-sm font-medium hover:bg-slate-50">
+                      Recusar
+                    </button>
+                  </ActionForm>
+                ) : (
+                  <p className="mt-2 text-sm text-slate-600">A diretoria confirma ou recusa. Até lá o recebimento continua valendo.</p>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {receipts.length > 0 && (
         <section className={`${CARD} mt-8`} aria-labelledby="recebidos">
           <h2 id="recebidos" className="border-b border-slate-200 px-5 py-3 text-sm font-semibold uppercase tracking-wide">
             Últimos recebimentos
           </h2>
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>
@@ -139,22 +185,48 @@ export default async function RecebimentosPage() {
                       {column}
                     </th>
                   ))}
+                  <th scope="col" className="px-4 py-2 text-left font-semibold">
+                    Estorno
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                {receipts.map((receipt, index) => (
-                  <tr key={`${receipt.orderNumber}-${index}`} className="border-t border-slate-200">
+                {receipts.map((receipt) => (
+                  <tr key={receipt.id} className="border-t border-slate-200 align-top">
                     <td className="px-4 py-3">
                       <Link href={`${ORDERS}/${receipt.orderNumber}`} className="font-medium text-brand underline-offset-2 hover:underline">
                         {receipt.customerName ?? "sem cliente"}
                       </Link>
-                      <span className="block text-xs text-slate-500">#{receipt.orderNumber}</span>
+                      <span className="block text-xs text-slate-500">
+                        #{receipt.orderNumber} · {receipt.label}
+                      </span>
                     </td>
                     <td className="whitespace-nowrap px-4 py-3">{showIsoDate(receipt.receivedOn)}</td>
                     <td className="px-4 py-3">{receipt.method ?? "—"}</td>
                     <td className="px-4 py-3">{receipt.sellerName}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-right font-semibold">{showMoney(receipt.amount)}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-right">{showMoney(receipt.commission)}</td>
+                    <td className="px-4 py-3">
+                      {receipt.state === "estornado" ? (
+                        <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-900">Estornado</span>
+                      ) : receipt.state === "estorno-pedido" ? (
+                        <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-900">Aguardando a diretoria</span>
+                      ) : (
+                        <ActionForm action={requestRefundAction} className="flex flex-wrap items-center gap-2">
+                          <input type="hidden" name="id" value={receipt.id} />
+                          <input
+                            name="reason"
+                            type="text"
+                            placeholder="Motivo"
+                            aria-label={`Motivo do estorno do pedido ${receipt.orderNumber}`}
+                            className={`${INPUT} w-40`}
+                          />
+                          <button type="submit" className="rounded border border-red-300 bg-white px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50">
+                            Pedir estorno
+                          </button>
+                        </ActionForm>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>

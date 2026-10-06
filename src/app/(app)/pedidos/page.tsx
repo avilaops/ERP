@@ -61,11 +61,11 @@ export default async function PedidosPage({ searchParams }: { searchParams: Prom
         </Link>
       </div>
 
-      <dl className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <dl className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         {cards.map(([label, value, note]) => (
           <div key={label} className={`${CARD} p-4`}>
             <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</dt>
-            <dd className="mt-1 text-2xl font-bold">{value}</dd>
+            <dd className="mt-1 text-lg font-bold sm:text-2xl">{value}</dd>
             <dd className="text-xs text-slate-600">{note}</dd>
           </div>
         ))}
@@ -84,7 +84,7 @@ export default async function PedidosPage({ searchParams }: { searchParams: Prom
             </Link>
           ))}
         </nav>
-        <form method="get" action={HERE} role="search" className="flex gap-2">
+        <form method="get" action={HERE} role="search" className="flex w-full gap-2 sm:w-auto">
           {tab !== "abertos" && <input type="hidden" name="aba" value={tab} />}
           <input
             type="search"
@@ -92,7 +92,7 @@ export default async function PedidosPage({ searchParams }: { searchParams: Prom
             defaultValue={search}
             placeholder="Cliente, CNPJ/CPF ou número"
             aria-label="Buscar pedido por cliente, CNPJ/CPF ou número"
-            className="w-64 rounded border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand"
+            className="min-w-0 flex-1 rounded border border-slate-300 bg-white px-3 py-2 text-sm sm:w-64 sm:flex-none outline-none focus:ring-2 focus:ring-brand"
           />
           <button type="submit" className="rounded border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50">
             Buscar
@@ -110,7 +110,7 @@ export default async function PedidosPage({ searchParams }: { searchParams: Prom
                 : "Nenhum pedido nesta aba."}
           </p>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>

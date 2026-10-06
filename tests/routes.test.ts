@@ -28,7 +28,7 @@ test("toda rota da matriz tem page.tsx que chama requirePermission com o própri
 });
 
 /** Pages already ported from the prototype. The others still say "Em construção". */
-const PORTED = ["parametros", "produtos", "tabela-precos", "clientes", "pedidos", "aprovacoes", "recebimentos"];
+const PORTED = ["parametros", "produtos", "tabela-precos", "clientes", "pedidos", "aprovacoes", "recebimentos", "comissoes"];
 
 test("páginas portadas não são mais marcador; as outras continuam Em construção", () => {
   for (const item of MENU_ITEMS) {
@@ -39,7 +39,7 @@ test("páginas portadas não são mais marcador; as outras continuam Em constru�
       assert.ok(code.includes("PlaceholderPage"), `${item.href} deveria estar Em construção`);
     }
   }
-  assert.equal(MENU_ITEMS.filter((item) => !PORTED.includes(item.key)).length, 7);
+  assert.equal(MENU_ITEMS.filter((item) => !PORTED.includes(item.key)).length, 6);
 });
 
 /** Every source file under the protected group, relative to it. */
@@ -54,6 +54,7 @@ test("toda ação de servidor confere a permissão antes de qualquer outra coisa
   assert.ok(actions.includes("pedidos/actions.ts"));
   assert.ok(actions.includes("aprovacoes/actions.ts"));
   assert.ok(actions.includes("recebimentos/actions.ts"));
+  assert.ok(actions.includes("comissoes/actions.ts"));
   for (const file of actions) {
     const code = readFileSync(APP_DIR + file, "utf8");
     // Each exported action opens with the check: nothing is read from the form or the database before it.
@@ -202,6 +203,20 @@ test("usuários: só quem tem Parâmetros cadastra, e quem altera sai da sessão
   assert.ok(actions.includes("session.email, conn)"));
 });
 
+test("comissões e estorno: o escopo e quem decide saem da sessão", () => {
+  const page = source("/comissoes");
+  assert.ok(page.includes("const manages = managesCommissions(session.role);"));
+  assert.ok(page.includes("const scope = manages ? null : session.email;"));
+  // Toda leitura de comissão passa o escopo: nenhuma chamada com `null` fixo.
+  assert.doesNotMatch(page, /list(Commissions|CommissionMonths|CarriedBalances)\([^)]*\bnull\b/);
+  const paying = readFileSync(`${APP_DIR}comissoes/actions.ts`, "utf8");
+  assert.ok(paying.includes("if (!managesCommissions(session.role)) return"));
+  assert.ok(paying.indexOf("managesCommissions(session.role)") < paying.indexOf("payCommissions("));
+  const refunds = readFileSync(`${APP_DIR}recebimentos/actions.ts`, "utf8");
+  assert.ok(refunds.includes("if (!confirmsRefunds(session.role)) return"));
+  assert.ok(refunds.indexOf("confirmsRefunds(session.role)") < refunds.indexOf("decideRefund("));
+});
+
 test("formas de pagamento: só quem tem Parâmetros altera", () => {
   assert.ok(source("/parametros/formas-de-pagamento").includes('await requirePermission("parametros")'));
   const actions = readFileSync(`${APP_DIR}parametros/formas-de-pagamento/actions.ts`, "utf8");
@@ -232,6 +247,10 @@ test("o perfil não é lido de dado enviado pelo navegador", () => {
   for (const code of [layout, sidebar]) {
     assert.doesNotMatch(code, /"use client"|searchParams|next\/headers/);
   }
+  // No celular o menu abre e fecha: essa moldura é o único pedaço de navegador, e não recebe sessão nem perfil.
+  const frame = readFileSync(new URL("../src/components/MobileMenu.tsx", import.meta.url), "utf8");
+  assert.match(frame, /^"use client"/);
+  assert.doesNotMatch(frame, /session|role|@\/lib\/(auth|db)/i);
 });
 
 const API_DIR = fileURLToPath(new URL("../src/app/api/", import.meta.url));
