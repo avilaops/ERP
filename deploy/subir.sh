@@ -35,8 +35,10 @@ cd $PASTA
 GIT_SHA=$COMMIT BUILT_AT=$AGORA docker compose build -q
 # Migração antes de trocar o container: cria o esquema de cada empresa de
 # ERP_TENANTS e aplica o que falta. Falha aqui aborta o deploy com a versão antiga no ar.
+# </dev/null: sem isso o `run` lê a entrada padrão e engole o resto deste roteiro,
+# e o `up` logo abaixo nunca roda.
 docker compose run --rm --no-deps -T erp \
-  node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/db-migrate.ts
+  node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/db-migrate.ts </dev/null
 GIT_SHA=$COMMIT BUILT_AT=$AGORA docker compose up -d --force-recreate
 docker image prune -f >/dev/null
 REMOTO
