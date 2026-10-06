@@ -216,6 +216,12 @@ funções puras, sem banco e sem tela, conferidas com os números dos prints do 
     mudam num comando só. Quem decide e se pode aprovar pedido com prejuízo
     (`approvesAtLoss`, só Diretoria; a regra é `needsDirector` no motor) saem da sessão,
     nunca do formulário. A fila não traz custo: só o nome da faixa.
+13. **O pedido fechado gera o que tem a receber** (`receivables`), no mesmo comando do
+    fechamento, a partir de `paymentOf`. Reabrir cancela o que estava em aberto; pedido com
+    valor já recebido não se reabre. **A baixa é `recordReceipt`** (`src/lib/db/receivables.ts`):
+    valor inteiro, recebível, recebimento e comissão do vendedor num comando só, com o IPI e
+    a comissão da versão da tabela do pedido. Recebimento é evento: não se edita nem se apaga
+    (o estorno, quando vier, é lançamento próprio).
 
 ## Fotos dos equipamentos
 

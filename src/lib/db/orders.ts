@@ -5,7 +5,8 @@ import type { Customer } from "@/lib/db/customers";
 import { pgErrorCode } from "@/lib/db/pool";
 import type { Queryable } from "@/lib/db/pool";
 import { loadPublishedSnapshot, loadPublishedTable } from "@/lib/db/price-table";
-import { closingProblems, engineOrder, saleOf } from "@/lib/order-quote";
+import { isoDate } from "@/lib/format";
+import { closingProblems, engineOrder, paymentOf, receivableColumns, saleOf } from "@/lib/order-quote";
 import { ORDER_NUMBER } from "@/lib/order-number";
 import { assertAmount } from "@/lib/pricing/money";
 import { orderBand, policyCheck, quoteSale } from "@/lib/pricing/order";
@@ -475,6 +476,7 @@ export async function closeOrder(number: string, who: string, scope: OrderScope,
   if (!policy) throw new Error("Pedido sem estado de entrega chegou à política.");
 
   const status: OrderStatus = policy.needsApproval ? "aguardando_aprovacao" : "fechado";
+  const plan = receivableColumns(paymentOf(order, sale, table, isoDate(new Date())));
   // One statement: the order changes and, when it closes, the closing is recorded with it.
   const { rows } = await conn.query(
     `WITH closed AS (
@@ -489,9 +491,35 @@ export async function closeOrder(number: string, who: string, scope: OrderScope,
      ), requested AS (
        INSERT INTO order_approvals (order_id, requested_by, revision_hash, reasons)
        SELECT id, $3, $7, $8::text[] FROM closed WHERE status = 'aguardando_aprovacao'
+     ), receivable AS (
+       -- What the order expects to receive, from the plan. Closing again after a reopening
+       -- rewrites what was not received yet.
+       INSERT INTO receivables (order_id, kind, number, due_date, amount, method, updated_by)
+       SELECT closed.id, plan.kind, plan.number, plan.due_date::date, plan.amount, plan.method, $3
+         FROM closed,
+              unnest($9::text[], $10::int[], $11::text[], $12::numeric[], $13::text[]) AS plan (kind, number, due_date, amount, method)
+        WHERE closed.status = 'fechado'
+       ON CONFLICT (order_id, kind, number) DO UPDATE
+          SET due_date = EXCLUDED.due_date, amount = EXCLUDED.amount, method = EXCLUDED.method,
+              status = 'aberta', updated_at = now(), updated_by = EXCLUDED.updated_by
+        WHERE receivables.status <> 'recebida'
      )
      SELECT id FROM closed`,
-    [number, status, who, order.revision, scope.sellerEmail, sale.invoiceTotal, orderSignature(order), policy.reasons],
+    [
+      number,
+      status,
+      who,
+      order.revision,
+      scope.sellerEmail,
+      sale.invoiceTotal,
+      orderSignature(order),
+      policy.reasons,
+      plan.kinds,
+      plan.numbers,
+      plan.dueDates,
+      plan.amounts,
+      plan.methods,
+    ],
   );
   if (rows.length === 0) throw new OrderError(CHANGED);
   return { status, reasons: policy.reasons, missing: [] };
@@ -503,13 +531,26 @@ export async function closeOrder(number: string, who: string, scope: OrderScope,
  */
 export async function reopenOrder(number: string, who: string, scope: OrderScope, conn: Queryable): Promise<void> {
   assertWho(who);
+  const received = await conn.query(
+    `SELECT 1 FROM receivables r JOIN orders o ON o.id = r.order_id
+      WHERE o.number = $1 AND ($2::text IS NULL OR o.seller_email = $2) AND r.status = 'recebida' LIMIT 1`,
+    [number, scope.sellerEmail],
+  );
+  if (received.rows.length > 0) {
+    throw new OrderError("Este pedido já tem valor recebido e não pode ser reaberto. Fale com o financeiro.");
+  }
   const { rows } = await conn.query(
     `WITH reopened AS (
        UPDATE orders
           SET status = 'em_negociacao', closed_at = NULL, updated_at = now(), updated_by = $2
         WHERE number = $1 AND status IN ('fechado', 'aguardando_aprovacao')
           AND ($3::text IS NULL OR seller_email = $3)
+          AND NOT EXISTS (SELECT 1 FROM receivables r WHERE r.order_id = orders.id AND r.status = 'recebida')
         RETURNING id
+     ), cancelled AS (
+       -- What was still to be received leaves with the closing.
+       UPDATE receivables SET status = 'cancelada', updated_at = now(), updated_by = $2
+         FROM reopened WHERE order_id = reopened.id AND status = 'aberta'
      ), marked AS (
        UPDATE order_closings SET reopened_at = now(), reopened_by = $2
          FROM reopened WHERE order_id = reopened.id AND reopened_at IS NULL

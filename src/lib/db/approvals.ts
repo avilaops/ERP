@@ -2,7 +2,8 @@ import { getOrder, listOrders, loadOrderStanding, OrderError } from "@/lib/db/or
 import type { OrderSummary } from "@/lib/db/orders";
 import type { Queryable } from "@/lib/db/pool";
 import { loadPublishedTable } from "@/lib/db/price-table";
-import { saleOf } from "@/lib/order-quote";
+import { isoDate } from "@/lib/format";
+import { paymentOf, receivableColumns, saleOf } from "@/lib/order-quote";
 import { needsDirector } from "@/lib/pricing/order";
 import type { ApprovalReason, DiscountBand } from "@/lib/pricing/order";
 
@@ -78,7 +79,9 @@ export async function decideApproval(number: string, decision: Decision, who: De
   }
   const table = await loadPublishedTable(order.priceTableVersion, conn);
   if (!table) throw new Error(`Tabela v${order.priceTableVersion} não encontrada.`);
-  const { invoiceTotal } = saleOf(order, table);
+  const sale = saleOf(order, table);
+  const { invoiceTotal } = sale;
+  const plan = receivableColumns(paymentOf(order, sale, table, isoDate(new Date())));
 
   const { rows } = await conn.query(
     `WITH target AS (
@@ -94,6 +97,18 @@ export async function decideApproval(number: string, decision: Decision, who: De
      ), recorded AS (
        INSERT INTO order_closings (order_id, closed_by, invoice_total)
        SELECT id, $3, $8::numeric FROM target WHERE status = 'fechado'
+     ), receivable AS (
+       -- What the order expects to receive, from the plan. Closing again after a reopening
+       -- rewrites what was not received yet.
+       INSERT INTO receivables (order_id, kind, number, due_date, amount, method, updated_by)
+       SELECT target.id, plan.kind, plan.number, plan.due_date::date, plan.amount, plan.method, $3
+         FROM target,
+              unnest($9::text[], $10::int[], $11::text[], $12::numeric[], $13::text[]) AS plan (kind, number, due_date, amount, method)
+        WHERE target.status = 'fechado'
+       ON CONFLICT (order_id, kind, number) DO UPDATE
+          SET due_date = EXCLUDED.due_date, amount = EXCLUDED.amount, method = EXCLUDED.method,
+              status = 'aberta', updated_at = now(), updated_by = EXCLUDED.updated_by
+        WHERE receivables.status <> 'recebida'
      )
      SELECT id FROM target`,
     [
@@ -105,6 +120,11 @@ export async function decideApproval(number: string, decision: Decision, who: De
       who.role,
       comment,
       invoiceTotal,
+      plan.kinds,
+      plan.numbers,
+      plan.dueDates,
+      plan.amounts,
+      plan.methods,
     ],
   );
   if (rows.length === 0) throw new OrderError(GONE);

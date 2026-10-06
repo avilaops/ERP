@@ -89,6 +89,8 @@ export function dueDates(order: OrderData, table: PublishedTable, today: string)
   };
 }
 
+const DOWN_PAYMENT = "Entrada";
+
 /** One amount the order expects to receive: the down payment or one installment. */
 export type ExpectedReceipt = {
   /** `Entrada`, `1/3`, `2/3`… */
@@ -142,7 +144,7 @@ export function paymentOf(order: PaymentData, sale: SaleQuote, table: PublishedT
 
   const receipts: ExpectedReceipt[] = [];
   if (downPayment > 0) {
-    receipts.push({ label: "Entrada", dueDate: base, method: order.downPaymentMethod, amount: downPayment, commission: commission(downPayment) });
+    receipts.push({ label: DOWN_PAYMENT, dueDate: base, method: order.downPaymentMethod, amount: downPayment, commission: commission(downPayment) });
   }
   const parts =
     balance > 0 && order.installmentCount
@@ -173,6 +175,24 @@ export function paymentOf(order: PaymentData, sale: SaleQuote, table: PublishedT
     receipts,
     installmentsTotal: roundCents(parts.reduce((total, part) => total + part.amount, 0)),
   };
+}
+
+/** The plan as the columns of `receivables`, one array per column, for a single insert. */
+export type ReceivableColumns = { kinds: string[]; numbers: number[]; dueDates: string[]; amounts: number[]; methods: (string | null)[] };
+
+/** What a closed order expects to receive: the down payment is number 0, the installments 1, 2, 3… */
+export function receivableColumns(plan: PaymentPlan): ReceivableColumns {
+  const columns: ReceivableColumns = { kinds: [], numbers: [], dueDates: [], amounts: [], methods: [] };
+  let installment = 0;
+  for (const receipt of plan.receipts) {
+    const down = receipt.label === DOWN_PAYMENT;
+    columns.kinds.push(down ? "entrada" : "parcela");
+    columns.numbers.push(down ? 0 : ++installment);
+    columns.dueDates.push(receipt.dueDate);
+    columns.amounts.push(receipt.amount);
+    columns.methods.push(receipt.method);
+  }
+  return columns;
 }
 
 /** What is missing for the order to be closed, in the words of the screen. Empty when it can go on to the policy. */

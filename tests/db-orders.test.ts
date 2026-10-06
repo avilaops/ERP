@@ -21,6 +21,7 @@ import {
 } from "@/lib/db/orders";
 import type { OrderPayment, OrderScope, OrderTerms } from "@/lib/db/orders";
 import { loadParams, saveParams } from "@/lib/db/params";
+import { listOpenReceivables, listReceipts, recordReceipt } from "@/lib/db/receivables";
 import { latestVersion, loadPublishedSnapshot, loadPublishedTable, publishPriceTable } from "@/lib/db/price-table";
 import { createProduct, listProducts, updateProduct } from "@/lib/db/products";
 import { closingProblems, directorOf, dueDates, paymentOf, saleOf } from "@/lib/order-quote";
@@ -752,6 +753,80 @@ test("aprovação: se o pedido mudou entre a leitura e a decisão, nada é grava
     "SELECT count(*)::int AS pending FROM order_approvals a JOIN orders o ON o.id = a.order_id WHERE o.number = '261004-RECU' AND a.status = 'pendente'",
   );
   assert.equal(rows[0].pending, 1);
+});
+
+test("recebimentos: o pedido fechado gera a entrada e as parcelas; a baixa grava o recebimento e a comissão", { skip }, async () => {
+  // O pedido do print, fechado com entrada de 30.000 e saldo em 2 parcelas.
+  const N = "260930-BBMN";
+  const open = (await listOpenReceivables(db.pool)).filter((item) => item.orderNumber === N);
+  assert.deepEqual(
+    open.map(({ label, dueDate, amount, method, customerName, sellerName }) => [label, dueDate, amount, method, customerName, sellerName]),
+    [
+      ["Entrada", "2026-09-30", 30000, "PIX", "Academia MA", SELLER.name],
+      ["1/2", "2026-10-30", 7613.33, "Boleto", "Academia MA", SELLER.name],
+      ["2/2", "2026-11-29", 7613.34, "Boleto", "Academia MA", SELLER.name],
+    ],
+  );
+  // O fechamento anterior, reaberto, não deixou sobra: são só estas três em aberto.
+  const all = await db.pool.query("SELECT r.status, count(*)::int AS n FROM receivables r JOIN orders o ON o.id = r.order_id WHERE o.number = $1 GROUP BY r.status", [N]);
+  assert.deepEqual(all.rows, [{ status: "aberta", n: 3 }]);
+
+  const [down, first] = open;
+  await assert.rejects(() => recordReceipt(down.id, { receivedOn: "2026-10-07", method: "PIX", note: null }, "financeiro@teste.local", "2026-10-06", db.pool), /não pode ser no futuro/);
+  await assert.rejects(() => recordReceipt(down.id, { receivedOn: "06/10/2026", method: "PIX", note: null }, "financeiro@teste.local", "2026-10-06", db.pool), /Informe a data/);
+
+  // Comissão: 30.000 ÷ 1,13 × 2% = 530,97, do mês de setembro, para pagar em 05/10.
+  assert.deepEqual(await recordReceipt(down.id, { receivedOn: "2026-09-30", method: " PIX ", note: " comprovante 123 " }, "financeiro@teste.local", "2026-10-06", db.pool), { commission: 530.97 });
+  const { rows } = await db.pool.query(
+    `SELECT p.amount::float AS amount, p.amount_without_ipi::float AS base, p.method, p.note, p.recorded_by,
+            to_char(p.received_at AT TIME ZONE 'America/Sao_Paulo', 'YYYY-MM-DD HH24:MI') AS received,
+            m.seller_email, m.amount::float AS commission, m.rate::float AS rate, m.base_amount::float AS commission_base,
+            to_char(m.competence, 'YYYY-MM-DD') AS competence, to_char(m.payment_due, 'YYYY-MM-DD') AS due, m.paid_at
+       FROM receipts p JOIN commissions m ON m.receipt_id = p.id WHERE p.receivable_id = $1`,
+    [down.id],
+  );
+  assert.deepEqual(rows, [
+    {
+      amount: 30000, base: 26548.67, method: "PIX", note: "comprovante 123", recorded_by: "financeiro@teste.local", received: "2026-09-30 12:00",
+      seller_email: SELLER.email, commission: 530.97, rate: 0.02, commission_base: 26548.67, competence: "2026-09-01", due: "2026-10-05", paid_at: null,
+    },
+  ]);
+  // Baixa não se repete, e o que foi recebido sai da lista.
+  await assert.rejects(() => recordReceipt(down.id, { receivedOn: "2026-09-30", method: null, note: null }, "financeiro@teste.local", "2026-10-06", db.pool), /não está mais em aberto/);
+  await assert.rejects(() => recordReceipt(999999, { receivedOn: "2026-09-30", method: null, note: null }, "financeiro@teste.local", "2026-10-06", db.pool), /não está mais em aberto/);
+  assert.deepEqual((await listOpenReceivables(db.pool)).filter((item) => item.orderNumber === N).map((item) => item.label), ["1/2", "2/2"]);
+
+  const past = await listReceipts(5, db.pool);
+  assert.deepEqual(
+    [past[0].orderNumber, past[0].receivedOn, past[0].amount, past[0].method, past[0].commission, past[0].recordedBy],
+    [N, "2026-09-30", 30000, "PIX", 530.97, "financeiro@teste.local"],
+  );
+
+  // Com valor recebido, o pedido não volta para negociação.
+  await assert.rejects(() => reopenOrder(N, DIRECTOR, ALL, db.pool), /já tem valor recebido e não pode ser reaberto/);
+  assert.equal((await order(N)).status, "fechado");
+  assert.equal(first.label, "1/2");
+});
+
+test("recebimentos: aprovado gera a receber; reaberto cancela o que estava em aberto; pedido em aprovação não gera nada", { skip }, async () => {
+  // 261004-APRV foi aprovado pelo gerente: entrada de 5.000 e saldo em 2 parcelas.
+  const approved = (await listOpenReceivables(db.pool)).filter((item) => item.orderNumber === "261004-APRV");
+  assert.deepEqual(approved.map((item) => [item.label, item.amount]), [["Entrada", 5000], ["1/2", 8350.6], ["2/2", 8350.61]]);
+  // 261004-RECU aguarda aprovação: nada a receber ainda.
+  assert.equal((await listOpenReceivables(db.pool)).filter((item) => item.orderNumber === "261004-RECU").length, 0);
+
+  await reopenOrder("261004-APRV", DIRECTOR, ALL, db.pool);
+  assert.equal((await listOpenReceivables(db.pool)).filter((item) => item.orderNumber === "261004-APRV").length, 0);
+  const cancelled = await db.pool.query("SELECT DISTINCT r.status FROM receivables r JOIN orders o ON o.id = r.order_id WHERE o.number = '261004-APRV'");
+  assert.deepEqual(cancelled.rows, [{ status: "cancelada" }]);
+
+  // Fechado de novo com outra condição: à vista. Fica só a entrada; as parcelas antigas seguem canceladas.
+  await savePayment("261004-APRV", { ...PAYMENT, downPayment: 21701.21, installmentCount: null, balanceMethod: null }, SELLER.email, MINE, db.pool);
+  assert.equal((await closeOrder("261004-APRV", SELLER.email, MINE, db.pool)).status, "fechado");
+  assert.deepEqual(
+    (await listOpenReceivables(db.pool)).filter((item) => item.orderNumber === "261004-APRV").map((item) => [item.label, item.amount]),
+    [["Entrada", 21701.21]],
+  );
 });
 
 test("a migração dos pedidos não tem cascata nem coluna de preço, custo ou total", () => {

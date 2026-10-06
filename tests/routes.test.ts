@@ -28,7 +28,7 @@ test("toda rota da matriz tem page.tsx que chama requirePermission com o própri
 });
 
 /** Pages already ported from the prototype. The others still say "Em construção". */
-const PORTED = ["parametros", "produtos", "tabela-precos", "clientes", "pedidos", "aprovacoes"];
+const PORTED = ["parametros", "produtos", "tabela-precos", "clientes", "pedidos", "aprovacoes", "recebimentos"];
 
 test("páginas portadas não são mais marcador; as outras continuam Em construção", () => {
   for (const item of MENU_ITEMS) {
@@ -39,7 +39,7 @@ test("páginas portadas não são mais marcador; as outras continuam Em constru�
       assert.ok(code.includes("PlaceholderPage"), `${item.href} deveria estar Em construção`);
     }
   }
-  assert.equal(MENU_ITEMS.filter((item) => !PORTED.includes(item.key)).length, 8);
+  assert.equal(MENU_ITEMS.filter((item) => !PORTED.includes(item.key)).length, 7);
 });
 
 /** Every source file under the protected group, relative to it. */
@@ -53,6 +53,7 @@ test("toda ação de servidor confere a permissão antes de qualquer outra coisa
   assert.ok(actions.includes("clientes/actions.ts"));
   assert.ok(actions.includes("pedidos/actions.ts"));
   assert.ok(actions.includes("aprovacoes/actions.ts"));
+  assert.ok(actions.includes("recebimentos/actions.ts"));
   for (const file of actions) {
     const code = readFileSync(APP_DIR + file, "utf8");
     // Each exported action opens with the check: nothing is read from the form or the database before it.
