@@ -47,6 +47,10 @@ export default async function ParametrosPage() {
         <Link href="/parametros/usuarios" className="font-medium text-brand underline">
           Usuários e perfis da equipe
         </Link>
+        {" · "}
+        <Link href="/parametros/formas-de-pagamento" className="font-medium text-brand underline">
+          Formas de pagamento
+        </Link>
       </p>
 
       <div className="mt-6 grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">

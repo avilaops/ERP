@@ -209,7 +209,8 @@ funções puras, sem banco e sem tela, conferidas com os números dos prints do 
     Pedido fechado ou aguardando não se altera: volta para negociação por `reopenOrder`, na
     mesma versão da tabela. Pedido que já foi fechado uma vez tem histórico
     (`order_closings`) e não se exclui. As formas de pagamento são a tabela
-    `payment_methods` da empresa, nunca lista no código.
+    `payment_methods` da empresa, nunca lista no código; a Diretoria as edita em
+    Parâmetros → Formas de pagamento (renomear, ordenar, desligar; nunca apagar).
 12. **Aprovação é `decideApproval`** (`src/lib/db/approvals.ts`): aprovar fecha o pedido,
     recusar exige motivo e devolve à negociação; pedido, pedido de aprovação e fechamento
     mudam num comando só. Quem decide e se pode aprovar pedido com prejuízo
