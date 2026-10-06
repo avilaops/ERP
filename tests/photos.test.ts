@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { crc32 } from "node:zlib";
 import sharp from "sharp";
 import {
   FORMAT_MESSAGE,
@@ -8,6 +9,7 @@ import {
   PhotoError,
   sniffFormat,
   TOO_LARGE_MESSAGE,
+  TOO_MANY_PIXELS_MESSAGE,
   UNREADABLE_MESSAGE,
 } from "@/lib/photos/normalize";
 
@@ -85,6 +87,28 @@ test("entrada de 15 MB + 1 byte é recusada antes de abrir a imagem", async () =
   const input = Buffer.alloc(MAX_UPLOAD_BYTES + 1);
   input.set([0xff, 0xd8, 0xff]);
   await assert.rejects(() => normalizePhoto(input), refused(TOO_LARGE_MESSAGE));
+});
+
+/** A small PNG whose header declares another size: nothing that large is ever allocated by the test. */
+async function pngDeclaring(width: number, height: number): Promise<Buffer> {
+  const png = await solid(8, 8, "#3366cc").png().toBuffer();
+  // Signature (8) + length (4) + "IHDR" (4), then width and height; the CRC covers "IHDR" and its 13 bytes.
+  png.writeUInt32BE(width, 16);
+  png.writeUInt32BE(height, 20);
+  png.writeUInt32BE(crc32(png.subarray(12, 29)), 29);
+  return png;
+}
+
+test("imagem acima de 50 megapixels é recusada com mensagem própria, sem ser decodificada", async () => {
+  const input = await pngDeclaring(8000, 6251);
+  const meta = await sharp(input, { limitInputPixels: false }).metadata();
+  assert.deepEqual([meta.width, meta.height], [8000, 6251], "a entrada do teste precisa declarar 50,008 MP");
+  assert.ok(input.length < 1024, "a recusa é pelos pixels, não pelo tamanho do arquivo");
+
+  await assert.rejects(() => normalizePhoto(input), refused(TOO_MANY_PIXELS_MESSAGE));
+  // No limite exato a recusa não é pelos pixels: o arquivo é que não tem os dados que declara.
+  const atLimit = await pngDeclaring(8000, 6250);
+  await assert.rejects(() => normalizePhoto(atLimit), refused(UNREADABLE_MESSAGE));
 });
 
 test("a mesma entrada dá sempre a mesma saída", async () => {

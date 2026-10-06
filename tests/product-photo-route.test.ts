@@ -146,6 +146,19 @@ test("GET: qualquer um dos quatro perfis recebe a foto; If-None-Match igual dá 
   assert.equal(cached.status, 304);
   assert.equal((await cached.arrayBuffer()).byteLength, 0);
   assert.equal((await get(productId, { "if-none-match": '"outro"' })).status, 200);
+
+  // Lista de ETags, forma fraca (um proxy acrescenta `W/`) e `*` também dão 304.
+  for (const header of [
+    `"outro", "${stored.sha256}"`,
+    `W/"${stored.sha256}"`,
+    `"outro" , W/"${stored.sha256}" ,"mais-um"`,
+    "*",
+  ]) {
+    assert.equal((await get(productId, { "if-none-match": header })).status, 304, header);
+  }
+  for (const header of ['"outro", W/"mais-um"', stored.sha256, `W/${stored.sha256}`, ""]) {
+    assert.equal((await get(productId, { "if-none-match": header })).status, 200, header);
+  }
 });
 
 test("GET: sem foto, produto inexistente ou id que não é inteiro positivo dá 404", { skip }, async () => {

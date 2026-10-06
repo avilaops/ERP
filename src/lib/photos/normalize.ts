@@ -17,6 +17,8 @@ export const MAX_STORED_BYTES = 1024 * 1024;
 export const FORMAT_MESSAGE = "Formato de imagem não aceito: use JPG, PNG ou WebP.";
 export const UNREADABLE_MESSAGE = "Não foi possível ler a imagem.";
 export const TOO_LARGE_MESSAGE = "Imagem grande demais: o limite é 15 MB.";
+export const TOO_MANY_PIXELS_MESSAGE = "Imagem com pixels demais: o limite é 50 megapixels. Reduza a foto e envie de novo.";
+export const TOO_HEAVY_MESSAGE = "A foto não coube em 1 MB depois de reduzida. Envie uma foto com menos detalhe ou menor.";
 
 /** A refusal the user can act on. The message goes to the screen as it is. */
 export class PhotoError extends Error {}
@@ -58,6 +60,10 @@ export async function normalizePhoto(input: Uint8Array): Promise<NormalizedPhoto
   if (sniffFormat(input) === null) throw new PhotoError(FORMAT_MESSAGE);
 
   try {
+    // Only the header is read here: the size is known before a pixel is decoded.
+    const { width = 0, height = 0 } = await sharp(input, { limitInputPixels: false }).metadata();
+    if (width * height > MAX_INPUT_PIXELS) throw new PhotoError(TOO_MANY_PIXELS_MESSAGE);
+
     for (const quality of QUALITIES) {
       const { data, info } = await sharp(input, { limitInputPixels: MAX_INPUT_PIXELS, failOn: "error" })
         .rotate()
@@ -74,8 +80,9 @@ export async function normalizePhoto(input: Uint8Array): Promise<NormalizedPhoto
         };
       }
     }
-  } catch {
+  } catch (error) {
+    if (error instanceof PhotoError) throw error;
     throw new PhotoError(UNREADABLE_MESSAGE);
   }
-  throw new PhotoError(UNREADABLE_MESSAGE);
+  throw new PhotoError(TOO_HEAVY_MESSAGE);
 }

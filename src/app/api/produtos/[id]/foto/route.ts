@@ -55,6 +55,18 @@ async function readLimited(request: Request): Promise<Uint8Array | null> {
   return Buffer.concat(chunks);
 }
 
+/**
+ * Whether `If-None-Match` names this ETag. The header may carry a list, `*`, or
+ * the weak form `W/"…"` a proxy adds; the comparison is the weak one (RFC 9110).
+ */
+function matchesEtag(header: string | null, etag: string): boolean {
+  if (header === null) return false;
+  return header.split(",").some((candidate) => {
+    const value = candidate.trim();
+    return value === "*" || value.replace(/^W\//, "") === etag;
+  });
+}
+
 export async function GET(request: Request, context: Context): Promise<Response> {
   const session = await getSession();
   if (!session) return UNAUTHENTICATED();
@@ -66,7 +78,7 @@ export async function GET(request: Request, context: Context): Promise<Response>
 
   const etag = `"${photo.sha256}"`;
   const headers = { ETag: etag, "Cache-Control": "private, no-cache" };
-  if (request.headers.get("if-none-match") === etag) return new Response(null, { status: 304, headers });
+  if (matchesEtag(request.headers.get("if-none-match"), etag)) return new Response(null, { status: 304, headers });
   return new Response(new Uint8Array(photo.bytes), {
     status: 200,
     headers: { ...headers, "Content-Type": photo.mimeType, "Content-Length": String(photo.bytes.length) },
