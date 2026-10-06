@@ -8,7 +8,7 @@ import { UFS } from "@/lib/pricing/states";
 
 type SaveAction = (state: CustomerFormState, formData: FormData) => Promise<CustomerFormState>;
 
-const INPUT = "mt-1 w-full min-w-0 rounded border bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-blue-600";
+const INPUT = "mt-1 w-full min-w-0 rounded border bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-brand";
 
 /**
  * The record of a customer. Only reads and shows text: what is required, the
@@ -134,7 +134,7 @@ export function CustomerForm({
         <button
           type="submit"
           disabled={pending}
-          className="rounded bg-blue-700 px-4 py-2 font-medium text-white hover:bg-blue-800 disabled:opacity-60"
+          className="rounded bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark disabled:opacity-60"
         >
           {pending ? "Gravando…" : "Salvar cliente"}
         </button>

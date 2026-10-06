@@ -34,9 +34,9 @@ const NONE = "—";
 const TERMS = "condicoes";
 const CARD = "rounded-lg border border-slate-200 bg-white";
 const TITLE = "text-sm font-semibold uppercase tracking-wide";
-const INPUT = "rounded border border-slate-300 bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-blue-600";
+const INPUT = "rounded border border-slate-300 bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-brand";
 const BUTTON = "rounded border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50";
-const PRIMARY = "rounded bg-blue-700 px-4 py-2 font-medium text-white hover:bg-blue-800";
+const PRIMARY = "rounded bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark";
 const HELP = "mt-1 text-xs text-slate-500";
 
 const BAND_COLORS = {
@@ -181,7 +181,7 @@ export default async function PedidoPage({
                             className={`${INPUT} w-16 py-1 text-right`}
                           />
                           {editable && (
-                            <button type="submit" className="rounded px-2 py-1 text-xs text-blue-700 hover:bg-slate-100">
+                            <button type="submit" className="rounded px-2 py-1 text-xs text-brand hover:bg-slate-100">
                               Alterar
                             </button>
                           )}

@@ -76,7 +76,7 @@ export function PasteCostsForm({ action, onClose }: { action: PasteAction; onClo
           aria-describedby="colar-ajuda"
           placeholder={"LD-B001\t8.146,64\t28,11565\nLD-B002\t8.738,77"}
           spellCheck={false}
-          className="w-full rounded border border-slate-300 px-3 py-2 font-mono text-sm outline-none focus:ring-2 focus:ring-blue-600"
+          className="w-full rounded border border-slate-300 px-3 py-2 font-mono text-sm outline-none focus:ring-2 focus:ring-brand"
         />
         {/* What was checked: applying a different text only checks it again. */}
         {preview && <input type="hidden" name="checked" value={state.text} />}
@@ -158,7 +158,7 @@ export function PasteCostsForm({ action, onClose }: { action: PasteAction; onClo
               name="intent"
               value="apply"
               disabled={pending}
-              className="rounded bg-blue-700 px-4 py-2 font-medium text-white hover:bg-blue-800 disabled:opacity-60"
+              className="rounded bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark disabled:opacity-60"
             >
               {state.rows.length === 1 ? "Aplicar 1 custo" : `Aplicar ${state.rows.length} custos`}
             </button>

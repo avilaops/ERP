@@ -1,7 +1,27 @@
 @import "tailwindcss";
 
+/* Identity of the prototype (prototype/ludus-comercial.html): the light palette and the two type families. */
+@theme {
+  --color-brand: #2c49a8;
+  --color-brand-dark: #223a86;
+  --color-brand-soft: #e4e9f8;
+  --font-display: var(--font-barlow-condensed), "Arial Narrow", Arial, sans-serif;
+  --font-sans: var(--font-plex-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
 body {
-  background: #f4f5f7;
-  color: #1c2230;
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: #edefeb;
+  color: #172120;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Page titles as in the prototype: condensed, upper case. */
+h1 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 2.125rem;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  text-wrap: balance;
 }

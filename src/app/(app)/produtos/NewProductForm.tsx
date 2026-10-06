@@ -73,7 +73,7 @@ export function NewProductForm({ action, onClose }: { action: CreateAction; onCl
                   defaultValue={values[key]}
                   aria-invalid={invalid || undefined}
                   aria-describedby={HELP[key] ? `${id}-ajuda` : undefined}
-                  className={`mt-1 w-full min-w-0 rounded border bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-blue-600 ${
+                  className={`mt-1 w-full min-w-0 rounded border bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-brand ${
                     numeric ? "text-right" : ""
                   } ${invalid ? "border-red-500" : "border-slate-300"}`}
                 />
@@ -91,7 +91,7 @@ export function NewProductForm({ action, onClose }: { action: CreateAction; onCl
           <button
             type="submit"
             disabled={pending}
-            className="rounded bg-blue-700 px-4 py-2 font-medium text-white hover:bg-blue-800 disabled:opacity-60"
+            className="rounded bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark disabled:opacity-60"
           >
             {pending ? "Gravando…" : "Salvar equipamento"}
           </button>

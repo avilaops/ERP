@@ -16,7 +16,7 @@ export default function NoAccessPage() {
       </p>
       {/* Plain link: a full navigation re-runs the access check on the server. */}
       {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-      <a href="/" className="text-blue-700 underline">
+      <a href="/" className="text-brand underline">
         Voltar ao início
       </a>
     </main>

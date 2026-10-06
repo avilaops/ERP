@@ -51,7 +51,7 @@ export function ParamsForm({ saved, action }: { saved: ParamsFormValues; action:
                     {field.label}
                   </label>
                   <div
-                    className={`mt-1 flex items-center rounded border bg-white focus-within:ring-2 focus-within:ring-blue-600 ${
+                    className={`mt-1 flex items-center rounded border bg-white focus-within:ring-2 focus-within:ring-brand ${
                       invalid ? "border-red-500" : "border-slate-300"
                     }`}
                   >
@@ -85,7 +85,7 @@ export function ParamsForm({ saved, action }: { saved: ParamsFormValues; action:
         <button
           type="submit"
           disabled={pending}
-          className="rounded bg-blue-700 px-4 py-2 font-medium text-white hover:bg-blue-800 disabled:opacity-60"
+          className="rounded bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark disabled:opacity-60"
         >
           {pending ? "Gravando…" : "Salvar parâmetros"}
         </button>

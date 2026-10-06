@@ -31,7 +31,7 @@ export default async function ClientePage({
 
   const [{ id }, query] = await Promise.all([params, searchParams]);
   const back = (
-    <Link href={ITEM.href} className="text-sm text-blue-700 underline">
+    <Link href={ITEM.href} className="text-sm text-brand underline">
       ← {ITEM.label}
     </Link>
   );

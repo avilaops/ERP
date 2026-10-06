@@ -12,18 +12,23 @@ export function Sidebar({ session }: { session: Session }) {
 
   return (
     <aside className="flex w-64 shrink-0 flex-col gap-4 border-r border-slate-200 bg-white p-4">
-      <p className="text-lg font-semibold">ERP Ludus</p>
+      {/* The logo is a mask, painted with the ink colour, as in the prototype. */}
+      <div
+        role="img"
+        aria-label="Ludus Equipamentos"
+        className="h-9 w-28 bg-slate-900 [mask:url(/logo-ludus.png)_left_center/contain_no-repeat]"
+      />
 
       <section className="rounded border border-slate-200 bg-slate-50 p-3" aria-label="Seu acesso">
         <p className="text-xs uppercase tracking-wide text-slate-500">Seu acesso</p>
-        <p className="truncate font-medium">{session.name}</p>
+        <p className="truncate font-display text-lg font-semibold uppercase leading-tight">{session.name}</p>
         <p className="text-sm text-slate-600">{ROLE_LABELS[session.role]}</p>
       </section>
 
       {canAccess(session.role, "pedidos") && (
         <Link
           href="/pedidos/novo"
-          className="rounded bg-blue-700 px-3 py-2 text-center font-medium text-white hover:bg-blue-800"
+          className="rounded bg-brand px-3 py-2 text-center font-medium text-white hover:bg-brand-dark"
         >
           + Novo pedido
         </Link>
@@ -31,7 +36,7 @@ export function Sidebar({ session }: { session: Session }) {
 
       <nav aria-label="Menu principal" className="flex flex-col">
         {items.map((item) => (
-          <Link key={item.key} href={item.href} className="rounded px-3 py-2 hover:bg-slate-100">
+          <Link key={item.key} href={item.href} className="rounded-lg px-3 py-2 font-medium text-slate-700 hover:bg-slate-100 hover:text-slate-900">
             {item.label}
           </Link>
         ))}

@@ -128,7 +128,7 @@ export default async function ProdutosPage({
                 defaultValue={search}
                 placeholder="Buscar nome, código ou fornecedor"
                 aria-label="Buscar nome, código ou fornecedor"
-                className="w-72 rounded border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-600"
+                className="w-72 rounded border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand"
               />
               <button type="submit" className="rounded border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50">
                 Buscar

@@ -48,7 +48,7 @@ export default async function TabelaPrecosPage({
           {costs && (
             <>
               {" "}
-              <Link href={menuItem("produtos").href} className="text-blue-700 underline">
+              <Link href={menuItem("produtos").href} className="text-brand underline">
                 Publicar em {menuItem("produtos").label}
               </Link>
             </>
@@ -77,7 +77,7 @@ export default async function TabelaPrecosPage({
                   name="v"
                   defaultValue={table.version}
                   aria-label="Versão da tabela"
-                  className="rounded border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-600"
+                  className="rounded border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand"
                 >
                   {versions.map((item) => (
                     <option key={item.version} value={item.version}>
@@ -92,7 +92,7 @@ export default async function TabelaPrecosPage({
                 defaultValue={search}
                 placeholder="Buscar nome ou código"
                 aria-label="Buscar nome ou código"
-                className="w-72 rounded border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-600"
+                className="w-72 rounded border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand"
               />
               <button type="submit" className="rounded border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50">
                 Buscar

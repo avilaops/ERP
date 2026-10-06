@@ -36,7 +36,7 @@ export default async function NovoPedidoPage() {
           {seesCosts(session.role) && (
             <>
               {" "}
-              <Link href={menuItem("produtos").href} className="text-blue-700 underline">
+              <Link href={menuItem("produtos").href} className="text-brand underline">
                 Publicar em {menuItem("produtos").label}
               </Link>
             </>
@@ -68,7 +68,7 @@ export default async function NovoPedidoPage() {
               id="productId"
               name="productId"
               required
-              className="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-blue-600"
+              className="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-brand"
             >
               {items.map((item) => (
                 <option key={item.productId} value={item.productId}>
@@ -87,10 +87,10 @@ export default async function NovoPedidoPage() {
               type="text"
               inputMode="numeric"
               defaultValue="1"
-              className="mt-1 w-20 rounded border border-slate-300 px-3 py-2 text-right outline-none focus:ring-2 focus:ring-blue-600"
+              className="mt-1 w-20 rounded border border-slate-300 px-3 py-2 text-right outline-none focus:ring-2 focus:ring-brand"
             />
           </div>
-          <button type="submit" className="rounded bg-blue-700 px-4 py-2 font-medium text-white hover:bg-blue-800">
+          <button type="submit" className="rounded bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark">
             Adicionar
           </button>
         </ActionForm>
