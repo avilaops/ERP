@@ -1,4 +1,4 @@
-# Produção do ERP no servidor apps-noclient, em /opt/erp. Sobe só a aplicação:
+# Produção do ERP no servidor applications, em /opt/erp. Sobe só a aplicação:
 # o banco é o PostgreSQL do próprio servidor, alcançado por host.docker.internal.
 # Publica apenas em 127.0.0.1; quem atende a internet é o Caddy (deploy/Caddyfile.snippet).
 services:

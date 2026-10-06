@@ -8,7 +8,7 @@ Como rodar, testar e o que falta para produção. Atualizado em 06/10/2026.
 | --- | --- |
 | Desenvolvimento (servidor `creators` da Ávila Ops) | No ar sob demanda: `npm run dev`, bancos `erp` e `erp_test` no PostgreSQL do servidor |
 | Integração contínua (GitHub Actions) | `.github/workflows/ci.yml`: lint, tipos, testes com banco e build, a cada push na `main` e em todo PR |
-| Produção | **No ar no servidor, ainda não acessível pela internet.** Container em `/opt/erp` no `apps-noclient`, banco `erp` criado, migrações aplicadas. Falta o Cloudflare apontar `erp.avilaops.com` para `204.168.249.111` (seção Produção) |
+| Produção | **No ar no servidor `applications`** (`178.105.82.48`), em `/opt/erp`. Falta o registro `erp` do Cloudflare apontar para ele; até lá o endereço cai na cópia antiga do `apps-noclient` (seção Produção) |
 
 ## Variáveis de ambiente
 
@@ -92,34 +92,35 @@ A cada push na `main` e em todo PR, o GitHub Actions sobe um PostgreSQL 16, inst
 dependências e roda lint, tipos, testes (falha se algum teste de banco for pulado) e build.
 **Não faz deploy.**
 
-## Produção: `erp.avilaops.com` no servidor `apps-noclient`
+## Produção: `erp.avilaops.com` no servidor `applications`
 
-O ERP roda em container no `apps-noclient` (`204.168.249.111`), em `/opt/erp`, na porta `3140`
-só em `127.0.0.1`. O Caddy do servidor atende `erp.avilaops.com` e repassa para ela. O banco é o
-PostgreSQL do próprio servidor, com um esquema por empresa.
+O ERP roda em container no `applications` (`178.105.82.48`, o servidor onde já ficam o Auth
+central e os demais sistemas da Ávila Ops), em `/opt/erp`, na porta `3140` só em `127.0.0.1`. Ele
+usa o que o servidor já tem: o Caddy atende `erp.avilaops.com` e repassa para a porta; o banco é
+o PostgreSQL do servidor (banco e role `erp`, um esquema por empresa); o backup é o
+`/usr/local/bin/backup-todos-bancos.sh`, que já inclui o banco `erp`.
 
-**Situação em 06/10/2026:** publicado no servidor com `deploy/subir.sh` (container `erp` saudável,
-banco `erp` com o esquema `tenant_ludus` migrado, bloco no Caddy, banco incluído no backup diário
-das 03:30). **Ainda não abre em `https://erp.avilaops.com`:** o endereço responde erro 525 do
-Cloudflare, porque o registro DNS dele lá não aponta para este servidor. Enquanto isso o Caddy não
-consegue emitir o certificado.
+**Situação em 06/10/2026:** publicado com `SERVIDOR=applications bash deploy/subir.sh` (container
+`erp` saudável, esquema `tenant_ludus` migrado, bloco no Caddy, banco no backup diário). Direto na
+origem, `/api/health` responde com certificado válido. **O endereço público ainda não chega
+aqui:** o registro `erp` no Cloudflare aponta para `204.168.249.111` (`apps-noclient`), onde ficou
+a primeira instalação, parada na revisão `5c58ebd`.
 
-Para destravar, no painel do Cloudflare (zona `avilaops.com`), o registro `erp` tem de ser:
-tipo A, valor `204.168.249.111`, **somente DNS** (nuvem cinza), como o `engops`. Em um ou dois
-minutos o Caddy emite o certificado sozinho. Se for para manter o proxy laranja, o desafio HTTP-01
-não passa ("Always Use HTTPS") e é preciso um certificado Origin CA em `/etc/caddy/certs`, como o
-da `partsagricola.com.br`.
+Para concluir, no painel do Cloudflare (zona `avilaops.com`), trocar o valor do registro A `erp`
+para `178.105.82.48`. Depois disso: conferir o login pelo Auth central e remover a instalação do
+`apps-noclient` (container, `/opt/erp`, bloco do Caddy, banco e a linha do backup de lá).
 
 Quem entra hoje: só `nicolas@avilaops.com`, como Diretoria da Ludus. Os outros usuários entram em
 `ERP_USERS`, no `/opt/erp/.env`, seguido de `docker compose up -d --force-recreate` em `/opt/erp`.
+O `SSO_JWT_SECRET` veio da primeira instalação e ainda não foi conferido contra o do Auth.
 
-O `/etc/caddy/Caddyfile` do servidor foi editado direto (backups `Caddyfile.bak-20261006-*` ao
-lado). O arquivo que o cabeçalho dele chama de fonte, no repositório do ArxisVR, já estava bem
-diferente do servidor e não foi alterado.
+O `/etc/caddy/Caddyfile` do servidor foi editado direto, no lugar do comentário que marcava o
+antigo ERP em Odoo (backup `Caddyfile.bak-20261006-082120-antes-erp-novo` ao lado). O roteiro de
+backup original está em `/opt/backups/backup-todos-bancos.sh.bak-20261006-antes-erp`.
 
 ### Preparar o servidor (uma vez)
 
-1. **Acesso:** a chave de quem publica autorizada no `apps-noclient` e um apelido `apps-noclient`
+1. **Acesso:** a chave de quem publica autorizada no `applications` e um apelido `applications`
    em `~/.ssh/config`. O servidor `creators` já tem os dois (usuário `root`), desde 06/10/2026.
 2. **Banco:** criar a role e o banco do ERP no PostgreSQL do servidor, aceitando conexão da
    rede do Docker (`172.17.0.0/16`), e incluir o banco no backup diário.
@@ -136,9 +137,7 @@ diferente do servidor e não foi alterado.
    - `ERP_USERS`: os e-mails reais, como `email:PERFIL@ludus`
    - sem `ERP_LOCAL_LOGIN` (em produção é ignorada de qualquer jeito)
 4. **Caddy:** colar `deploy/Caddyfile.snippet` em `/etc/caddy/Caddyfile`, validar e recarregar.
-5. **Cloudflare:** `erp.avilaops.com` já aponta para o Cloudflare; conferir que a origem é o
-   `204.168.249.111` e que o modo SSL é "Full (strict)". Hoje o endereço responde erro 525
-   porque não há quem atenda na origem.
+5. **Cloudflare:** o registro A `erp` da zona `avilaops.com` aponta para `178.105.82.48`.
 6. **Auth central:** o aplicativo `erp` já está cadastrado com `https://erp.avilaops.com`.
 
 ### Publicar

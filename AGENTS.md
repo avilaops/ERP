@@ -260,7 +260,7 @@ Arquivos temporários de agente: `.work/` (ignorado pelo Git).
 
 ## Produção
 
-`erp.avilaops.com`, no servidor `apps-noclient`, em container (`Dockerfile`, `deploy/`). Publica-se
+`erp.avilaops.com`, no servidor `applications` (o mesmo do Auth central), em container (`Dockerfile`, `deploy/`). Publica-se
 com `bash deploy/subir.sh`; os passos e as variáveis estão em `docs/operacao.md`. O build é feito
 fora do servidor e chega como `standalone.tgz`; a migração de cada empresa roda antes de o
 container novo subir. `/api/health` responde com a revisão no ar.

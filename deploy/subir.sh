@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Publica o ERP no apps-noclient: build local → standalone.tgz → /opt/erp →
+# Publica o ERP no servidor applications: build local → standalone.tgz → /opt/erp →
 # imagem de runtime → migração de cada empresa → docker compose up → conferência.
 # Só sai 0 se /api/health responder com a revisão enviada.
 #
@@ -7,7 +7,7 @@
 # Pré-requisitos (uma vez, ver docs/operacao.md): acesso por SSH ao servidor,
 # /opt/erp/.env preenchido, banco e bloco do Caddy criados.
 set -euo pipefail
-SERVIDOR="${SERVIDOR:-apps-noclient}"
+SERVIDOR="${SERVIDOR:-applications}"
 PASTA="/opt/erp"
 PORTA=3140
 cd "$(dirname "$0")/.."
