@@ -145,7 +145,25 @@ export default async function ProdutosPage({
             {search === "" ? "Nenhum equipamento nesta aba." : `Nenhum equipamento encontrado para "${search}".`}
           </p>
         ) : (
-          <div className="relative overflow-x-auto">
+          <>
+            {/* On a phone each equipment is a card that opens its own screen; the table is for wider screens. */}
+            <ul className="border-t border-slate-200 md:hidden">
+              {rows.map((row) => (
+                <li key={row.id} className="border-t border-slate-200 first:border-t-0">
+                  <Link href={`${ITEM.href}/${row.id}`} className="flex items-center justify-between gap-3 px-4 py-3 active:bg-slate-50">
+                    <span className="min-w-0">
+                      <span className="block truncate font-medium">{row.values.name}</span>
+                      <span className="block truncate text-xs text-slate-500">{[row.values.code || "sem código", row.supplier].filter(Boolean).join(" · ")}</span>
+                    </span>
+                    <span className="shrink-0 text-right">
+                      <span className="block font-semibold">{row.tableWithIpi ?? "sem custo"}</span>
+                      <span className="block text-xs text-slate-500">{row.tableWithIpi ? "tabela c/ IPI" : "toque para informar"}</span>
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          <div className="relative hidden overflow-x-auto md:block">
             <table className="w-full text-sm">
               <thead className="border-t border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>
@@ -176,6 +194,7 @@ export default async function ProdutosPage({
               </tbody>
             </table>
           </div>
+          </>
         )}
       </section>
     </>

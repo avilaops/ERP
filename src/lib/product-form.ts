@@ -148,3 +148,16 @@ export type RowState = ProductFormState<RowKey>;
 
 export const IDLE_NEW_PRODUCT: NewProductState = { status: "idle", errors: [], invalid: [], values: null };
 export const IDLE_ROW: RowState = { status: "idle", errors: [], invalid: [], values: null };
+
+/** What the screen of one equipment shows for a saved product: every field, as text. */
+export function productToForm(product: Product): ProductFormValues<NewProductKey> {
+  return {
+    ...productToRow(product),
+    supplierName: product.supplierName ?? "",
+    supplierModel: product.supplierModel ?? "",
+    supplierPriceUsd: product.supplierPriceUsd === null ? "" : formatMoney(product.supplierPriceUsd),
+  };
+}
+
+/** What saving the screen of one equipment answers: the id of what was saved, or what to fix. */
+export type ProductScreenResult = { ok: true; id: number } | { ok: false; errors: string[]; invalid: NewProductKey[] };

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import type { ReactNode } from "react";
 import type { PasteState } from "@/lib/advisory-paste";
@@ -39,11 +40,15 @@ export function ProductTools({
               aria-expanded={open === panel}
               aria-controls={controls}
               onClick={() => setOpen(open === panel ? null : panel)}
-              className="rounded border border-slate-300 bg-white px-4 py-2 font-medium hover:bg-slate-50"
+              className={`rounded border border-slate-300 bg-white px-4 py-2 font-medium hover:bg-slate-50 ${panel === "new" ? "hidden md:block" : ""}`}
             >
               {label}
             </button>
           ))}
+          {/* On a phone a new equipment has a screen of its own. */}
+          <Link href="/produtos/novo" className="rounded bg-brand px-4 py-2 font-medium text-white md:hidden">
+            + Equipamento
+          </Link>
         </div>
       </div>
 

@@ -339,6 +339,13 @@ abre e fecha): coluna à esquerda a partir de `md`, barra no topo com o botão "
 Tabela larga rola dentro do próprio cartão (`relative overflow-x-auto`; o `relative` segura os
 rótulos `sr-only`, que senão alargam a página). Campo com largura fixa só a partir de `sm`
 (`min-w-0 flex-1 sm:w-64 sm:flex-none`), e grade de uma coluna usa `grid-cols-[minmax(0,1fr)]`.
+**Cadastro no celular é uma tela só** (pedido do Nicolas em 06/10/2026, com exemplos): tela
+própria, poucos campos grandes, o resto dobrado em "Mais dados", e os botões de salvar presos
+no rodapé (`sticky bottom-0`, com `env(safe-area-inset-bottom)`). O modelo é
+`produtos/ProductScreen.tsx` (`/produtos/novo` e `/produtos/[id]`): foto, nome, código e custo;
+"Salvar" e "Salvar e adicionar outro". Lista com formulário por linha não serve no celular: vira
+cartões que abrem a tela do item. Campo de data tem regra em `globals.css` para não vazar do
+cartão no iPhone.
 A lista de pedidos vira cartões abaixo de `md`. O sistema é instalável na tela de início
 (`src/app/manifest.ts`, ícones em `public/icons/` e `src/app/*.png`); o manifesto é público e
 igual para todas as empresas, sem nome nem dado de nenhuma.

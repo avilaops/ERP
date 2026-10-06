@@ -19,7 +19,7 @@ import { latestVersion, loadPublishedSnapshot, PriceTableError, publishPriceTabl
 import { draftPriceTable, NOTHING_TO_PUBLISH, pendingChanges } from "@/lib/price-table";
 import type { PublishState } from "@/lib/price-table";
 import { NEW_PRODUCT_FIELDS, parseProductForm, rawProductValues, ROW_FIELDS } from "@/lib/product-form";
-import type { NewProductState, ProductFieldKey, RowState } from "@/lib/product-form";
+import type { NewProductState, ProductFieldKey, ProductScreenResult, RowState } from "@/lib/product-form";
 
 const FAILED = "Não foi possível gravar agora. Nada foi alterado; tente de novo.";
 
@@ -224,5 +224,27 @@ export async function publishPriceTableAction(_previous: PublishState, formData:
     if (error instanceof PriceTableError) return publishError(error.message);
     console.error("[produtos] falha ao publicar:", error instanceof Error ? error.message : error);
     return publishError(FAILED);
+  }
+}
+
+/**
+ * "Salvar equipamento" of the screen of one equipment, new or saved: every
+ * field at once. Answers with the id, so the screen can send the photo next.
+ */
+export async function saveProductScreenAction(formData: FormData): Promise<ProductScreenResult> {
+  const session = await requirePermission("produtos");
+  const conn = tenantDb(session.tenant.slug);
+
+  const read = reader(formData);
+  const parsed = parseProductForm(NEW_PRODUCT_FIELDS, read);
+  if (!parsed.ok) return { ok: false, errors: parsed.errors, invalid: parsed.invalid };
+
+  const id = read("id");
+  try {
+    const product = id ? await updateProduct(Number(id), parsed.input, session.email, conn) : await createProduct(parsed.input, session.email, conn);
+    revalidate();
+    return { ok: true, id: product.id };
+  } catch (error) {
+    return { ok: false, errors: [problem(id ? "alterar" : "cadastrar", error)], invalid: [] };
   }
 }
