@@ -41,7 +41,6 @@ Para incluir uma empresa:
 5. Reinicie a aplicação.
 
 Todas as empresas usam o mesmo endereço, `erp.avilaops.com`: o que separa uma da outra é o login.
-Os domínios `ludusequipamentos.com.br` e `.com` não são do ERP; ficam para o site institucional da Ludus.
 
 Quem pertence a mais de uma empresa escolhe em `/empresa` ("Trocar de empresa", no menu).
 

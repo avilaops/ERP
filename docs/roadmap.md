@@ -57,7 +57,7 @@ Para depois, quando a empresa crescer: CRM integrado ao WhatsApp Business com um
 
 | Pendência | Quem | Afeta | Observação |
 | --- | --- | --- | --- |
-| Colocar o sistema no ar em erp.avilaops.com | Ávila Ops | Fase 1 | Decidido em 06/10: o sistema fica no endereço da Ávila Ops; os domínios da Ludus são para o site institucional |
+| Colocar o sistema no ar em erp.avilaops.com | Ávila Ops | Fase 1 | Decidido em 06/10: o sistema fica no endereço da Ávila Ops |
 | Lista de usuários com nome, e-mail e perfil | Ludus | Fase 1 | E-mails corporativos ainda a combinar |
 | Fotos dos equipamentos com código e descrição | Ludus (videomaker) | Fase 3 | Enviar também o catálogo completo da China |
 | Entrada mínima da equipe: manter 65% ou subir para 70% | Rogério | Fase 2 | A regra nova sugere 70% no pior caso |

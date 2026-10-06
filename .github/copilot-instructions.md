@@ -1,9 +1,15 @@
-# ERP Ludus Equipamentos: instruções do projeto
+# ERP Ávila Ops: instruções do projeto
 
 ## Contexto
-O sistema é multi-empresa; a primeira empresa é a Ludus Equipamentos, e as regras de negócio abaixo são as dela. A Ludus Equipamentos importa equipamentos de musculação da China e vende para academias, studios e clientes finais. Empresa nova, CNPJ próprio, sem dados legados: o cadastro começa do zero.
+ERP comercial **multi-empresa** da Ávila Ops Tecnologia, servido em `https://erp.avilaops.com`. Cada empresa cliente entra pelo mesmo endereço e enxerga só os próprios dados.
 
-O dono (Rogério) montou um **protótipo funcional no Claude** (artifact React). Este repositório é a versão de produção, desenvolvida pela Ávila Ops Tecnologia. **O protótipo é a especificação de referência**: telas, textos, regras e cálculos devem se comportar igual a ele, salvo quando este arquivo disser o contrário. O código do protótipo fica em `prototype/` apenas como referência e nunca é importado pela aplicação.
+A primeira empresa é a **Ludus Equipamentos**, que importa equipamentos de musculação da China e vende para academias, studios e clientes finais. Empresa nova, CNPJ próprio, sem dados legados: o cadastro começa do zero. As regras de negócio deste arquivo nasceram dela, e os números citados (15%, 20%, 65%, alíquotas) são os **valores iniciais** dos Parâmetros dela, não constantes do sistema.
+
+O dono da Ludus (Rogério) montou um **protótipo funcional no Claude**. **O protótipo é a especificação de referência** das telas, textos, regras e cálculos, salvo quando este arquivo ou o `AGENTS.md` disserem o contrário. O código dele fica em `prototype/` apenas como referência e nunca é importado pela aplicação.
+
+**Dois princípios que valem para tudo:**
+- **Nada de uma empresa fica fixo no código.** Nome, logo, alíquotas, taxas, tabelas por estado e listas de regra vêm da empresa da sessão ou dos Parâmetros dela.
+- **Toda tabela de regra é editável** pela diretoria da empresa, em Parâmetros. Se a lei mudar, quem altera o número é o cliente. Se for escrever um número de negócio numa constante, falta um parâmetro.
 
 Documentação de negócio: `docs/manual/` (uma página por funcionalidade) e `docs/roadmap.md`. Inventário do protótipo, com as divergências entre ele, estas instruções e o código: `docs/copilot/inventario-prototipo.md`.
 
@@ -21,7 +27,7 @@ A descrição detalhada e as regras por pasta estão no [`AGENTS.md`](../AGENTS.
 - **Validação de formulário** em funções puras testadas, no servidor (`src/lib/*-form.ts`).
 - **npm** como gerenciador de pacotes.
 - **Banco de desenvolvimento:** PostgreSQL do servidor da Ávila Ops; fora dele, `docker compose up -d` sobe um PostgreSQL 16 local (só o banco, não a aplicação).
-- **Endereço do sistema:** `https://erp.avilaops.com`, o mesmo para todas as empresas. Não há domínio por empresa no ERP (os domínios `ludusequipamentos.com.br` e `.com` são para o site institucional da Ludus, outro projeto).
+- **Endereço do sistema:** `https://erp.avilaops.com`, o mesmo para todas as empresas. Não há domínio por empresa.
 
 **Não use, e não sugira:** Prisma ou outro ORM, `Prisma.Decimal`, SQLite, Zod, React Hook Form, Vitest, Playwright, pnpm, `src/modules/`, `organization_id`, `audit_log`, exclusão lógica (`deleted_at`). Nada disso existe no projeto.
 
@@ -56,9 +62,9 @@ A descrição detalhada e as regras por pasta estão no [`AGENTS.md`](../AGENTS.
 
 Permissão checada no servidor em toda action e query. Campos sensíveis (custo, valor China, lucro, margem) **nunca** são serializados para o client de quem não tem permissão (`VENDEDOR`, `GERENTE_COMERCIAL` e `FINANCEIRO`); não basta esconder na tela.
 
-## Regras de negócio (iguais ao protótipo)
+## Regras de negócio (as da Ludus, iguais ao protótipo)
 
-### Parâmetros (editáveis pela diretoria; valores iniciais)
+### Parâmetros (editáveis pela diretoria de cada empresa; abaixo, os valores iniciais da Ludus)
 - Lucro líquido alvo por venda: 15% (sobre o valor com desconto, depois de impostos, DIFAL, taxas, equipamento e IRPJ/CSLL)
 - Desconto livre do vendedor: 20%
 - Margem de segurança da importação: 5% (soma no custo de todos os equipamentos)

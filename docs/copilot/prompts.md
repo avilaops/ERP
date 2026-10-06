@@ -1,8 +1,8 @@
-# Prompts para o Copilot: ERP Ludus
+# Prompts para o Copilot: ERP Ávila Ops
 
 O contexto permanente está em [`.github/copilot-instructions.md`](../../.github/copilot-instructions.md), que o Copilot lê sozinho em toda conversa, e as regras por pasta estão no [`AGENTS.md`](../../AGENTS.md). Use os prompts abaixo no Copilot Chat em modo Agent, um por vez, na ordem do [roadmap](../roadmap.md).
 
-Revisto em 06/10/2026 para a stack que está no código: PostgreSQL com `pg` e SQL direto (migrações em `db/migrations/`), `src/lib/` e `src/app/(app)/`, npm, testes com o executor do Node, endereço `erp.avilaops.com`. Não há Prisma, SQLite, Vitest, Playwright, pnpm, `src/modules/`, `organization_id` nem `audit_log`.
+Revisto em 06/10/2026 para a stack que está no código: PostgreSQL com `pg` e SQL direto (migrações em `db/migrations/`), `src/lib/` e `src/app/(app)/`, npm, testes com o executor do Node, endereço `erp.avilaops.com`. Não há Prisma, SQLite, Vitest, Playwright, pnpm, `src/modules/`, `organization_id` nem `audit_log`. O sistema é multi-empresa, com um esquema do banco por empresa: toda tela e ação usa `tenantDb(session.tenant.slug)`, e nada de uma empresa fica fixo no código.
 
 Todo prompt termina do mesmo jeito: `npm run lint`, `npm run typecheck`, `npm test` (nenhum teste pulado) e `npm run build`, e commit direto na `main`.
 
