@@ -6,7 +6,8 @@ import { pgErrorCode } from "@/lib/db/pool";
 import type { Queryable } from "@/lib/db/pool";
 import { loadPublishedSnapshot, loadPublishedTable } from "@/lib/db/price-table";
 import { isoDate } from "@/lib/format";
-import { closingProblems, engineOrder, paymentOf, receivableColumns, saleOf } from "@/lib/order-quote";
+import { closingProblems, engineOrder, paymentOf, receivableColumns, saleOf, simulatedOrder } from "@/lib/order-quote";
+import type { Simulation } from "@/lib/order-quote";
 import { ORDER_NUMBER } from "@/lib/order-number";
 import { assertAmount } from "@/lib/pricing/money";
 import { orderBand, policyCheck, quoteSale } from "@/lib/pricing/order";
@@ -360,6 +361,19 @@ export async function loadOrderStanding(order: Order, conn: Queryable): Promise<
     band,
     policy: policyCheck({ discount: order.discount, downPayment: order.downPayment, invoiceTotal, band }, snapshot.params),
   };
+}
+
+/**
+ * The band of a simulated sale, for who does not see costs: the costs of the
+ * version are used here, on the server, and only the name of the band leaves.
+ * `null` without a delivery state.
+ */
+export async function simulationBand(version: number, simulation: Simulation, conn: Queryable): Promise<DiscountBand | null> {
+  if (simulation.deliveryUf === null) return null;
+  const snapshot = await loadPublishedSnapshot(version, conn);
+  if (!snapshot) throw new Error(`Tabela v${version} não encontrada.`);
+  const input = engineOrder(simulatedOrder(simulation, new Date()), snapshot);
+  return input ? orderBand(input, snapshot.params) : null;
 }
 
 export type OrderPayment = {

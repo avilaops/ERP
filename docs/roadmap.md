@@ -71,9 +71,9 @@ O maior risco é o prazo de 30/10 para começar a vender. Ele depende do servido
 
 - [x] Proposta aprovada e entrada paga
 - [x] Acesso ao protótipo, ficha cadastral e logos recebidos
-- [ ] Servidor no ar em erp.avilaops.com
+- [x] Servidor no ar em erp.avilaops.com
 - [x] Login com os quatro perfis funcionando
-- [ ] Protótipo portado e validado com um pedido de teste
+- [ ] Protótipo portado e validado com um pedido de teste (portado em 06/10: todas as telas do menu no ar; falta a validação do Rogério com um pedido de teste)
 - [ ] Equipamentos cadastrados com fotos
 - [ ] Equipe treinada e sistema em operação (30/10)
 - [ ] ICMS e DIFAL de importados validados com o contador

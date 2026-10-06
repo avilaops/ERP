@@ -72,6 +72,11 @@ export function confirmsRefunds(role: Role): boolean {
   return role === "DIRETORIA";
 }
 
+/** Who sets the sales goals. Everyone else with Preços e metas only follows them. */
+export function setsGoals(role: Role): boolean {
+  return role === "DIRETORIA";
+}
+
 /** Who may approve an order that gives a loss. Everyone else with Aprovações decides only orders with profit. */
 export function approvesAtLoss(role: Role): boolean {
   return role === "DIRETORIA";

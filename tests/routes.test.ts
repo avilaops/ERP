@@ -27,8 +27,8 @@ test("toda rota da matriz tem page.tsx que chama requirePermission com o própri
   }
 });
 
-/** Pages already ported from the prototype. The others still say "Em construção". */
-const PORTED = ["parametros", "produtos", "tabela-precos", "clientes", "pedidos", "aprovacoes", "recebimentos", "comissoes", "contas-pagar", "fornecedores"];
+/** Every item of the menu is a real screen now: none is a placeholder. */
+const PORTED = MENU_ITEMS.map((item) => item.key);
 
 test("páginas portadas não são mais marcador; as outras continuam Em construção", () => {
   for (const item of MENU_ITEMS) {
@@ -39,7 +39,7 @@ test("páginas portadas não são mais marcador; as outras continuam Em constru�
       assert.ok(code.includes("PlaceholderPage"), `${item.href} deveria estar Em construção`);
     }
   }
-  assert.equal(MENU_ITEMS.filter((item) => !PORTED.includes(item.key)).length, 4);
+  assert.equal(MENU_ITEMS.filter((item) => !PORTED.includes(item.key)).length, 0);
 });
 
 /** Every source file under the protected group, relative to it. */
@@ -57,6 +57,7 @@ test("toda ação de servidor confere a permissão antes de qualquer outra coisa
   assert.ok(actions.includes("comissoes/actions.ts"));
   assert.ok(actions.includes("contas-pagar/actions.ts"));
   assert.ok(actions.includes("fornecedores/actions.ts"));
+  assert.ok(actions.includes("precos-metas/actions.ts"));
   for (const file of actions) {
     const code = readFileSync(APP_DIR + file, "utf8");
     // Each exported action opens with the check: nothing is read from the form or the database before it.
@@ -203,6 +204,29 @@ test("usuários: só quem tem Parâmetros cadastra, e quem altera sai da sessão
   assert.equal(actions.split('await requirePermission("parametros")').length - 1, 2);
   assert.ok(actions.includes("createUser(parsed.user, session.email, conn)"));
   assert.ok(actions.includes("session.email, conn)"));
+});
+
+test("Dashboard, Preços e metas e Simulador: custo e lucro só para quem pode ver, decidido pela sessão", () => {
+  for (const route of ["/dashboard", "/precos-metas", "/simulador"]) {
+    const code = source(route);
+    assert.ok(code.includes('export const dynamic = "force-dynamic"'), route);
+    assert.doesNotMatch(code, /"DIRETORIA"|use cache|unstable_cache/, route);
+    assert.doesNotMatch(code, /seesCosts\((?!session\.role\))/, route);
+    const decides = code.indexOf("seesCosts(session.role)");
+    assert.ok(decides > code.indexOf("await requirePermission("), route);
+    // Tudo o que revela custo ou lucro vem depois da decisão, e só dentro dela.
+    for (const costly of ["ordersProfit(", "loadPublishedSnapshot(", "loadParams(", "listProductCosts(", "listCommissionsDue("]) {
+      const at = code.indexOf(costly);
+      if (at !== -1 && route !== "/dashboard") assert.ok(at > decides, `${route}: ${costly} antes de seesCosts`);
+    }
+  }
+  assert.ok(source("/dashboard").indexOf("ordersProfit(") > source("/dashboard").indexOf("seesCosts(session.role)"));
+  // No simulador a equipe recebe só o nome da faixa.
+  assert.ok(source("/simulador").includes("simulationBand(latest.version, simulation, conn)"));
+  const goals = readFileSync(`${APP_DIR}precos-metas/actions.ts`, "utf8");
+  assert.ok(goals.includes("if (!setsGoals(session.role)) return"));
+  assert.ok(goals.indexOf("setsGoals(session.role)") < goals.indexOf("saveGoal("));
+  assert.doesNotMatch(goals, /text\("month"\)/);
 });
 
 test("comissões e estorno: o escopo e quem decide saem da sessão", () => {

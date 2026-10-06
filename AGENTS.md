@@ -272,6 +272,18 @@ guardada no banco da empresa (`product_photos`), nunca em disco nem em `public/`
    custo, e nunca toca em custo, crédito, embalagem nem `active`. O formato da pasta está
    no `README.md`.
 
+## Dashboard, Preços e metas, Simulador e Equipe
+
+Todos os itens do menu são telas de verdade; não há mais marcador "Em construção". Os números
+saem de funções puras com teste (`src/lib/dashboard-view.ts`): o pedido conta como fechado no mês
+em que fechou e, no funil, no mês em que foi criado. **Lucro, meta, multiplicador, desconto máximo
+por destino e ponto de equilíbrio só são lidos para quem `seesCosts`** (`ordersProfit`,
+`loadParams`, `loadPublishedSnapshot` ficam depois dessa decisão na página; `tests/routes.test.ts`
+confere). No Simulador a equipe recebe só o nome da faixa (`simulationBand`) e nada é gravado. As
+metas de venda (`sales_goals`, uma da equipe e uma por vendedor em cada mês) são definidas só pela
+Diretoria (`setsGoals`), sempre para o mês corrente. Os gráficos são `src/components/Charts.tsx`,
+componentes de servidor em CSS, sem biblioteca.
+
 ## Contas a pagar e fornecedores
 
 Diretoria e Financeiro. Fornecedor (`src/lib/db/suppliers.ts`) é empresa, pessoa ou exterior

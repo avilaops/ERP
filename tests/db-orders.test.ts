@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { after, before, test } from "node:test";
 import { decideApproval, lastDecision, listPastDecisions, listPendingApprovals } from "@/lib/db/approvals";
 import { createCustomer } from "@/lib/db/customers";
+import { listDashboardOrders, ordersProfit } from "@/lib/db/dashboard";
 import {
   addOrderItem,
   closeOrder,
@@ -18,6 +19,7 @@ import {
   saveOrderTerms,
   savePayment,
   setOrderItemQuantity,
+  simulationBand,
 } from "@/lib/db/orders";
 import type { OrderPayment, OrderScope, OrderTerms } from "@/lib/db/orders";
 import { loadParams, saveParams } from "@/lib/db/params";
@@ -933,6 +935,40 @@ test("estorno: pedido com motivo, confirmado pela diretoria; o valor volta a rec
   await recordReceipt(entrada.id, { receivedOn: "2026-11-03", method: "PIX", note: null }, FINANCE, "2026-11-04", db.pool);
   assert.deepEqual(await payCommissions(SELLER.email, "2026-11", FINANCE, db.pool), { paid: 134.75, entries: 3 });
   assert.deepEqual([...(await listCarriedBalances("2026-12", null, db.pool))], []);
+});
+
+test("dashboard: cada pedido com datas, vendedor, destino e itens; o lucro soma os fechados com o custo da versão de cada um", { skip }, async () => {
+  const all = await listDashboardOrders(ALL, db.pool);
+  const printed = all.find((item) => item.number === "260930-BBMN");
+  assert.ok(printed);
+  assert.deepEqual(
+    [printed.status, printed.sellerName, printed.deliveryUf, printed.discount, printed.ipi, /^\d{4}-\d{2}-\d{2}$/.test(printed.createdOn), printed.closedOn === printed.createdOn],
+    ["fechado", SELLER.name, "MA", 0, 0.13, true, true],
+  );
+  assert.deepEqual(printed.items, [
+    { name: "Equipamento LD-B001", quantity: 1, tableUnitPrice: 19204.61 },
+    { name: "Equipamento LD-B002", quantity: 1, tableUnitPrice: 20818.99 },
+  ]);
+  assert.ok((await listDashboardOrders(THEIRS, db.pool)).every((item) => item.sellerEmail === OTHER_SELLER.email));
+  // Nada de custo na leitura do dashboard.
+  assert.doesNotMatch(JSON.stringify(all), /cost|profit|china/i);
+
+  // O lucro do pedido do print é o do quadro do diretor: 8.117,99 sobre 40.023,60.
+  const profit = await ordersProfit(["260930-BBMN", "999999-NADA"], db.pool);
+  assert.deepEqual([profit.netSale.toFixed(2), profit.netProfit.toFixed(2)], ["40023.60", "8117.99"]);
+  assert.deepEqual(await ordersProfit([], db.pool), { netSale: 0, netProfit: 0 });
+});
+
+test("simulador: a equipe recebe só o nome da faixa, calculado no servidor", { skip }, async () => {
+  const base = { productId: ID["LD-B001"], quantity: 1, deliveryUf: "MA" as const, taxpayer: false, freight: 0 };
+  assert.equal(await simulationBand(1, { ...base, discount: 0 }, db.pool), "na-meta");
+  assert.equal(await simulationBand(1, { ...base, discount: 0.3 }, db.pool), "abaixo-da-meta");
+  assert.equal(await simulationBand(1, { ...base, discount: 0.6 }, db.pool), "prejuizo");
+  // Frete por nossa conta pesa na faixa; sem estado não há faixa.
+  assert.equal(await simulationBand(1, { ...base, discount: 0.15 }, db.pool), "na-meta");
+  assert.equal(await simulationBand(1, { ...base, discount: 0.15, freight: 5000 }, db.pool), "prejuizo");
+  assert.equal(await simulationBand(1, { ...base, discount: 0, deliveryUf: null }, db.pool), null);
+  await assert.rejects(() => simulationBand(1, { ...base, productId: ID["LD-B009"], discount: 0 }, db.pool), /não está na tabela v1/);
 });
 
 test("a migração dos pedidos não tem cascata nem coluna de preço, custo ou total", () => {

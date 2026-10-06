@@ -56,6 +56,25 @@ export function engineOrder(order: OrderData, snapshot: PublishedSnapshot): Orde
   };
 }
 
+/** A sale that is only being tried out: one product of a published table, nothing written. */
+export type Simulation = { productId: number; quantity: number; discount: number; deliveryUf: Order["deliveryUf"]; taxpayer: boolean; freight: number };
+
+/** The simulation in the shape the functions of the order take. `at` is the moment it is made. */
+export function simulatedOrder(simulation: Simulation, at: Date): OrderData & Pick<Order, "downPayment"> {
+  return {
+    items: [{ productId: simulation.productId, quantity: simulation.quantity }],
+    discount: simulation.discount,
+    deliveryUf: simulation.deliveryUf,
+    taxpayer: simulation.taxpayer,
+    freight: simulation.freight,
+    productionDays: null,
+    downPaymentDate: null,
+    downPayment: 0,
+    updatedAt: at,
+    closedAt: null,
+  };
+}
+
 /** The "Só o diretor vê" board and the limits of the discount. */
 export type DirectorBoard = { quote: OrderQuote; max: MaxDiscounts; targetNetProfit: number };
 
