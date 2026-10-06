@@ -49,5 +49,6 @@ conta() { printf '%s\n' "$LISTA" | grep -cE "$1" || true; }
 [ "$(conta '^\./node_modules/sharp/package\.json$')" = "1" ] || { echo "! sem o pacote sharp (a foto do equipamento não gravaria)"; exit 1; }
 [ "$(conta '^\./node_modules/@img/sharp-linux-x64/lib/sharp-linux-x64\.node$')" = "1" ] || { echo "! sem o binário nativo do sharp (@img/sharp-linux-x64)"; exit 1; }
 [ "$(conta '^\./node_modules/@img/sharp-libvips-linux-x64/lib/libvips-cpp\.so')" != "0" ] || { echo "! sem a libvips do sharp (@img/sharp-libvips-linux-x64)"; exit 1; }
+[ "$(conta '^\./public/icons/icon-512\.png$')" = "1" ] || { echo "! sem os ícones do aplicativo (public/icons)"; exit 1; }
 echo "· $(du -h "$SAIDA" | cut -f1) em $SAIDA"
 echo "$SAIDA"

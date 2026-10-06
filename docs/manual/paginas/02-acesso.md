@@ -18,7 +18,12 @@ Como entrar no sistema e o que cada perfil pode ver e fazer.
 
 > **Observação**
 >
-> No celular, use o menu do navegador e escolha "Adicionar à tela de início". O sistema passa a abrir como um aplicativo.
+> Para instalar no celular:
+>
+> - **Android (Chrome):** toque no menu ⋮ e escolha "Instalar aplicativo" ou "Adicionar à tela inicial".
+> - **iPhone (Safari):** toque no botão Compartilhar e escolha "Adicionar à Tela de Início".
+>
+> O sistema passa a abrir como um aplicativo, com o ícone ERP.
 
 ## Perfis de acesso
 
@@ -36,4 +41,4 @@ O cadastro de usuários e a troca de perfil são feitos pela diretoria em [Equip
 Na tela de entrada, clique em "Esqueceu a senha?" e siga o link enviado para o seu e-mail. Se o e-mail não chegar, fale com a diretoria ou com a Ávila Ops.
 
 ---
-*Atualizado em 04/10/2026 · Ávila Ops Tecnologia*
+*Atualizado em 06/10/2026 · Ávila Ops Tecnologia*

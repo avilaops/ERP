@@ -74,7 +74,11 @@ export async function GET(_request: Request, context: Context): Promise<Response
     const { photo } = product;
     if (!photo) continue;
     // A photo that cannot be read does not stop the quotation: its frame stays empty.
-    const small = await thumbnail(photo, PHOTO_SIDE).catch(() => null);
+    const small = await thumbnail(photo, PHOTO_SIDE).catch(() => {
+      // Left in the log so someone can find which photo to send again; the answer does not change.
+      console.warn(`[orcamento] a miniatura do produto ${productId} falhou; o quadro sai vazio`);
+      return null;
+    });
     if (small) photos.set(productId, small);
     // The stored bytes (up to 1 MB each) are let go here, not held until the PDF is done.
     product.photo = null;

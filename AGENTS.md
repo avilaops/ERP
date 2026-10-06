@@ -331,7 +331,8 @@ O botão **Salvar PDF** do pedido abre o orçamento para o cliente, em A4.
    bytes. Caractere que a fonte não tem vira `?`.
 4. **A foto entra sempre reduzida por `thumbnail`** (`src/lib/photos/normalize.ts`), uma por vez.
    Feita a miniatura, a rota solta os bytes da foto gravada; foto que não abre deixa o quadro
-   vazio, sem derrubar o PDF. O nome do equipamento para em 4 linhas e a descrição em 3, com "…".
+   vazio, sem derrubar o PDF, e um `console.warn` com o id do produto no registro. O nome do
+   equipamento para em 4 linhas e a descrição em 3, com "…".
    Descrição e foto são as do cadastro de hoje (`loadQuoteProducts`); nome, código e preço são
    os da versão da tabela do pedido.
 5. **A logo e o nome são os da empresa da sessão** (`loadLogo`, passada por `logoPng`; sem logo
@@ -356,6 +357,12 @@ cartão no iPhone.
 A lista de pedidos vira cartões abaixo de `md`. O sistema é instalável na tela de início
 (`src/app/manifest.ts`, ícones em `public/icons/` e `src/app/*.png`); o manifesto é público e
 igual para todas as empresas, sem nome nem dado de nenhuma.
+Nome, cores e a lista de ícones do aplicativo têm fonte única em `src/lib/app-identity.ts`
+(manifesto e `layout.tsx` leem de lá). **Manifesto e ícone são do produto, nunca da empresa:** o
+celular os busca sem sessão. Ícone novo entra em `APP_ICONS`, sem transparência e, se mascarável,
+com o desenho dentro do quadrado central de 60%; `tests/app-install.test.ts` confere. **Não há
+service worker nem uso offline:** guardar tela de uma empresa no aparelho é risco de vazamento
+entre empresas.
 
 ## Git
 

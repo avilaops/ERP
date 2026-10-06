@@ -77,6 +77,6 @@ O maior risco é o prazo de 30/10 para começar a vender. Ele depende do servido
 - [ ] Equipamentos cadastrados com fotos
 - [ ] Equipe treinada e sistema em operação (30/10)
 - [ ] ICMS e DIFAL de importados validados com o contador
-- [ ] Orçamento em PDF com foto e uso no celular
+- [x] Orçamento em PDF com foto e uso no celular
 - [ ] Decisão sobre NF-e (certificado A1 e emissor)
 - [ ] Fim dos 3 meses de evolução (30/01/2027)

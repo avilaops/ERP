@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
-import { after, before, test } from "node:test";
+import { after, before, mock, test } from "node:test";
 import pg from "pg";
 import { PDFDocument } from "pdf-lib";
 import sharp from "sharp";
@@ -216,10 +216,16 @@ test("foto gravada que não abre: o PDF sai assim mesmo, com o quadro dela vazio
   assert.equal(rows.length, 1);
   const broken = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(600, 0x41)]);
   await conn.query("UPDATE product_photos SET bytes = $1 WHERE product_id = $2", [broken, rows[0].product_id]);
+  const warn = mock.method(console, "warn", () => {});
   try {
     const response = await get(ORDER);
     assert.equal(response.status, 200);
     assert.equal(response.headers.get("content-type"), "application/pdf");
+    // Fica no registro qual produto está com a foto estragada, e só isso: nem bytes, nem o erro da imagem.
+    assert.deepEqual(
+      warn.mock.calls.map((call) => call.arguments),
+      [[`[orcamento] a miniatura do produto ${rows[0].product_id} falhou; o quadro sai vazio`]],
+    );
     const bytes = new Uint8Array(await response.arrayBuffer());
     assert.equal(Buffer.from(bytes.subarray(0, 5)).toString("latin1"), "%PDF-");
     // Uma imagem a menos (a foto); o resto do orçamento está inteiro.
@@ -229,8 +235,13 @@ test("foto gravada que não abre: o PDF sai assim mesmo, com o quadro dela vazio
   } finally {
     await conn.query("UPDATE product_photos SET bytes = $1 WHERE product_id = $2", [rows[0].bytes, rows[0].product_id]);
   }
-  // Com a foto de volta, ela volta ao PDF.
-  assert.equal(pdfImages(new Uint8Array(await (await get(ORDER)).arrayBuffer())), before);
+  // Com a foto de volta, ela volta ao PDF e nada mais é registrado.
+  try {
+    assert.equal(pdfImages(new Uint8Array(await (await get(ORDER)).arrayBuffer())), before);
+    assert.equal(warn.mock.callCount(), 1);
+  } finally {
+    warn.mock.restore();
+  }
 });
 
 test("pedido de outro vendedor, inexistente, de outra empresa ou com número torto: 404", { skip }, async () => {
