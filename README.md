@@ -33,8 +33,46 @@ Para ver as telas na própria máquina sem depender disso, descomente `ERP_LOCAL
 | `npm run typecheck` | Confere os tipos do TypeScript. |
 | `npm test` | Roda os testes automatizados (os de banco usam `ERP_TEST_DATABASE_URL`, de `.env.test.local`). |
 | `npm run db:migrate` | Cria o esquema de cada empresa de `ERP_TENANTS` e aplica as migrações pendentes de `db/migrations/` em todos. Rodar de novo não muda nada. |
+| `npm run db:import-products -- <pasta> --empresa <identificador> [--apply]` | Carrega em lote equipamentos, descrições e fotos numa empresa. Sem `--apply` só confere e mostra o que faria. |
 
 O login é feito pelo Auth central da Ávila Ops, e o perfil de cada pessoa (Diretoria, Gerente comercial, Vendedor ou Financeiro) é definido dentro do ERP. Em desenvolvimento, com `ERP_LOCAL_LOGIN=1` no `.env.local`, `/dev/login` entra com um usuário de teste por perfil. Detalhes e regras para quem mexe no código estão no [`AGENTS.md`](AGENTS.md).
+
+## Carga em lote de equipamentos e fotos
+
+Para cadastrar de uma vez os equipamentos de uma empresa, com descrição e foto:
+
+```bash
+npm run db:import-products -- /caminho/da/pasta --empresa ludus           # só confere, não grava
+npm run db:import-products -- /caminho/da/pasta --empresa ludus --apply   # grava
+```
+
+`--empresa` é obrigatório e tem de ser um identificador de `ERP_TENANTS`. O comando mostra o banco e a empresa de destino antes de qualquer coisa.
+
+A pasta tem este formato:
+
+```text
+pasta/
+  equipamentos.csv
+  fotos/
+    LD-B001.jpg
+    LD-B002.png
+```
+
+`equipamentos.csv` é UTF-8, separado por `;`, com cabeçalho na primeira linha. Colunas obrigatórias: `codigo`, `nome` e `descricao` (a descrição pode vir vazia). Opcionais: `fornecedor`, `modelo` e `preco_usd` (`1234.56` ou `1.234,56`). Texto com `;` ou quebra de linha vai entre aspas duplas. Exemplo:
+
+```csv
+codigo;nome;descricao;fornecedor;modelo;preco_usd
+LD-B001;MESA FLEXORA - BATERIA DE PESOS;"Estrutura em aço; bateria de 100 kg";DHZ;SM5001;605
+LD-B002;CADEIRA EXTENSORA;;;;
+```
+
+Cada foto se chama `<codigo>.jpg`, `.jpeg`, `.png` ou `.webp`, sem diferenciar maiúsculas, e fica direto em `fotos/` (subpasta não é lida). Uma foto por equipamento, de até 15 MB; o sistema guarda uma cópia reduzida (até 1200 × 1200).
+
+O que a carga faz: código novo cria o equipamento, sem custo; código que já existe tem o nome atualizado e, só quando vierem preenchidos, a descrição e os dados do fornecedor. Custo, crédito de impostos, embalagem e ativo/inativo nunca são alterados. Qualquer erro na planilha ou numa foto para tudo, com a lista completa dos erros, e nada é gravado. A última linha da saída resume o resultado:
+
+```text
+criados=2 atualizados=0 inalterados=0 fotos_gravadas=1 fotos_iguais=0 sem_foto=1 fotos_sem_equipamento=0
+```
 
 ## Contato
 

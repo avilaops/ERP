@@ -22,6 +22,10 @@ declare global {
  * reloads do not open a new pool each time.
  */
 export function tenantDb(slug: string): Queryable {
+  return tenantPool(slug);
+}
+
+function tenantPool(slug: string): pg.Pool {
   const schema = tenantSchema(slug);
   const pools = (globalThis.__ERP_DB_POOLS__ ??= new Map());
   let pool = pools.get(schema);
@@ -30,6 +34,19 @@ export function tenantDb(slug: string): Queryable {
     pools.set(schema, pool);
   }
   return pool;
+}
+
+/**
+ * One connection of a company, held while `fn` runs: what a transaction needs
+ * (`BEGIN` on a pool would land on a connection and the rest on others).
+ */
+export async function withTenantConnection<T>(slug: string, fn: (conn: Queryable) => Promise<T>): Promise<T> {
+  const client = await tenantPool(slug).connect();
+  try {
+    return await fn(client);
+  } finally {
+    client.release();
+  }
 }
 
 /** Closes every pool. For scripts and tests; the server keeps them open. */

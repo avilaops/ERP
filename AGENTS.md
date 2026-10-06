@@ -200,6 +200,36 @@ funções puras, sem banco e sem tela, conferidas com os números dos prints do 
     preço, custo nem total. Equipamento que já saiu numa versão só pode ser desativado. `src/lib/db/price-table.ts` não tem `UPDATE`,
     `DELETE` nem `TRUNCATE`; erro de publicação se resolve publicando outra versão.
 
+## Fotos dos equipamentos
+
+Cada equipamento tem descrição (`products.description`) e, no máximo, **uma foto**,
+guardada no banco da empresa (`product_photos`), nunca em disco nem em `public/`.
+
+1. **A foto guardada é sempre JPEG normalizado por `normalizePhoto`**
+   (`src/lib/photos/normalize.ts`): formato reconhecido pelos primeiros bytes (JPG, PNG ou
+   WebP; nunca pela extensão nem pelo `Content-Type`), girada pelo EXIF, reduzida para
+   caber em 1200 × 1200, fundo branco, sem metadados. Entrada acima de 15 MB ou de 50
+   megapixels é recusada. A pasta não conhece banco, `next/*` nem `process.env`.
+2. **Toda foto entra por `saveProductPhoto`** (`src/lib/db/product-photos.ts`). Nunca
+   `INSERT` direto em `product_photos`, nunca arquivo em `public/`.
+3. **A foto só sai pela rota `/api/produtos/[id]/foto`**, que exige sessão: qualquer
+   perfil vê (`GET`), só quem tem o item `produtos` troca ou apaga (`PUT` com os bytes
+   crus no corpo, `DELETE`). Não existe `POST` com formulário.
+4. **Todo `route.ts` em `src/app/api/` começa por `await getSession()`** e usa
+   `tenantDb(session.tenant.slug)`: a empresa, o perfil e o e-mail saem só da sessão,
+   nunca do corpo, de cabeçalho ou do endereço. `tests/routes.test.ts` falha se não for
+   assim, e `tests/product-photo-route.test.ts` confere que uma empresa não lê nem grava
+   foto de outra.
+5. `listProducts` devolve `hasPhoto`, nunca os bytes. A chave de `product_photos` não
+   apaga em cascata (nenhuma do banco apaga): `deleteProduct` apaga a foto no mesmo
+   comando, e equipamento com histórico continua recusado, com a foto no lugar.
+6. **A carga em lote é `npm run db:import-products -- <pasta> --empresa <identificador>`**
+   e, sem `--apply`, não grava nada. A empresa é sempre dita na linha de comando (tem de
+   estar em `ERP_TENANTS`); não há empresa padrão. A carga roda numa transação só
+   (`importProducts`, com uma conexão de `withTenantConnection`), cria equipamento sem
+   custo, e nunca toca em custo, crédito, embalagem nem `active`. O formato da pasta está
+   no `README.md`.
+
 ## Git
 
 Toda alteração vai por commit direto na `main`, na mesma tarefa:

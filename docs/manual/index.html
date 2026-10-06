@@ -399,7 +399,7 @@ ${fig("fornecedores","Tela de fornecedores antes do primeiro cadastro")}
 
 {id:"produtos", mod:"Cadastros", title:"Produtos e custos",
 lead:"Como cadastrar equipamentos, lançar o custo da assessoria e publicar a tabela para a equipe.",
-toc:["Visão geral da tela","Cadastrar um equipamento","Lançar ou colar custos","Colunas da tabela","Publicar a tabela para a equipe","Desativar ou excluir"],
+toc:["Visão geral da tela","Cadastrar um equipamento","Lançar ou colar custos","Colunas da tabela","Publicar a tabela para a equipe","Desativar ou excluir","Fotos e descrições em lote"],
 body:`
 <p>Acesse o menu ${mp("Produtos e custos")}. Esta tela é exclusiva da diretoria.</p>
 ${fig("produtos-custos","Produtos e custos com o aviso de tabela pendente e o botão Publicar")}
@@ -443,6 +443,30 @@ ${fig("produtos-custos","Produtos e custos com o aviso de tabela pendente e o bo
 <ol class="steps">
 <li>${b("Desativar")} tira o equipamento da venda, mas mantém o histórico. Ele vai para a aba Inativos.</li>
 <li>${b("Excluir")} remove o cadastro. Use só para itens lançados por engano.</li>
+</ol>
+<h2 id="s7">Fotos e descrições em lote</h2>
+<p>Cada equipamento pode ter uma descrição e uma foto. Para cadastrar tudo de uma vez, envie o material à Ávila Ops: a carga é feita por nós, não pela tela.</p>
+<p>O material é uma pasta com uma planilha e as fotos:</p>
+<ol class="steps">
+<li><b>Planilha</b> <code>equipamentos.csv</code> (no Excel: Salvar como, CSV UTF-8, separado por ponto e vírgula), com uma linha por equipamento e a primeira linha com o nome das colunas.</li>
+<li><b>Fotos</b> em uma pasta chamada <code>fotos</code>, uma por equipamento, com o <b>código do equipamento como nome do arquivo</b>: <code>LD-B001.jpg</code>, <code>LD-B002.png</code>. Valem JPG, PNG e WebP, de até 15 MB cada.</li>
+</ol>
+<div class="table-wrap"><table>
+<tr><th>Coluna</th><th>O que é</th></tr>
+<tr><td>codigo</td><td>Código Ludus do equipamento (ex.: LD-B001). Só letras, números, hífen, sublinhado e ponto. Obrigatório.</td></tr>
+<tr><td>nome</td><td>Nome do equipamento. Obrigatório.</td></tr>
+<tr><td>descricao</td><td>Texto de descrição. Pode ficar em branco.</td></tr>
+<tr><td>fornecedor</td><td>Nome da fábrica. Opcional.</td></tr>
+<tr><td>modelo</td><td>Modelo da fábrica. Opcional.</td></tr>
+<tr><td>preco_usd</td><td>Preço do fornecedor em dólar (ex.: 1234.56 ou 1.234,56). Opcional.</td></tr>
+</table></div>
+<p>O que acontece na carga:</p>
+<ol class="steps">
+<li>Código novo vira um equipamento novo, ainda sem custo: ele aparece na aba ${b("Sem custo")} até a diretoria lançar o custo da assessoria.</li>
+<li>Código que já existe tem o nome atualizado. Descrição e dados do fornecedor só mudam se vierem preenchidos: campo em branco não apaga o que já está cadastrado.</li>
+<li>Custo, crédito de impostos, embalagem e a situação ativo ou inativo nunca são alterados pela carga.</li>
+<li>A foto é guardada em tamanho reduzido. Enviar uma foto nova para o mesmo código troca a anterior.</li>
+<li>Se houver erro na planilha ou em alguma foto, nada é gravado e a Ávila Ops devolve a lista do que corrigir.</li>
 </ol>`},
 
 {id:"tabela-precos", mod:"Cadastros", title:"Tabela de preços", pend:true,

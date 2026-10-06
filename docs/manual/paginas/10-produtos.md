@@ -12,6 +12,7 @@ Como cadastrar equipamentos, lançar o custo da assessoria e publicar a tabela p
 4. Colunas da tabela
 5. Publicar a tabela para a equipe
 6. Desativar ou excluir
+7. Fotos e descrições em lote
 
 Acesse o menu **Produtos e custos**. Esta tela é exclusiva da diretoria.
 
@@ -62,5 +63,31 @@ Quando há alterações não publicadas, aparece o aviso "A equipe ainda vê a t
 1.  **Desativar** tira o equipamento da venda, mas mantém o histórico. Ele vai para a aba Inativos.
 2.  **Excluir** remove o cadastro. Use só para itens lançados por engano.
 
+## Fotos e descrições em lote
+
+Cada equipamento pode ter uma descrição e uma foto. Para cadastrar tudo de uma vez, envie o material à Ávila Ops: a carga é feita por nós, não pela tela.
+
+O material é uma pasta com uma planilha e as fotos:
+
+1.  **Planilha** `equipamentos.csv` (no Excel: Salvar como, CSV UTF-8, separado por ponto e vírgula), com uma linha por equipamento e a primeira linha com o nome das colunas.
+2.  **Fotos** em uma pasta chamada `fotos`, uma por equipamento, com o **código do equipamento como nome do arquivo**: `LD-B001.jpg`, `LD-B002.png`. Valem JPG, PNG e WebP, de até 15 MB cada.
+
+| Coluna | O que é |
+| --- | --- |
+| codigo | Código Ludus do equipamento (ex.: LD-B001). Só letras, números, hífen, sublinhado e ponto. Obrigatório. |
+| nome | Nome do equipamento. Obrigatório. |
+| descricao | Texto de descrição. Pode ficar em branco. |
+| fornecedor | Nome da fábrica. Opcional. |
+| modelo | Modelo da fábrica. Opcional. |
+| preco_usd | Preço do fornecedor em dólar (ex.: 1234.56 ou 1.234,56). Opcional. |
+
+O que acontece na carga:
+
+1.  Código novo vira um equipamento novo, ainda sem custo: ele aparece na aba **Sem custo** até a diretoria lançar o custo da assessoria.
+2.  Código que já existe tem o nome atualizado. Descrição e dados do fornecedor só mudam se vierem preenchidos: campo em branco não apaga o que já está cadastrado.
+3.  Custo, crédito de impostos, embalagem e a situação ativo ou inativo nunca são alterados pela carga.
+4.  A foto é guardada em tamanho reduzido. Enviar uma foto nova para o mesmo código troca a anterior.
+5.  Se houver erro na planilha ou em alguma foto, nada é gravado e a Ávila Ops devolve a lista do que corrigir.
+
 ---
-*Atualizado em 04/10/2026 · Ávila Ops Tecnologia*
+*Atualizado em 06/10/2026 · Ávila Ops Tecnologia*
