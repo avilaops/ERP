@@ -70,8 +70,14 @@ export async function GET(_request: Request, context: Context): Promise<Response
 
   // One image at a time: the server has little memory.
   const photos = new Map<number, Uint8Array>();
-  for (const [productId, { photo }] of products) {
-    if (photo) photos.set(productId, await thumbnail(photo, PHOTO_SIDE));
+  for (const [productId, product] of products) {
+    const { photo } = product;
+    if (!photo) continue;
+    // A photo that cannot be read does not stop the quotation: its frame stays empty.
+    const small = await thumbnail(photo, PHOTO_SIDE).catch(() => null);
+    if (small) photos.set(productId, small);
+    // The stored bytes (up to 1 MB each) are let go here, not held until the PDF is done.
+    product.photo = null;
   }
   const stored = await loadLogo(conn);
   // A logo that cannot be read does not stop the quotation: the company's name goes in its place.

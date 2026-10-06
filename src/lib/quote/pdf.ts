@@ -13,6 +13,8 @@ const BODY_BOTTOM = MARGIN + 26;
 const PHOTO_BOX = 56;
 const ROW_PADDING = 6;
 const ROW_MIN_HEIGHT = PHOTO_BOX + 2 * ROW_PADDING;
+/** A name with no end would make a row taller than the page, and a row never splits. */
+const NAME_MAX_LINES = 4;
 const DESCRIPTION_MAX_LINES = 3;
 /** The box the logo fits in, at the top left. */
 const LOGO_BOX = { width: 170, height: 48 };
@@ -240,7 +242,7 @@ export async function renderQuotePdf(document: QuoteDocument, { logo, photos }: 
 
   tableHead();
   for (const item of document.items) {
-    const name = wrap(clean(item.name), fonts.bold, 9, textWidth);
+    const name = clamp(wrap(clean(item.name), fonts.bold, 9, textWidth), NAME_MAX_LINES, fonts.bold, 9, textWidth);
     const description = item.description
       ? clamp(wrap(clean(item.description), fonts.regular, 8, textWidth), DESCRIPTION_MAX_LINES, fonts.regular, 8, textWidth)
       : [];

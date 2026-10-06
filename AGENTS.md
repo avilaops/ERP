@@ -330,6 +330,8 @@ O botão **Salvar PDF** do pedido abre o orçamento para o cliente, em A4.
    do PDF: sem navegador, sem arquivo de fonte, sem ler disco. A mesma entrada gera os mesmos
    bytes. Caractere que a fonte não tem vira `?`.
 4. **A foto entra sempre reduzida por `thumbnail`** (`src/lib/photos/normalize.ts`), uma por vez.
+   Feita a miniatura, a rota solta os bytes da foto gravada; foto que não abre deixa o quadro
+   vazio, sem derrubar o PDF. O nome do equipamento para em 4 linhas e a descrição em 3, com "…".
    Descrição e foto são as do cadastro de hoje (`loadQuoteProducts`); nome, código e preço são
    os da versão da tabela do pedido.
 5. **A logo e o nome são os da empresa da sessão** (`loadLogo`, passada por `logoPng`; sem logo

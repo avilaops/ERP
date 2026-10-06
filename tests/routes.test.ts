@@ -334,6 +334,8 @@ test("orçamento em PDF: sai da conta da equipe, nunca lê custo, e o escopo vem
   assert.deepEqual([...route.matchAll(/export (?:async )?function (\w+)/g)].map(([, name]) => name), ["GET"]);
   // A foto entra sempre reduzida, e o pedido é conferido antes de qualquer imagem ser lida.
   assert.ok(route.includes("await thumbnail(photo, PHOTO_SIDE)"));
+  // Depois da miniatura, os bytes da foto gravada são soltos: não ficam presos até o fim da resposta.
+  assert.match(route, /await thumbnail\(photo, PHOTO_SIDE\)[\s\S]*?product\.photo = null;[\s\S]*?renderQuotePdf\(/);
   assert.ok(route.indexOf("getOrder(") < route.indexOf("loadQuoteProducts(") && route.indexOf("loadQuoteProducts(") < route.indexOf("thumbnail(photo"));
 
   // O conteúdo e o desenho não conhecem custo nem sessão.

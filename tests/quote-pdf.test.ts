@@ -178,6 +178,37 @@ test("nome e descrição quebram na coluna; a descrição para em 3 linhas com r
   assert.ok(!lines[first + 3].includes("aço") && !lines[first + 3].includes("estofado"));
 });
 
+test("nome sem fim: para em 4 linhas com reticências, e a linha do item cabe na página", async () => {
+  const endless = "Estação multifuncional com torres de peso e polias ajustáveis ".repeat(120).trim();
+  const bytes = await renderQuotePdf(
+    { ...DOCUMENT, items: [item(1, { name: endless, description: "Estofado preto." }), item(2, { name: "X".repeat(4000) })] },
+    NOTHING,
+  );
+  assert.equal((await PDFDocument.load(bytes, { updateMetadata: false })).getPageCount(), 1);
+  const pieces = pdfPieces(bytes);
+  const lines = pieces.map((piece) => piece.text);
+
+  // Entre o código e a descrição, só as 4 linhas do nome; a última diz que algo ficou de fora.
+  const name = lines.slice(lines.indexOf("LD-B001") + 1, lines.indexOf("Estofado preto."));
+  assert.equal(name.length, 4);
+  assert.ok(name[0].startsWith("Estação multifuncional") && name[3].endsWith("…"));
+  assert.ok(name.slice(0, 3).every((line) => !line.includes("…")));
+  // Uma palavra só, mais larga que a coluna, também para em 4 linhas.
+  const word = lines.filter((line) => /^X+…?$/.test(line));
+  assert.equal(word.length, 4);
+  assert.ok(word[3].endsWith("…"));
+
+  // Nada sai pelo rodapé nem pelas margens.
+  for (const piece of pieces) assert.ok(piece.x >= 36 && piece.y >= 36 && piece.y <= 841.89 - 36, `"${piece.text.slice(0, 30)}" fora da margem`);
+  // O texto do nome acaba antes da primeira coluna de número.
+  const font = await (await PDFDocument.create()).embedFont(StandardFonts.HelveticaBold);
+  const firstNumber = Math.min(...pieces.filter((piece) => piece.text === "1").map((piece) => piece.x));
+  for (const line of [...name, ...word]) {
+    const piece = pieces.find((candidate) => candidate.text === line);
+    assert.ok(piece && piece.x + font.widthOfTextAtSize(line, 9) < firstNumber, `"${line.slice(0, 30)}" encosta nos valores`);
+  }
+});
+
 test("valores grandes: cada coluna tem a largura do seu maior valor, e nada sai da página nem encosta no vizinho", async () => {
   const big = item(1, {
     quantity: 1250,

@@ -206,6 +206,33 @@ test("com a logo da empresa cadastrada, ela entra no PDF no lugar do nome", { sk
   assert.ok(!pdfText(bytes).split("\n").includes("Empresa A"));
 });
 
+test("foto gravada que não abre: o PDF sai assim mesmo, com o quadro dela vazio", { skip }, async () => {
+  const conn = tenantDb(A);
+  signIn(EMAILS.VENDEDOR);
+  const before = pdfImages(new Uint8Array(await (await get(ORDER)).arrayBuffer()));
+
+  // A foto só é gravada depois de normalizada; aqui ela é estragada direto na tabela.
+  const { rows } = await conn.query("SELECT product_id, bytes FROM product_photos");
+  assert.equal(rows.length, 1);
+  const broken = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(600, 0x41)]);
+  await conn.query("UPDATE product_photos SET bytes = $1 WHERE product_id = $2", [broken, rows[0].product_id]);
+  try {
+    const response = await get(ORDER);
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("content-type"), "application/pdf");
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    assert.equal(Buffer.from(bytes.subarray(0, 5)).toString("latin1"), "%PDF-");
+    // Uma imagem a menos (a foto); o resto do orçamento está inteiro.
+    assert.equal(pdfImages(bytes), before - 1);
+    const text = pdfText(bytes);
+    for (const expected of ["Supino reto", "Estofado preto.", "Leg press", invoiceTotal]) assert.ok(text.includes(expected), `falta "${expected}"`);
+  } finally {
+    await conn.query("UPDATE product_photos SET bytes = $1 WHERE product_id = $2", [rows[0].bytes, rows[0].product_id]);
+  }
+  // Com a foto de volta, ela volta ao PDF.
+  assert.equal(pdfImages(new Uint8Array(await (await get(ORDER)).arrayBuffer())), before);
+});
+
 test("pedido de outro vendedor, inexistente, de outra empresa ou com número torto: 404", { skip }, async () => {
   signIn(OTHER_SELLER);
   assert.equal((await get(ORDER)).status, 404);
