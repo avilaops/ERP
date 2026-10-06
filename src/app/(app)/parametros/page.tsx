@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requirePermission } from "@/lib/auth";
 import { tenantDb } from "@/lib/db/pool";
 import { menuItem } from "@/lib/auth/permissions";
@@ -42,6 +43,11 @@ export default async function ParametrosPage() {
     <>
       <h1 className="text-2xl font-semibold">{menuItem("parametros").label}</h1>
       <p className="mt-1 text-slate-600">Impostos, canal e política. Tudo que muda aqui recalcula a tabela inteira.</p>
+      <p className="mt-2 text-sm">
+        <Link href="/parametros/usuarios" className="font-medium text-brand underline">
+          Usuários e perfis da equipe
+        </Link>
+      </p>
 
       <div className="mt-6 grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="flex min-w-0 flex-col gap-6">

@@ -4,7 +4,7 @@ import { decideAccess, sessionFrom } from "@/lib/auth/access";
 import type { Identity, Session } from "@/lib/auth/access";
 import { assertAuthConfig, isProduction } from "@/lib/auth/config";
 import type { AuthEnv } from "@/lib/auth/config";
-import { createEnvDirectory } from "@/lib/auth/directory";
+import { createCombinedDirectory, createEnvDirectory } from "@/lib/auth/directory";
 import type { UserDirectory } from "@/lib/auth/directory";
 import { LOCAL_COOKIE, LOCAL_LOGIN_PATH, localProvider } from "@/lib/auth/local-provider";
 import { menuItem } from "@/lib/auth/permissions";
@@ -12,6 +12,8 @@ import type { MenuItemKey } from "@/lib/auth/permissions";
 import { loginUrl, SSO_COOKIE, verifySsoToken } from "@/lib/auth/sso";
 import { chooseMembership, parseTenants } from "@/lib/auth/tenants";
 import type { Tenant } from "@/lib/auth/tenants";
+import { tenantDb } from "@/lib/db/pool";
+import { findActiveUser } from "@/lib/db/users";
 
 export type { Session } from "@/lib/auth/access";
 
@@ -28,6 +30,19 @@ type Runtime = {
 };
 
 /**
+ * `ERP_USERS` plus the users each company registered on its own screen
+ * (Parâmetros → Usuários), read from the schema of that company.
+ */
+function directoryOf(raw: string | undefined, tenants: Tenant[]): UserDirectory {
+  return createCombinedDirectory(
+    createEnvDirectory(raw, tenants),
+    tenants,
+    (tenant, email) => findActiveUser(email, tenantDb(tenant.slug)),
+    (tenant, error) => console.error(`[auth] cadastro de usuários de ${tenant.slug} não pôde ser lido:`, error instanceof Error ? error.message : error),
+  );
+}
+
+/**
  * Built on every request, not at import time, so `next build` does not need the
  * production variables. In production an invalid configuration throws here as
  * well as at start-up (src/instrumentation.ts): no request is ever served
@@ -40,7 +55,7 @@ function runtime(env: AuthEnv): Runtime {
       ssoSecret: config.ssoSecret,
       appUrl: config.appUrl,
       tenants: config.tenants,
-      directory: createEnvDirectory(env.ERP_USERS, config.tenants),
+      directory: directoryOf(env.ERP_USERS, config.tenants),
     };
   }
   const tenants = parseTenants(env.ERP_TENANTS);
@@ -48,7 +63,7 @@ function runtime(env: AuthEnv): Runtime {
     ssoSecret: env.SSO_JWT_SECRET,
     appUrl: env.APP_URL?.trim() || DEV_APP_URL,
     tenants,
-    directory: createEnvDirectory(env.ERP_USERS, tenants),
+    directory: directoryOf(env.ERP_USERS, tenants),
   };
 }
 

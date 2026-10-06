@@ -94,3 +94,37 @@ test("várias empresas: entrada sem empresa, com empresa desconhecida ou repetid
   // Sem empresa configurada ninguém entra.
   assert.throws(() => parseErpUsers("dir@teste.local:DIRETORIA", []), /falta a empresa/);
 });
+
+test("diretório combinado: ERP_USERS vem primeiro; o resto é o cadastro de cada empresa", async () => {
+  const { createCombinedDirectory } = await import("@/lib/auth/directory");
+  const tenants = [
+    { slug: "ludus", name: "Ludus" },
+    { slug: "outra", name: "Outra" },
+    { slug: "fora", name: "Fora do ar" },
+  ];
+  const configured = createEnvDirectory("suporte@avila.test:DIRETORIA@ludus", tenants);
+  const registered: Record<string, Record<string, { name: string; role: "VENDEDOR" | "FINANCEIRO" }>> = {
+    ludus: { "ana@ludus.test": { name: "Ana", role: "VENDEDOR" }, "suporte@avila.test": { name: "Rebaixado", role: "VENDEDOR" } },
+    outra: { "ana@ludus.test": { name: "Ana", role: "FINANCEIRO" } },
+  };
+  const failures: string[] = [];
+  const directory = createCombinedDirectory(
+    configured,
+    tenants,
+    async (tenant, email) => {
+      if (tenant.slug === "fora") throw new Error("banco fora do ar");
+      return registered[tenant.slug]?.[email] ?? null;
+    },
+    (tenant) => failures.push(tenant.slug),
+  );
+
+  // Cadastrada em duas empresas, com um perfil em cada; a que não respondeu não deixa entrar.
+  assert.deepEqual(
+    (await directory.findMemberships(" ANA@ludus.test ")).map((user) => [user.tenant.slug, user.role, user.name]),
+    [["ludus", "VENDEDOR", "Ana"], ["outra", "FINANCEIRO", "Ana"]],
+  );
+  assert.deepEqual(failures, ["fora"]);
+  // O acesso de quem dá suporte não é rebaixado pelo cadastro da empresa.
+  assert.deepEqual((await directory.findMemberships("suporte@avila.test")).map((user) => [user.tenant.slug, user.role]), [["ludus", "DIRETORIA"]]);
+  assert.deepEqual(await directory.findMemberships("ninguem@x.test"), []);
+});

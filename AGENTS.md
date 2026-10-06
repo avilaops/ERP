@@ -75,8 +75,11 @@ Decisão do Nicolas em 06/10/2026. Um banco, **um esquema do PostgreSQL por empr
    vêm da empresa ou dos Parâmetros dela. A logo fica no banco (`company_settings`), é
    trocada pela diretoria em Parâmetros e servida por `/empresa/logo`, sempre a da empresa
    de quem está logado.
-5. Empresas e usuários vêm de `ERP_TENANTS` e `ERP_USERS` (`email:PERFIL@empresa`). Quando
-   forem para o banco, troca-se `parseTenants` e `UserDirectory`, não quem os usa.
+5. Empresas vêm de `ERP_TENANTS`. **Usuário quem cadastra é o cliente**, na tela
+   Parâmetros → Usuários (tabela `users` da empresa, só Diretoria): dado pessoal não é
+   digitado pela Ávila Ops nem fica em variável. `ERP_USERS` (`email:PERFIL@empresa`) é só o
+   acesso de quem instala e dá suporte, e vem primeiro; o resto do login lê o cadastro de
+   cada empresa (`createCombinedDirectory`). Ninguém tira o próprio acesso (`updateUser`).
 6. Testes de isolamento em `tests/db-tenants.test.ts` (banco) e `tests/access.test.ts`
    (sessão): mexeu em login, sessão ou conexão, eles têm de continuar passando.
 
@@ -97,8 +100,8 @@ Regras que não se quebram:
 2. **`permissions.ts` é a única fonte de "qual perfil acessa qual item".** Menu, rotas
    e testes leem de lá. Mudou a matriz: mude esse arquivo e `tests/permissions.test.ts`.
 3. **O perfil vem do diretório do ERP (`directory.ts`), nunca do navegador nem do
-   `papel` do SSO.** Hoje o diretório lê `ERP_USERS`; quando houver banco, troca-se a
-   implementação de `UserDirectory`, não quem a usa. Do token do SSO só se aceita o
+   `papel` do SSO.** O diretório junta `ERP_USERS` com o cadastro de usuários de cada
+   empresa (ver Multi-empresa, item 5). Do token do SSO só se aceita o
    que tem `exp` numérico (`sso.ts`): sessão sem validade é recusada.
 4. **Falha fechada.** Em produção, sem `SSO_JWT_SECRET`, `APP_URL`, `ERP_TENANTS` ou `ERP_USERS`
    válidos, o processo não sobe (`src/instrumentation.ts`) e nenhuma requisição é

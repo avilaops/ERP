@@ -193,14 +193,22 @@ test("multi-empresa: toda leitura e gravação usa o banco da empresa da sessão
   }
 });
 
+test("usuários: só quem tem Parâmetros cadastra, e quem altera sai da sessão", () => {
+  assert.ok(source("/parametros/usuarios").includes('await requirePermission("parametros")'));
+  const actions = readFileSync(`${APP_DIR}parametros/usuarios/actions.ts`, "utf8");
+  assert.equal(actions.split('await requirePermission("parametros")').length - 1, 2);
+  assert.ok(actions.includes("createUser(parsed.user, session.email, conn)"));
+  assert.ok(actions.includes("session.email, conn)"));
+});
+
 test("/pedidos/novo é protegida pelo item Pedidos", () => {
   assert.ok(source("/pedidos/novo").includes(`await requirePermission("pedidos", "/pedidos/novo")`));
 });
 
 test("não existe página no grupo protegido sem requirePermission", () => {
   const all = pages();
-  // The menu items, plus /pedidos/novo, one order and the record of one customer.
-  assert.equal(all.length, MENU_ITEMS.length + 3);
+  // The menu items, plus /pedidos/novo, one order, the record of one customer and the users of the company.
+  assert.equal(all.length, MENU_ITEMS.length + 4);
   for (const route of all) {
     assert.match(source(route), /await requirePermission\(/, route);
   }

@@ -68,6 +68,45 @@ export function parseErpUsers(raw: string | undefined, tenants: Tenant[]): Direc
   return users;
 }
 
+/** What the company's own register says about an e-mail: the active user, or `null`. */
+export type RegisteredLookup = (tenant: Tenant, email: string) => Promise<{ name: string; role: Role } | null>;
+
+/**
+ * The configuration and the register of each company, together. `ERP_USERS` is
+ * the access of who installs and supports the system and comes first; everyone
+ * else is who the directors of the company registered on the screen. A company
+ * whose register cannot be read lets nobody in through it: the failure is
+ * reported and the rest goes on.
+ */
+export function createCombinedDirectory(
+  configured: UserDirectory,
+  tenants: Tenant[],
+  lookup: RegisteredLookup,
+  report: (tenant: Tenant, error: unknown) => void = () => {},
+): UserDirectory {
+  return {
+    async findMemberships(email) {
+      const wanted = normalizeEmail(email);
+      const fixed = await configured.findMemberships(wanted);
+      const memberships: DirectoryUser[] = [];
+      for (const tenant of tenants) {
+        const own = fixed.find((user) => user.tenant.slug === tenant.slug);
+        if (own) {
+          memberships.push(own);
+          continue;
+        }
+        try {
+          const registered = await lookup(tenant, wanted);
+          if (registered) memberships.push({ email: wanted, name: registered.name, role: registered.role, tenant });
+        } catch (error) {
+          report(tenant, error);
+        }
+      }
+      return memberships;
+    },
+  };
+}
+
 export function createEnvDirectory(raw: string | undefined, tenants: Tenant[]): UserDirectory {
   const users = parseErpUsers(raw, tenants);
   return {
