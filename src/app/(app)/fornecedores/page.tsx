@@ -28,8 +28,8 @@ export default async function FornecedoresPage() {
         <summary className="cursor-pointer px-5 py-3 text-sm font-semibold uppercase tracking-wide">+ Novo fornecedor</summary>
         <ActionForm action={createSupplierAction} className="grid gap-4 border-t border-slate-200 p-5 sm:grid-cols-2">
           <SupplierFields saved={null} />
-          <div className="sm:col-span-2">
-            <button type="submit" className="rounded bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark">
+          <div className="sm:col-span-2 sticky bottom-0 z-10 -mx-4 border-t border-slate-200 bg-white px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:static md:mx-0 md:border-0 md:bg-transparent md:p-0">
+            <button type="submit" className="w-full rounded bg-brand px-4 py-3 font-medium text-white hover:bg-brand-dark md:w-auto md:py-2">
               Salvar fornecedor
             </button>
           </div>

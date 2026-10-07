@@ -130,11 +130,12 @@ export function CustomerForm({
         {cepNote && <p className="px-5 pb-5 text-xs text-slate-500">{cepNote}</p>}
       </fieldset>
 
-      <div className="flex items-center gap-4">
+      {/* On the customer's own screen the button stays in reach at the bottom of a phone. Inside an order, the order has its own bar. */}
+      <div className={`flex items-center gap-4 ${hidden === undefined ? "sticky bottom-0 z-10 -mx-4 border-t border-slate-200 bg-white px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:static md:mx-0 md:border-0 md:bg-transparent md:p-0" : ""}`}>
         <button
           type="submit"
           disabled={pending}
-          className="rounded bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark disabled:opacity-60"
+          className={`rounded bg-brand px-4 font-medium text-white hover:bg-brand-dark disabled:opacity-60 ${hidden === undefined ? "py-3 md:py-2" : "py-2"}`}
         >
           {pending ? "Gravando…" : "Salvar cliente"}
         </button>

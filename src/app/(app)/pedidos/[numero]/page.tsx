@@ -176,6 +176,26 @@ export default async function PedidoPage({
         </div>
       )}
 
+      {/* On a phone the page is long: the parts stay one touch away, each saying whether it is filled in. */}
+      <nav aria-label="Partes do pedido" className="sticky top-[3.75rem] z-10 -mx-4 mt-4 flex gap-2 overflow-x-auto border-b border-slate-200 bg-[#edefeb] px-4 py-2 text-sm md:hidden">
+        {(
+          [
+            ["equipamentos", "Itens", order.items.length > 0],
+            ["cliente", "Cliente", linked !== null && isComplete(linked)],
+            ["entrega", "Entrega", order.deliveryUf !== null && order.productionDays !== null],
+            ["pagamento", "Pagamento", plan.balance === 0 || (order.installmentCount !== null && order.balanceMethod !== null)],
+          ] as const
+        ).map(([anchor, label, filled]) => (
+          <a
+            key={anchor}
+            href={`#${anchor}`}
+            className={`whitespace-nowrap rounded-full border px-3 py-1.5 font-medium ${filled ? "border-emerald-300 bg-emerald-50 text-emerald-900" : "border-amber-300 bg-amber-50 text-amber-900"}`}
+          >
+            {filled ? "✓" : "•"} {label}
+          </a>
+        ))}
+      </nav>
+
       <fieldset disabled={!editable} className="mt-6 flex min-w-0 flex-col gap-6">
         <section className={CARD} aria-labelledby="equipamentos">
           <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3">

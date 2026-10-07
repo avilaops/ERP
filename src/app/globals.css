@@ -38,3 +38,8 @@ input[type="date"] {
 input[type="date"]::-webkit-date-and-time-value {
   text-align: left;
 }
+
+/* A section reached by its link stops below the bars fixed at the top of a phone. */
+h2[id] {
+  scroll-margin-top: 7.5rem;
+}
