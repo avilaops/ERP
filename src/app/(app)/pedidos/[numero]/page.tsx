@@ -184,7 +184,66 @@ export default async function PedidoPage({
             </h2>
             <p className="text-xs text-slate-600">{units} un.</p>
           </div>
-          <div className="relative overflow-x-auto">
+          {/* On a phone each item is a card; the table is for wider screens. */}
+          <ul className="md:hidden">
+            {order.items.map((item, index) => {
+              const product = products.get(item.productId);
+              const line = sale.lines[index];
+              return (
+                <li key={item.productId} className="border-b border-slate-200 px-4 py-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="min-w-0">
+                      <span className="block font-medium">{product?.name}</span>
+                      <span className="block text-xs text-slate-500">
+                        {product?.code ?? "sem código"} · {showMoney(line.unitWithIpi)} c/ IPI cada
+                      </span>
+                    </span>
+                    <span className="shrink-0 font-semibold">{showMoney(line.totalWithIpi)}</span>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between gap-3">
+                    <ActionForm action={setItemQuantityAction} className="flex flex-wrap items-center gap-2">
+                      <input type="hidden" name="number" value={order.number} />
+                      <input type="hidden" name="productId" value={item.productId} />
+                      <label className="flex items-center gap-2 text-sm text-slate-600">
+                        Qtd
+                        <input
+                          key={item.quantity}
+                          name="quantity"
+                          type="text"
+                          inputMode="numeric"
+                          size={1}
+                          defaultValue={item.quantity}
+                          className={`${INPUT} w-16 py-1.5 text-right text-slate-900`}
+                        />
+                      </label>
+                      {editable && (
+                        <button type="submit" className="rounded border border-slate-300 px-3 py-1.5 text-sm font-medium text-brand">
+                          Alterar
+                        </button>
+                      )}
+                    </ActionForm>
+                    {editable && order.items.length > 1 && (
+                      <ActionForm action={removeItemAction}>
+                        <input type="hidden" name="number" value={order.number} />
+                        <input type="hidden" name="productId" value={item.productId} />
+                        <button type="submit" className="rounded px-2 py-1.5 text-sm text-red-700">
+                          Remover
+                        </button>
+                      </ActionForm>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+            <li className="flex items-center justify-between gap-3 bg-slate-50 px-4 py-3 text-sm font-semibold">
+              <span>
+                Total · {units} un.
+                {discountValue > 0 && <span className="block text-xs font-normal text-slate-600">desconto de {showMoney(discountValue)}</span>}
+              </span>
+              <span className="text-base">{showMoney(sale.invoiceTotal)}</span>
+            </li>
+          </ul>
+          <div className="relative hidden overflow-x-auto md:block">
             <table className="w-full text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>
@@ -273,7 +332,7 @@ export default async function PedidoPage({
           {editable && (
             <ActionForm action={addItemAction} className="flex flex-wrap items-end gap-3 border-t border-slate-200 p-5">
               <input type="hidden" name="number" value={order.number} />
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0 basis-full sm:flex-1 sm:basis-0">
                 <label htmlFor="productId" className="block text-sm font-medium">
                   Adicionar equipamento da tabela v{table.version}
                 </label>
@@ -763,9 +822,24 @@ export default async function PedidoPage({
         </div>
       </fieldset>
 
+      {/* On a phone the total stays in sight, with the way to the closing. */}
+      <div className="sticky bottom-0 z-10 -mx-4 mt-6 flex items-center justify-between gap-3 border-t border-slate-200 bg-white px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:hidden">
+        <span>
+          <span className="block text-xs text-slate-600">Total da nota</span>
+          <span className="block text-lg font-bold leading-tight">{showMoney(sale.invoiceTotal)}</span>
+        </span>
+        {editable ? (
+          <a href="#fechar" className="rounded-lg bg-brand px-4 py-3 font-semibold text-white">
+            {missing.length > 0 ? `Faltam ${missing.length} para fechar` : "Ir para fechar"}
+          </a>
+        ) : (
+          <span className="rounded-full bg-slate-200 px-3 py-1 text-sm font-medium">{STATUS_LABELS[order.status]}</span>
+        )}
+      </div>
+
       {editable && (
-        <section className={`${CARD} mt-6 p-5`} aria-labelledby="fechar">
-          <h2 id="fechar" className={TITLE}>
+        <section className={`${CARD} mt-6 scroll-mt-20 p-5`} aria-labelledby="fechar">
+          <h2 id="fechar" className={`${TITLE} scroll-mt-24`}>
             Fechar pedido
           </h2>
           {missing.length > 0 ? (
