@@ -12,7 +12,7 @@ import { signingKeyOf, signNfeXml } from "@/lib/fiscal/sign";
 import { testPfx } from "./fiscal-helpers.ts";
 
 const INPUT: NfeInput = {
-  environment: "homologacao", freightMode: "1", series: 1, number: 9, randomCode: "48291736", issuedAt: "2026-10-08T10:30:00-03:00",
+  environment: "homologacao", freightMode: "1", transport: { carrier: null, volumes: null, volumeKind: null, netWeight: null, grossWeight: null }, series: 1, number: 9, randomCode: "48291736", issuedAt: "2026-10-08T10:30:00-03:00",
   issuer: { cnpj: "12345678000195", legalName: "Ludus Equipamentos Ltda", stateRegistration: "110042490114", taxRegime: 3, street: "Rua das Máquinas", number: "100", district: "Distrito Industrial", cityCode: "3549805", city: "São José do Rio Preto", uf: "SP", cep: "15035000" },
   recipient: { kind: "PJ", document: "98765432000198", name: "Academia", stateRegistration: null, taxpayer: false, street: "Av. Brasil", number: "500", district: "Centro", cityCode: "2111300", city: "São Luís", uf: "MA", cep: "65000000" },
   rules: { operationNature: "Venda de mercadoria", cfopInternal: "5102", cfopInterstate: "6102", cfopInterstateNonTaxpayer: "6108", icmsCode: "00", ipiCst: null, ipiFrameCode: "999", pisCst: "01", pisRate: 0.0065, cofinsCst: "01", cofinsRate: 0.03, finalConsumer: true, ipiInIcmsBase: true, additionalInfo: null, ibsCbs: { cst: "000", classCode: "000001", ibsStateRate: 0.001, ibsCityRate: 0, cbsRate: 0.009 } },

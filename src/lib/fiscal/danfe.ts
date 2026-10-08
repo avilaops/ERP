@@ -22,6 +22,8 @@ export type DanfeData = {
   items: DanfeItem[];
   totals: { icmsBase: number; icms: number; products: number; freight: number; discount: number; ipi: number; invoice: number; difal: number; fcp: number; ibs: number; cbs: number };
   freightMode: string; info: string;
+  carrier: { name: string; document: string; registration: string; address: string; city: string; uf: string } | null;
+  volumes: { quantity: string; kind: string; netWeight: string; grossWeight: string };
 };
 
 const block = (xml: string, name: string) => new RegExp(`<${name}[ >][\\s\\S]*?</${name}>`).exec(xml)?.[0] ?? "";
@@ -51,6 +53,8 @@ export function danfeData(xml: string): DanfeData {
   const ide = block(xml, "ide");
   const totals = block(xml, "ICMSTot");
   const protocol = block(xml, "protNFe");
+  const carrierXml = block(block(xml, "transp"), "transporta");
+  const volumesXml = block(block(xml, "transp"), "vol");
   const items = [...xml.matchAll(/<det nItem="\d+">[\s\S]*?<\/det>/g)].map(([item]) => {
     const icms = block(item, "ICMS");
     const ipi = block(item, "IPI");
@@ -72,6 +76,8 @@ export function danfeData(xml: string): DanfeData {
       ibs: number(block(block(xml, "IBSCBSTot"), "gIBS"), "vIBS"), cbs: number(block(block(xml, "IBSCBSTot"), "gCBS"), "vCBS"),
     },
     freightMode: value(block(xml, "transp"), "modFrete"), info: value(block(xml, "infAdic"), "infCpl"),
+    carrier: carrierXml === "" ? null : { name: value(carrierXml, "xNome"), document: value(carrierXml, "CNPJ") || value(carrierXml, "CPF"), registration: value(carrierXml, "IE"), address: value(carrierXml, "xEnder"), city: value(carrierXml, "xMun"), uf: value(carrierXml, "UF") },
+    volumes: { quantity: value(volumesXml, "qVol"), kind: value(volumesXml, "esp"), netWeight: value(volumesXml, "pesoL"), grossWeight: value(volumesXml, "pesoB") },
   };
 }
 
@@ -213,7 +219,7 @@ export async function renderDanfe(data: DanfeData): Promise<Uint8Array> {
 
   // How many rows fit: the first page carries the customer, the taxes and the carrier above the table.
   const FOOT = 64;
-  const firstRows = Math.max(1, Math.floor((PAGE.height - MARGIN - 84 - 44 - 9 - 66 - 9 - 44 - 9 - 22 - 21 - FOOT - 12 - MARGIN) / ROW));
+  const firstRows = Math.max(1, Math.floor((PAGE.height - MARGIN - 84 - 44 - 9 - 66 - 9 - 44 - 9 - 66 - 21 - FOOT - 12 - MARGIN) / ROW));
   const otherRows = Math.floor((PAGE.height - MARGIN - 84 - 44 - 21 - FOOT - 12 - MARGIN) / ROW);
   const pages = Math.max(1, 1 + Math.ceil(Math.max(0, data.items.length - firstRows) / otherRows));
 
@@ -239,7 +245,11 @@ export async function renderDanfe(data: DanfeData): Promise<Uint8Array> {
 
       heading("TRANSPORTADOR / VOLUMES TRANSPORTADOS", y);
       y -= 9;
-      y = row(y, [["FRETE POR CONTA", FREIGHT[data.freightMode] ?? data.freightMode, 1]]);
+      const weight = (kilos: string) => (kilos ? Number(kilos).toLocaleString("pt-BR", { minimumFractionDigits: 3, maximumFractionDigits: 3 }) : "");
+      const who = data.carrier;
+      y = row(y, [["RAZÃO SOCIAL", who?.name ?? "", 0.4], ["FRETE POR CONTA", FREIGHT[data.freightMode] ?? data.freightMode, 0.3], ["CNPJ / CPF", who?.document ? formatDocument(who.document) : "", 0.3]]);
+      y = row(y, [["ENDEREÇO", who?.address ?? "", 0.45], ["MUNICÍPIO", who?.city ?? "", 0.27], ["UF", who?.uf ?? "", 0.06], ["INSCRIÇÃO ESTADUAL", who?.registration ?? "", 0.22]]);
+      y = row(y, [["QUANTIDADE", data.volumes.quantity, 0.2], ["ESPÉCIE", data.volumes.kind, 0.3], ["PESO BRUTO (kg)", weight(data.volumes.grossWeight), 0.25, "right"], ["PESO LÍQUIDO (kg)", weight(data.volumes.netWeight), 0.25, "right"]]);
     }
 
     y = tableHead(y);

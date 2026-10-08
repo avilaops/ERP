@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { loadOrderTransport } from "@/lib/db/carriers";
 import { loadFiscalSettings, loadProductFiscal } from "@/lib/db/fiscal";
 import type { ProductFiscal } from "@/lib/db/fiscal";
 import { listPaymentCodes, loadFiscalRules } from "@/lib/db/fiscal-rules";
@@ -48,6 +49,7 @@ export async function previewOrderNfe(orderNumber: string, now: Date, conn: Quer
   const freight = await conn.query("SELECT nfe_freight_mode FROM orders WHERE id = $1", [order.id]);
   const built = orderNfe({
     freightMode: (freight.rows[0]?.nfe_freight_mode ?? null) as FreightMode | null,
+    transport: await loadOrderTransport(order.id, conn),
     settings,
     rules,
     order,

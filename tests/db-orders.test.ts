@@ -1111,6 +1111,20 @@ test("nota fiscal de conferência: pedido fechado, com os cadastros preenchidos,
   const { xml, key } = buildNfeXml(ready.input);
   assert.equal(key.length, 44);
   assert.ok(xml.includes("<nNF>42</nNF>") && xml.includes("<dhEmi>2026-10-08T10:00:00-03:00</dhEmi>") && xml.includes(`Pedido ${number}`));
+  // Transporte: opcional; informado, vai para a nota sem reabrir o pedido nem mudar a revisão dele.
+  const { createCarrier, saveOrderTransport } = await import("@/lib/db/carriers");
+  const orderRow = await db.pool.query("SELECT id, updated_at::text AS revision FROM orders WHERE number = $1", [number]);
+  const carrier = await createCarrier({ document: "11.222.333/0001-81", name: "Transportes Rápidos Ltda", stateRegistration: "110042490114", address: null, city: null, uf: "SP" }, "diretoria@teste.local", db.pool);
+  assert.ok(buildNfeXml(ready.input).xml.includes("</modFrete></transp>"));
+  await saveOrderTransport(orderRow.rows[0].id, { carrierId: carrier.id, volumes: 4, volumeKind: "Caixa", netWeight: 320.5, grossWeight: 350 }, db.pool);
+  await assert.rejects(() => saveOrderTransport(orderRow.rows[0].id, { carrierId: carrier.id, volumes: 4, volumeKind: null, netWeight: 400, grossWeight: 350 }, db.pool), /peso líquido não pode passar/);
+  await assert.rejects(() => saveOrderTransport(orderRow.rows[0].id, { carrierId: 999999, volumes: null, volumeKind: null, netWeight: null, grossWeight: null }, db.pool), /Transportadora não encontrada/);
+  const carried = await previewOrderNfe(number, now, db.pool);
+  assert.ok(buildNfeXml(carried!.input).xml.includes("<transporta><CNPJ>11222333000181</CNPJ><xNome>Transportes Rápidos Ltda</xNome><IE>110042490114</IE><UF>SP</UF></transporta><vol><qVol>4</qVol><esp>Caixa</esp><pesoL>320.500</pesoL><pesoB>350.000</pesoB></vol>"));
+  assert.equal((await db.pool.query("SELECT updated_at::text AS revision FROM orders WHERE number = $1", [number])).rows[0].revision, orderRow.rows[0].revision);
+  const { deleteCarrier } = await import("@/lib/db/carriers");
+  await assert.rejects(() => deleteCarrier(carrier.id, db.pool), /está em pedido/);
+
   // Conferência não consome o número.
   const { rows } = await db.pool.query("SELECT nfe_next_number FROM company_settings");
   assert.equal(rows[0].nfe_next_number, 42);

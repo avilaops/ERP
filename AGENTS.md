@@ -254,11 +254,22 @@ funções puras, sem banco e sem tela, conferidas com os números dos prints do 
     veredito; número inutilizado não é reaproveitado por nota rejeitada. **Frete**: a modalidade
     (`modFrete`, as seis opções do leiaute, `FREIGHT_MODES`) é escolhida no bloco "Nota fiscal" do
     pedido e fica em `orders.nfe_freight_mode`; sem escolha vale a sugestão (CIF se o pedido tem
-    frete por nossa conta, senão FOB). Transportadora e volumes ainda não vão na nota.
+    frete por nossa conta, senão FOB). **Transportadora e volumes**
+    (migração `0025`, `src/lib/db/carriers.ts`): pela norma (MOC 7.0, Anexo I, grupo X) só a
+    modalidade é obrigatória; transportadora (cadastro em Parâmetros → Transportadoras) e volumes
+    (quantidade, espécie, pesos) são opcionais, e o que fica em branco não vai para a nota. O
+    cadastro já recusa o que a SEFAZ rejeitaria (documento inválido, inscrição sem UF). **Não há
+    campo de veículo nem de reboque**: em venda interestadual a nota com eles é rejeitada (868).
+    Transporte não é condição comercial: gravar não reabre o pedido nem muda a revisão dele.
 17. **O build de publicação roda no `apps-noclient`**, não no `creators` (pedido do Nicolas,
     2026-10-08): `deploy/subir.sh` confere aqui (lint, tipos, testes), manda só o que está
     commitado para `/opt/build/erp` de lá, faz o `next build` e o pacote, e o pacote vai de lá
     para o `applications`. `BUILD_HOST=local` volta a fazer o build nesta máquina.
+
+18. **Formulário recusado não perde o que foi digitado.** O `ActionForm` chama a ação à mão
+    (`onSubmit` + `startTransition`), porque o navegador limparia todos os campos depois de
+    qualquer ação, inclusive a recusada; os campos só voltam ao que o servidor mostra quando a
+    ação foi aceita. Formulário novo de servidor usa o `ActionForm`, não `<form action>` solto.
 
 10. **Provisões e taxa fixa por pedido são parâmetros** (migração `0013`): perdas, garantia e
     inadimplência somam em `channelRate`; a taxa fixa sai do lucro do pedido uma vez, junto com o

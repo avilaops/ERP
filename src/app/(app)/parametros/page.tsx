@@ -73,6 +73,10 @@ export default async function ParametrosPage({ searchParams }: { searchParams: P
           Despesas fixas
         </Link>
         {" · "}
+        <Link href="/parametros/transportadoras" className="font-medium text-brand underline">
+          Transportadoras
+        </Link>
+        {" · "}
         <Link href="/parametros/fiscal" className="font-medium text-brand underline">
           Fiscal e certificado digital
         </Link>

@@ -33,6 +33,7 @@ const SOURCE: OrderNfeSource = {
   receipts: [{ method: "PIX", amount: 8400 }, { method: "Boleto", amount: 5530.85 }],
   paymentCodes: new Map([["PIX", "17"], ["Boleto", "15"]]),
   freightMode: null,
+  transport: { carrier: null, volumes: null, volumeKind: null, netWeight: null, grossWeight: null },
   number: 7,
   randomCode: "12345678",
   issuedAt: "2026-10-08T10:00:00-03:00",

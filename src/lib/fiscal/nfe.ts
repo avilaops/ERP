@@ -114,8 +114,20 @@ export const FREIGHT_MODES = [
 ] as const;
 export type FreightMode = (typeof FREIGHT_MODES)[number][0];
 
+/** Who carries and what goes. Everything is optional in the layout: what is `null` is left out of the invoice. */
+export type NfeTransport = {
+  carrier: { kind: "PJ" | "PF"; document: string; name: string; stateRegistration: string | null; address: string | null; city: string | null; uf: string | null } | null;
+  volumes: number | null;
+  /** Kind of volume: box, pallet, crate… */
+  volumeKind: string | null;
+  /** Kilos. */
+  netWeight: number | null;
+  grossWeight: number | null;
+};
+
 export type NfeInput = {
   environment: "homologacao" | "producao";
+  transport: NfeTransport;
   /** `modFrete`: who hires the freight. */
   freightMode: FreightMode;
   series: number;
@@ -238,6 +250,10 @@ export function nfeProblems(input: NfeInput): string[] {
   need(rules.ibsCbs === null || (/^\d{3}$/.test(rules.ibsCbs.cst) && /^\d{6}$/.test(rules.ibsCbs.classCode)), "Regras fiscais: CST do IBS/CBS com três dígitos e classificação tributária com seis.");
 
   need(FREIGHT_MODES.some(([code]) => code === input.freightMode), "Pedido: escolha a modalidade do frete da nota.");
+  const carrier = input.transport.carrier;
+  // Rule X07-10 of the layout: a carrier with a state registration has to say its state.
+  need(!carrier || carrier.stateRegistration === null || Boolean(carrier.uf), "Transportadora: com inscrição estadual, informe a UF (Parâmetros → Transportadoras).");
+  need(!carrier || (carrier.kind === "PJ" ? /^[0-9A-Z]{12}\d{2}$/ : /^\d{11}$/).test(carrier.document), "Transportadora: CNPJ ou CPF completo (Parâmetros → Transportadoras).");
   need(input.items.length > 0, "Pedido sem itens.");
   input.items.forEach((item, index) => {
     const which = `Item ${index + 1} (${item.name})`;
@@ -412,6 +428,28 @@ function itemXml(item: NfeItem, index: number, input: NfeInput): string {
   return group("det", product + taxes, ` nItem="${index + 1}"`);
 }
 
+/** The transport group: the way of freight always; the carrier and the volumes only with what was informed. */
+function transportXml(input: NfeInput): string {
+  const { carrier, volumes, volumeKind, netWeight, grossWeight } = input.transport;
+  const weight = (value: number | null) => (value === null ? null : value.toFixed(3));
+  return group(
+    "transp",
+    tag("modFrete", input.freightMode) +
+      (carrier
+        ? group(
+            "transporta",
+            tag(carrier.kind === "PJ" ? "CNPJ" : "CPF", carrier.document) +
+              tag("xNome", clean(carrier.name, 60)) +
+              tag("IE", carrier.stateRegistration) +
+              tag("xEnder", carrier.address ? clean(carrier.address, 60) : null) +
+              tag("xMun", carrier.city ? clean(carrier.city, 60) : null) +
+              tag("UF", carrier.uf),
+          )
+        : "") +
+      group("vol", tag("qVol", volumes) + tag("esp", volumeKind ? clean(volumeKind, 60) : null) + tag("pesoL", weight(netWeight)) + tag("pesoB", weight(grossWeight))),
+  );
+}
+
 /**
  * The XML of the invoice, not signed. Throws `NfeError` with everything that is
  * missing: an invoice with a hole never leaves here.
@@ -521,7 +559,7 @@ export function buildNfeXml(input: NfeInput): { key: string; xml: string; totals
     dest +
     input.items.map((item, index) => itemXml(item, index, input)).join("") +
     total +
-    group("transp", tag("modFrete", input.freightMode)) +
+    transportXml(input) +
     payment +
     group("infAdic", tag("infCpl", rules.additionalInfo ? clean(rules.additionalInfo, 5000) : null));
 

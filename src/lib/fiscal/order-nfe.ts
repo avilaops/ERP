@@ -3,7 +3,7 @@ import type { FiscalRules } from "@/lib/db/fiscal-rules";
 import type { Order } from "@/lib/db/orders";
 import { cityCode } from "@/lib/fiscal/cities";
 import { nfeProblems, nfeTotals } from "@/lib/fiscal/nfe";
-import type { FreightMode, NfeInput, NfeTotals } from "@/lib/fiscal/nfe";
+import type { FreightMode, NfeInput, NfeTotals, NfeTransport } from "@/lib/fiscal/nfe";
 import { roundCents } from "@/lib/pricing/money";
 import type { PricingParams } from "@/lib/pricing/params";
 
@@ -22,6 +22,7 @@ export type OrderNfeSource = {
   paymentCodes: ReadonlyMap<string, string | null>;
   /** What was chosen for the invoice of this order, or `null`: then the suggestion holds. */
   freightMode: FreightMode | null;
+  transport: NfeTransport;
   number: number;
   randomCode: string;
   issuedAt: string;
@@ -64,6 +65,7 @@ export function orderNfe(source: OrderNfeSource): { input: NfeInput; problems: s
   const input: NfeInput = {
     environment: settings.environment,
     freightMode: source.freightMode ?? suggestedFreightMode(source.order.freight),
+    transport: source.transport,
     series: settings.series,
     number: source.number,
     randomCode: source.randomCode,

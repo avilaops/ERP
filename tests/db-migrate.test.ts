@@ -55,6 +55,7 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "0022_eventos_da_nota.sql",
     "0023_ibs_cbs.sql",
     "0024_frete_da_nota_e_inutilizacao.sql",
+    "0025_transportadoras_e_volumes.sql",
   ]);
 
   const second = await withClient((client) => migrate(client, MIGRATIONS_DIR));
@@ -69,6 +70,7 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
   );
   assert.deepEqual(tables.rows.map((row) => row.table_name), [
     "audit_log",
+    "carriers",
     "commissions",
     "company_settings",
     "customers",

@@ -5,7 +5,7 @@ import type { NfeInput } from "@/lib/fiscal/nfe";
 
 const INPUT: NfeInput = {
   environment: "producao",
-  freightMode: "1",
+  freightMode: "1", transport: { carrier: null, volumes: null, volumeKind: null, netWeight: null, grossWeight: null },
   series: 1,
   number: 123,
   randomCode: "48291736",
@@ -112,6 +112,16 @@ test("Simples Nacional: CSOSN, sem base nem valor de ICMS; homologação troca o
   assert.equal(simples.xml.split("NF-E EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL").length - 1, 2);
 });
 
+test("transporte: transportadora e volumes vão na ordem do leiaute; em branco, só a modalidade; inscrição sem UF é barrada", () => {
+  const carrier = { kind: "PJ" as const, document: "11222333000181", name: "Transportes Rápidos Ltda", stateRegistration: "110042490114", address: "Rod. BR-153", city: "Rio Preto", uf: "SP" };
+  const full = buildNfeXml({ ...INPUT, freightMode: "2", transport: { carrier, volumes: 12, volumeKind: "Palete", netWeight: 1850.5, grossWeight: 1990 } }).xml;
+  assert.ok(full.includes("<transp><modFrete>2</modFrete><transporta><CNPJ>11222333000181</CNPJ><xNome>Transportes Rápidos Ltda</xNome><IE>110042490114</IE><xEnder>Rod. BR-153</xEnder><xMun>Rio Preto</xMun><UF>SP</UF></transporta><vol><qVol>12</qVol><esp>Palete</esp><pesoL>1850.500</pesoL><pesoB>1990.000</pesoB></vol></transp>"));
+  assert.ok(buildNfeXml(INPUT).xml.includes("<transp><modFrete>1</modFrete></transp>"));
+  // Venda para outro estado não leva veículo nem reboque (rejeição 868): o sistema nem tem esse campo.
+  assert.doesNotMatch(full, /veicTransp|reboque|placa/);
+  assert.ok(nfeProblems({ ...INPUT, transport: { ...INPUT.transport, carrier: { ...carrier, uf: null } } }).some((problem) => problem.includes("informe a UF")));
+});
+
 test("nota com falta não sai: cada problema diz onde se corrige, todos de uma vez", () => {
   const broken: NfeInput = {
     ...INPUT,
@@ -143,6 +153,10 @@ test("esquema oficial da NF-e 4.00 (XSD): o XML passa inteiro; só falta a assin
     { ...INPUT, recipient: { ...INPUT.recipient, taxpayer: true, stateRegistration: "123456789" } },
     // CNPJ alfanumérico do cliente (NT 2026.004), o exemplo da nota técnica; frete por conta do remetente.
     { ...INPUT, freightMode: "0", recipient: { ...INPUT.recipient, document: "12ABC34501DE35" } },
+    // Transportadora com inscrição e UF, e volumes com pesos.
+    { ...INPUT, freightMode: "2", transport: { carrier: { kind: "PJ", document: "11222333000181", name: "Transportes Rápidos Ltda", stateRegistration: "110042490114", address: "Rod. BR-153, km 50", city: "São José do Rio Preto", uf: "SP" }, volumes: 12, volumeKind: "Palete", netWeight: 1850.5, grossWeight: 1990 } },
+    // Só o transportador pessoa física, sem endereço; só quantidade de volumes.
+    { ...INPUT, transport: { carrier: { kind: "PF", document: "52998224725", name: "João Carreteiro", stateRegistration: null, address: null, city: null, uf: null }, volumes: 3, volumeKind: null, netWeight: null, grossWeight: null } },
   ];
   for (const [index, input] of cases.entries()) {
     const result = await validateXML({

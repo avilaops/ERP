@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/auth";
 import { menuItem } from "@/lib/auth/permissions";
 import { IssueError, issueOrderNfe, registerOrderNfeEvent } from "@/lib/db/issue-nfe";
+import { CarrierError, saveOrderTransport } from "@/lib/db/carriers";
 import { saveFreightMode } from "@/lib/db/invoices";
 import { getOrder } from "@/lib/db/orders";
 import { tenantDb } from "@/lib/db/pool";
@@ -62,17 +63,34 @@ export async function registerNfeEventAction(_previous: ActionState, formData: F
   return { error: null };
 }
 
-/** The way of freight of the invoice, among the options of the layout. */
-export async function saveFreightModeAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
+/** The transport of the invoice: the way of freight (one of the options of the layout), who carries and the volumes. */
+export async function saveTransportAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
   const session = await requirePermission("parametros");
   const conn = tenantDb(session.tenant.slug);
-  const number = formData.get("number");
-  const mode = formData.get("freightMode");
-  if (typeof number !== "string" || !ORDER_NUMBER.test(number)) return { error: "Pedido não encontrado." };
-  if (typeof mode !== "string" || !["0", "1", "2", "3", "4", "9"].includes(mode)) return { error: "Escolha a modalidade do frete na lista." };
+  const text = (key: string) => {
+    const value = formData.get(key);
+    return typeof value === "string" ? value.trim() : "";
+  };
+  const number = text("number");
+  const mode = text("freightMode");
+  if (!ORDER_NUMBER.test(number)) return { error: "Pedido não encontrado." };
+  if (!["0", "1", "2", "3", "4", "9"].includes(mode)) return { error: "Escolha a modalidade do frete na lista." };
+  const whole = (key: string) => (text(key) === "" ? null : /^\d{1,6}$/.test(text(key)) ? Number(text(key)) : Number.NaN);
+  const weight = (key: string) => (text(key) === "" ? null : /^\d{1,8}([.,]\d{1,3})?$/.test(text(key)) ? Number(text(key).replace(",", ".")) : Number.NaN);
   const order = await getOrder(number, { sellerEmail: null }, conn);
   if (!order) return { error: "Pedido não encontrado." };
-  await saveFreightMode(order.id, mode, conn);
+  try {
+    await saveOrderTransport(
+      order.id,
+      { carrierId: text("carrierId") === "" ? null : Number(text("carrierId")), volumes: whole("volumes"), volumeKind: text("volumeKind") || null, netWeight: weight("netWeight"), grossWeight: weight("grossWeight") },
+      conn,
+    );
+    await saveFreightMode(order.id, mode, conn);
+  } catch (error) {
+    if (error instanceof CarrierError) return { error: error.message };
+    console.error("[nfe] falha ao gravar o transporte:", error instanceof Error ? error.message : error);
+    return { error: FAILED };
+  }
   revalidatePath(`${menuItem("pedidos").href}/${number}`);
   return { error: null };
 }

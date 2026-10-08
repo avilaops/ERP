@@ -8,6 +8,7 @@ import { completenessText, isComplete, isRequired, normalizeDocument, taxpayerFr
 import type { CustomerKind } from "@/lib/customer";
 import { CUSTOMER_FIELDS, customerToForm } from "@/lib/customer-form";
 import { lastDecision } from "@/lib/db/approvals";
+import { listCarriers, loadOrderTransport } from "@/lib/db/carriers";
 import { listOrderInvoiceEvents, listOrderInvoices } from "@/lib/db/invoices";
 import { previewOrderNfe } from "@/lib/db/order-nfe";
 import { findCustomerByDocument } from "@/lib/db/customers";
@@ -25,7 +26,7 @@ import { DiscountFields } from "@/components/DiscountFields";
 import { proposalText } from "@/lib/quote/text";
 import { decideApprovalAction } from "../../aprovacoes/actions";
 import { FREIGHT_MODES } from "@/lib/fiscal/nfe";
-import { issueNfeAction, registerNfeEventAction, saveFreightModeAction } from "../nfe-actions";
+import { issueNfeAction, registerNfeEventAction, saveTransportAction } from "../nfe-actions";
 import { CustomerForm } from "../../clientes/CustomerForm";
 import { ActionForm } from "../ActionForm";
 import {
@@ -141,6 +142,8 @@ export default async function PedidoPage({
   const invoice = order.status === "fechado" && allows(session, "parametros") ? await previewOrderNfe(order.number, new Date(), conn) : null;
   const invoices = invoice ? await listOrderInvoices(order.id, conn) : [];
   const events = invoice ? await listOrderInvoiceEvents(order.id, conn) : [];
+  const carriers = invoice ? await listCarriers(conn) : [];
+  const transport = await loadOrderTransport(order.id, conn);
   // What "Copiar proposta" puts in the clipboard: only what the customer reads in the PDF.
   const proposal = proposalText({
     company: session.tenant.name,
@@ -301,9 +304,9 @@ export default async function PedidoPage({
               ))}
             </ul>
           )}
-          <ActionForm action={saveFreightModeAction} className="mt-3 flex flex-wrap items-end gap-2">
+          <ActionForm action={saveTransportAction} className="mt-3 grid gap-3 sm:grid-cols-4">
             <input type="hidden" name="number" value={order.number} />
-            <div className="min-w-0 flex-1">
+            <div className="sm:col-span-2">
               <label htmlFor="freightMode" className="block text-xs font-medium text-slate-600">
                 Modalidade do frete na nota
               </label>
@@ -315,9 +318,42 @@ export default async function PedidoPage({
                 ))}
               </select>
             </div>
-            <button type="submit" className={BUTTON}>
-              Salvar frete
-            </button>
+            <div className="sm:col-span-2">
+              <label htmlFor="carrierId" className="block text-xs font-medium text-slate-600">
+                Transportadora (opcional) ·{" "}
+                <Link href="/parametros/transportadoras" className="text-brand underline">
+                  cadastrar
+                </Link>
+              </label>
+              <select key={transport.carrier?.id ?? ""} id="carrierId" name="carrierId" defaultValue={transport.carrier?.id ?? ""} className={`${INPUT} mt-1 w-full`}>
+                <option value="">— sem transportadora na nota —</option>
+                {carriers.map((carrier) => (
+                  <option key={carrier.id} value={carrier.id}>
+                    {carrier.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {(
+              [
+                ["volumes", "Volumes (qtd.)", transport.volumes === null ? "" : String(transport.volumes), "numeric"],
+                ["volumeKind", "Espécie (caixa, palete…)", transport.volumeKind ?? "", "text"],
+                ["grossWeight", "Peso bruto (kg)", transport.grossWeight === null ? "" : String(transport.grossWeight).replace(".", ","), "decimal"],
+                ["netWeight", "Peso líquido (kg)", transport.netWeight === null ? "" : String(transport.netWeight).replace(".", ","), "decimal"],
+              ] as const
+            ).map(([name, label, value, mode]) => (
+              <div key={name}>
+                <label htmlFor={name} className="block text-xs font-medium text-slate-600">
+                  {label}
+                </label>
+                <input key={value} id={name} name={name} type="text" inputMode={mode} defaultValue={value} autoComplete="off" className={`${INPUT} mt-1 w-full`} />
+              </div>
+            ))}
+            <div className="sm:col-span-4">
+              <button type="submit" className={BUTTON}>
+                Salvar transporte
+              </button>
+            </div>
           </ActionForm>
           {invoice.problems.length > 0 ? (
             <>
