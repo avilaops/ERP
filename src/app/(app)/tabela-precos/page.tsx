@@ -137,8 +137,7 @@ export default async function TabelaPrecosPage({
         <div className="flex flex-wrap items-end justify-between gap-4 p-4">
           <div className="flex flex-col gap-3">
             <p className="font-medium">
-              Tabela v{table.version} · publicada em {showDate(table.publishedAt)}
-              {snapshot && ` por ${snapshot.publishedBy}`}
+              Tabela v{table.version} · {showDate(table.publishedAt)}
             </p>
             <form method="get" action={ITEM.href} role="search" className="flex flex-wrap gap-2">
               {lines.length > 1 && <input type="hidden" name={LINE_PARAM} value={line.id} />}
