@@ -20,10 +20,13 @@ export function ProductTools({
   heading,
   create,
   paste,
+  lineId,
 }: {
   heading: ReactNode;
   create: (state: NewProductState, formData: FormData) => Promise<NewProductState>;
   paste: (state: PasteState, formData: FormData) => Promise<PasteState>;
+  /** The product line the list shows: a new equipment is created in it. */
+  lineId: number;
 }) {
   const [open, setOpen] = useState<Panel | null>(null);
   const close = () => setOpen(null);
@@ -49,14 +52,14 @@ export function ProductTools({
             Catálogo do fornecedor
           </Link>
           {/* On a phone a new equipment has a screen of its own. */}
-          <Link href="/produtos/novo" className="rounded bg-brand px-4 py-2 font-medium text-white md:hidden">
+          <Link href={`/produtos/novo?linha=${lineId}`} className="rounded bg-brand px-4 py-2 font-medium text-white md:hidden">
             + Equipamento
           </Link>
         </div>
       </div>
 
       {open === "paste" && <PasteCostsForm action={paste} onClose={close} />}
-      {open === "new" && <NewProductForm action={create} onClose={close} />}
+      {open === "new" && <NewProductForm action={create} onClose={close} lineId={lineId} />}
     </>
   );
 }

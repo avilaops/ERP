@@ -88,8 +88,9 @@ export function supplierLine(product: Pick<Product, "supplierName" | "supplierMo
 }
 
 /** The address of the list for a tab and a search, without what is default. */
-export function listHref(base: string, tab: ProductTab, search: string): string {
+export function listHref(base: string, tab: ProductTab, search: string, lineId: number | null = null): string {
   const query = new URLSearchParams();
+  if (lineId !== null) query.set("linha", String(lineId));
   if (tab !== "ativos") query.set("aba", tab);
   if (search.trim() !== "") query.set("q", search.trim());
   const text = query.toString();

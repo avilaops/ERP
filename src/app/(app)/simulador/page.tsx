@@ -1,3 +1,6 @@
+import { LineTabs } from "@/components/LineTabs";
+import { listLines } from "@/lib/db/product-lines";
+import { LINE_PARAM, pickLine } from "@/lib/lines-view";
 import { DiscountFields } from "@/components/DiscountFields";
 import { requirePermission } from "@/lib/auth";
 import { menuItem, seesCosts } from "@/lib/auth/permissions";
@@ -33,12 +36,15 @@ export default async function SimuladorPage({ searchParams }: { searchParams: Pr
   const conn = tenantDb(session.tenant.slug);
   const query = await searchParams;
 
-  const latest = await latestVersion(conn);
+  const lines = await listLines(conn);
+  const productLine = pickLine(lines, query[LINE_PARAM]);
+  const latest = await latestVersion(conn, productLine.id);
   const table = latest ? await loadPublishedTable(latest.version, conn) : null;
   if (!latest || !table || table.items.length === 0) {
     return (
       <>
         <h1 className="text-2xl font-semibold">{menuItem("simulador").label}</h1>
+        <LineTabs lines={lines} current={productLine.id} path={menuItem("simulador").href} />
         <p className={`${CARD} mt-6 p-6 text-sm text-slate-600`}>Nenhuma tabela publicada ainda. Sem ela não há preço para simular.</p>
       </>
     );
@@ -79,10 +85,12 @@ export default async function SimuladorPage({ searchParams }: { searchParams: Pr
       <p className="mt-1 text-slate-600">
         Uma venda de teste com a tabela v{table.version}. Nada é gravado: para vender, abra um pedido.
       </p>
+      <LineTabs lines={lines} current={productLine.id} path={menuItem("simulador").href} />
 
       <div className="mt-6 grid grid-cols-[minmax(0,1fr)] items-start gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="flex min-w-0 flex-col gap-6">
           <form method="get" className={`${CARD} grid gap-4 p-5 sm:grid-cols-2`}>
+            {lines.length > 1 && <input type="hidden" name={LINE_PARAM} value={productLine.id} />}
             <div className="sm:col-span-2">
               <label htmlFor="equipamento" className={LABEL}>
                 Equipamento

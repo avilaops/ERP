@@ -1,3 +1,6 @@
+import { LineTabs } from "@/components/LineTabs";
+import { listLines } from "@/lib/db/product-lines";
+import { LINE_PARAM, pickLine } from "@/lib/lines-view";
 import Link from "next/link";
 import { requirePermission } from "@/lib/auth";
 import { tenantDb } from "@/lib/db/pool";
@@ -13,11 +16,14 @@ export const dynamic = "force-dynamic";
 
 const CARD = "mt-6 rounded-lg border border-slate-200 bg-white";
 
-export default async function NovoPedidoPage() {
+export default async function NovoPedidoPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const session = await requirePermission("pedidos", "/pedidos/novo");
   const conn = tenantDb(session.tenant.slug);
 
-  const latest = await latestVersion(conn);
+  // An order is of one product line: the one of the table it is opened with.
+  const lines = await listLines(conn);
+  const line = pickLine(lines, (await searchParams)[LINE_PARAM]);
+  const latest = await latestVersion(conn, line.id);
   const table = latest ? await loadPublishedTable(latest.version, conn) : null;
 
   const heading = (
@@ -26,6 +32,8 @@ export default async function NovoPedidoPage() {
       <p className="mt-1 text-slate-600">
         Escolha o primeiro equipamento. O pedido recebe um número e fica salvo enquanto você preenche o resto.
       </p>
+      <LineTabs lines={lines} current={line.id} path="/pedidos/novo" />
+      {lines.length > 1 && <p className="mt-2 text-sm text-slate-600">O pedido é de uma linha só: os equipamentos e os preços são os da linha {line.name}.</p>}
     </>
   );
 

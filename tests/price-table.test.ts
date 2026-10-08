@@ -22,7 +22,7 @@ const product = (id: number, change: Partial<Product>): Product => ({
   taxCredit: 0,
   packaging: 0,
   active: true,
-  hasPhoto: false,
+  hasPhoto: false, lineId: 1,
   ...change,
 });
 
@@ -36,6 +36,7 @@ const PRINT = [
 
 const published = (products: Product[] = PRINT, params = P): PublishedSnapshot => ({
   version: 35,
+  lineId: 1,
   publishedAt: new Date("2026-10-05T12:00:00Z"),
   publishedBy: "rogerio@ludus.test",
   ...draftPriceTable(params, products),

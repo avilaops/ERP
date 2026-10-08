@@ -304,8 +304,8 @@ test("/pedidos/novo é protegida pelo item Pedidos", () => {
 test("não existe página no grupo protegido sem requirePermission", () => {
   const all = pages();
   // The menu items, plus /pedidos/novo, one order, the record of one customer and of one supplier,
-  // and the users, the forms of payment and the categories of bills of the company.
-  assert.equal(all.length, MENU_ITEMS.length + 16);
+  // and the users, the forms of payment and the categories of bills of the company, and its product lines.
+  assert.equal(all.length, MENU_ITEMS.length + 17);
   for (const route of all) {
     assert.match(source(route), /await requirePermission\(/, route);
   }
@@ -401,4 +401,23 @@ test("tabela de preços: o + Pedido de cada linha só aparece para quem vende e 
   assert.ok(page.includes('const sells = allows(session, "pedidos");'));
   assert.ok(page.includes("{sells && ("));
   assert.ok(page.includes("<ActionForm action={createOrderAction}>"));
+});
+
+test("linhas de produto: nas telas, parâmetros, custos, tabela mais nova e publicação sempre dizem a linha", () => {
+  const dir = fileURLToPath(new URL("../src/app", import.meta.url));
+  const sources = (readdirSync(dir, { recursive: true }) as string[]).filter((file) => /\.(ts|tsx)$/.test(file));
+  let calls = 0;
+  for (const file of sources) {
+    const text = readFileSync(`${dir}/${file}`, "utf8");
+    // Without the line these functions answer for the first one: on a screen that would be silent.
+    for (const [call, args] of text.matchAll(/\b(?:loadParams|listProductCosts|latestVersion)\(([^()]*)\)/g)) {
+      calls += 1;
+      assert.match(args, /[lL]ine(Id)?\b|\.id\b/, `${file}: ${call} sem a linha de produto`);
+    }
+    for (const [call] of text.matchAll(/\b(?:saveParams|publishPriceTable)\([^()]*\)/g)) {
+      calls += 1;
+      assert.match(call, /line\.id\)$/, `${file}: ${call} sem a linha de produto`);
+    }
+  }
+  assert.ok(calls >= 12, `só ${calls} chamadas conferidas`);
 });

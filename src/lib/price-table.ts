@@ -127,9 +127,11 @@ export function publishNotice(
   draft: PriceTableDraft,
   latest: PriceTableVersion | null,
   pending: PendingChanges | null,
+  /** The number the next publication takes. With more than one product line it is not the one after `latest`: the numbering is one for the company. */
+  nextNumber: number = (latest?.version ?? 0) + 1,
 ): PublishNotice {
   const empty = draft.items.length === 0;
-  const next = empty ? null : (latest?.version ?? 0) + 1;
+  const next = empty ? null : nextNumber;
 
   if (!latest) {
     return {

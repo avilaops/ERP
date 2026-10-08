@@ -1,3 +1,4 @@
+import { MAIN_LINE } from "@/lib/product-line";
 import { pgErrorCode } from "@/lib/db/pool";
 import type { Queryable } from "@/lib/db/pool";
 import type { AdvisoryCostRow } from "@/lib/advisory-paste";
@@ -18,6 +19,8 @@ export type Product = {
   taxCredit: number;
   packaging: number;
   active: boolean;
+  /** The product line it is sold in: its parameters and its published table. */
+  lineId: number;
   /** Whether there is a photo. The bytes never come with the product: see product-photos.ts. */
   hasPhoto: boolean;
 };
@@ -33,6 +36,8 @@ export type ProductInput = {
   taxCredit?: number;
   packaging?: number;
   active?: boolean;
+  /** Without it, the main line. */
+  lineId?: number;
 };
 
 /** Only the fields present are changed. `advisoryCost: null` takes the product back to "without cost". */
@@ -42,7 +47,7 @@ export type ProductPatch = Partial<ProductInput>;
 export class ProductError extends Error {}
 
 const COLUMNS =
-  "id, name, code, description, supplier_name, supplier_model, supplier_price_usd, advisory_cost, tax_credit, packaging, active, " +
+  "id, name, code, description, supplier_name, supplier_model, supplier_price_usd, advisory_cost, tax_credit, packaging, active, line_id, " +
   "EXISTS (SELECT 1 FROM product_photos WHERE product_photos.product_id = products.id) AS has_photo";
 
 const numberOrNull = (value: unknown) => (value === null ? null : Number(value));
@@ -63,6 +68,7 @@ function toProduct(row: Record<string, unknown>): Product {
     taxCredit: Number(row.tax_credit),
     packaging: Number(row.packaging),
     active: row.active === true,
+    lineId: Number(row.line_id),
     hasPhoto: row.has_photo === true,
   };
 }
@@ -82,6 +88,7 @@ const PATCH_COLUMNS: [keyof ProductPatch, string][] = [
   ["taxCredit", "tax_credit"],
   ["packaging", "packaging"],
   ["active", "active"],
+  ["lineId", "line_id"],
 ];
 
 /** What goes to the column for one field of a patch, checked the same way as on creation. */
@@ -115,10 +122,14 @@ function patchValue(field: keyof ProductPatch, patch: ProductPatch): unknown {
       return patch.packaging;
     case "active":
       return patch.active === true;
+    case "lineId":
+      if (!isId(patch.lineId as number)) throw new ProductError(NO_LINE);
+      return patch.lineId;
   }
 }
 
 const isId = (id: number) => Number.isSafeInteger(id) && id > 0;
+const NO_LINE = "Linha de produto não encontrada. Recarregue a página.";
 
 export async function createProduct(input: ProductInput, updatedBy: string, conn: Queryable): Promise<Product> {
   const name = input.name.trim();
@@ -138,8 +149,8 @@ export async function createProduct(input: ProductInput, updatedBy: string, conn
   try {
     const { rows } = await conn.query(
       `INSERT INTO products
-         (name, code, description, supplier_name, supplier_model, supplier_price_usd, advisory_cost, tax_credit, packaging, active, updated_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+         (name, code, description, supplier_name, supplier_model, supplier_price_usd, advisory_cost, tax_credit, packaging, active, updated_by, line_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        RETURNING ${COLUMNS}`,
       [
         name,
@@ -153,11 +164,13 @@ export async function createProduct(input: ProductInput, updatedBy: string, conn
         packaging,
         input.active ?? true,
         updatedBy,
+        input.lineId ?? MAIN_LINE,
       ],
     );
     return toProduct(rows[0]);
   } catch (error) {
     if (pgErrorCode(error) === UNIQUE_VIOLATION) throw new ProductError(`Já existe produto com o código "${code}".`);
+    if (pgErrorCode(error) === FOREIGN_KEY_VIOLATION) throw new ProductError(NO_LINE);
     throw error;
   }
 }
@@ -194,6 +207,7 @@ export async function updateProduct(
     if (pgErrorCode(error) === UNIQUE_VIOLATION) {
       throw new ProductError(`Já existe produto com o código "${blankToNull(patch.code)}".`);
     }
+    if (pgErrorCode(error) === FOREIGN_KEY_VIOLATION) throw new ProductError(NO_LINE);
     throw error;
   }
 }
@@ -302,18 +316,20 @@ export async function applyAdvisoryCosts(
   return updated.map(toProduct);
 }
 
-/** Products by name. `active` filters one side; without it, all of them. */
-export async function listProducts({ active }: { active?: boolean } = {}, conn: Queryable): Promise<Product[]> {
-  const { rows } =
-    active === undefined
-      ? await conn.query(`SELECT ${COLUMNS} FROM products ORDER BY name, id`)
-      : await conn.query(`SELECT ${COLUMNS} FROM products WHERE active = $1 ORDER BY name, id`, [active]);
+/** Products by name. `active` filters one side and `lineId` one line; without them, all of them. */
+export async function listProducts({ active, lineId }: { active?: boolean; lineId?: number } = {}, conn: Queryable): Promise<Product[]> {
+  const { rows } = await conn.query(
+    `SELECT ${COLUMNS} FROM products
+      WHERE ($1::boolean IS NULL OR active = $1) AND ($2::integer IS NULL OR line_id = $2)
+      ORDER BY name, id`,
+    [active ?? null, lineId ?? null],
+  );
   return rows.map(toProduct);
 }
 
-/** What the engine needs from the active products that already have a cost. */
-export async function listProductCosts(conn: Queryable): Promise<ProductCost[]> {
-  const products = await listProducts({ active: true }, conn);
+/** What the engine needs from the active products of a line that already have a cost. */
+export async function listProductCosts(conn: Queryable, lineId: number = MAIN_LINE): Promise<ProductCost[]> {
+  const products = await listProducts({ active: true, lineId }, conn);
   return products.flatMap(({ advisoryCost, taxCredit, packaging }) =>
     advisoryCost === null ? [] : [{ advisoryCost, taxCredit, packaging }],
   );

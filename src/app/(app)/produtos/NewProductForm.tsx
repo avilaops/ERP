@@ -22,7 +22,7 @@ const HELP: Partial<Record<NewProductKey, string>> = {
  * The form "+ Equipamento" opens in the page itself. After an error the fields
  * keep what was typed; after a save they come back blank, ready for the next one.
  */
-export function NewProductForm({ action, onClose }: { action: CreateAction; onClose: () => void }) {
+export function NewProductForm({ action, onClose, lineId }: { action: CreateAction; onClose: () => void; lineId: number }) {
   const [state, formAction, pending] = useActionState(action, IDLE_NEW_PRODUCT);
   const values = state.status === "error" && state.values ? state.values : EMPTY_NEW_PRODUCT;
 
@@ -33,6 +33,8 @@ export function NewProductForm({ action, onClose }: { action: CreateAction; onCl
       noValidate
       className="mt-4 rounded-lg border border-slate-200 bg-white"
     >
+      {/* The product line the equipment is created in: the one the list shows. */}
+      <input type="hidden" name="lineId" value={lineId} />
       <h2 className="border-b border-slate-200 px-5 py-3 text-sm font-semibold uppercase tracking-wide">
         Novo equipamento
       </h2>

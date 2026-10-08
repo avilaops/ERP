@@ -1,3 +1,6 @@
+import { LineTabs } from "@/components/LineTabs";
+import { listLines } from "@/lib/db/product-lines";
+import { LINE_PARAM, pickLine } from "@/lib/lines-view";
 import Link from "next/link";
 import { requirePermission } from "@/lib/auth";
 import { tenantDb } from "@/lib/db/pool";
@@ -17,11 +20,14 @@ import { ParamsForm } from "./ParamsForm";
 export const metadata = { title: `${menuItem("parametros").label} · ERP` };
 export const dynamic = "force-dynamic";
 
-export default async function ParametrosPage() {
+export default async function ParametrosPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const session = await requirePermission("parametros");
   const conn = tenantDb(session.tenant.slug);
 
-  const [params, costs, logoVersion] = await Promise.all([loadParams(conn), listProductCosts(conn), loadLogoVersion(conn)]);
+  // Each product line has its own parameters: the screen shows and saves one line at a time.
+  const lines = await listLines(conn);
+  const line = pickLine(lines, (await searchParams)[LINE_PARAM]);
+  const [params, costs, logoVersion] = await Promise.all([loadParams(conn, line.id), listProductCosts(conn, line.id), loadLogoVersion(conn)]);
   const commissionDay = await loadCommissionDay(conn);
   const policy = await loadApprovalPolicy(conn);
   // Every figure of the board is calculated here, on the server, by the engine.
@@ -47,6 +53,10 @@ export default async function ParametrosPage() {
       <h1 className="text-2xl font-semibold">{menuItem("parametros").label}</h1>
       <p className="mt-1 text-slate-600">Impostos, canal e política. Tudo que muda aqui recalcula a tabela inteira.</p>
       <p className="mt-2 text-sm">
+        <Link href="/parametros/linhas" className="font-medium text-brand underline">
+          Linhas de produto
+        </Link>
+        {" · "}
         <Link href="/parametros/usuarios" className="font-medium text-brand underline">
           Usuários e perfis da equipe
         </Link>
@@ -67,6 +77,8 @@ export default async function ParametrosPage() {
           Fiscal e certificado digital
         </Link>
       </p>
+      <LineTabs lines={lines} current={line.id} path="/parametros" />
+      {lines.length > 1 && <p className="mt-2 text-sm text-slate-600">Parâmetros da linha <strong>{line.name}</strong>. Logo, dia da comissão e regras de aprovação valem para a empresa toda.</p>}
 
       <div className="mt-6 grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="flex min-w-0 flex-col gap-6">
@@ -152,7 +164,7 @@ export default async function ParametrosPage() {
               </div>
             </ActionForm>
           </section>
-          <ParamsForm saved={form} action={saveParamsAction} />
+          <ParamsForm key={line.id} lineId={line.id} saved={form} action={saveParamsAction} />
         </div>
 
         <aside className="rounded-lg border border-slate-200 bg-white" aria-labelledby="resultado">
@@ -177,6 +189,7 @@ export default async function ParametrosPage() {
                   {suggestion ? showPercent(suggestion.rate, 0) : "—"}
                   {suggestion && (
                     <form action={adoptSuggestedDownPaymentAction}>
+                      <input type="hidden" name="lineId" value={line.id} />
                       <button type="submit" className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50">
                         usar
                       </button>

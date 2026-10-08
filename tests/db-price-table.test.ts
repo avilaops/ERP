@@ -83,7 +83,7 @@ test("publicar o print: a v1 guarda os preços do protótipo, o crédito exato e
   );
   assert.deepEqual(snapshot.params, await loadParams(db.pool));
   assert.deepEqual(snapshot.items, draft.items);
-  assert.deepEqual({ version: snapshot.version, publishedAt: snapshot.publishedAt, publishedBy: snapshot.publishedBy }, version);
+  assert.deepEqual({ version: snapshot.version, lineId: snapshot.lineId, publishedAt: snapshot.publishedAt, publishedBy: snapshot.publishedBy }, version);
 });
 
 test("o retrato não muda quando o rascunho muda", { skip }, async () => {
@@ -196,6 +196,7 @@ test("a equipe não recebe custo do banco: a leitura dela só tem nome, código 
   assert.ok(table);
   assert.deepEqual(Object.keys(table), [
     "version",
+    "lineId",
     "publishedAt",
     "freeDiscount",
     "ipi",

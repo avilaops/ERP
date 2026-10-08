@@ -1,3 +1,6 @@
+import { LineTabs } from "@/components/LineTabs";
+import { listLines } from "@/lib/db/product-lines";
+import { LINE_PARAM, pickLine } from "@/lib/lines-view";
 import { ActionForm } from "../pedidos/ActionForm";
 import { createOrderAction } from "../pedidos/actions";
 import Link from "next/link";
@@ -33,8 +36,11 @@ export default async function TabelaPrecosPage({
   // The profile comes from the session. Nothing in the address turns costs on.
   const costs = seesCosts(session.role);
 
-  const latest = await latestVersion(conn);
-  const versions = !latest ? [] : costs ? await listVersions(conn) : [latest];
+  // One product line at a time: each has its own published table.
+  const lines = await listLines(conn);
+  const line = pickLine(lines, query[LINE_PARAM]);
+  const latest = await latestVersion(conn, line.id);
+  const versions = !latest ? [] : costs ? (await listVersions(conn)).filter((item) => item.lineId === line.id) : [latest];
   const version = chosenVersion(costs, first(query.v), versions);
   const table = version === null ? null : await loadPublishedTable(version, conn);
   // Costs and parameters of the version are read only for who may see them.
@@ -44,6 +50,7 @@ export default async function TabelaPrecosPage({
     <>
       <h1 className="text-2xl font-semibold">{ITEM.label}</h1>
       <p className="mt-1 text-slate-600">A tabela publicada, que a equipe usa para vender.</p>
+      <LineTabs lines={lines} current={line.id} path={ITEM.href} />
     </>
   );
 
@@ -126,6 +133,7 @@ export default async function TabelaPrecosPage({
               {snapshot && ` por ${snapshot.publishedBy}`}
             </p>
             <form method="get" action={ITEM.href} role="search" className="flex flex-wrap gap-2">
+              {lines.length > 1 && <input type="hidden" name={LINE_PARAM} value={line.id} />}
               {costs && versions.length > 1 && (
                 <select
                   name="v"

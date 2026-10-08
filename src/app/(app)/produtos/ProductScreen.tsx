@@ -32,6 +32,8 @@ export function ProductScreen({
   save,
   setActive,
   remove,
+  lines,
+  lineId,
 }: {
   id: number | null;
   saved: ProductFormValues<NewProductKey> | null;
@@ -41,6 +43,9 @@ export function ProductScreen({
   save: Save;
   setActive: RowAction;
   remove: RowAction;
+  /** The product lines of the company and the one of this equipment. */
+  lines: { id: number; name: string }[];
+  lineId: number;
 }) {
   const router = useRouter();
   const form = useRef<HTMLFormElement>(null);
@@ -133,6 +138,23 @@ export function ProductScreen({
       className="mx-auto flex max-w-xl flex-col gap-5"
     >
       {id !== null && <input type="hidden" name="id" value={id} />}
+      {lines.length > 1 ? (
+        <div>
+          <label htmlFor="lineId" className="block font-medium">
+            Linha de produto
+          </label>
+          <select id="lineId" name="lineId" defaultValue={lineId} className={`${INPUT} border-slate-300`}>
+            {lines.map((line) => (
+              <option key={line.id} value={line.id}>
+                {line.name}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-sm text-slate-500">Define os parâmetros e a tabela de preços em que o equipamento entra.</p>
+        </div>
+      ) : (
+        <input type="hidden" name="lineId" value={lineId} />
+      )}
 
       <div className="flex items-center gap-4">
         <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-slate-300 bg-white text-xs text-slate-500">

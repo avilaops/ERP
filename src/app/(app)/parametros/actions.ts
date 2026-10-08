@@ -1,5 +1,7 @@
 "use server";
 
+import { listLines } from "@/lib/db/product-lines";
+import { exactLine } from "@/lib/lines-view";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/auth";
 import { tenantDb } from "@/lib/db/pool";
@@ -29,6 +31,8 @@ function policyProblem(params: PricingParams): string | null {
   }
 }
 
+const NO_LINE = "A linha de produto desta tela não existe mais. Recarregue a página.";
+
 /** A server action is a public endpoint: the permission is checked again, before reading anything. */
 export async function saveParamsAction(_previous: ParamsFormState, formData: FormData): Promise<ParamsFormState> {
   const session = await requirePermission("parametros");
@@ -46,8 +50,11 @@ export async function saveParamsAction(_previous: ParamsFormState, formData: For
   const problem = policyProblem(parsed.params);
   if (problem) return { status: "error", errors: [problem], invalid: [], values: typed };
 
+  const line = exactLine(await listLines(conn), formData.get("lineId"));
+  if (!line) return { status: "error", errors: [NO_LINE], invalid: [], values: typed };
+
   try {
-    await saveParams(parsed.params, session.email, conn);
+    await saveParams(parsed.params, session.email, conn, line.id);
   } catch (error) {
     console.error("[parametros] falha ao gravar:", error instanceof Error ? error.message : error);
     return { status: "error", errors: [SAVE_FAILED], invalid: [], values: typed };
@@ -58,19 +65,21 @@ export async function saveParamsAction(_previous: ParamsFormState, formData: For
 }
 
 /** The "usar" button: adopts the suggested down payment as the policy. Same checks as saving. */
-export async function adoptSuggestedDownPaymentAction(): Promise<void> {
+export async function adoptSuggestedDownPaymentAction(formData: FormData): Promise<void> {
   const session = await requirePermission("parametros");
   const conn = tenantDb(session.tenant.slug);
 
-  const params = await loadParams(conn);
-  const suggestion = suggestedDownPayment(await listProductCosts(conn), params);
+  const line = exactLine(await listLines(conn), formData.get("lineId"));
+  if (!line) return;
+  const params = await loadParams(conn, line.id);
+  const suggestion = suggestedDownPayment(await listProductCosts(conn, line.id), params);
   if (!suggestion) return;
 
   const next = { ...params, minDownPayment: suggestion.rate };
   // A suggestion of 100% or more is not a policy the system can hold: nothing is saved.
   if (policyProblem(next)) return;
 
-  await saveParams(next, session.email, conn);
+  await saveParams(next, session.email, conn, line.id);
   revalidatePath(PATH);
 }
 

@@ -15,12 +15,14 @@ type SaveAction = (state: ParamsFormState, formData: FormData) => Promise<Params
  * what was typed; otherwise they follow `saved`, which the page refreshes after
  * a save and after the "usar" button.
  */
-export function ParamsForm({ saved, action }: { saved: ParamsFormValues; action: SaveAction }) {
+export function ParamsForm({ saved, action, lineId }: { saved: ParamsFormValues; action: SaveAction; lineId: number }) {
   const [state, formAction, pending] = useActionState(action, IDLE_FORM_STATE);
   const values = state.status === "error" && state.values ? state.values : saved;
 
   return (
     <form action={formAction} className="flex flex-col gap-6" noValidate>
+      {/* The product line these parameters belong to. */}
+      <input type="hidden" name="lineId" value={lineId} />
       {state.status === "error" && (
         <div role="alert" className="rounded border border-red-300 bg-red-50 p-4 text-sm text-red-900">
           <p className="font-semibold">Nada foi gravado.</p>

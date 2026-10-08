@@ -49,6 +49,7 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "0016_cadastro_fiscal_e_certificado.sql",
     "0017_catalogo_do_fornecedor.sql",
     "0018_icms_de_saida_por_estado.sql",
+    "0019_linhas_de_produto.sql",
   ]);
 
   const second = await withClient((client) => migrate(client, MIGRATIONS_DIR));
@@ -82,6 +83,7 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "price_table_versions",
     "pricing_params",
     "pricing_params_history",
+    "product_lines",
     "product_photos",
     "products",
     "receipts",
@@ -97,15 +99,16 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
   ]);
 });
 
-test("migração: os parâmetros iniciais não sobrescrevem o que a diretoria já gravou", { skip }, async () => {
-  await db.pool.query("UPDATE pricing_params SET target_net_profit = 0.12, updated_by = 'diretoria@teste.local'");
-  await db.pool.query("DELETE FROM schema_migrations WHERE name = '0002_parametros_iniciais.sql'");
-  const again = await withClient((client) => migrate(client, MIGRATIONS_DIR));
-  assert.deepEqual(again, ["0002_parametros_iniciais.sql"]);
-  const { rows } = await db.pool.query("SELECT target_net_profit, updated_by FROM pricing_params");
-  assert.equal(rows.length, 1);
-  assert.equal(Number(rows[0].target_net_profit), 0.12);
-  assert.equal(rows[0].updated_by, "diretoria@teste.local");
+test("migração: os parâmetros e as alíquotas que existiam passam a ser os da linha 1, a única", { skip }, async () => {
+  const lines = await db.pool.query("SELECT id, name FROM product_lines");
+  assert.deepEqual(lines.rows, [{ id: 1, name: "Importada" }]);
+  const params = await db.pool.query("SELECT line_id, updated_by FROM pricing_params");
+  assert.deepEqual(params.rows, [{ line_id: 1, updated_by: "migracao-0002" }]);
+  const rates = await db.pool.query("SELECT DISTINCT line_id, count(*)::int AS states FROM state_tax_rates GROUP BY line_id");
+  assert.deepEqual(rates.rows, [{ line_id: 1, states: 27 }]);
+  // A próxima linha criada pela tela não colide com a 1.
+  const next = await db.pool.query("SELECT nextval(pg_get_serial_sequence('product_lines', 'id'))::int AS id");
+  assert.equal(next.rows[0].id, 2);
 });
 
 test("migração: custo real e preço de tabela não são colunas; crédito guarda oito casas", { skip }, async () => {

@@ -1,3 +1,6 @@
+import { LineTabs } from "@/components/LineTabs";
+import { listLines } from "@/lib/db/product-lines";
+import { LINE_PARAM, pickLine } from "@/lib/lines-view";
 import Link from "next/link";
 import { Bars, Kpi } from "@/components/Charts";
 import { requirePermission } from "@/lib/auth";
@@ -31,7 +34,7 @@ const INPUT = "mt-1 rounded border border-slate-300 bg-white px-3 py-2 outline-n
 const DAY_MS = 86_400_000;
 const STALE_DAYS = 45;
 
-export default async function PrecosMetasPage() {
+export default async function PrecosMetasPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const session = await requirePermission("precos-metas");
   const conn = tenantDb(session.tenant.slug);
 
@@ -41,8 +44,11 @@ export default async function PrecosMetasPage() {
   const sellers = await listSellers(conn);
   const goals = goalsView(orders, await listGoals(month, conn), sellers, month);
   const pending = (await listPendingApprovals(conn)).length;
-  const versions = await listVersions(conn);
-  const products = await listProducts({ active: true }, conn);
+  // Sales, goals and approvals are of the company; table, costs and parameters are of one product line.
+  const lines = await listLines(conn);
+  const line = pickLine(lines, (await searchParams)[LINE_PARAM]);
+  const versions = (await listVersions(conn)).filter((item) => item.lineId === line.id);
+  const products = await listProducts({ active: true, lineId: line.id }, conn);
   const withoutCost = products.filter((product) => product.advisoryCost === null).length;
   const withoutCode = products.filter((product) => product.code === null).length;
   const latest = versions[0] ?? null;
@@ -53,8 +59,8 @@ export default async function PrecosMetasPage() {
   // Everything below is read only for who may see costs: target, multiplier, profit and what the company owes.
   const director = seesCosts(session.role)
     ? await (async () => {
-        const params = await loadParams(conn);
-        const result = paramsResult(params, await listProductCosts(conn));
+        const params = await loadParams(conn, line.id);
+        const result = paramsResult(params, await listProductCosts(conn, line.id));
         const closed = dashboardView(orders, "mes", today);
         const profit = await ordersProfit(closed.closedNumbers, conn);
         const byState = UFS.map((uf) => ({
@@ -78,6 +84,7 @@ export default async function PrecosMetasPage() {
     <>
       <h1 className="text-2xl font-semibold">{menuItem("precos-metas").label}</h1>
       <p className="mt-1 text-slate-600">Como estão a tabela, as metas de {monthLabel(month)} e o que espera decisão.</p>
+      <LineTabs lines={lines} current={line.id} path={menuItem("precos-metas").href} />
 
       <dl className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <Kpi

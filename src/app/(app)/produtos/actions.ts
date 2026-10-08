@@ -1,5 +1,7 @@
 "use server";
 
+import { listLines } from "@/lib/db/product-lines";
+import { exactLine } from "@/lib/lines-view";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/auth";
 import { tenantDb } from "@/lib/db/pool";
@@ -15,7 +17,7 @@ import {
   updateProduct,
 } from "@/lib/db/products";
 import { loadParams } from "@/lib/db/params";
-import { latestVersion, loadPublishedSnapshot, PriceTableError, publishPriceTable } from "@/lib/db/price-table";
+import { latestVersion, loadPublishedSnapshot, nextVersionNumber, PriceTableError, publishPriceTable } from "@/lib/db/price-table";
 import { draftPriceTable, NOTHING_TO_PUBLISH, pendingChanges } from "@/lib/price-table";
 import type { PublishState } from "@/lib/price-table";
 import { NEW_PRODUCT_FIELDS, parseProductForm, rawProductValues, ROW_FIELDS } from "@/lib/product-form";
@@ -48,6 +50,8 @@ const rowError = (message: string, values: RowState["values"] = null): RowState 
   values,
 });
 
+const NO_LINE = "A linha de produto desta tela não existe mais. Recarregue a página.";
+
 const SAVED: RowState = { status: "saved", errors: [], invalid: [], values: null };
 
 /** A server action is a public endpoint: the permission is checked again, before reading anything. */
@@ -61,7 +65,9 @@ export async function createProductAction(_previous: NewProductState, formData: 
   if (!parsed.ok) return { status: "error", errors: parsed.errors, invalid: parsed.invalid, values: typed };
 
   try {
-    await createProduct(parsed.input, session.email, conn);
+    const line = exactLine(await listLines(conn), formData.get("lineId"));
+    if (!line) return { status: "error", errors: [NO_LINE], invalid: [], values: typed };
+    await createProduct({ ...parsed.input, lineId: line.id }, session.email, conn);
   } catch (error) {
     return { status: "error", errors: [problem("cadastrar", error)], invalid: [], values: typed };
   }
@@ -202,19 +208,25 @@ export async function publishPriceTableAction(_previous: PublishState, formData:
 
   const expected = Number(formData.get("expected"));
   try {
-    const [params, products, latest] = await Promise.all([loadParams(conn), listProducts({ active: true }, conn), latestVersion(conn)]);
+    const line = exactLine(await listLines(conn), formData.get("lineId"));
+    if (!line) return publishError(NO_LINE);
+    const [params, products, latest, next] = await Promise.all([
+      loadParams(conn, line.id),
+      listProducts({ active: true, lineId: line.id }, conn),
+      latestVersion(conn, line.id),
+      nextVersionNumber(conn),
+    ]);
     const published = latest ? await loadPublishedSnapshot(latest.version, conn) : null;
 
     const draft = draftPriceTable(params, products);
     if (draft.items.length === 0) return publishError(NOTHING_TO_PUBLISH);
     if (!pendingChanges(draft, published)) return publishError(`Nada mudou desde a tabela v${latest?.version}.`);
 
-    const next = (latest?.version ?? 0) + 1;
     if (expected !== next) {
       return publishError("A tabela já foi publicada por outra pessoa. Confira o que está pendente e publique de novo.");
     }
 
-    const { version } = await publishPriceTable(draft, next, session.email, conn);
+    const { version } = await publishPriceTable(draft, next, session.email, conn, line.id);
     console.info(`[produtos] tabela v${version} publicada: ${draft.items.length} equipamento(s), por ${session.email}`);
 
     revalidatePath(menuItem("produtos").href);
@@ -241,7 +253,10 @@ export async function saveProductScreenAction(formData: FormData): Promise<Produ
 
   const id = read("id");
   try {
-    const product = id ? await updateProduct(Number(id), parsed.input, session.email, conn) : await createProduct(parsed.input, session.email, conn);
+    const line = exactLine(await listLines(conn), formData.get("lineId"));
+    if (!line) return { ok: false, errors: [NO_LINE], invalid: [] };
+    const input = { ...parsed.input, lineId: line.id };
+    const product = id ? await updateProduct(Number(id), input, session.email, conn) : await createProduct(input, session.email, conn);
     revalidate();
     return { ok: true, id: product.id };
   } catch (error) {

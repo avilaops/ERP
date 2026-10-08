@@ -113,7 +113,7 @@ export function ProductRow({
         <td className="whitespace-nowrap px-2 py-4 text-right">{row.realCost}</td>
         <td className="whitespace-nowrap px-2 py-3 text-right">
           <span className="font-semibold">{row.table}</span>
-          {row.tableWithIpi && <span className="block text-xs text-slate-500">c/IPI {row.tableWithIpi}</span>}
+          {row.tableWithIpi && row.tableWithIpi !== row.table && <span className="block text-xs text-slate-500">c/IPI {row.tableWithIpi}</span>}
         </td>
         <td className="whitespace-nowrap px-2 py-4 text-right">{row.maxSp}</td>
         <td className="whitespace-nowrap px-2 py-4 text-right">{row.maxTaxpayer}</td>

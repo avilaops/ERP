@@ -26,7 +26,7 @@ import {
   setOrderItemQuantity,
 } from "@/lib/db/orders";
 import type { OrderScope } from "@/lib/db/orders";
-import { latestVersion } from "@/lib/db/price-table";
+import { latestVersion, loadPublishedTable } from "@/lib/db/price-table";
 import { isoDate } from "@/lib/format";
 import { parseOrderPayment, parseOrderTerms, parseQuantity } from "@/lib/order-form";
 import type { ActionState } from "@/lib/order-form";
@@ -68,7 +68,9 @@ export async function createOrderAction(_previous: ActionState, formData: FormDa
 
   let number: string;
   try {
-    const latest = await latestVersion(conn);
+    // The line is the one of the table the screen showed; the newest of that line is the one sold with.
+    const shown = await loadPublishedTable(Number(read("version")), conn);
+    const latest = shown ? await latestVersion(conn, shown.lineId) : null;
     if (!latest) return { error: "Nenhuma tabela publicada ainda. Sem ela não há preço para vender." };
     // The prices on the screen were the ones of the version it showed.
     if (Number(read("version")) !== latest.version) {

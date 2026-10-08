@@ -1,9 +1,12 @@
+import { LineTabs } from "@/components/LineTabs";
+import { listLines } from "@/lib/db/product-lines";
+import { LINE_PARAM, pickLine } from "@/lib/lines-view";
 import Link from "next/link";
 import { requirePermission } from "@/lib/auth";
 import { tenantDb } from "@/lib/db/pool";
 import { menuItem } from "@/lib/auth/permissions";
 import { loadParams } from "@/lib/db/params";
-import { latestVersion, loadPublishedSnapshot } from "@/lib/db/price-table";
+import { latestVersion, loadPublishedSnapshot, nextVersionNumber } from "@/lib/db/price-table";
 import { listProducts } from "@/lib/db/products";
 import type { Product } from "@/lib/db/products";
 import { showMoney, showPercent } from "@/lib/format";
@@ -81,11 +84,20 @@ export default async function ProdutosPage({
   const tab = parseTab(first(query.aba));
   const search = (first(query.q) ?? "").trim();
 
-  const [params, products, latest] = await Promise.all([loadParams(conn), listProducts({}, conn), latestVersion(conn)]);
+  // One product line at a time: its equipments, its parameters and its published table.
+  const lines = await listLines(conn);
+  const line = pickLine(lines, query[LINE_PARAM]);
+  const several = lines.length > 1;
+  const [params, products, latest, nextNumber] = await Promise.all([
+    loadParams(conn, line.id),
+    listProducts({ lineId: line.id }, conn),
+    latestVersion(conn, line.id),
+    nextVersionNumber(conn),
+  ]);
   // What the team sees against what would be published now.
   const published = latest ? await loadPublishedSnapshot(latest.version, conn) : null;
   const draft = draftPriceTable(params, products);
-  const notice = publishNotice(draft, latest, pendingChanges(draft, published));
+  const notice = publishNotice(draft, latest, pendingChanges(draft, published), nextNumber);
   const rows = viewProducts(products, { tab, search }).map((product) => toRow(product, params));
 
   return (
@@ -93,6 +105,7 @@ export default async function ProdutosPage({
       <ProductTools
         create={createProductAction}
         paste={pasteAdvisoryCostsAction}
+        lineId={line.id}
         heading={
           <>
             <h1 className="text-2xl font-semibold">{ITEM.label}</h1>
@@ -104,7 +117,9 @@ export default async function ProdutosPage({
         }
       />
 
-      <PublishBanner notice={notice} action={publishPriceTableAction} />
+      <LineTabs lines={lines} current={line.id} path={ITEM.href} />
+
+      <PublishBanner key={line.id} notice={notice} action={publishPriceTableAction} lineId={line.id} />
 
       <section className="mt-6 rounded-lg border border-slate-200 bg-white" aria-label="Equipamentos">
         <div className="flex flex-wrap items-end justify-between gap-4 p-4">
@@ -113,7 +128,7 @@ export default async function ProdutosPage({
               {PRODUCT_TABS.map(({ key, label }) => (
                 <Link
                   key={key}
-                  href={listHref(ITEM.href, key, search)}
+                  href={listHref(ITEM.href, key, search, several ? line.id : null)}
                   aria-current={key === tab ? "page" : undefined}
                   className={`rounded-md px-3 py-1.5 font-medium ${
                     key === tab ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100"
@@ -125,6 +140,7 @@ export default async function ProdutosPage({
             </nav>
             <form method="get" action={ITEM.href} role="search" className="flex w-full gap-2 sm:w-auto">
               {tab !== "ativos" && <input type="hidden" name="aba" value={tab} />}
+              {several && <input type="hidden" name={LINE_PARAM} value={line.id} />}
               <input
                 type="search"
                 name="q"
@@ -158,7 +174,7 @@ export default async function ProdutosPage({
                     </span>
                     <span className="shrink-0 text-right">
                       <span className="block font-semibold">{row.tableWithIpi ?? "sem custo"}</span>
-                      <span className="block text-xs text-slate-500">{row.tableWithIpi ? "tabela c/ IPI" : "toque para informar"}</span>
+                      <span className="block text-xs text-slate-500">{row.tableWithIpi ? (row.tableWithIpi === row.table ? "preço de tabela" : "tabela c/ IPI") : "toque para informar"}</span>
                     </span>
                   </Link>
                 </li>

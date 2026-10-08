@@ -1,3 +1,4 @@
+import { listLines } from "@/lib/db/product-lines";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requirePermission } from "@/lib/auth";
@@ -21,6 +22,7 @@ export default async function EquipamentoPage({ params }: { params: Promise<{ id
   const conn = tenantDb(session.tenant.slug);
   const product = /^[1-9]\d{0,8}$/.test(id) ? (await listProducts({}, conn)).find((item) => item.id === Number(id)) : undefined;
   if (!product) notFound();
+  const lines = await listLines(conn);
   const fiscal = await loadProductFiscal(product.id, conn);
   const fromSupplier = await listSupplierItemsOf(product.code, conn);
 
@@ -41,6 +43,8 @@ export default async function EquipamentoPage({ params }: { params: Promise<{ id
           // The route answers with an ETag, so a changed photo is fetched again.
           photo={product.hasPhoto ? `/api/produtos/${product.id}/foto` : null}
           active={product.active}
+          lines={lines}
+          lineId={product.lineId}
           save={saveProductScreenAction}
           setActive={setProductActiveAction}
           remove={deleteProductAction}

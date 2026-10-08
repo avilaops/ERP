@@ -18,7 +18,7 @@ const product = (id: number, name: string, code: string | null, advisoryCost: nu
   taxCredit,
   packaging: 0,
   active: true,
-  hasPhoto: false,
+  hasPhoto: false, lineId: 1,
 });
 
 const PUBLISHED_AT = new Date("2026-10-05T12:00:00Z");
@@ -26,6 +26,7 @@ const PUBLISHED_AT = new Date("2026-10-05T12:00:00Z");
 /** The v1 of the print, as the directors read it. */
 const SNAPSHOT: PublishedSnapshot = {
   version: 1,
+  lineId: 1,
   publishedAt: PUBLISHED_AT,
   publishedBy: "rogerio@ludus.test",
   ...draftPriceTable(DEFAULT_PARAMS, [
@@ -39,6 +40,7 @@ const SNAPSHOT: PublishedSnapshot = {
 /** The same version as the team reads it: what `loadPublishedTable` returns. */
 const TABLE: PublishedTable = {
   version: 1,
+  lineId: 1,
   publishedAt: PUBLISHED_AT,
   freeDiscount: SNAPSHOT.params.freeDiscount,
   ipi: SNAPSHOT.params.ipi,
@@ -110,7 +112,7 @@ test("ordem por código, com número comparado como número; sem código por úl
 });
 
 test("qual versão aparece: só quem pode escolher sai da mais nova", () => {
-  const versions: PriceTableVersion[] = [3, 2, 1].map((version) => ({ version, publishedAt: PUBLISHED_AT, publishedBy: "x" }));
+  const versions: PriceTableVersion[] = [3, 2, 1].map((version) => ({ version, lineId: 1, publishedAt: PUBLISHED_AT, publishedBy: "x" }));
   // Diretoria.
   assert.equal(chosenVersion(true, "1", versions), 1);
   assert.equal(chosenVersion(true, undefined, versions), 3);

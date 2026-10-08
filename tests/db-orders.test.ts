@@ -119,6 +119,7 @@ test("a equipe lê as condições comerciais da versão, e nada de custo", { ski
   assert.ok(table);
   assert.deepEqual(Object.keys(table), [
     "version",
+    "lineId",
     "publishedAt",
     "freeDiscount",
     "ipi",

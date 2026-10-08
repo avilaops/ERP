@@ -1,3 +1,4 @@
+import { MAIN_LINE } from "@/lib/product-line";
 import { limitsByDestination } from "@/lib/pricing/table";
 import type { DestinationLimit } from "@/lib/pricing/table";
 import type { Destination } from "@/lib/pricing/taxes";
@@ -9,7 +10,7 @@ import { assertAmount, assertRate } from "@/lib/pricing/money";
 import { validateParams } from "@/lib/pricing/params";
 import type { PricingParams } from "@/lib/pricing/params";
 
-export type PriceTableVersion = { version: number; publishedAt: Date; publishedBy: string };
+export type PriceTableVersion = { version: number; lineId: number; publishedAt: Date; publishedBy: string };
 
 /** What went into the price of one product and the price that came out, in cents. */
 export type PriceTableItem = {
@@ -35,6 +36,8 @@ export type PublishedPrice = { productId: number; code: string | null; name: str
  */
 export type PublishedTable = {
   version: number;
+  /** The product line of this version: an order opened with it is of that line. */
+  lineId: number;
   publishedAt: Date;
   freeDiscount: number;
   ipi: number;
@@ -58,23 +61,31 @@ const COLUMN_LIST = PARAM_COLUMN_LIST;
 
 const toVersion = (row: Record<string, unknown>): PriceTableVersion => ({
   version: Number(row.version),
+  lineId: Number(row.line_id),
   publishedAt: row.published_at as Date,
   publishedBy: String(row.published_by),
 });
 
-/** The version the team sells with, or `null` before the first publication. */
-export async function latestVersion(conn: Queryable): Promise<PriceTableVersion | null> {
+/** The version the team sells a line with, or `null` before the first publication of that line. */
+export async function latestVersion(conn: Queryable, lineId: number = MAIN_LINE): Promise<PriceTableVersion | null> {
   const { rows } = await conn.query(
-    "SELECT version, published_at, published_by FROM price_table_versions ORDER BY version DESC LIMIT 1",
+    "SELECT version, line_id, published_at, published_by FROM price_table_versions WHERE line_id = $1 ORDER BY version DESC LIMIT 1",
+    [lineId],
   );
   return rows[0] ? toVersion(rows[0]) : null;
+}
+
+/** The number the next publication takes: one numbering for the company, whatever the line. */
+export async function nextVersionNumber(conn: Queryable): Promise<number> {
+  const { rows } = await conn.query("SELECT COALESCE(MAX(version), 0) + 1 AS next FROM price_table_versions");
+  return Number(rows[0].next);
 }
 
 /** A version with its parameters and costs. The parameters are validated on the way out. */
 export async function loadPublishedSnapshot(version: number, conn: Queryable): Promise<PublishedSnapshot | null> {
   if (!Number.isSafeInteger(version) || version <= 0) return null;
   const { rows } = await conn.query(
-    `SELECT version, published_at, published_by, ${COLUMN_LIST} FROM price_table_versions WHERE version = $1`,
+    `SELECT version, line_id, published_at, published_by, ${COLUMN_LIST} FROM price_table_versions WHERE version = $1`,
     [version],
   );
   if (!rows[0]) return null;
@@ -138,19 +149,20 @@ export async function publishPriceTable(
   version: number,
   publishedBy: string,
   conn: Queryable,
+  lineId: number = MAIN_LINE,
 ): Promise<PriceTableVersion> {
   assertDraft(draft, version, publishedBy);
 
   const items = draft.items;
-  // $1 to $14 are the version, who publishes, the items and the rates by state; the parameters come after.
-  const placeholders = PARAM_COLUMNS.map((_, index) => `$${index + 15}::numeric`).join(", ");
+  // $1 to $15 are the version, who publishes, the items, the rates by state and the line; the parameters come after.
+  const placeholders = PARAM_COLUMNS.map((_, index) => `$${index + 16}::numeric`).join(", ");
   try {
     const { rows } = await conn.query(
       `WITH published AS (
-         INSERT INTO price_table_versions (version, published_by, ${COLUMN_LIST})
-         SELECT $1::integer, $2::text, ${placeholders}
+         INSERT INTO price_table_versions (version, published_by, line_id, ${COLUMN_LIST})
+         SELECT $1::integer, $2::text, $15::integer, ${placeholders}
           WHERE $1::integer = (SELECT COALESCE(MAX(version), 0) + 1 FROM price_table_versions)
-         RETURNING version, published_at, published_by
+         RETURNING version, line_id, published_at, published_by
        ), written AS (
          INSERT INTO price_table_items
            (version, product_id, code, name, advisory_cost, tax_credit, packaging, table_price, table_price_with_ipi)
@@ -166,7 +178,7 @@ export async function publishPriceTable(
            FROM published, unnest($11::text[], $12::numeric[], $13::numeric[], $14::numeric[]) AS rate (uf, internal_icms, fcp, outbound_icms)
          RETURNING version
        )
-       SELECT version, published_at, published_by FROM published
+       SELECT version, line_id, published_at, published_by FROM published
         WHERE EXISTS (SELECT 1 FROM written) AND EXISTS (SELECT 1 FROM rates)`,
       [
         version,
@@ -180,6 +192,7 @@ export async function publishPriceTable(
         items.map((item) => item.table),
         items.map((item) => item.tableWithIpi),
         ...stateRateArrays(draft.params.stateRates),
+        lineId,
         ...PARAM_COLUMNS.map(([field]) => draft.params[field]),
       ],
     );
@@ -201,7 +214,7 @@ export async function publishPriceTable(
 export async function loadPublishedTable(version: number, conn: Queryable): Promise<PublishedTable | null> {
   if (!Number.isSafeInteger(version) || version <= 0) return null;
   const { rows } = await conn.query(
-    `SELECT version, published_at, free_discount, ipi, min_down_payment, proposal_validity_days, commission
+    `SELECT version, line_id, published_at, free_discount, ipi, min_down_payment, proposal_validity_days, commission
        FROM price_table_versions WHERE version = $1`,
     [version],
   );
@@ -213,6 +226,7 @@ export async function loadPublishedTable(version: number, conn: Queryable): Prom
   );
   return {
     version: Number(rows[0].version),
+    lineId: Number(rows[0].line_id),
     publishedAt: rows[0].published_at as Date,
     freeDiscount: Number(rows[0].free_discount),
     ipi: Number(rows[0].ipi),
@@ -248,7 +262,7 @@ export async function loadDiscountLimits(version: number, conn: Queryable): Prom
 /** Every publication, from the newest to the oldest. */
 export async function listVersions(conn: Queryable): Promise<PriceTableVersion[]> {
   const { rows } = await conn.query(
-    "SELECT version, published_at, published_by FROM price_table_versions ORDER BY version DESC",
+    "SELECT version, line_id, published_at, published_by FROM price_table_versions ORDER BY version DESC",
   );
   return rows.map(toVersion);
 }

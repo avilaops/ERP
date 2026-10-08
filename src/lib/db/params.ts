@@ -1,3 +1,4 @@
+import { MAIN_LINE } from "@/lib/product-line";
 import type { Queryable } from "@/lib/db/pool";
 import { validateParams } from "@/lib/pricing/params";
 import type { PricingParams, ScalarParams } from "@/lib/pricing/params";
@@ -69,41 +70,41 @@ export function rowToParams(row: Record<string, unknown>, stateRates: StateRates
  * answering with values from the code. What comes out is validated before
  * anyone uses it: an invalid row throws instead of returning crooked parameters.
  */
-export async function loadParams(conn: Queryable): Promise<PricingParams> {
-  const { rows } = await conn.query(`SELECT ${COLUMN_LIST} FROM pricing_params`);
+export async function loadParams(conn: Queryable, lineId: number = MAIN_LINE): Promise<PricingParams> {
+  const { rows } = await conn.query(`SELECT ${COLUMN_LIST} FROM pricing_params WHERE line_id = $1`, [lineId]);
   const row = rows[0];
   if (!row) throw new Error("Parâmetros não cadastrados no banco. Rode `npm run db:migrate`.");
 
-  const rates = await conn.query("SELECT uf, internal_icms, fcp, outbound_icms FROM state_tax_rates");
+  const rates = await conn.query("SELECT uf, internal_icms, fcp, outbound_icms FROM state_tax_rates WHERE line_id = $1", [lineId]);
   return rowToParams(row, rowsToStateRates(rates.rows));
 }
 
-/** Validates, makes sure a table price exists for these parameters, then writes the single row and the rates by state. */
-export async function saveParams(params: PricingParams, updatedBy: string, conn: Queryable): Promise<void> {
+/** Validates, makes sure a table price exists for these parameters, then writes the row of the line and its rates by state. */
+export async function saveParams(params: PricingParams, updatedBy: string, conn: Queryable, lineId: number = MAIN_LINE): Promise<void> {
   validateParams(params);
   tableMultiplier(params);
   if (updatedBy.trim() === "") throw new Error("Falta dizer quem está gravando os parâmetros.");
 
   const values = COLUMNS.map(([field]) => params[field]);
-  // $1 is who saves and $2 to $5 are the four columns of the rates by state; the parameters come after.
-  const placeholders = COLUMNS.map((_, index) => `$${index + 6}`).join(", ");
+  // $1 is who saves, $2 to $5 are the four columns of the rates by state and $6 is the line; the parameters come after.
+  const placeholders = COLUMNS.map((_, index) => `$${index + 7}`).join(", ");
   const updates = COLUMNS.map(([, column]) => `${column} = EXCLUDED.${column}`).join(", ");
-  // One statement: the single row and the 27 states are written together or not at all.
+  // One statement: the row of the line and its 27 states are written together or not at all.
   await conn.query(
     `WITH saved AS (
-       INSERT INTO pricing_params (id, ${COLUMN_LIST}, updated_by)
-       VALUES (true, ${placeholders}, $1)
-       ON CONFLICT (id) DO UPDATE SET ${updates}, updated_at = now(), updated_by = EXCLUDED.updated_by
+       INSERT INTO pricing_params (line_id, ${COLUMN_LIST}, updated_by)
+       VALUES ($6, ${placeholders}, $1)
+       ON CONFLICT (line_id) DO UPDATE SET ${updates}, updated_at = now(), updated_by = EXCLUDED.updated_by
        RETURNING updated_by
      )
-     INSERT INTO state_tax_rates (uf, internal_icms, fcp, outbound_icms, updated_by)
-     SELECT rate.uf, rate.internal_icms, rate.fcp, rate.outbound_icms, saved.updated_by
+     INSERT INTO state_tax_rates (line_id, uf, internal_icms, fcp, outbound_icms, updated_by)
+     SELECT $6, rate.uf, rate.internal_icms, rate.fcp, rate.outbound_icms, saved.updated_by
        FROM saved, unnest($2::text[], $3::numeric[], $4::numeric[], $5::numeric[]) AS rate (uf, internal_icms, fcp, outbound_icms)
-     ON CONFLICT (uf) DO UPDATE
+     ON CONFLICT (line_id, uf) DO UPDATE
         SET internal_icms = EXCLUDED.internal_icms, fcp = EXCLUDED.fcp, outbound_icms = EXCLUDED.outbound_icms,
             updated_at = now(), updated_by = EXCLUDED.updated_by
       WHERE state_tax_rates.internal_icms <> EXCLUDED.internal_icms OR state_tax_rates.fcp <> EXCLUDED.fcp
          OR state_tax_rates.outbound_icms IS DISTINCT FROM EXCLUDED.outbound_icms`,
-    [updatedBy, ...stateRateArrays(params.stateRates), ...values],
+    [updatedBy, ...stateRateArrays(params.stateRates), lineId, ...values],
   );
 }

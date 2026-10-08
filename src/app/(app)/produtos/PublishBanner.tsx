@@ -11,7 +11,7 @@ type PublishAction = (state: PublishState, formData: FormData) => Promise<Publis
  * Only shows text that came ready from the server. Publishing takes a second
  * click here: a published version is never removed.
  */
-export function PublishBanner({ notice, action }: { notice: PublishNotice; action: PublishAction }) {
+export function PublishBanner({ notice, action, lineId }: { notice: PublishNotice; action: PublishAction; lineId: number }) {
   const [confirming, setConfirming] = useState(false);
   const [state, formAction, pending] = useActionState(action, IDLE_PUBLISH);
 
@@ -31,6 +31,7 @@ export function PublishBanner({ notice, action }: { notice: PublishNotice; actio
         {notice.next !== null && (
           <form action={formAction} className="flex flex-wrap items-center gap-2">
             <input type="hidden" name="expected" value={notice.next} />
+            <input type="hidden" name="lineId" value={lineId} />
             {/* Different keys: the pressed button must never become the one that submits. */}
             {confirming ? (
               <>

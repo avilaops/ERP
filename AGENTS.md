@@ -174,6 +174,20 @@ funções puras, sem banco e sem tela, conferidas com os números dos prints do 
     IPI (`hasIpi = table.ipi > 0`); nada disso é fixo por empresa. **O desconto se digita em % ou
     em R$** (`DiscountFields` + `src/lib/discount-entry.ts`): só o percentual é enviado e gravado.
 
+13. **Linhas de produto** (migração `0019`, `src/lib/db/product-lines.ts`): a mesma empresa vende
+    mais de uma linha (importada, nacional…). Cada linha tem os seus parâmetros
+    (`pricing_params.line_id`), as suas 27 alíquotas (`state_tax_rates`), os seus equipamentos
+    (`products.line_id`) e a sua tabela publicada (`price_table_versions.line_id`). **A numeração
+    das versões é uma só na empresa** (`nextVersionNumber`), e **o pedido é de uma linha só**: a
+    da versão com que foi aberto; não há pedido misturando linhas. Nas telas a linha vem de
+    `?linha=` (`pickLine`, que cai na primeira) e nas gravações de um campo `lineId` conferido
+    com `exactLine`, que **não** cai em outra linha. `loadParams`, `listProductCosts`,
+    `latestVersion`, `saveParams` e `publishPriceTable` têm a linha como último argumento, com a
+    linha 1 de padrão só para os testes: em `src/app` a linha é sempre dita (teste em
+    `tests/routes.test.ts`). Cadastro em Parâmetros → Linhas de produto: a nova nasce com cópia
+    dos parâmetros de outra; só sai a que não tem equipamento nem tabela publicada. Com uma linha
+    só, nenhuma tela mostra o seletor (`LineTabs`).
+
 10. **Provisões e taxa fixa por pedido são parâmetros** (migração `0013`): perdas, garantia e
     inadimplência somam em `channelRate`; a taxa fixa sai do lucro do pedido uma vez, junto com o
     frete (`quoteOrder`, `orderMaxDiscounts`). Entram com zero, e "Outras taxas da venda" segue

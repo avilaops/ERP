@@ -90,7 +90,8 @@ export default async function PedidoPage({
   const snapshot = costs ? await loadPublishedSnapshot(order.priceTableVersion, conn) : null;
   const board = snapshot ? directorOf(order, snapshot) : null;
 
-  const latest = await latestVersion(conn);
+  // The newest table of the line of this order: another line publishing does not make this one old.
+  const latest = await latestVersion(conn, table.lineId);
   const sale = saleOf(order, table);
   const today = isoDate(new Date());
   const dates = dueDates(order, table, today);

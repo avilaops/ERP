@@ -74,7 +74,8 @@ test("parâmetros: o banco recusa taxa fora de [0, 1) e uma segunda linha", { sk
   await assert.rejects(() => db.pool.query("UPDATE pricing_params SET ipi = 1.3"), /check|numeric field overflow/i);
   await assert.rejects(() => db.pool.query("UPDATE pricing_params SET commission = -0.01"), /check/i);
   await assert.rejects(() => db.pool.query("UPDATE pricing_params SET proposal_validity_days = 0"), /check/i);
-  await assert.rejects(() => db.pool.query("UPDATE pricing_params SET id = false"), /check/i);
+  // Uma linha de parâmetros por linha de produto, e só de linha que existe.
+  await assert.rejects(() => db.pool.query("UPDATE pricing_params SET line_id = 99"), /fkey/i);
   assert.equal(await count(), 1);
 });
 
@@ -112,7 +113,7 @@ test("alíquotas por estado: a migração semeia as 27, gravar altera só as que
     await assert.rejects(() => other.pool.query("UPDATE state_tax_rates SET internal_icms = 1 WHERE uf = 'MA'"), /check/i);
     await assert.rejects(() => other.pool.query("UPDATE state_tax_rates SET fcp = -0.01 WHERE uf = 'MA'"), /check/i);
     await assert.rejects(
-      () => other.pool.query("INSERT INTO state_tax_rates (uf, internal_icms, updated_by) VALUES ('XX', 0.1, 'x')"),
+      () => other.pool.query("INSERT INTO state_tax_rates (line_id, uf, internal_icms, updated_by) VALUES (1, 'XX', 0.1, 'x')"),
       /check/i,
     );
     // Estado faltando no banco é erro na leitura, não conta com alíquota inventada.
