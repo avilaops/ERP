@@ -57,13 +57,13 @@ export async function listDashboardOrders(scope: OrderScope, conn: Queryable): P
 }
 
 /**
- * The net profit of the given orders, each with the costs of its own table
- * version. Only for who `seesCosts`: the caller asks this only for them.
+ * The net sale and the net profit of each of the given orders, each with the
+ * costs of its own table version. Only for who `seesCosts`: the caller asks
+ * this only for them.
  */
-export async function ordersProfit(numbers: string[], conn: Queryable): Promise<{ netSale: number; netProfit: number }> {
+export async function ordersProfitEach(numbers: string[], conn: Queryable): Promise<Map<string, { netSale: number; netProfit: number }>> {
   const snapshots = new Map<number, PublishedSnapshot>();
-  let netSale = 0;
-  let netProfit = 0;
+  const each = new Map<string, { netSale: number; netProfit: number }>();
   for (const number of numbers) {
     const order = await getOrder(number, { sellerEmail: null }, conn);
     if (!order) continue;
@@ -75,8 +75,18 @@ export async function ordersProfit(numbers: string[], conn: Queryable): Promise<
     }
     const board = directorOf(order, snapshot);
     if (!board) continue;
-    netSale += board.quote.netSale;
-    netProfit += board.quote.netProfit;
+    each.set(number, { netSale: board.quote.netSale, netProfit: board.quote.netProfit });
+  }
+  return each;
+}
+
+/** The net profit of the given orders, summed. */
+export async function ordersProfit(numbers: string[], conn: Queryable): Promise<{ netSale: number; netProfit: number }> {
+  let netSale = 0;
+  let netProfit = 0;
+  for (const figures of (await ordersProfitEach(numbers, conn)).values()) {
+    netSale += figures.netSale;
+    netProfit += figures.netProfit;
   }
   return { netSale, netProfit };
 }

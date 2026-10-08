@@ -2,11 +2,11 @@ import Link from "next/link";
 import { Bars, Columns, Kpi } from "@/components/Charts";
 import { requirePermission } from "@/lib/auth";
 import { allows, menuItem, seesAllOrders, seesCosts } from "@/lib/auth/permissions";
-import { dashboardView, parsePeriod, PERIODS } from "@/lib/dashboard-view";
-import { listDashboardOrders, ordersProfit } from "@/lib/db/dashboard";
+import { cashForecast, change, dashboardView, parsePeriod, PERIODS } from "@/lib/dashboard-view";
+import { listDashboardOrders, ordersProfit, ordersProfitEach } from "@/lib/db/dashboard";
 import { listCommissionsDue, listPayables } from "@/lib/db/payables";
 import { tenantDb } from "@/lib/db/pool";
-import { listOpenReceivables } from "@/lib/db/receivables";
+import { listOpenReceivables, receivedInMonth } from "@/lib/db/receivables";
 import { isoDate, showMoney, showPercent } from "@/lib/format";
 import { payablesSummary } from "@/lib/payables-view";
 import { addDays } from "@/lib/pricing/payment";
@@ -46,11 +46,36 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const periodLabel = PERIODS.find((item) => item.key === period)?.label.toLowerCase() ?? "";
 
   // Profit is read only for who may see costs.
-  const profit = seesCosts(session.role) ? await ordersProfit(view.closedNumbers, conn) : null;
-  const receivables = allows(session, "recebimentos") ? receivablesSummary(await listOpenReceivables(conn), today, addDays(today, 30)) : null;
-  const payables = allows(session, "contas-pagar")
-    ? payablesSummary(await listPayables(conn), await listCommissionsDue(conn), { today, inSevenDays: addDays(today, 7), month: today.slice(0, 7) })
+  const director = seesCosts(session.role);
+  const profit = director ? await ordersProfit(view.closedNumbers, conn) : null;
+  const profitBefore = director ? await ordersProfit(view.previous.closedNumbers, conn) : null;
+  // Net profit of each of the twelve months of the chart, for the directors only.
+  const profitEach = director ? await ordersProfitEach(view.closedByMonth.flatMap((month) => month.numbers), conn) : null;
+  const profitByMonth = profitEach
+    ? view.closedByMonth.map((month) => ({ label: month.label, value: Math.round(month.numbers.reduce((sum, number) => sum + (profitEach.get(number)?.netProfit ?? 0), 0) * 100) / 100 }))
     : null;
+
+  const openReceivables = allows(session, "recebimentos") ? await listOpenReceivables(conn) : null;
+  const receivables = openReceivables ? receivablesSummary(openReceivables, today, addDays(today, 30)) : null;
+  const received = openReceivables ? await receivedInMonth(today.slice(0, 7), conn) : null;
+  const bills = allows(session, "contas-pagar") ? { payables: await listPayables(conn), commissions: await listCommissionsDue(conn) } : null;
+  const payables = bills ? payablesSummary(bills.payables, bills.commissions, { today, inSevenDays: addDays(today, 7), month: today.slice(0, 7) }) : null;
+  // The cash expected needs both sides: who sees only one of them does not get half a forecast.
+  const cash =
+    openReceivables && bills
+      ? cashForecast(
+          openReceivables.map((item) => ({ dueDate: item.dueDate, amount: item.open })),
+          [...bills.payables.filter((item) => item.status === "aberta"), ...bills.commissions.filter((item) => item.amount > 0)].map((item) => ({ dueDate: item.dueDate, amount: item.amount })),
+          today,
+        )
+      : null;
+  /** "▲ 12% vs. período anterior", or nothing when the period before has nothing to compare with. */
+  const versus = (delta: number | null) =>
+    delta === null ? null : (
+      <span className={`mt-1 block font-medium ${delta >= 0 ? "text-emerald-800" : "text-red-700"}`}>
+        {delta >= 0 ? "▲" : "▼"} {showPercent(Math.abs(delta), 0)} <span className="font-normal text-slate-600">vs. período anterior</span>
+      </span>
+    );
   const { funnel } = view;
 
   return (
@@ -94,14 +119,28 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       )}
 
       <dl className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-        <Kpi label="Vendas fechadas" value={showMoney(view.closed.total)} note={`${view.closed.count} ${view.closed.count === 1 ? "pedido" : "pedidos"} · com IPI`} />
+        <Kpi label="Vendas fechadas" value={showMoney(view.closed.total)} note={<>com IPI{versus(change(view.closed.total, view.previous.closed.total))}</>} />
+        <Kpi
+          label="Pedidos fechados"
+          value={String(view.closed.count)}
+          note={
+            <>
+              {funnel.created} {funnel.created === 1 ? "orçamento criado" : "orçamentos criados"}
+              {versus(change(view.closed.count, view.previous.closed.count))}
+            </>
+          }
+        />
         <Kpi label="Em negociação" value={showMoney(view.open.total)} note={`${view.open.count} ${view.open.count === 1 ? "pedido em aberto" : "pedidos em aberto"} · hoje`} />
-        <Kpi label="Ticket médio" value={view.averageTicket === null ? NONE : showMoney(view.averageTicket)} note="por pedido fechado" />
-        <Kpi label="Conversão" value={view.conversion === null ? NONE : showPercent(view.conversion, 0)} note="fechados sobre fechados e perdidos" />
+        <Kpi label="Ticket médio" value={view.averageTicket === null ? NONE : showMoney(view.averageTicket)} note={<>por pedido fechado{versus(change(view.averageTicket, view.previous.averageTicket))}</>} />
+        <Kpi label="Taxa de fechamento" value={view.conversion === null ? NONE : showPercent(view.conversion, 0)} note={<>fechados ÷ (fechados + perdidos){versus(change(view.conversion, view.previous.conversion))}</>} />
         <Kpi label="Desconto médio" value={view.averageDiscount === null ? NONE : showPercent(view.averageDiscount)} note="nos pedidos fechados" />
         {profit && (
           <>
-            <Kpi label="Lucro líquido" value={showMoney(Math.round(profit.netProfit * 100) / 100)} note="dos pedidos fechados · só a diretoria vê" />
+            <Kpi
+              label="Lucro líquido"
+              value={showMoney(Math.round(profit.netProfit * 100) / 100)}
+              note={<>dos pedidos fechados · só a diretoria vê{versus(change(profit.netProfit, profitBefore?.netProfit ?? null))}</>}
+            />
             <Kpi label="Margem líquida" value={profit.netSale > 0 ? showPercent(profit.netProfit / profit.netSale) : NONE} note="sobre o valor sem IPI" />
           </>
         )}
@@ -111,7 +150,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         <h2 id="por-mes" className={TITLE}>
           Vendas fechadas por mês
         </h2>
-        <p className="mb-4 text-xs text-slate-600">últimos 12 meses · com IPI</p>
+        <p className="mb-4 text-xs text-slate-600">últimos 12 meses · com IPI · total {showMoney(view.byMonth.reduce((sum, bar) => sum + bar.value, 0))}</p>
         <Columns bars={view.byMonth} format={showMoney} />
       </section>
 
@@ -188,6 +227,57 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         )}
       </section>
 
+      {(cash || profitByMonth) && (
+        <div className="mt-6 grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-2">
+          {cash && (
+            <section className={CARD} aria-labelledby="caixa-previsto">
+              <h2 id="caixa-previsto" className={TITLE}>
+                Caixa previsto
+              </h2>
+              <p className="mb-3 text-xs text-slate-600">parcelas a receber − contas e comissões a pagar · próximos 6 meses · o vencido conta no mês atual</p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
+                      <th className="py-2 pr-3 font-semibold">Mês</th>
+                      <th className="py-2 pr-3 text-right font-semibold">Entra</th>
+                      <th className="py-2 pr-3 text-right font-semibold">Sai</th>
+                      <th className="py-2 pr-3 text-right font-semibold">Saldo do mês</th>
+                      <th className="py-2 text-right font-semibold">Acumulado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cash.map((month) => (
+                      <tr key={month.label} className="border-b border-slate-100 last:border-0">
+                        <td className="py-2 pr-3">{month.label}</td>
+                        <td className="py-2 pr-3 text-right">{showMoney(month.comesIn)}</td>
+                        <td className="py-2 pr-3 text-right">{showMoney(month.goesOut)}</td>
+                        <td className={`py-2 pr-3 text-right font-medium ${month.balance < 0 ? "text-red-700" : ""}`}>{showMoney(month.balance)}</td>
+                        <td className={`py-2 text-right font-semibold ${month.accumulated < 0 ? "text-red-700" : ""}`}>{showMoney(month.accumulated)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
+          {profitByMonth && (
+            <section className={CARD} aria-labelledby="lucro-por-mes">
+              <h2 id="lucro-por-mes" className={TITLE}>
+                Lucro líquido por mês
+              </h2>
+              <p className="mb-4 text-xs text-slate-600">só a diretoria vê · dos pedidos fechados em cada mês, depois de impostos, custo e IR</p>
+              <Columns bars={profitByMonth.map((bar) => ({ ...bar, value: Math.max(0, bar.value) }))} format={showMoney} />
+              {profitByMonth.some((bar) => bar.value < 0) && (
+                <p className="mt-2 text-xs text-red-700">
+                  Meses com prejuízo: {profitByMonth.filter((bar) => bar.value < 0).map((bar) => `${bar.label} (${showMoney(bar.value)})`).join(", ")}.
+                </p>
+              )}
+            </section>
+          )}
+        </div>
+      )}
+
       {(receivables || payables) && (
         <div className="mt-6 grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-2">
           {receivables && (
@@ -200,9 +290,13 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                   abrir recebimentos
                 </Link>
               </div>
-              <dl className="mt-4 grid grid-cols-3 gap-3 text-sm">
+              <dl className="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
                 <div>
-                  <dt className="text-slate-600">Total</dt>
+                  <dt className="text-slate-600">Recebido no mês</dt>
+                  <dd className="font-semibold">{showMoney(received ?? 0)}</dd>
+                </div>
+                <div>
+                  <dt className="text-slate-600">Total a receber</dt>
                   <dd className="font-semibold">{showMoney(receivables.open.total)}</dd>
                 </div>
                 <div>

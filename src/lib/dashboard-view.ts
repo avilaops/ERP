@@ -29,6 +29,17 @@ export function periodStart(period: PeriodKey, today: string): string {
   return months === 0 ? `${month.slice(0, 4)}-01` : shiftMonth(month, 1 - months);
 }
 
+/** The first and last month (`AAAA-MM`) of the period right before the one that ends in the month of `today`. */
+export function previousRange(period: PeriodKey, today: string): { start: string; end: string } {
+  const start = periodStart(period, today);
+  if (period === "ano") return { start: shiftMonth(start, -12), end: shiftMonth(today.slice(0, 7), -12) };
+  const months = PERIODS.find((item) => item.key === period)?.months ?? 1;
+  return { start: shiftMonth(start, -months), end: shiftMonth(start, -1) };
+}
+
+/** How much a figure changed against the period before, as a fraction; `null` when there is nothing to compare with. */
+export const change = (now: number | null, before: number | null): number | null => (now === null || before === null || before === 0 ? null : (now - before) / before);
+
 /** What an order is worth as the team sees it, from the engine: without and with IPI. */
 function worth(order: DashboardOrder) {
   if (order.items.length === 0) return { netSale: 0, invoiceTotal: 0 };
@@ -38,9 +49,22 @@ function worth(order: DashboardOrder) {
 
 export type Bar = { label: string; value: number };
 
+/** The same figures of the period that came right before, to say whether the team went up or down. */
+export type PreviousPeriod = {
+  closed: { total: number; count: number };
+  averageTicket: number | null;
+  conversion: number | null;
+  averageDiscount: number | null;
+  closedNumbers: string[];
+};
+
 export type DashboardView = {
   /** Closed in the period, with IPI. */
   closed: { total: number; count: number };
+  /** The period of the same length right before this one ("Ano": January to the same month of last year). */
+  previous: PreviousPeriod;
+  /** The numbers of the orders closed in each of the twelve months of `byMonth`, for the profit by month. */
+  closedByMonth: { label: string; numbers: string[] }[];
   averageTicket: number | null;
   /** Closed over closed plus lost, among the orders created in the period. */
   conversion: number | null;
@@ -97,6 +121,22 @@ export function dashboardView(orders: DashboardOrder[], period: PeriodKey, today
   const count = (status: DashboardOrder["status"]) => created.filter((order) => order.status === status).length;
   const decided = count("fechado") + count("perdido");
 
+  // The period before, with the same rules: closed by the month it was closed, conversion by the month it was created.
+  const before = previousRange(period, today);
+  const wasWithin = (date: string | null) => date !== null && date.slice(0, 7) >= before.start && date.slice(0, 7) <= before.end;
+  const closedBefore = orders.filter((order) => order.status === "fechado" && wasWithin(order.closedOn));
+  const createdBefore = orders.filter((order) => wasWithin(order.createdOn));
+  const totalBefore = closedBefore.reduce((sum, order) => sum + worth(order).invoiceTotal, 0);
+  const wonBefore = createdBefore.filter((order) => order.status === "fechado").length;
+  const decidedBefore = wonBefore + createdBefore.filter((order) => order.status === "perdido").length;
+  const previous: PreviousPeriod = {
+    closed: { total: roundCents(totalBefore), count: closedBefore.length },
+    averageTicket: closedBefore.length === 0 ? null : roundCents(totalBefore / closedBefore.length),
+    conversion: decidedBefore === 0 ? null : wonBefore / decidedBefore,
+    averageDiscount: closedBefore.length === 0 ? null : closedBefore.reduce((sum, order) => sum + order.discount, 0) / closedBefore.length,
+    closedNumbers: closedBefore.map((order) => order.number),
+  };
+
   const bySeller = new Map<string, number>();
   const byProduct = new Map<string, number>();
   const byState = new Map<string, number>();
@@ -111,9 +151,13 @@ export function dashboardView(orders: DashboardOrder[], period: PeriodKey, today
 
   const months = Array.from({ length: 12 }, (_, index) => shiftMonth(month, index - 11));
   const monthly = new Map(months.map((item) => [item, 0]));
+  const numbersByMonth = new Map(months.map((item) => [item, [] as string[]]));
   for (const order of orders) {
     const key = order.status === "fechado" && order.closedOn ? order.closedOn.slice(0, 7) : null;
-    if (key !== null && monthly.has(key)) add(monthly, key, worth(order).invoiceTotal);
+    if (key !== null && monthly.has(key)) {
+      add(monthly, key, worth(order).invoiceTotal);
+      numbersByMonth.get(key)!.push(order.number);
+    }
   }
 
   const ages = AGES.map(([label]) => ({ label, value: 0, count: 0 }));
@@ -132,6 +176,8 @@ export function dashboardView(orders: DashboardOrder[], period: PeriodKey, today
   return {
     open: { total: roundCents(openTotal), count: openCount, byAge: ages.filter((age) => age.count > 0).map((age) => ({ ...age, value: roundCents(age.value) })) },
     closed: { total: roundCents(total), count: closed.length },
+    previous,
+    closedByMonth: months.map((item) => ({ label: shortMonth(item), numbers: numbersByMonth.get(item) ?? [] })),
     averageTicket: closed.length === 0 ? null : roundCents(total / closed.length),
     conversion: decided === 0 ? null : count("fechado") / decided,
     averageDiscount: closed.length === 0 ? null : closed.reduce((sum, order) => sum + order.discount, 0) / closed.length,
@@ -197,4 +243,37 @@ export function goalsView(
       .filter((item) => item.goal > 0 || item.closed > 0)
       .sort((a, b) => b.closed - a.closed || a.label.localeCompare(b.label, "pt-BR")),
   ];
+}
+
+const LONG_MONTHS = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+
+export type CashMonth = { label: string; comesIn: number; goesOut: number; balance: number; accumulated: number };
+
+/**
+ * The cash expected for the next six months, from what is already agreed:
+ * what the closed orders still have to receive against the bills and
+ * commissions to pay, each in the month it falls due. What is overdue (or has
+ * no date) counts in the current month: it is expected now. Nothing is
+ * forecast beyond what is written.
+ */
+export function cashForecast(comingIn: { dueDate: string | null; amount: number }[], goingOut: { dueDate: string | null; amount: number }[], today: string): CashMonth[] {
+  const first = today.slice(0, 7);
+  const months = Array.from({ length: 6 }, (_, index) => shiftMonth(first, index));
+  const sumBy = (items: { dueDate: string | null; amount: number }[]) => {
+    const totals = new Map(months.map((month) => [month, 0]));
+    for (const item of items) {
+      const month = item.dueDate === null || item.dueDate.slice(0, 7) < first ? first : item.dueDate.slice(0, 7);
+      if (totals.has(month)) totals.set(month, (totals.get(month) ?? 0) + item.amount);
+    }
+    return totals;
+  };
+  const inflow = sumBy(comingIn);
+  const outflow = sumBy(goingOut);
+  let accumulated = 0;
+  return months.map((month) => {
+    const comesIn = roundCents(inflow.get(month) ?? 0);
+    const goesOut = roundCents(outflow.get(month) ?? 0);
+    accumulated = roundCents(accumulated + comesIn - goesOut);
+    return { label: `${LONG_MONTHS[Number(month.slice(5, 7)) - 1]}/${month.slice(0, 4)}`, comesIn, goesOut, balance: roundCents(comesIn - goesOut), accumulated };
+  });
 }

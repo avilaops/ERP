@@ -86,7 +86,7 @@ export function ProductRow({
             <a
               href={`/produtos/${row.id}`}
               aria-label={`Abrir ${name}`}
-              className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded border border-slate-200 bg-white text-[10px] text-slate-400 hover:border-brand"
+              className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded border border-slate-200 bg-white text-[9px] text-slate-400 hover:border-brand"
             >
               {row.hasPhoto ? (
                 // eslint-disable-next-line @next/next/no-img-element -- served by the app itself, per company and per session
@@ -99,25 +99,31 @@ export function ProductRow({
               {field("name", "font-medium")}
               <div className="mt-1.5 flex items-center gap-2">
                 {field("code", "max-w-28 shrink-0")}
-                {row.supplier && <span className="whitespace-nowrap text-xs text-slate-500">{row.supplier}</span>}
                 <a href={`/produtos/${row.id}`} className="whitespace-nowrap text-xs font-medium text-brand underline">
                   abrir
                 </a>
               </div>
+              {row.supplier && <span className="mt-1 block truncate text-xs text-slate-500">{row.supplier}</span>}
             </div>
           </div>
         </td>
         <td className="px-2 py-3">{field("advisoryCost", "text-right", "decimal")}</td>
         <td className="px-2 py-3">{field("taxCredit", "text-right", "decimal")}</td>
         <td className="px-2 py-3">{field("packaging", "text-right", "decimal")}</td>
-        <td className="whitespace-nowrap px-2 py-4 text-right">{row.realCost}</td>
         <td className="whitespace-nowrap px-2 py-3 text-right">
+          <span className="block text-xs text-slate-500">custo real {row.realCost}</span>
           <span className="font-semibold">{row.table}</span>
           {row.tableWithIpi && row.tableWithIpi !== row.table && <span className="block text-xs text-slate-500">c/IPI {row.tableWithIpi}</span>}
         </td>
-        <td className="whitespace-nowrap px-2 py-4 text-right">{row.maxSp}</td>
-        <td className="whitespace-nowrap px-2 py-4 text-right">{row.maxTaxpayer}</td>
-        <td className="sticky right-0 whitespace-nowrap bg-white px-2 py-3 pr-4 text-right">
+        <td className="whitespace-nowrap px-2 py-3 text-right text-xs">
+          <span className="block">
+            <span className="text-slate-500">SP</span> <span className="text-sm">{row.maxSp}</span>
+          </span>
+          <span className="block">
+            <span className="text-slate-500">c/IE</span> <span className="text-sm">{row.maxTaxpayer}</span>
+          </span>
+        </td>
+        <td className="sticky right-0 whitespace-nowrap bg-white px-2 py-3 pr-3 text-right">
           {/* First submit button of the form: it is the one Enter presses. */}
           <button
             form={form}
@@ -164,7 +170,7 @@ export function ProductRow({
       </tr>
       {state.status === "error" && (
         <tr>
-          <td colSpan={9} className="px-4 pb-3">
+          <td colSpan={7} className="px-4 pb-3">
             <div role="alert" className="rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-900">
               <span className="font-semibold">Nada foi gravado em {name}.</span> {state.errors.join(" ")}
             </div>

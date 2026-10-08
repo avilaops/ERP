@@ -2,7 +2,7 @@ import { LineTabs } from "@/components/LineTabs";
 import { listLines } from "@/lib/db/product-lines";
 import { LINE_PARAM, pickLine } from "@/lib/lines-view";
 import Link from "next/link";
-import { Bars, Kpi } from "@/components/Charts";
+import { Kpi } from "@/components/Charts";
 import { requirePermission } from "@/lib/auth";
 import { menuItem, seesCosts, setsGoals } from "@/lib/auth/permissions";
 import { monthLabel } from "@/lib/commissions-view";
@@ -13,14 +13,13 @@ import { listGoals, listSellers } from "@/lib/db/goals";
 import { loadParams } from "@/lib/db/params";
 import { listCommissionsDue } from "@/lib/db/payables";
 import { tenantDb } from "@/lib/db/pool";
-import { listVersions } from "@/lib/db/price-table";
+import { listVersions, listVersionStats, loadPublishedSnapshot } from "@/lib/db/price-table";
 import { listProductCosts, listProducts } from "@/lib/db/products";
 import { formatMoney, isoDate, showDateTime, showMoney, showMultiplier, showPercent } from "@/lib/format";
 import { roundCents } from "@/lib/pricing/money";
 import { parseDate } from "@/lib/pricing/payment";
 import { paramsResult } from "@/lib/pricing/results";
-import { UFS } from "@/lib/pricing/states";
-import { maxDiscounts } from "@/lib/pricing/table";
+import { limitsByDestination, tableMultiplier } from "@/lib/pricing/table";
 import { ActionForm } from "../pedidos/ActionForm";
 import { saveGoalAction } from "./actions";
 
@@ -52,6 +51,8 @@ export default async function PrecosMetasPage({ searchParams }: { searchParams: 
   const withoutCost = products.filter((product) => product.advisoryCost === null).length;
   const withoutCode = products.filter((product) => product.code === null).length;
   const latest = versions[0] ?? null;
+  const stats = await listVersionStats(conn);
+  const latestStats = latest ? (stats.get(latest.version) ?? null) : null;
   // Whole days between the day of the publication and today, both in São Paulo.
   const tableAge = latest ? Math.round((parseDate(today) - parseDate(isoDate(latest.publishedAt))) / DAY_MS) : null;
   const mayEdit = setsGoals(session.role);
@@ -63,13 +64,19 @@ export default async function PrecosMetasPage({ searchParams }: { searchParams: 
         const result = paramsResult(params, await listProductCosts(conn, line.id));
         const closed = dashboardView(orders, "mes", today);
         const profit = await ordersProfit(closed.closedNumbers, conn);
-        const byState = UFS.map((uf) => ({
-          label: uf,
-          // The table price is the cost times the multiplier, so the limit is the same for every equipment.
-          value: Math.max(0, maxDiscounts({ tableTotal: result.tableMultiplier, cost: 1 }, params, { uf, taxpayer: false }).atTarget),
-        })).sort((a, b) => a.value - b.value || a.label.localeCompare(b.label));
+        // The table price is the cost times the multiplier, so the limit is the same for every equipment.
+        // Inside the state, a taxpayer outside it (one line for each outbound rate), then every state without registration.
+        const byState = limitsByDestination(params)
+          .limits.map((limit) => ({ label: limit.label, value: limit.atTarget }))
+          .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label));
+        // The markup of each publication shown below, from the parameters it was published with.
+        const markups = new Map<number, number>();
+        for (const version of versions.slice(0, 12)) {
+          const snapshot = await loadPublishedSnapshot(version.version, conn);
+          if (snapshot) markups.set(version.version, tableMultiplier(snapshot.params) - 1);
+        }
         const commissions = (await listCommissionsDue(conn)).filter((item) => item.amount > 0).reduce((total, item) => total + item.amount, 0);
-        return { params, result, profit, byState, commissions: roundCents(commissions) };
+        return { params, result, profit, byState, markups, commissions: roundCents(commissions) };
       })()
     : null;
 
@@ -101,9 +108,23 @@ export default async function PrecosMetasPage({ searchParams }: { searchParams: 
           }
         />
         <Kpi label="Tabela em vigor" value={latest ? `v${latest.version}` : "—"} note={latest ? `publicada em ${showDateTime(latest.publishedAt)}` : "nenhuma publicação"} />
+        <Kpi
+          label="Ticket médio da tabela"
+          value={latestStats ? showMoney(latestStats.averageTable) : "—"}
+          note={latestStats ? `${latestStats.items} ${latestStats.items === 1 ? "equipamento" : "equipamentos"} na tabela · sem IPI` : "sem tabela publicada"}
+        />
         {director && (
           <>
-            <Kpi label="Preço de tabela" value={`custo × ${showMultiplier(director.result.tableMultiplier)}`} note={`meta de lucro líquido de ${showPercent(director.params.targetNetProfit, 0)}`} />
+            <Kpi
+              label="Preço de tabela"
+              value={`custo × ${showMultiplier(director.result.tableMultiplier)}`}
+              note={`markup de ${showPercent(director.result.markup, 0)} · pior caso ${director.result.worstDestination.uf}`}
+            />
+            <Kpi
+              label="Meta de lucro líquido"
+              value={showPercent(director.params.targetNetProfit, 0)}
+              note={`garantida até ${showPercent(director.params.freeDiscount, 0)} de desconto em qualquer estado`}
+            />
             <Kpi label="Comissões a pagar" value={showMoney(director.commissions)} note="devidas aos vendedores" />
           </>
         )}
@@ -220,9 +241,30 @@ export default async function PrecosMetasPage({ searchParams }: { searchParams: 
               Desconto máximo na meta, por destino
             </h2>
             <p className="mb-4 text-xs text-slate-600">
-              cliente sem inscrição estadual · o vendedor dá até {showPercent(director.params.freeDiscount, 0)} sozinho · só a diretoria vê
+              a linha marca os {showPercent(director.params.freeDiscount, 0)} que o vendedor dá sozinho · IE = cliente com inscrição estadual fora de SP, pelo ICMS de saída · só a
+              diretoria vê
             </p>
-            <Bars bars={director.byState} format={(value) => showPercent(value)} empty="" />
+            {(() => {
+              const top = Math.max(...director.byState.map((bar) => bar.value), director.params.freeDiscount, 0.0001);
+              return (
+                <ul className="grid gap-x-8 gap-y-1.5 sm:grid-cols-2">
+                  {director.byState.map((bar) => (
+                    <li key={bar.label} className="grid grid-cols-[3.5rem_minmax(0,1fr)_3.25rem] items-center gap-2 text-sm">
+                      <span className="truncate">{bar.label}</span>
+                      <span className="relative h-2.5 rounded bg-slate-100">
+                        <span
+                          className={`block h-full rounded ${bar.value > director.params.freeDiscount + 1e-9 ? "bg-emerald-600" : "bg-slate-500"}`}
+                          style={{ width: `${(bar.value / top) * 100}%` }}
+                        />
+                        <span className="absolute -top-0.5 h-3.5 w-px bg-slate-900" style={{ left: `${(director.params.freeDiscount / top) * 100}%` }} aria-hidden="true" />
+                      </span>
+                      <strong className="text-right">{showPercent(bar.value)}</strong>
+                    </li>
+                  ))}
+                </ul>
+              );
+            })()}
+            <p className="mt-3 text-xs text-slate-600">É a alçada do gerente: ele aprova até aqui sem saber qual é a meta.</p>
           </section>
         )}
 
@@ -237,7 +279,7 @@ export default async function PrecosMetasPage({ searchParams }: { searchParams: 
               <table className="w-full text-sm">
                 <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                   <tr>
-                    {["Versão", "Publicada em", "Por"].map((column) => (
+                    {["Versão", "Publicada em", "Por", ...(director ? ["Markup"] : []), "Equipamentos", "Ticket médio"].map((column) => (
                       <th key={column} scope="col" className="px-4 py-2 text-left font-semibold">
                         {column}
                       </th>
@@ -254,6 +296,9 @@ export default async function PrecosMetasPage({ searchParams }: { searchParams: 
                       </td>
                       <td className="whitespace-nowrap px-4 py-2">{showDateTime(version.publishedAt)}</td>
                       <td className="px-4 py-2">{version.publishedBy}</td>
+                      {director && <td className="px-4 py-2">{director.markups.has(version.version) ? showPercent(director.markups.get(version.version) ?? 0, 0) : "—"}</td>}
+                      <td className="px-4 py-2">{stats.get(version.version)?.items ?? "—"}</td>
+                      <td className="whitespace-nowrap px-4 py-2">{stats.has(version.version) ? showMoney(stats.get(version.version)?.averageTable ?? 0) : "—"}</td>
                     </tr>
                   ))}
                 </tbody>

@@ -266,3 +266,9 @@ export async function listVersions(conn: Queryable): Promise<PriceTableVersion[]
   );
   return rows.map(toVersion);
 }
+
+/** How many equipments each publication has and their average table price (without IPI): the "ticket médio" of the table. */
+export async function listVersionStats(conn: Queryable): Promise<Map<number, { items: number; averageTable: number }>> {
+  const { rows } = await conn.query("SELECT version, count(*) AS items, avg(table_price) AS average FROM price_table_items GROUP BY version");
+  return new Map(rows.map((row) => [Number(row.version), { items: Number(row.items), averageTable: Math.round(Number(row.average) * 100) / 100 }]));
+}

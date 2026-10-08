@@ -11,6 +11,7 @@ import { formatMoney, formatPercent, parseMoney, parsePercent, showMoney, showPe
 import { BAND_TEXT, parseQuantity, UF_NAMES } from "@/lib/order-form";
 import { directorOf, saleOf, simulatedOrder } from "@/lib/order-quote";
 import type { Simulation } from "@/lib/order-quote";
+import { saleBreakdown } from "@/lib/pricing/breakdown";
 import { roundCents } from "@/lib/pricing/money";
 import { ORIGIN_UF, UFS } from "@/lib/pricing/states";
 import type { Uf } from "@/lib/pricing/states";
@@ -69,6 +70,8 @@ export default async function SimuladorPage({ searchParams }: { searchParams: Pr
   // The profile comes from the session. Costs are read only for who may see them.
   const snapshot = seesCosts(session.role) ? await loadPublishedSnapshot(latest.version, conn) : null;
   const board = snapshot ? directorOf(simulatedOrder(simulation, new Date()), snapshot) : null;
+  // Where each real goes, for the directors: the board opened line by line.
+  const breakdown = board && snapshot ? saleBreakdown(board.quote, snapshot.params, { uf: deliveryUf, taxpayer: simulation.taxpayer }) : null;
   const policyDownPayment = roundCents(table.minDownPayment * sale.invoiceTotal);
   const [line] = sale.lines;
 
@@ -186,6 +189,35 @@ export default async function SimuladorPage({ searchParams }: { searchParams: Pr
               </div>
             </dl>
           </section>
+
+          {breakdown && (
+            <section className={`${CARD} p-5`} aria-labelledby="cada-real">
+              <h2 id="cada-real" className="text-sm font-semibold uppercase tracking-wide">
+                Para onde vai cada real
+              </h2>
+              <p className="mt-1 text-xs text-slate-600">sobre o valor da venda{hasIpi ? " sem IPI" : ""} · só a diretoria vê</p>
+              <ul className="mt-4 flex flex-col gap-1.5 text-sm">
+                {breakdown.map((item) => (
+                  <li
+                    key={item.label}
+                    className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 sm:grid-cols-[minmax(0,14rem)_7rem_minmax(0,1fr)_4rem] ${
+                      item.kind === "subtotal" || item.kind === "profit" ? "border-t border-slate-200 pt-2 font-semibold" : ""
+                    } ${item.kind === "sale" ? "font-semibold" : ""}`}
+                  >
+                    <span className={item.kind === "cost" ? "text-slate-700" : ""}>{item.label}</span>
+                    <span className="text-right">{item.amount < 0 ? `– ${showMoney(-item.amount)}` : showMoney(item.amount)}</span>
+                    <span className="col-span-2 h-2 rounded bg-slate-100 sm:col-span-1" aria-hidden="true">
+                      <span
+                        className={`block h-full rounded ${item.kind === "cost" ? "bg-red-700" : item.kind === "profit" ? (item.amount >= 0 ? "bg-emerald-600" : "bg-red-700") : "bg-brand"}`}
+                        style={{ width: `${Math.min(100, Math.abs(item.share) * 100)}%` }}
+                      />
+                    </span>
+                    <span className="hidden text-right text-xs text-slate-600 sm:block">{showPercent(item.share)}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
         </div>
 
         <div className="flex min-w-0 flex-col gap-6">

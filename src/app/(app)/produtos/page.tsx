@@ -37,13 +37,12 @@ export const dynamic = "force-dynamic";
 const NONE = "—";
 /** The typed columns keep room for `11.571,09` and for the credit in full precision; their titles may wrap. */
 const COLUMNS: [string, string][] = [
-  ["Custo assessoria R$", "min-w-28"],
-  ["Crédito imp. %", "min-w-26"],
-  ["Embalagem R$", "min-w-24"],
-  ["Custo real", ""],
-  ["Tabela s/IPI", ""],
-  ["Máx. SP", ""],
-  ["Máx. c/IE", ""],
+  ["Custo assessoria R$", "min-w-24"],
+  ["Crédito imp. %", "min-w-24"],
+  ["Embalagem R$", "min-w-20"],
+  ["Custo real · Tabela s/IPI", "min-w-28"],
+  // One column for the two limits, one under the other: the table fits a laptop without scrolling sideways.
+  ["Desc. máx. na meta", "min-w-24"],
 ];
 
 /** Every figure of the row is calculated here, on the server, by the engine. */
@@ -184,7 +183,7 @@ export default async function ProdutosPage({
             <table className="w-full text-sm">
               <thead className="border-t border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>
-                  <th scope="col" className="min-w-64 px-2 py-2 pl-4 text-left align-bottom font-semibold">
+                  <th scope="col" className="min-w-40 px-2 py-2 pl-4 text-left align-bottom font-semibold">
                     Equipamento
                   </th>
                   {COLUMNS.map(([column, width]) => (

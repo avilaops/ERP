@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { dashboardView, goalsView, parsePeriod, periodStart, sellersView, shiftMonth, shortMonth } from "@/lib/dashboard-view";
+import { cashForecast, change, dashboardView, goalsView, previousRange, parsePeriod, periodStart, sellersView, shiftMonth, shortMonth } from "@/lib/dashboard-view";
 import type { DashboardOrder } from "@/lib/db/dashboard";
 
 const order = (over: Partial<DashboardOrder>): DashboardOrder => ({
@@ -91,4 +91,40 @@ test("em aberto por idade: o que está em negociação ou esperando aprovação 
       { label: "Mais de 30 dias", value: 1000, count: 1 },
     ],
   });
+});
+
+test("período anterior: mesmo tamanho logo antes; no Ano, janeiro ao mesmo mês do ano passado; variação só quando há com o que comparar", () => {
+  assert.deepEqual(previousRange("mes", "2026-10-06"), { start: "2026-09", end: "2026-09" });
+  assert.deepEqual(previousRange("3m", "2026-10-06"), { start: "2026-05", end: "2026-07" });
+  assert.deepEqual(previousRange("12m", "2026-10-06"), { start: "2024-11", end: "2025-10" });
+  assert.deepEqual(previousRange("ano", "2026-10-06"), { start: "2025-01", end: "2025-10" });
+
+  // Setembro não teve pedido fechado: nada a comparar.
+  const month = dashboardView(ORDERS, "mes", "2026-10-06");
+  assert.deepEqual(month.previous.closed, { total: 0, count: 0 });
+  assert.equal(change(month.closed.total, month.previous.closed.total), null);
+  // Em 12 meses, o período anterior pega o pedido fechado em outubro de 2025 (1.130).
+  const year = dashboardView(ORDERS, "12m", "2026-10-06");
+  assert.deepEqual(year.previous.closed, { total: 1130, count: 1 });
+  assert.deepEqual(year.previous.closedNumbers, ["251005-HHHH"]);
+  assert.equal(year.previous.averageTicket, 1130);
+  assert.equal(change(year.closed.total, year.previous.closed.total)?.toFixed(2), ((year.closed.total - 1130) / 1130).toFixed(2));
+  assert.equal(change(50, 100), -0.5);
+  assert.equal(change(null, 100), null);
+  // Os pedidos fechados de cada mês do gráfico, para o lucro por mês da diretoria.
+  assert.deepEqual(month.closedByMonth.at(-1), { label: "out/26", numbers: ["261001-AAAA", "261003-BBBB", "260920-FFFF"] });
+  assert.deepEqual(month.closedByMonth.find((item) => item.label === "ago/26")?.numbers, ["260810-GGGG"]);
+  assert.equal(month.closedByMonth.length, 12);
+});
+
+test("caixa previsto: seis meses, cada valor no mês do vencimento; o vencido e o sem data contam no mês atual; acumulado soma os saldos", () => {
+  const cash = cashForecast(
+    [{ dueDate: "2026-09-10", amount: 1000 }, { dueDate: null, amount: 500 }, { dueDate: "2026-10-20", amount: 2000 }, { dueDate: "2026-12-05", amount: 3000.555 }, { dueDate: "2027-04-01", amount: 9999 }],
+    [{ dueDate: "2026-10-05", amount: 800 }, { dueDate: "2026-11-10", amount: 4000 }],
+    "2026-10-08",
+  );
+  assert.deepEqual(cash.map((month) => month.label), ["outubro/2026", "novembro/2026", "dezembro/2026", "janeiro/2027", "fevereiro/2027", "março/2027"]);
+  assert.deepEqual(cash[0], { label: "outubro/2026", comesIn: 3500, goesOut: 800, balance: 2700, accumulated: 2700 });
+  assert.deepEqual(cash[1], { label: "novembro/2026", comesIn: 0, goesOut: 4000, balance: -4000, accumulated: -1300 });
+  assert.deepEqual([cash[2].comesIn, cash[2].accumulated, cash[5].accumulated], [3000.56, 1700.56, 1700.56]);
 });
