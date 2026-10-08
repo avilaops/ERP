@@ -56,6 +56,7 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "0023_ibs_cbs.sql",
     "0024_frete_da_nota_e_inutilizacao.sql",
     "0025_transportadoras_e_volumes.sql",
+    "0026_local_de_entrega_da_nota.sql",
   ]);
 
   const second = await withClient((client) => migrate(client, MIGRATIONS_DIR));

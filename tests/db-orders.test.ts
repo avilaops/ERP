@@ -1125,6 +1125,23 @@ test("nota fiscal de conferência: pedido fechado, com os cadastros preenchidos,
   const { deleteCarrier } = await import("@/lib/db/carriers");
   await assert.rejects(() => deleteCarrier(carrier.id, db.pool), /está em pedido/);
 
+  // Local de entrega: opcional; ou o endereço inteiro, ou nada; não reabre o pedido.
+  const { DeliveryError, loadOrderDelivery, saveOrderDelivery } = await import("@/lib/db/order-delivery");
+  const orderId = Number(orderRow.rows[0].id);
+  const nothing = { name: null, document: null, cep: null, street: null, number: null, complement: null, district: null, city: null, uf: null, phone: null };
+  assert.equal(await loadOrderDelivery(orderId, db.pool), null);
+  await assert.rejects(() => saveOrderDelivery(orderId, { ...nothing, street: "Rua da Obra" }, db.pool), (error: unknown) => error instanceof DeliveryError && /Número/.test(error.message) && /CEP/.test(error.message) && /Estado/.test(error.message));
+  await assert.rejects(() => saveOrderDelivery(orderId, { ...nothing, street: "Rua da Obra", number: "77", district: "Centro", city: "Cidade Inventada", uf, cep: "01001-000" }, db.pool), /não está na tabela do IBGE/);
+  await assert.rejects(() => saveOrderDelivery(orderId, { ...nothing, street: "Rua da Obra", number: "77", district: "Centro", city, uf, cep: "01001-000", document: "111.111.111-11" }, db.pool), /confira os números/);
+  await saveOrderDelivery(orderId, { ...nothing, name: " Obra Nova ", street: "Rua da Obra", number: "77", district: "Centro", city, uf: uf.toLowerCase(), cep: "01001-000", phone: "(11) 3333-4444" }, db.pool);
+  assert.deepEqual(await loadOrderDelivery(orderId, db.pool), { name: "Obra Nova", document: null, cep: "01001000", street: "Rua da Obra", number: "77", complement: null, district: "Centro", city, uf, phone: "1133334444" });
+  const delivered = await previewOrderNfe(number, now, db.pool);
+  assert.deepEqual(delivered!.problems, []);
+  assert.match(buildNfeXml(delivered!.input).xml, /<\/dest><entrega><(CNPJ|CPF)>[0-9A-Z]+<\/\1><xNome>Obra Nova<\/xNome><xLgr>Rua da Obra<\/xLgr><nro>77<\/nro>/);
+  assert.equal((await db.pool.query("SELECT updated_at::text AS revision FROM orders WHERE number = $1", [number])).rows[0].revision, orderRow.rows[0].revision);
+  await saveOrderDelivery(orderId, nothing, db.pool);
+  assert.equal(await loadOrderDelivery(orderId, db.pool), null);
+
   // Conferência não consome o número.
   const { rows } = await db.pool.query("SELECT nfe_next_number FROM company_settings");
   assert.equal(rows[0].nfe_next_number, 42);

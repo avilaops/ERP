@@ -10,7 +10,7 @@ import { testPfx } from "./fiscal-helpers.ts";
 
 const item = (index: number) => ({ code: `LD-WH${String(index + 1).padStart(3, "0")}`, name: `Equipamento "${index + 1}" & acessórios`, ncm: "95069100", cest: null, origin: 0, unit: "UN", quantity: 2, unitPrice: 1000.5, ipiRate: 0.1 });
 const input = (count: number, environment: "homologacao" | "producao" = "producao"): NfeInput => ({
-  environment, freightMode: "1", transport: { carrier: null, volumes: null, volumeKind: null, netWeight: null, grossWeight: null }, series: 1, number: 123, randomCode: "48291736", issuedAt: "2026-10-08T10:30:00-03:00",
+  environment, freightMode: "1", transport: { carrier: null, volumes: null, volumeKind: null, netWeight: null, grossWeight: null }, delivery: null, series: 1, number: 123, randomCode: "48291736", issuedAt: "2026-10-08T10:30:00-03:00",
   issuer: { cnpj: "12345678000195", legalName: "Ludus Equipamentos Ltda", stateRegistration: "110042490114", taxRegime: 3, street: "Rua das Máquinas", number: "100", district: "Distrito Industrial", cityCode: "3549805", city: "São José do Rio Preto", uf: "SP", cep: "15035000" },
   recipient: { kind: "PJ", document: "98765432000198", name: "Academia Força & Forma", stateRegistration: "123456789", taxpayer: true, street: "Av. Brasil", number: "500", complement: "Sala 2", district: "Centro", cityCode: "2111300", city: "São Luís", uf: "MA", cep: "65000000" },
   rules: { operationNature: "Venda de mercadoria", cfopInternal: "5102", cfopInterstate: "6102", cfopInterstateNonTaxpayer: "6108", icmsCode: "00", ipiCst: "50", ipiFrameCode: "999", pisCst: "01", pisRate: 0.0065, cofinsCst: "01", cofinsRate: 0.03, finalConsumer: true, ipiInIcmsBase: true, additionalInfo: "Pedido 261008-W9LG", ibsCbs: { cst: "000", classCode: "000001", ibsStateRate: 0.001, ibsCityRate: 0, cbsRate: 0.009 } },
@@ -29,6 +29,9 @@ test("DANFE: os dados vêm do XML da nota — chave, emitente, destinatário, it
   assert.deepEqual(data.items[0], { code: "LD-WH001", name: 'Equipamento "1" & acessórios', ncm: "95069100", taxCode: "000", cfop: "6102", unit: "UN", quantity: 2, unitPrice: 1000.5, total: 2001, icmsBase: 2201.1, icms: 154.08, icmsRate: 7, ipi: 200.1, ipiRate: 10 });
   assert.deepEqual([data.totals.products, data.totals.ipi, data.totals.invoice], [built.totals.products, built.totals.ipi, built.totals.invoice]);
   assert.equal(data.info, "Pedido 261008-W9LG");
+  assert.equal(data.delivery, null);
+  const elsewhere = buildNfeXml({ ...input(1), delivery: { kind: "PJ", document: "98765432000198", name: "Filial Teresina", street: "Rua da Obra", number: "77", complement: "Galpão 2", district: "Centro", cityCode: "2211001", city: "Teresina", uf: "PI", cep: "64000000" } });
+  assert.equal(danfeData(elsewhere.xml).delivery, "Filial Teresina - Rua da Obra, 77, Galpão 2 - Centro - Teresina/PI - CEP 64000-000");
   assert.throws(() => danfeData("<x/>"), /não é de uma NF-e/);
 });
 

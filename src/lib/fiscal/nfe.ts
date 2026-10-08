@@ -50,6 +50,16 @@ export type NfeRecipient = NfeAddress & {
   email?: string | null;
 };
 
+/**
+ * Where the goods go when it is not the recipient's address (group `entrega`).
+ * The document is of who receives there; the recipient's when nobody else was named.
+ */
+export type NfeDelivery = NfeAddress & {
+  kind: "PJ" | "PF";
+  document: string;
+  name: string | null;
+};
+
 /** The fiscal rules of the operation: the table the accountant fills in, by product line. */
 export type NfeRules = {
   operationNature: string;
@@ -138,6 +148,8 @@ export type NfeInput = {
   issuedAt: string;
   issuer: NfeIssuer;
   recipient: NfeRecipient;
+  /** `null`: the goods go to the recipient's address. */
+  delivery: NfeDelivery | null;
   rules: NfeRules;
   items: NfeItem[];
   /** ICMS of the operation, as a fraction: the internal rate inside the state, the outbound rate to another. */
@@ -214,6 +226,15 @@ function address(prefix: "enderEmit" | "enderDest", place: NfeAddress): string {
   );
 }
 
+/**
+ * The state the goods physically go to: the place of delivery when there is
+ * one, the recipient's otherwise. It is what makes the operation internal or
+ * interstate and says which state the DIFAL belongs to: the layout validates
+ * `idDest` and the group `ICMSUFDest` by `entrega/UF` when it is informed
+ * (rules E12-30, E12-40, NA01-20 and NA01-30 of MOC 7.0, Anexo I).
+ */
+export const destinationUf = (input: Pick<NfeInput, "recipient" | "delivery">): string => input.delivery?.uf ?? input.recipient.uf;
+
 /** What is missing or wrong before any XML is written. Every problem at once, each naming the register that fixes it. */
 export function nfeProblems(input: NfeInput): string[] {
   const problems: string[] = [];
@@ -234,6 +255,15 @@ export function nfeProblems(input: NfeInput): string[] {
   need(/^\d{8}$/.test(recipient.cep) && Boolean(UF_CODES[recipient.uf]), "Cliente: CEP e UF.");
   need(recipient.street.trim() !== "" && recipient.number.trim() !== "" && recipient.district.trim() !== "" && recipient.city.trim() !== "", "Cliente: rua, número, bairro e cidade.");
   need(!recipient.taxpayer || /^\d{2,14}$/.test(recipient.stateRegistration ?? ""), "Cliente contribuinte: inscrição estadual em números.");
+
+  const delivery = input.delivery;
+  if (delivery) {
+    need(delivery.kind === "PJ" ? /^[0-9A-Z]{12}\d{2}$/.test(delivery.document) : /^\d{11}$/.test(delivery.document), "Local de entrega: CNPJ ou CPF de quem recebe.");
+    // Rules G07-20 and G07-30: the city exists in the IBGE table and belongs to the state of the delivery.
+    need(/^\d{7}$/.test(delivery.cityCode) && delivery.cityCode.slice(0, 2) === UF_CODES[delivery.uf], "Local de entrega: cidade da tabela do IBGE, no estado informado.");
+    need(/^\d{8}$/.test(delivery.cep), "Local de entrega: CEP com oito dígitos.");
+    need(delivery.street.trim() !== "" && delivery.number.trim() !== "" && delivery.district.trim() !== "" && delivery.city.trim() !== "", "Local de entrega: rua, número, bairro e cidade.");
+  }
 
   need(rules.operationNature.trim() !== "", "Regras fiscais: natureza da operação.");
   for (const [name, cfop] of [["dentro do estado", rules.cfopInternal], ["para outro estado", rules.cfopInterstate], ["para não contribuinte de outro estado", rules.cfopInterstateNonTaxpayer]] as const) {
@@ -279,7 +309,7 @@ function figuresOf(item: NfeItem, input: NfeInput): ItemFigures {
   const ipi = rules.ipiCst === null ? 0 : roundCents(product * item.ipiRate);
   const taxed = issuer.taxRegime !== 1 && rules.icmsCode === "00";
   const icmsBase = taxed ? roundCents(product + (rules.finalConsumer && rules.ipiInIcmsBase ? ipi : 0)) : 0;
-  const interstate = issuer.uf !== recipient.uf;
+  const interstate = issuer.uf !== destinationUf(input);
   const owesDifal = taxed && interstate && !recipient.taxpayer && rules.finalConsumer;
   const icms = roundCents(icmsBase * input.icmsRate);
   const pis = roundCents(product * rules.pisRate);
@@ -343,7 +373,7 @@ function contribution(name: "PIS" | "COFINS", cst: string, base: number, fractio
 function itemXml(item: NfeItem, index: number, input: NfeInput): string {
   const { rules, issuer, recipient } = input;
   const figures = figuresOf(item, input);
-  const interstate = issuer.uf !== recipient.uf;
+  const interstate = issuer.uf !== destinationUf(input);
   const cfop = !interstate ? rules.cfopInternal : recipient.taxpayer ? rules.cfopInterstate : rules.cfopInterstateNonTaxpayer;
   const quantity = item.quantity.toFixed(4);
   const unit = item.unitPrice.toFixed(10);
@@ -461,7 +491,7 @@ export function buildNfeXml(input: NfeInput): { key: string; xml: string; totals
   const { issuer, recipient, rules } = input;
   const key = accessKey(input);
   const totals = nfeTotals(input);
-  const interstate = issuer.uf !== recipient.uf;
+  const interstate = issuer.uf !== destinationUf(input);
   const homologation = input.environment === "homologacao";
 
   const ide = group(
@@ -502,6 +532,26 @@ export function buildNfeXml(input: NfeInput): { key: string; xml: string; totals
       tag("IE", recipient.taxpayer ? recipient.stateRegistration : null) +
       tag("email", recipient.email ? clean(recipient.email, 60) : null),
   );
+
+  const place = input.delivery;
+  const entrega = place
+    ? group(
+        "entrega",
+        tag(place.kind === "PJ" ? "CNPJ" : "CPF", place.document) +
+          tag("xNome", place.name ? clean(place.name, 60) : null) +
+          tag("xLgr", clean(place.street, 60)) +
+          tag("nro", clean(place.number, 60)) +
+          tag("xCpl", place.complement ? clean(place.complement, 60) : null) +
+          tag("xBairro", clean(place.district, 60)) +
+          tag("cMun", place.cityCode) +
+          tag("xMun", clean(place.city, 60)) +
+          tag("UF", place.uf) +
+          tag("CEP", place.cep) +
+          tag("cPais", "1058") +
+          tag("xPais", "BRASIL") +
+          tag("fone", place.phone ? onlyDigits(place.phone).slice(0, 14) : null),
+      )
+    : "";
 
   const hasDifal = totals.difal > 0 || totals.fcp > 0;
   const total = group(
@@ -557,6 +607,7 @@ export function buildNfeXml(input: NfeInput): { key: string; xml: string; totals
     ide +
     emit +
     dest +
+    entrega +
     input.items.map((item, index) => itemXml(item, index, input)).join("") +
     total +
     transportXml(input) +

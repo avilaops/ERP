@@ -34,6 +34,7 @@ const SOURCE: OrderNfeSource = {
   paymentCodes: new Map([["PIX", "17"], ["Boleto", "15"]]),
   freightMode: null,
   transport: { carrier: null, volumes: null, volumeKind: null, netWeight: null, grossWeight: null },
+  delivery: null,
   number: 7,
   randomCode: "12345678",
   issuedAt: "2026-10-08T10:00:00-03:00",
@@ -71,7 +72,26 @@ test("o que falta nos cadastros aparece como pendência, com o lugar onde se cor
     assert.ok(problems.some((problem) => problem.includes(piece)), piece);
   }
   assert.ok(orderNfe({ ...SOURCE, order: { ...SOURCE.order, customer: null } }).problems.includes("Pedido sem cliente."));
-  assert.ok(orderNfe({ ...SOURCE, order: { ...SOURCE.order, deliveryUf: "PI" } }).problems.some((problem) => problem.includes("local de entrega diferente")));
+  assert.ok(orderNfe({ ...SOURCE, order: { ...SOURCE.order, deliveryUf: "PI" } }).problems.some((problem) => problem.includes("informe o local de entrega")));
+});
+
+test("entrega em outro endereço: a nota leva o grupo de entrega, e o estado da entrega é o que define operação, alíquota e DIFAL", () => {
+  const place = { name: null, document: null, cep: "64000000", street: "Rua da Obra", number: "77", complement: null, district: "Centro", city: "Teresina", uf: "PI", phone: null };
+  // Cliente do Maranhão, pedido fechado para o Piauí: sem o local de entrega a nota não sai; com ele, sai para o Piauí.
+  const order = { ...SOURCE.order, deliveryUf: "PI" as const };
+  const { input, problems } = orderNfe({ ...SOURCE, order, delivery: place });
+  assert.deepEqual(problems, []);
+  assert.equal(input.delivery?.cityCode, "2211001");
+  assert.equal(input.delivery?.document, SOURCE.order.customer!.document);
+  assert.equal(input.icmsRate, SOURCE.params.stateRates.PI.outboundIcms ?? SOURCE.params.icmsInterstate);
+  assert.deepEqual(input.destination, { internalIcms: SOURCE.params.stateRates.PI.internalIcms, fcp: SOURCE.params.stateRates.PI.fcp });
+  // Local de entrega em estado diferente do que formou o preço do pedido é barrado.
+  assert.ok(orderNfe({ ...SOURCE, delivery: place }).problems.some((problem) => problem.includes("corrija o local de entrega")));
+  // Cliente de fora com entrega dentro do estado do emitente: operação interna, ICMS interno.
+  const inside = orderNfe({ ...SOURCE, order: { ...SOURCE.order, deliveryUf: "SP" }, delivery: { ...place, city: "Campinas", uf: "SP", cep: "13010000" } });
+  assert.deepEqual(inside.problems, []);
+  assert.equal(inside.input.icmsRate, SOURCE.params.icmsSp);
+  assert.equal(inside.totals.difal, 0);
 });
 
 test("dentro do estado usa o ICMS interno; centavos de diferença entre pagamento e nota vão para a última forma", () => {

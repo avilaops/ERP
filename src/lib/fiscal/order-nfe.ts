@@ -1,11 +1,14 @@
 import type { FiscalSettings, ProductFiscal } from "@/lib/db/fiscal";
 import type { FiscalRules } from "@/lib/db/fiscal-rules";
+import type { OrderDelivery } from "@/lib/db/order-delivery";
 import type { Order } from "@/lib/db/orders";
 import { cityCode } from "@/lib/fiscal/cities";
 import { nfeProblems, nfeTotals } from "@/lib/fiscal/nfe";
 import type { FreightMode, NfeInput, NfeTotals, NfeTransport } from "@/lib/fiscal/nfe";
 import { roundCents } from "@/lib/pricing/money";
 import type { PricingParams } from "@/lib/pricing/params";
+import { UFS } from "@/lib/pricing/states";
+import type { Uf } from "@/lib/pricing/states";
 
 export type OrderNfeSource = {
   settings: FiscalSettings;
@@ -23,6 +26,8 @@ export type OrderNfeSource = {
   /** What was chosen for the invoice of this order, or `null`: then the suggestion holds. */
   freightMode: FreightMode | null;
   transport: NfeTransport;
+  /** Where the goods go when it is not the customer's address, or `null`. */
+  delivery: OrderDelivery | null;
   number: number;
   randomCode: string;
   issuedAt: string;
@@ -42,7 +47,10 @@ export function orderNfe(source: OrderNfeSource): { input: NfeInput; problems: s
   const customer = order.customer;
   const issuerUf = settings.uf ?? "";
   const recipientUf = customer?.uf ?? "";
-  const interstate = issuerUf !== recipientUf;
+  const delivery = source.delivery;
+  // The state the goods go to: it is what the layout takes for internal or interstate and for the DIFAL.
+  const destination = (delivery?.uf ?? customer?.uf ?? null) as Uf | null;
+  const interstate = issuerUf !== (destination ?? "");
   const registration = customer?.stateRegistration && /^\d+$/.test(customer.stateRegistration) ? customer.stateRegistration : null;
 
   const items = order.items.map((item) => {
@@ -61,6 +69,8 @@ export function orderNfe(source: OrderNfeSource): { input: NfeInput; problems: s
       ipiRate: params.ipi,
     };
   });
+
+  const rates = destination && (UFS as readonly string[]).includes(destination) ? params.stateRates[destination] : null;
 
   const input: NfeInput = {
     environment: settings.environment,
@@ -100,6 +110,22 @@ export function orderNfe(source: OrderNfeSource): { input: NfeInput; problems: s
       phone: customer?.phone ?? null,
       email: customer?.email ?? null,
     },
+    delivery: delivery
+      ? {
+          kind: (delivery.document ?? customer?.document ?? "").length === 11 ? "PF" : "PJ",
+          document: delivery.document ?? customer?.document ?? "",
+          name: delivery.name,
+          street: delivery.street,
+          number: delivery.number,
+          complement: delivery.complement,
+          district: delivery.district,
+          cityCode: cityCode(delivery.city, delivery.uf) ?? "",
+          city: delivery.city,
+          uf: delivery.uf,
+          cep: delivery.cep,
+          phone: delivery.phone,
+        }
+      : null,
     rules: {
       operationNature: rules.operationNature ?? "",
       cfopInternal: rules.cfopInternal ?? "",
@@ -120,8 +146,8 @@ export function orderNfe(source: OrderNfeSource): { input: NfeInput; problems: s
     },
     items,
     // Inside the state, its internal rate; to another, the outbound rate of the destination (7%, 12% or the general one).
-    icmsRate: !interstate ? params.icmsSp : customer?.uf ? (params.stateRates[customer.uf].outboundIcms ?? params.icmsInterstate) : params.icmsInterstate,
-    destination: customer?.uf ? { internalIcms: params.stateRates[customer.uf].internalIcms, fcp: params.stateRates[customer.uf].fcp } : { internalIcms: 0, fcp: 0 },
+    icmsRate: !interstate ? params.icmsSp : rates ? (rates.outboundIcms ?? params.icmsInterstate) : params.icmsInterstate,
+    destination: rates ? { internalIcms: rates.internalIcms, fcp: rates.fcp } : { internalIcms: 0, fcp: 0 },
     payments: [],
     software: source.software,
   };
@@ -142,8 +168,13 @@ export function orderNfe(source: OrderNfeSource): { input: NfeInput; problems: s
   const problems = nfeProblems(input);
   if (!customer) problems.unshift("Pedido sem cliente.");
   if (settings.taxRegime === null) problems.unshift("Empresa: regime tributário (Parâmetros → Fiscal).");
-  if (customer && order.deliveryUf && customer.uf && order.deliveryUf !== customer.uf) {
-    problems.push(`Entrega em ${order.deliveryUf} com cliente de ${customer.uf}: nota com local de entrega diferente do cadastro ainda não é montada.`);
+  // The state of delivery of the order formed its price: the invoice has to go to the same state.
+  if (customer && order.deliveryUf && destination && order.deliveryUf !== destination) {
+    problems.push(
+      delivery
+        ? `O local de entrega da nota é em ${destination} e o pedido foi fechado para entrega em ${order.deliveryUf}: corrija o local de entrega abaixo.`
+        : `O pedido é para entrega em ${order.deliveryUf} e o cliente é de ${customer.uf}: informe o local de entrega abaixo.`,
+    );
   }
   return { input, problems, totals: nfeTotals(input) };
 }

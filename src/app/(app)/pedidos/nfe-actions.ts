@@ -6,6 +6,7 @@ import { menuItem } from "@/lib/auth/permissions";
 import { IssueError, issueOrderNfe, registerOrderNfeEvent } from "@/lib/db/issue-nfe";
 import { CarrierError, saveOrderTransport } from "@/lib/db/carriers";
 import { saveFreightMode } from "@/lib/db/invoices";
+import { DeliveryError, saveOrderDelivery } from "@/lib/db/order-delivery";
 import { getOrder } from "@/lib/db/orders";
 import { tenantDb } from "@/lib/db/pool";
 import { vaultKey } from "@/lib/fiscal/certificate";
@@ -14,6 +15,8 @@ import type { ActionState } from "@/lib/order-form";
 import { ORDER_NUMBER } from "@/lib/order-number";
 
 const FAILED = "Não foi possível emitir agora. Confira a situação da nota abaixo antes de tentar de novo.";
+
+const FAILED_TO_SAVE = "Não foi possível gravar agora. Tente de novo.";
 
 const send = sendToSefaz;
 
@@ -90,6 +93,42 @@ export async function saveTransportAction(_previous: ActionState, formData: Form
     if (error instanceof CarrierError) return { error: error.message };
     console.error("[nfe] falha ao gravar o transporte:", error instanceof Error ? error.message : error);
     return { error: FAILED };
+  }
+  revalidatePath(`${menuItem("pedidos").href}/${number}`);
+  return { error: null };
+}
+
+/**
+ * The place of delivery of the invoice, when the goods do not go to the address
+ * of the customer's register. The button "Usar o endereço do cadastro" sends
+ * `clear` and takes it away.
+ */
+export async function saveDeliveryAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
+  const session = await requirePermission("parametros");
+  const conn = tenantDb(session.tenant.slug);
+  const text = (key: string) => {
+    const value = formData.get(key);
+    return typeof value === "string" && value.trim() !== "" ? value.trim() : null;
+  };
+  const number = text("number");
+  if (number === null || !ORDER_NUMBER.test(number)) return { error: "Pedido não encontrado." };
+  const order = await getOrder(number, { sellerEmail: null }, conn);
+  if (!order) return { error: "Pedido não encontrado." };
+  const clear = text("clear") !== null;
+  const field = (key: string) => (clear ? null : text(key));
+  try {
+    await saveOrderDelivery(
+      order.id,
+      {
+        name: field("deliveryName"), document: field("deliveryDocument"), cep: field("deliveryCep"), street: field("deliveryStreet"), number: field("deliveryNumber"),
+        complement: field("deliveryComplement"), district: field("deliveryDistrict"), city: field("deliveryCity"), uf: field("deliveryState"), phone: field("deliveryPhone"),
+      },
+      conn,
+    );
+  } catch (error) {
+    if (error instanceof DeliveryError) return { error: error.message };
+    console.error("[nfe] falha ao gravar o local de entrega:", error instanceof Error ? error.message : error);
+    return { error: FAILED_TO_SAVE };
   }
   revalidatePath(`${menuItem("pedidos").href}/${number}`);
   return { error: null };

@@ -22,6 +22,8 @@ export type DanfeData = {
   items: DanfeItem[];
   totals: { icmsBase: number; icms: number; products: number; freight: number; discount: number; ipi: number; invoice: number; difal: number; fcp: number; ibs: number; cbs: number };
   freightMode: string; info: string;
+  /** The place of delivery, when it is not the recipient's address: already as the line the paper shows. */
+  delivery: string | null;
   carrier: { name: string; document: string; registration: string; address: string; city: string; uf: string } | null;
   volumes: { quantity: string; kind: string; netWeight: string; grossWeight: string };
 };
@@ -47,6 +49,15 @@ function party(xml: string, address: string): Party {
 }
 
 /** What the paper shows, read from the XML of the invoice (signed or not, with or without the protocol). */
+/** "Rua, número, complemento - bairro - cidade/UF - CEP", with who receives when the invoice names one. */
+function deliveryLine(xml: string): string | null {
+  const place = block(xml, "entrega");
+  if (place === "") return null;
+  const street = [value(place, "xLgr"), value(place, "nro"), value(place, "xCpl")].filter(Boolean).join(", ");
+  const cep = value(place, "CEP");
+  return [value(place, "xNome"), street, value(place, "xBairro"), `${value(place, "xMun")}/${value(place, "UF")}`, cep ? `CEP ${formatCep(cep)}` : ""].filter(Boolean).join(" - ");
+}
+
 export function danfeData(xml: string): DanfeData {
   const key = /Id="NFe(\d{44})"/.exec(xml)?.[1];
   if (!key) throw new Error("O XML não é de uma NF-e deste sistema.");
@@ -76,6 +87,7 @@ export function danfeData(xml: string): DanfeData {
       ibs: number(block(block(xml, "IBSCBSTot"), "gIBS"), "vIBS"), cbs: number(block(block(xml, "IBSCBSTot"), "gCBS"), "vCBS"),
     },
     freightMode: value(block(xml, "transp"), "modFrete"), info: value(block(xml, "infAdic"), "infCpl"),
+    delivery: deliveryLine(xml),
     carrier: carrierXml === "" ? null : { name: value(carrierXml, "xNome"), document: value(carrierXml, "CNPJ") || value(carrierXml, "CPF"), registration: value(carrierXml, "IE"), address: value(carrierXml, "xEnder"), city: value(carrierXml, "xMun"), uf: value(carrierXml, "UF") },
     volumes: { quantity: value(volumesXml, "qVol"), kind: value(volumesXml, "esp"), netWeight: value(volumesXml, "pesoL"), grossWeight: value(volumesXml, "pesoB") },
   };
@@ -277,6 +289,7 @@ export async function renderDanfe(data: DanfeData): Promise<Uint8Array> {
     text("INFORMAÇÕES COMPLEMENTARES", MARGIN + 2, foot - 6.5, 5);
     const extra = [
       data.homologation ? "NF-e EMITIDA EM AMBIENTE DE HOMOLOGAÇÃO - SEM VALOR FISCAL." : "",
+      data.delivery ? `LOCAL DE ENTREGA: ${data.delivery}.` : "",
       data.totals.difal > 0 || data.totals.fcp > 0 ? `ICMS devido ao estado de destino (DIFAL): R$ ${money(data.totals.difal)}; Fundo de Combate à Pobreza: R$ ${money(data.totals.fcp)}.` : "",
       data.totals.ibs > 0 || data.totals.cbs > 0 ? `Reforma tributária: IBS R$ ${money(data.totals.ibs)}; CBS R$ ${money(data.totals.cbs)} (não somam ao total da nota em 2026).` : "",
       data.info,

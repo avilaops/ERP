@@ -446,6 +446,13 @@ ainda não existe.** Regras do cofre, que não se quebram:
 3. **Entra conferido** (`saveCertificate`): abre com a senha, tem chave privada, está em vigor e o
    CNPJ é o da empresa. Um por empresa: enviar outro substitui.
 4. O ambiente começa em `homologacao`; passar para `producao` é escolha da diretoria na tela.
+5. **Local de entrega** (migração `0026`, `src/lib/db/order-delivery.ts`): só quando a mercadoria
+   vai para endereço diferente do cadastro; ou o endereço inteiro, ou nada. **O estado para onde a
+   mercadoria vai (`destinationUf` em `src/lib/fiscal/nfe.ts`) é o que define operação interna ou
+   interestadual, CFOP, alíquota e DIFAL**: o da entrega quando há, o do cliente quando não há
+   (regras E12-30, E12-40, NA01-20 e NA01-30 do MOC 7.0, Anexo I). Nunca compare só a UF do
+   cliente com a do emitente. O estado da entrega da nota tem de ser o `delivery_uf` do pedido,
+   que formou o preço; diferente disso é pendência, não ajuste automático.
 
 ## Contas a pagar e fornecedores
 

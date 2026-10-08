@@ -3,6 +3,7 @@ import { loadOrderTransport } from "@/lib/db/carriers";
 import { loadFiscalSettings, loadProductFiscal } from "@/lib/db/fiscal";
 import type { ProductFiscal } from "@/lib/db/fiscal";
 import { listPaymentCodes, loadFiscalRules } from "@/lib/db/fiscal-rules";
+import { loadOrderDelivery } from "@/lib/db/order-delivery";
 import { getOrder } from "@/lib/db/orders";
 import type { Order } from "@/lib/db/orders";
 import type { Queryable } from "@/lib/db/pool";
@@ -50,6 +51,7 @@ export async function previewOrderNfe(orderNumber: string, now: Date, conn: Quer
   const built = orderNfe({
     freightMode: (freight.rows[0]?.nfe_freight_mode ?? null) as FreightMode | null,
     transport: await loadOrderTransport(order.id, conn),
+    delivery: await loadOrderDelivery(order.id, conn),
     settings,
     rules,
     order,

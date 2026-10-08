@@ -9,6 +9,7 @@ import type { CustomerKind } from "@/lib/customer";
 import { CUSTOMER_FIELDS, customerToForm } from "@/lib/customer-form";
 import { lastDecision } from "@/lib/db/approvals";
 import { listCarriers, loadOrderTransport } from "@/lib/db/carriers";
+import { loadOrderDelivery } from "@/lib/db/order-delivery";
 import { listOrderInvoiceEvents, listOrderInvoices } from "@/lib/db/invoices";
 import { previewOrderNfe } from "@/lib/db/order-nfe";
 import { findCustomerByDocument } from "@/lib/db/customers";
@@ -26,7 +27,7 @@ import { DiscountFields } from "@/components/DiscountFields";
 import { proposalText } from "@/lib/quote/text";
 import { decideApprovalAction } from "../../aprovacoes/actions";
 import { FREIGHT_MODES } from "@/lib/fiscal/nfe";
-import { issueNfeAction, registerNfeEventAction, saveTransportAction } from "../nfe-actions";
+import { issueNfeAction, registerNfeEventAction, saveDeliveryAction, saveTransportAction } from "../nfe-actions";
 import { CustomerForm } from "../../clientes/CustomerForm";
 import { ActionForm } from "../ActionForm";
 import {
@@ -144,6 +145,7 @@ export default async function PedidoPage({
   const events = invoice ? await listOrderInvoiceEvents(order.id, conn) : [];
   const carriers = invoice ? await listCarriers(conn) : [];
   const transport = await loadOrderTransport(order.id, conn);
+  const delivery = invoice ? await loadOrderDelivery(order.id, conn) : null;
   // What "Copiar proposta" puts in the clipboard: only what the customer reads in the PDF.
   const proposal = proposalText({
     company: session.tenant.name,
@@ -355,6 +357,72 @@ export default async function PedidoPage({
               </button>
             </div>
           </ActionForm>
+          <details className="mt-3 rounded border border-slate-200 p-3" open={delivery !== null || (order.customer !== null && order.deliveryUf !== null && order.customer.uf !== order.deliveryUf)}>
+            <summary className="cursor-pointer text-sm font-medium">
+              Local de entrega: {delivery ? `${delivery.street}, ${delivery.number} - ${delivery.city}/${delivery.uf}` : "o endereço do cadastro do cliente"}
+            </summary>
+            <p className="mt-2 text-xs text-slate-600">
+              Preencha só quando a mercadoria vai para outro endereço. O estado tem de ser o da entrega do pedido
+              {order.deliveryUf ? ` (${order.deliveryUf})` : ""}: é ele que define a operação e o imposto da nota.
+            </p>
+            <ActionForm action={saveDeliveryAction} className="mt-3 grid gap-3 sm:grid-cols-4">
+              <input type="hidden" name="number" value={order.number} />
+              {(
+                [
+                  ["deliveryCep", "CEP", delivery?.cep ?? "", "numeric", ""],
+                  ["deliveryStreet", "Rua", delivery?.street ?? "", "text", "sm:col-span-2"],
+                  ["deliveryNumber", "Número", delivery?.number ?? "", "text", ""],
+                  ["deliveryComplement", "Complemento (opcional)", delivery?.complement ?? "", "text", ""],
+                  ["deliveryDistrict", "Bairro", delivery?.district ?? "", "text", ""],
+                  ["deliveryCity", "Cidade", delivery?.city ?? "", "text", ""],
+                ] as const
+              ).map(([name, label, value, mode, span]) => (
+                <div key={name} className={span}>
+                  <label htmlFor={name} className="block text-xs font-medium text-slate-600">
+                    {label}
+                  </label>
+                  <input key={value} id={name} name={name} type="text" inputMode={mode} defaultValue={value} autoComplete="off" className={`${INPUT} mt-1 w-full`} />
+                </div>
+              ))}
+              <div>
+                <label htmlFor="deliveryState" className="block text-xs font-medium text-slate-600">
+                  Estado
+                </label>
+                <select key={delivery?.uf ?? order.deliveryUf ?? ""} id="deliveryState" name="deliveryState" defaultValue={delivery?.uf ?? order.deliveryUf ?? ""} className={`${INPUT} mt-1 w-full`}>
+                  <option value="">—</option>
+                  {UFS.map((uf) => (
+                    <option key={uf} value={uf}>
+                      {uf}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {(
+                [
+                  ["deliveryName", "Quem recebe (opcional)", delivery?.name ?? "", "text", "sm:col-span-2"],
+                  ["deliveryDocument", "CNPJ ou CPF de quem recebe (opcional)", delivery?.document ?? "", "text", ""],
+                  ["deliveryPhone", "Telefone (opcional)", delivery?.phone ?? "", "tel", ""],
+                ] as const
+              ).map(([name, label, value, mode, span]) => (
+                <div key={name} className={span}>
+                  <label htmlFor={name} className="block text-xs font-medium text-slate-600">
+                    {label}
+                  </label>
+                  <input key={value} id={name} name={name} type="text" inputMode={mode} defaultValue={value} autoComplete="off" className={`${INPUT} mt-1 w-full`} />
+                </div>
+              ))}
+              <div className="flex flex-wrap gap-2 sm:col-span-4">
+                <button type="submit" className={BUTTON}>
+                  Salvar local de entrega
+                </button>
+                {delivery ? (
+                  <button type="submit" name="clear" value="1" className="rounded border border-slate-300 px-3 py-1.5 text-sm font-medium hover:bg-slate-50">
+                    Usar o endereço do cadastro
+                  </button>
+                ) : null}
+              </div>
+            </ActionForm>
+          </details>
           {invoice.problems.length > 0 ? (
             <>
               <p className="mt-3 font-medium">Para montar a nota, falta:</p>

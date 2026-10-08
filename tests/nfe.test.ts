@@ -5,7 +5,7 @@ import type { NfeInput } from "@/lib/fiscal/nfe";
 
 const INPUT: NfeInput = {
   environment: "producao",
-  freightMode: "1", transport: { carrier: null, volumes: null, volumeKind: null, netWeight: null, grossWeight: null },
+  freightMode: "1", transport: { carrier: null, volumes: null, volumeKind: null, netWeight: null, grossWeight: null }, delivery: null,
   series: 1,
   number: 123,
   randomCode: "48291736",
@@ -122,6 +122,25 @@ test("transporte: transportadora e volumes vão na ordem do leiaute; em branco, 
   assert.ok(nfeProblems({ ...INPUT, transport: { ...INPUT.transport, carrier: { ...carrier, uf: null } } }).some((problem) => problem.includes("informe a UF")));
 });
 
+test("local de entrega: grupo logo depois do destinatário, na ordem do leiaute; a operação segue o estado da entrega", () => {
+  const place = { kind: "PJ" as const, document: "98765432000198", name: "Filial Teresina", street: "Rua da Obra", number: "77", complement: null, district: "Centro", cityCode: "2211001", city: "Teresina", uf: "PI", cep: "64000000", phone: "(86) 3222-1000" };
+  const { xml } = buildNfeXml({ ...INPUT, delivery: place, destination: { internalIcms: 0.225, fcp: 0 } });
+  assert.ok(xml.includes("</dest><entrega><CNPJ>98765432000198</CNPJ><xNome>Filial Teresina</xNome><xLgr>Rua da Obra</xLgr><nro>77</nro><xBairro>Centro</xBairro><cMun>2211001</cMun><xMun>Teresina</xMun><UF>PI</UF><CEP>64000000</CEP><cPais>1058</cPais><xPais>BRASIL</xPais><fone>8632221000</fone></entrega><det"));
+  assert.ok(xml.includes("<idDest>2</idDest>") && xml.includes("<pICMSUFDest>22.5000</pICMSUFDest>"));
+  assert.doesNotMatch(buildNfeXml(INPUT).xml, /<entrega>/);
+  // Cliente de outro estado que recebe dentro do estado do emitente: operação interna, sem DIFAL (regras E12-40 e NA01-20).
+  const inside = buildNfeXml({ ...INPUT, icmsRate: 0.18, delivery: { ...place, uf: "SP", cityCode: "3509502", city: "Campinas", cep: "13010000" } });
+  assert.ok(inside.xml.includes("<idDest>1</idDest>") && inside.xml.includes("<CFOP>5102</CFOP>"));
+  assert.doesNotMatch(inside.xml, /ICMSUFDest/);
+  assert.equal(inside.totals.difal, 0);
+  // Cliente do próprio estado que recebe em outro: interestadual, com DIFAL para o estado da entrega (E12-30 e NA01-30).
+  const outside = buildNfeXml({ ...INPUT, recipient: { ...INPUT.recipient, uf: "SP", cityCode: "3550308", city: "São Paulo" }, delivery: place, destination: { internalIcms: 0.225, fcp: 0 } });
+  assert.ok(outside.xml.includes("<idDest>2</idDest>") && outside.xml.includes("<CFOP>6108</CFOP>") && outside.xml.includes("<ICMSUFDest>"));
+  // Cidade de outro estado e CEP incompleto são barrados antes de escrever o XML.
+  const problems = nfeProblems({ ...INPUT, delivery: { ...place, uf: "MA", cep: "640" } });
+  assert.ok(problems.some((problem) => problem.includes("cidade da tabela do IBGE")) && problems.some((problem) => problem.includes("CEP com oito dígitos")));
+});
+
 test("nota com falta não sai: cada problema diz onde se corrige, todos de uma vez", () => {
   const broken: NfeInput = {
     ...INPUT,
@@ -155,6 +174,9 @@ test("esquema oficial da NF-e 4.00 (XSD): o XML passa inteiro; só falta a assin
     { ...INPUT, freightMode: "0", recipient: { ...INPUT.recipient, document: "12ABC34501DE35" } },
     // Transportadora com inscrição e UF, e volumes com pesos.
     { ...INPUT, freightMode: "2", transport: { carrier: { kind: "PJ", document: "11222333000181", name: "Transportes Rápidos Ltda", stateRegistration: "110042490114", address: "Rod. BR-153, km 50", city: "São José do Rio Preto", uf: "SP" }, volumes: 12, volumeKind: "Palete", netWeight: 1850.5, grossWeight: 1990 } },
+    // Local de entrega em outro estado, com quem recebe e telefone; e o mínimo, com CPF.
+    { ...INPUT, destination: { internalIcms: 0.225, fcp: 0 }, delivery: { kind: "PJ", document: "98765432000198", name: "Filial Teresina", street: "Rua da Obra", number: "77", complement: "Galpão 2", district: "Centro", cityCode: "2211001", city: "Teresina", uf: "PI", cep: "64000000", phone: "(86) 3222-1000" } },
+    { ...INPUT, icmsRate: 0.18, delivery: { kind: "PF", document: "52998224725", name: null, street: "Rua A", number: "1", district: "Centro", cityCode: "3509502", city: "Campinas", uf: "SP", cep: "13010000" } },
     // Só o transportador pessoa física, sem endereço; só quantidade de volumes.
     { ...INPUT, transport: { carrier: { kind: "PF", document: "52998224725", name: "João Carreteiro", stateRegistration: null, address: null, city: null, uf: null }, volumes: 3, volumeKind: null, netWeight: null, grossWeight: null } },
   ];
