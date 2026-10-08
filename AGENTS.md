@@ -220,8 +220,10 @@ funções puras, sem banco e sem tela, conferidas com os números dos prints do 
     NFeAutorizacao4 síncrono, com o A1 da empresa na conexão) e grava o veredito. Rejeitada reemite
     com o mesmo número; sem resposta, reenvia os mesmos bytes; autorizada guarda o `nfeProc` e não
     se repete. Só São Paulo tem endereço: outro estado é erro. **A verificação do certificado do
-    servidor nunca se desliga**; as raízes da ICP-Brasil vão num arquivo PEM apontado por
-    `NFE_CA_FILE`. O ambiente (homologação ou produção) é o de Parâmetros → Fiscal. **Nada disso foi
+    servidor nunca se desliga**; a conexão confia **só** na raiz v10 da ICP-Brasil
+    (`src/lib/fiscal/icp-brasil.ts`, impressão digital no arquivo e no teste), que não vem nas
+    raízes do sistema; `NFE_CA_FILE` a substitui se a cadeia mudar. Conferido de verdade em
+    2026-10-08: os dois endereços da SEFAZ-SP são aceitos com ela e um site comum é recusado. O ambiente (homologação ou produção) é o de Parâmetros → Fiscal. **Nada disso foi
     exercitado contra a SEFAZ de verdade**: os testes usam um servidor local que exige certificado.
     **O DANFE** (`src/lib/fiscal/danfe.ts`, `/api/pedidos/[numero]/danfe`) é desenhado a partir do
     XML da própria nota, nunca do pedido, com o código de barras da chave (Code 128 C,

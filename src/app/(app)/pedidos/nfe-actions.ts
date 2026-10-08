@@ -8,16 +8,17 @@ import { IssueError, issueOrderNfe } from "@/lib/db/issue-nfe";
 import type { Send } from "@/lib/db/issue-nfe";
 import { tenantDb } from "@/lib/db/pool";
 import { vaultKey } from "@/lib/fiscal/certificate";
+import { ICP_BRASIL_ROOT_V10 } from "@/lib/fiscal/icp-brasil";
 import { transmit } from "@/lib/fiscal/sefaz";
 import type { ActionState } from "@/lib/order-form";
 import { ORDER_NUMBER } from "@/lib/order-number";
 
 const FAILED = "Não foi possível emitir agora. Confira a situação da nota abaixo antes de tentar de novo.";
 
-/** The real channel: the company's certificate, and the roots of ICP-Brasil when the server has them in a file. */
+/** The real channel: the company's certificate, trusting only the root of ICP-Brasil (or the file that replaces it). */
 const send: Send = (url, action, envelope, certificate) => {
   const roots = process.env.NFE_CA_FILE;
-  return transmit(url, action, envelope, { ...certificate, ca: roots ? readFileSync(roots) : undefined });
+  return transmit(url, action, envelope, { ...certificate, ca: roots ? readFileSync(roots) : ICP_BRASIL_ROOT_V10 });
 };
 
 /**

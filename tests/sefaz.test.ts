@@ -128,3 +128,14 @@ test("SEFAZ: a transmissão apresenta o certificado da empresa, confere o do ser
     await new Promise((resolve) => server.close(resolve));
   }
 });
+
+test("raiz da ICP-Brasil: é a v10 do ITI, com a impressão digital registrada, e ainda vale", async () => {
+  const { X509Certificate } = await import("node:crypto");
+  const { ICP_BRASIL_ROOT_V10 } = await import("@/lib/fiscal/icp-brasil");
+  const root = new X509Certificate(ICP_BRASIL_ROOT_V10);
+  assert.equal(root.fingerprint256, "6E:0B:FF:06:9A:26:99:4C:15:DE:2C:48:88:CC:54:AF:84:88:2E:54:95:B7:FB:F6:6B:E9:CC:FF:EC:74:89:F6");
+  assert.match(root.subject, /CN=Autoridade Certificadora Raiz Brasileira v10/);
+  assert.equal(root.subject, root.issuer);
+  assert.ok(root.verify(root.publicKey));
+  assert.ok(new Date(root.validTo).getTime() > Date.now(), "a raiz venceu: troque pela nova do ITI");
+});
