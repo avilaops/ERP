@@ -42,6 +42,13 @@ test("páginas portadas não são mais marcador; as outras continuam Em constru�
   assert.equal(MENU_ITEMS.filter((item) => !PORTED.includes(item.key)).length, 0);
 });
 
+/** Every source file under src/, relative to it, with its code. */
+const SRC_DIR = fileURLToPath(new URL("../src/", import.meta.url));
+const SOURCES_UNDER_SRC = () =>
+  readdirSync(SRC_DIR, { recursive: true, encoding: "utf8" })
+    .filter((file) => /\.tsx?$/.test(file))
+    .map((file) => [file, readFileSync(SRC_DIR + file, "utf8")] as const);
+
 /** Every source file under the protected group, relative to it. */
 const appFiles = () =>
   readdirSync(APP_DIR, { recursive: true, encoding: "utf8" }).filter((file) => /\.tsx?$/.test(file));
@@ -247,6 +254,23 @@ test("comissões e estorno: o escopo e quem decide saem da sessão", () => {
   assert.ok(refunds.indexOf("confirmsRefunds(session.role)") < refunds.indexOf("decideRefund("));
 });
 
+test("certificado digital: só a diretoria envia; arquivo e senha não voltam para a tela nem vão para o log", () => {
+  const actions = readFileSync(`${APP_DIR}parametros/fiscal/actions.ts`, "utf8");
+  const page = source("/parametros/fiscal");
+  assert.ok(page.includes('await requirePermission("parametros")'));
+  // A chave do cofre vem do ambiente do servidor, nunca do formulário nem do banco.
+  assert.ok(actions.includes("vaultKey(process.env.ERP_CERT_KEY)"));
+  // A tela só conhece a ficha do certificado: nada que abra o cofre.
+  assert.doesNotMatch(page, /openCertificate|ciphertext|ERP_CERT_KEY|sealCertificate/);
+  // Nenhum log leva a senha ou o conteúdo do arquivo.
+  for (const line of actions.split("\n").filter((text) => /console\.(info|error|log|warn)/.test(text))) {
+    assert.doesNotMatch(line, /password|arrayBuffer|certificate\b|file\b/, line.trim());
+  }
+  // Fora da camada fiscal ninguém abre o certificado guardado.
+  const users = SOURCES_UNDER_SRC().filter(([, code]) => code.includes("openCertificate("));
+  assert.deepEqual(users.map(([file]) => file), ["lib/fiscal/certificate.ts"]);
+});
+
 test("formas de pagamento: só quem tem Parâmetros altera", () => {
   assert.ok(source("/parametros/formas-de-pagamento").includes('await requirePermission("parametros")'));
   const actions = readFileSync(`${APP_DIR}parametros/formas-de-pagamento/actions.ts`, "utf8");
@@ -261,7 +285,7 @@ test("não existe página no grupo protegido sem requirePermission", () => {
   const all = pages();
   // The menu items, plus /pedidos/novo, one order, the record of one customer and of one supplier,
   // and the users, the forms of payment and the categories of bills of the company.
-  assert.equal(all.length, MENU_ITEMS.length + 12);
+  assert.equal(all.length, MENU_ITEMS.length + 13);
   for (const route of all) {
     assert.match(source(route), /await requirePermission\(/, route);
   }

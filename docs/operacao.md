@@ -21,6 +21,7 @@ Todas descritas em `.env.example`. Nenhuma tem valor real no repositório.
 | `APP_URL` | Endereço público do sistema, usado na volta do login | Obrigatória e em `https` |
 | `ERP_TENANTS` | As empresas do sistema (`identificador:Nome`, separadas por `;`). Cada uma tem um esquema próprio no banco | Obrigatória; entrada inválida impede a subida |
 | `ERP_USERS` | Quem entra, com qual perfil e em qual empresa (`email:PERFIL@empresa`, separados por vírgula) | Obrigatória; entrada inválida impede a subida |
+| `ERP_CERT_KEY` | Chave do cofre do certificado digital A1 (32 bytes em base64). Fica só no servidor; sem ela o envio do certificado é recusado e o resto do sistema segue | Opcional para subir; necessária para o Fiscal |
 | `ERP_LOCAL_LOGIN` | `1` liga o login local de teste (`/dev/login`) | Ignorada: o login local não existe em produção |
 | `ERP_TEST_DATABASE_URL` | Banco dos testes; o nome tem de terminar em `_test` | Não se usa |
 
@@ -134,6 +135,10 @@ backup original está em `/opt/backups/backup-todos-bancos.sh.bak-20261006-antes
    - `APP_URL=https://erp.avilaops.com`
    - `ERP_TENANTS="ludus:Ludus Equipamentos"`
    - `ERP_USERS`: os e-mails reais, como `email:PERFIL@ludus`
+   - `ERP_CERT_KEY`: gerada no próprio servidor, uma por instalação
+     (`node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`). Nunca vai
+     para o repositório. Se for perdida ou trocada, o certificado guardado não abre mais: basta a
+     diretoria enviar o certificado de novo em Parâmetros → Fiscal
    - sem `ERP_LOCAL_LOGIN` (em produção é ignorada de qualquer jeito)
 4. **Caddy:** colar `deploy/Caddyfile.snippet` em `/etc/caddy/Caddyfile`, validar e recarregar.
 5. **Cloudflare:** o registro A `erp` da zona `avilaops.com` aponta para `178.105.82.48`.

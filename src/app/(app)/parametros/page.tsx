@@ -62,6 +62,10 @@ export default async function ParametrosPage() {
         <Link href="/parametros/despesas-fixas" className="font-medium text-brand underline">
           Despesas fixas
         </Link>
+        {" · "}
+        <Link href="/parametros/fiscal" className="font-medium text-brand underline">
+          Fiscal e certificado digital
+        </Link>
       </p>
 
       <div className="mt-6 grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">

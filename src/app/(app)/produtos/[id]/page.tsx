@@ -2,9 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requirePermission } from "@/lib/auth";
 import { menuItem } from "@/lib/auth/permissions";
+import { loadProductFiscal, PRODUCT_ORIGINS } from "@/lib/db/fiscal";
 import { tenantDb } from "@/lib/db/pool";
 import { listProducts } from "@/lib/db/products";
 import { productToForm } from "@/lib/product-form";
+import { saveProductFiscalAction } from "../../parametros/fiscal/actions";
+import { ActionForm } from "../../pedidos/ActionForm";
 import { deleteProductAction, saveProductScreenAction, setProductActiveAction } from "../actions";
 import { ProductScreen } from "../ProductScreen";
 
@@ -17,6 +20,7 @@ export default async function EquipamentoPage({ params }: { params: Promise<{ id
   const conn = tenantDb(session.tenant.slug);
   const product = /^[1-9]\d{0,8}$/.test(id) ? (await listProducts({}, conn)).find((item) => item.id === Number(id)) : undefined;
   if (!product) notFound();
+  const fiscal = await loadProductFiscal(product.id, conn);
 
   return (
     <>
@@ -40,6 +44,51 @@ export default async function EquipamentoPage({ params }: { params: Promise<{ id
           remove={deleteProductAction}
         />
       </div>
+
+      {fiscal && (
+        <details className="mx-auto mt-6 max-w-xl rounded-lg border border-slate-200 bg-white">
+          <summary className="cursor-pointer px-4 py-3 font-medium">Dados fiscais: NCM, origem e unidade</summary>
+          <ActionForm action={saveProductFiscalAction} className="grid gap-4 border-t border-slate-200 p-4 sm:grid-cols-2">
+            <input type="hidden" name="id" value={product.id} />
+            <div>
+              <label htmlFor="ncm" className="block text-sm font-medium">
+                NCM (8 dígitos)
+              </label>
+              <input id="ncm" name="ncm" type="text" inputMode="numeric" defaultValue={fiscal.ncm ?? ""} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 outline-none focus:ring-2 focus:ring-brand" />
+            </div>
+            <div>
+              <label htmlFor="unit" className="block text-sm font-medium">
+                Unidade
+              </label>
+              <input id="unit" name="unit" type="text" defaultValue={fiscal.unit} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 outline-none focus:ring-2 focus:ring-brand" />
+            </div>
+            <div className="sm:col-span-2">
+              <label htmlFor="origin" className="block text-sm font-medium">
+                Origem da mercadoria
+              </label>
+              <select key={fiscal.origin ?? ""} id="origin" name="origin" defaultValue={fiscal.origin ?? ""} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 outline-none focus:ring-2 focus:ring-brand">
+                <option value="">—</option>
+                {PRODUCT_ORIGINS.map(([code, label]) => (
+                  <option key={code} value={code}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="cest" className="block text-sm font-medium">
+                CEST (7 dígitos, se houver)
+              </label>
+              <input id="cest" name="cest" type="text" inputMode="numeric" defaultValue={fiscal.cest ?? ""} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 outline-none focus:ring-2 focus:ring-brand" />
+            </div>
+            <div className="sm:col-span-2">
+              <button type="submit" className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 font-medium hover:bg-slate-50">
+                Salvar dados fiscais
+              </button>
+            </div>
+          </ActionForm>
+        </details>
+      )}
     </>
   );
 }

@@ -300,6 +300,23 @@ metas de venda (`sales_goals`, uma da equipe e uma por vendedor em cada mês) s�
 Diretoria (`setsGoals`), sempre para o mês corrente. Os gráficos são `src/components/Charts.tsx`,
 componentes de servidor em CSS, sem biblioteca.
 
+## Fiscal e certificado digital (base da NF-e)
+
+A Ávila Ops emite a nota direto na SEFAZ: o ERP guarda e usa o certificado A1 da empresa.
+Feito até aqui (migração `0016`): dados fiscais do emitente e série/número/ambiente em
+`company_settings`, NCM/origem/CEST/unidade em `products`, e o cofre do certificado. **A emissão
+ainda não existe.** Regras do cofre, que não se quebram:
+
+1. **O certificado e a senha só existem cifrados** (`fiscal_certificates`, AES-256-GCM, selados
+   juntos por `sealCertificate`). A chave é `ERP_CERT_KEY`, do ambiente do servidor: nunca no
+   banco, no repositório nem no formulário. Sem ela o envio é recusado, e o resto do sistema segue.
+2. **Nada devolve o arquivo ou a senha**: nem tela, nem rota, nem log. A tela recebe só a ficha
+   (`loadCertificateInfo`: titular, CNPJ, validade, resumo). `openCertificate` só é chamado dentro
+   de `src/lib/fiscal/`; `tests/routes.test.ts` falha se aparecer em outro lugar.
+3. **Entra conferido** (`saveCertificate`): abre com a senha, tem chave privada, está em vigor e o
+   CNPJ é o da empresa. Um por empresa: enviar outro substitui.
+4. O ambiente começa em `homologacao`; passar para `producao` é escolha da diretoria na tela.
+
 ## Contas a pagar e fornecedores
 
 As **despesas fixas** são lista da empresa (`fixed_expenses`, Parâmetros → Despesas fixas). A
