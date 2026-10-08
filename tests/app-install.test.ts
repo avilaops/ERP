@@ -4,7 +4,7 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 import manifest from "@/app/manifest";
-import { APP_DESCRIPTION, APP_ICONS, APP_NAME, APP_SHORT_NAME, BACKGROUND_COLOR, ICON_COLOR, THEME_COLOR } from "@/lib/app-identity";
+import { APP_DESCRIPTION, APP_ICONS, APP_NAME, APP_SHORT_NAME, BACKGROUND_COLOR, ICON_BACKGROUND, ICON_COLOR, THEME_COLOR } from "@/lib/app-identity";
 
 const ROOT = fileURLToPath(new URL("../", import.meta.url));
 const read = (file: string) => readFileSync(`${ROOT}${file}`, "utf8");
@@ -60,9 +60,9 @@ test("manifesto: instalável, em tela cheia, com os ícones que existem em publi
   assert.deepEqual([...new Set((icons ?? []).map((icon) => icon.sizes))], ["192x192", "512x512"]);
 });
 
-test("ícones: PNG quadrado do tamanho declarado, sem transparência e com o fundo da marca", async () => {
-  const [red, green, blue] = rgb(ICON_COLOR);
-  for (const { file, size, maskable } of APP_ICONS) {
+test("ícones: PNG quadrado do tamanho declarado, a marca da Ávila sobre fundo branco, sem transparência fora da aba do navegador", async () => {
+  const [red, green, blue] = rgb(ICON_BACKGROUND);
+  for (const { file, size, maskable, transparent = false } of APP_ICONS) {
     const image = sharp(`${ROOT}${file}`);
     const { format, width, height } = await image.metadata();
     assert.deepEqual({ format, width, height }, { format: "png", width: size, height: size }, file);
@@ -70,18 +70,18 @@ test("ícones: PNG quadrado do tamanho declarado, sem transparência e com o fun
     assert.equal(pixels.length, size * size * 4, file);
     // O mascarável é cortado pelo celular: fora do quadrado central de 60% só pode haver fundo.
     const edge = maskable ? Math.ceil(size * 0.2) : 1;
-    let white = 0;
+    let drawn = 0;
     for (let at = 0; at < pixels.length; at += 4) {
       const x = (at / 4) % size;
       const y = Math.floor(at / 4 / size);
       // Transparência vira fundo preto na tela de início do iPhone.
-      if (pixels[at + 3] !== 255) assert.fail(`${file}: pixel transparente em ${x},${y}`);
-      const background = pixels[at] === red && pixels[at + 1] === green && pixels[at + 2] === blue;
+      if (!transparent && pixels[at + 3] !== 255) assert.fail(`${file}: pixel transparente em ${x},${y}`);
+      const background = transparent ? pixels[at + 3] === 0 : pixels[at] === red && pixels[at + 1] === green && pixels[at + 2] === blue;
       const outside = x < edge || y < edge || x >= size - edge || y >= size - edge;
       if (outside && !background) assert.fail(`${file}: desenho fora da área segura em ${x},${y}`);
-      if (!outside && pixels[at] === 255 && pixels[at + 1] === 255 && pixels[at + 2] === 255) white += 1;
+      if (!outside && !background) drawn += 1;
     }
-    assert.ok(white > 0, `${file}: sem desenho`);
+    assert.ok(drawn > 0, `${file}: sem desenho`);
   }
   // Nada além dos ícones é servido sem sessão a partir de public.
   assert.deepEqual(files("public").sort(), APP_ICONS.map(({ file }) => file).filter((file) => file.startsWith("public/")).sort());
