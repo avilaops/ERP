@@ -185,6 +185,39 @@ export async function listReceipts(limit: number, conn: Queryable): Promise<Past
   }));
 }
 
+/** What came in during a month (`AAAA-MM`, São Paulo) and was not refunded. */
+export async function receivedInMonth(month: string, conn: Queryable): Promise<number> {
+  const { rows } = await conn.query(
+    `SELECT COALESCE(sum(p.amount), 0) AS total
+       FROM receipts p
+      WHERE to_char(p.received_at AT TIME ZONE 'America/Sao_Paulo', 'YYYY-MM') = $1
+        AND NOT EXISTS (SELECT 1 FROM refund_requests q WHERE q.receipt_id = p.id AND q.status = 'confirmada')`,
+    [month],
+  );
+  return Number(rows[0].total);
+}
+
+/**
+ * The commission still to be born: what is open in the closed orders, without
+ * the IPI, at the commission rate of the table version of each order. A
+ * forecast, not an entry. With `sellerEmail`, only that seller's orders.
+ */
+export async function futureCommission(sellerEmail: string | null, conn: Queryable): Promise<number> {
+  const { rows } = await conn.query(
+    `SELECT COALESCE(sum(round(
+              (r.amount - (SELECT COALESCE(sum(p.amount), 0) FROM receipts p
+                            WHERE p.receivable_id = r.id
+                              AND NOT EXISTS (SELECT 1 FROM refund_requests q WHERE q.receipt_id = p.id AND q.status = 'confirmada')))
+              / (1 + v.ipi) * v.commission, 2)), 0) AS total
+       FROM receivables r
+       JOIN orders o ON o.id = r.order_id
+       JOIN price_table_versions v ON v.version = o.price_table_version
+      WHERE r.status = 'aberta' AND o.status = 'fechado' AND ($1::text IS NULL OR o.seller_email = $1)`,
+    [sellerEmail],
+  );
+  return Number(rows[0].total);
+}
+
 const UNIQUE_VIOLATION = "23505";
 
 /**

@@ -1,3 +1,5 @@
+import { futureCommission } from "@/lib/db/receivables";
+import { roundCents } from "@/lib/pricing/money";
 import Link from "next/link";
 import { requirePermission } from "@/lib/auth";
 import { managesCommissions, menuItem } from "@/lib/auth/permissions";
@@ -36,6 +38,15 @@ export default async function ComissoesPage({ searchParams }: { searchParams: Pr
   const month = chooseMonth(first(query.mes), months, current);
   const groups = commissionsView(await listCommissions(month, scope, conn), await listCarriedBalances(month, scope, conn));
   const paymentDay = await loadCommissionDay(conn);
+  // The four numbers of the month, for who is looking: a seller's are only their own.
+  const entries = groups.flatMap((group) => group.entries);
+  const totals = {
+    received: roundCents(entries.filter((entry) => !entry.refund).reduce((sum, entry) => sum + entry.base, 0)),
+    month: roundCents(groups.reduce((sum, group) => sum + group.total, 0)),
+    payable: roundCents(groups.reduce((sum, group) => sum + group.payable, 0)),
+    future: await futureCommission(scope, conn),
+  };
+  const sellers = groups.length;
   const shown = months.includes(current) ? months : [current, ...months];
 
   return (
@@ -45,6 +56,23 @@ export default async function ComissoesPage({ searchParams }: { searchParams: Pr
         A comissão nasce quando o valor é recebido, sobre a parte sem IPI. O que entra num mês é pago no dia {paymentDay} do mês
         seguinte. Estorno devolve a comissão e desconta do próximo pagamento.
       </p>
+
+      <dl className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+        {(
+          [
+            ["Recebido de clientes", showMoney(totals.received), `${monthLabel(month)} · sem IPI`],
+            ["Comissão do mês", showMoney(totals.month), manages ? `${sellers} ${sellers === 1 ? "vendedor" : "vendedores"}` : "sua comissão"],
+            ["Falta pagar", showMoney(totals.payable), "com o que ficou de meses anteriores"],
+            ["Comissão futura", showMoney(totals.future), "do que ainda não foi recebido"],
+          ] as const
+        ).map(([label, value, note]) => (
+          <div key={label} className="rounded-lg border border-slate-200 bg-white p-4">
+            <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</dt>
+            <dd className="mt-1 text-2xl font-bold">{value}</dd>
+            <dd className="text-xs text-slate-600">{note}</dd>
+          </div>
+        ))}
+      </dl>
 
       <nav aria-label="Mês" className="mt-6 flex flex-wrap gap-2 text-sm">
         {shown.map((item) => (

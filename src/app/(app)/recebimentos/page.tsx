@@ -1,9 +1,10 @@
+import { monthLabel } from "@/lib/commissions-view";
 import Link from "next/link";
 import { requirePermission } from "@/lib/auth";
 import { confirmsRefunds, menuItem } from "@/lib/auth/permissions";
 import { listPaymentMethods } from "@/lib/db/orders";
 import { tenantDb } from "@/lib/db/pool";
-import { listOpenReceivables, listPendingRefunds, listReceipts } from "@/lib/db/receivables";
+import { listOpenReceivables, listPendingRefunds, listReceipts, receivedInMonth } from "@/lib/db/receivables";
 import { formatMoney, isoDate, showDateTime, showIsoDate, showMoney } from "@/lib/format";
 import { addDays } from "@/lib/pricing/payment";
 import { isOverdue, receivablesSummary } from "@/lib/receivables-view";
@@ -28,12 +29,14 @@ export default async function RecebimentosPage() {
   const methods = await listPaymentMethods(conn);
   const refunds = await listPendingRefunds(conn);
   const decides = confirmsRefunds(session.role);
-  const summary = receivablesSummary(open, today, addDays(today, 7));
+  const summary = receivablesSummary(open, today, addDays(today, 30));
+  const received = await receivedInMonth(today.slice(0, 7), conn);
 
   const cards = [
     ["A receber", showMoney(summary.open.total), count(summary.open.count), ""],
-    ["Atrasado", showMoney(summary.overdue.total), count(summary.overdue.count), summary.overdue.count > 0 ? "text-red-700" : ""],
-    ["Vence em 7 dias", showMoney(summary.nextDays.total), count(summary.nextDays.count), ""],
+    ["Vencido", showMoney(summary.overdue.total), count(summary.overdue.count), summary.overdue.count > 0 ? "text-red-700" : ""],
+    ["Próximos 30 dias", showMoney(summary.nextDays.total), `${count(summary.nextDays.count)} a vencer`, ""],
+    ["Recebido no mês", showMoney(received), monthLabel(today.slice(0, 7)), ""],
   ] as const;
 
   return (
@@ -41,7 +44,7 @@ export default async function RecebimentosPage() {
       <h1 className="text-2xl font-semibold">{menuItem("recebimentos").label}</h1>
       <p className="mt-1 text-slate-600">Entradas e parcelas dos pedidos fechados. A baixa gera a comissão do vendedor.</p>
 
-      <dl className="mt-6 grid gap-4 sm:grid-cols-3">
+      <dl className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         {cards.map(([label, value, note, color]) => (
           <div key={label} className={`${CARD} p-4`}>
             <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</dt>

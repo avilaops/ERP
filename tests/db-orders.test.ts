@@ -1053,3 +1053,18 @@ test("a migração dos pedidos não tem cascata nem coluna de preço, custo ou t
     assert.doesNotMatch(column, /price|cost|total/, column);
   }
 });
+
+test("indicadores: recebido no mês não conta estorno confirmado; comissão futura é do que falta receber, e a do vendedor cabe na da equipe", { skip }, async () => {
+  const { receivedInMonth, futureCommission, listReceipts: receipts, listOpenReceivables: open } = await import("@/lib/db/receivables");
+  const all = await receipts(500, db.pool);
+  const month = all[0]?.receivedOn.slice(0, 7) ?? "2026-10";
+  const expected = all.filter((receipt) => receipt.receivedOn.startsWith(month) && receipt.state !== "estornado").reduce((sum, receipt) => sum + receipt.amount, 0);
+  assert.equal(Math.round((await receivedInMonth(month, db.pool)) * 100), Math.round(expected * 100));
+  assert.equal(await receivedInMonth("1999-01", db.pool), 0);
+
+  const team = await futureCommission(null, db.pool);
+  const stillOpen = (await open(db.pool)).reduce((sum, item) => sum + item.open, 0);
+  assert.ok(team >= 0 && team <= stillOpen);
+  assert.equal(team > 0, stillOpen > 0);
+  assert.equal(await futureCommission("ninguem@teste.local", db.pool), 0);
+});
