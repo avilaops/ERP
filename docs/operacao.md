@@ -22,6 +22,7 @@ Todas descritas em `.env.example`. Nenhuma tem valor real no repositório.
 | `ERP_TENANTS` | As empresas do sistema (`identificador:Nome`, separadas por `;`). Cada uma tem um esquema próprio no banco | Obrigatória; entrada inválida impede a subida |
 | `ERP_USERS` | Quem entra, com qual perfil e em qual empresa (`email:PERFIL@empresa`, separados por vírgula) | Obrigatória; entrada inválida impede a subida |
 | `ERP_CERT_KEY` | Chave do cofre do certificado digital A1 (32 bytes em base64). Fica só no servidor; sem ela o envio do certificado é recusado e o resto do sistema segue | Opcional para subir; necessária para o Fiscal |
+| `NFE_CA_FILE` | Arquivo PEM com as raízes da ICP-Brasil, para a conexão com a SEFAZ ao emitir nota. A verificação do servidor nunca é desligada | Opcional; sem ele vale só a lista de raízes do sistema, e a SEFAZ pode não ser reconhecida |
 | `ERP_LOCAL_LOGIN` | `1` liga o login local de teste (`/dev/login`) | Ignorada: o login local não existe em produção |
 | `ERP_TEST_DATABASE_URL` | Banco dos testes; o nome tem de terminar em `_test` | Não se usa |
 

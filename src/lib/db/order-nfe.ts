@@ -26,7 +26,7 @@ const previewCode = (orderNumber: string) => String(parseInt(createHash("sha256"
  * consuming it and signs nothing. `null` when the order does not exist or is
  * not closed.
  */
-export async function previewOrderNfe(orderNumber: string, now: Date, conn: Queryable) {
+export async function previewOrderNfe(orderNumber: string, now: Date, conn: Queryable, issue?: { number: number; randomCode: string }) {
   const order: Order | null = await getOrder(orderNumber, { sellerEmail: null }, conn);
   if (!order || order.status !== "fechado" || order.items.length === 0) return null;
   const table = await loadPublishedTable(order.priceTableVersion, conn);
@@ -44,7 +44,7 @@ export async function previewOrderNfe(orderNumber: string, now: Date, conn: Quer
   const plan = paymentOf(order, sale, table, isoDate(now));
   const codes = new Map((await listPaymentCodes(conn)).map((method) => [method.label, method.code]));
 
-  return orderNfe({
+  const built = orderNfe({
     settings,
     rules,
     order,
@@ -53,9 +53,10 @@ export async function previewOrderNfe(orderNumber: string, now: Date, conn: Quer
     params: snapshot.params,
     receipts: plan.receipts,
     paymentCodes: codes,
-    number: settings.nextNumber,
-    randomCode: previewCode(order.number),
+    number: issue?.number ?? settings.nextNumber,
+    randomCode: issue?.randomCode ?? previewCode(order.number),
     issuedAt: issueInstant(now),
     software: APP_NAME.normalize("NFD").replace(/[^\x20-\x7e]/g, "").replace(/\s+/g, " ").trim(),
   });
+  return { ...built, orderId: order.id, issuerUf: settings.uf ?? "" };
 }

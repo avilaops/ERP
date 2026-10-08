@@ -213,8 +213,17 @@ funções puras, sem banco e sem tela, conferidas com os números dos prints do 
     na forma canônica, então assinar não interpreta XML, e só assina o que este sistema montou. O
     teste confere a nota assinada no XSD oficial (zero pendências) e numa implementação
     independente (`xml-crypto`). Quem mexer em `tag`/`escape`/`group` do montador muda os bytes
-    assinados: rode `tests/nfe-sign.test.ts`. Transmissão à SEFAZ, DANFE, cancelamento e carta de
-    correção ainda não existem, e nenhuma tela assina.
+    assinados: rode `tests/nfe-sign.test.ts`. **A emissão existe** (`src/lib/db/issue-nfe.ts`,
+    botão "Emitir nota fiscal" no pedido fechado, só para quem edita os parâmetros): toma o próximo
+    número num comando só, monta, assina, **grava a nota assinada antes de enviar**
+    (`fiscal_invoices`, migração `0021`), envia à SEFAZ-SP (`src/lib/fiscal/sefaz.ts`,
+    NFeAutorizacao4 síncrono, com o A1 da empresa na conexão) e grava o veredito. Rejeitada reemite
+    com o mesmo número; sem resposta, reenvia os mesmos bytes; autorizada guarda o `nfeProc` e não
+    se repete. Só São Paulo tem endereço: outro estado é erro. **A verificação do certificado do
+    servidor nunca se desliga**; as raízes da ICP-Brasil vão num arquivo PEM apontado por
+    `NFE_CA_FILE`. O ambiente (homologação ou produção) é o de Parâmetros → Fiscal. **Nada disso foi
+    exercitado contra a SEFAZ de verdade**: os testes usam um servidor local que exige certificado.
+    DANFE, consulta de protocolo, cancelamento e carta de correção ainda não existem.
 
 10. **Provisões e taxa fixa por pedido são parâmetros** (migração `0013`): perdas, garantia e
     inadimplência somam em `channelRate`; a taxa fixa sai do lucro do pedido uma vez, junto com o

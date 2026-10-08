@@ -11,8 +11,10 @@ export function testPfx({
   from = new Date("2026-01-01T00:00:00Z"),
   until = new Date("2027-01-01T00:00:00Z"),
   withKey = true,
-}: { name?: string; password?: string; from?: Date; until?: Date; withKey?: boolean } = {}): Uint8Array {
-  const keys = forge.pki.rsa.generateKeyPair({ bits: 1024, e: 0x10001 });
+  bits = 1024,
+}: { name?: string; password?: string; from?: Date; until?: Date; withKey?: boolean; bits?: number } = {}): Uint8Array {
+  // 1024 keeps the tests fast; a TLS handshake needs 2048.
+  const keys = forge.pki.rsa.generateKeyPair({ bits, e: 0x10001 });
   const certificate = forge.pki.createCertificate();
   certificate.publicKey = keys.publicKey;
   certificate.serialNumber = "01";

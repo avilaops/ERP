@@ -163,6 +163,14 @@ export async function saveCertificate(
   return info;
 }
 
+/** The certificate as it is stored, sealed. Opening it takes the key of the vault, which is not in the database. */
+export async function loadSealedCertificate(conn: Queryable): Promise<{ ciphertext: Buffer; iv: Buffer; authTag: Buffer; validUntil: Date } | null> {
+  const { rows } = await conn.query("SELECT ciphertext, iv, auth_tag, valid_until FROM fiscal_certificates");
+  const row = rows[0];
+  if (!row) return null;
+  return { ciphertext: row.ciphertext as Buffer, iv: row.iv as Buffer, authTag: row.auth_tag as Buffer, validUntil: row.valid_until as Date };
+}
+
 /** Takes the certificate off the system. Without it no invoice is signed. */
 export async function removeCertificate(conn: Queryable): Promise<boolean> {
   const { rows } = await conn.query("DELETE FROM fiscal_certificates RETURNING id");

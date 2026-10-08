@@ -276,7 +276,8 @@ test("certificado digital: só a diretoria envia; arquivo e senha não voltam pa
   }
   // Fora da camada fiscal ninguém abre o certificado guardado.
   const users = SOURCES_UNDER_SRC().filter(([, code]) => code.includes("openCertificate("));
-  assert.deepEqual(users.map(([file]) => file), ["lib/fiscal/certificate.ts"]);
+  // Só a emissão abre o certificado guardado: para assinar a nota e falar com a SEFAZ.
+  assert.deepEqual(users.map(([file]) => file).sort(), ["lib/db/issue-nfe.ts", "lib/fiscal/certificate.ts"]);
 });
 
 test("catálogo do fornecedor: tela e foto só para quem tem Produtos e custos", () => {
@@ -441,4 +442,21 @@ test("nota fiscal: a conferência do XML só sai para quem edita os parâmetros,
   const loader = readFileSync(new URL("../src/lib/db/order-nfe.ts", import.meta.url), "utf8");
   assert.ok(loader.includes('order.status !== "fechado"'));
   assert.doesNotMatch(loader, /UPDATE|INSERT|DELETE/);
+});
+
+test("nota fiscal: só quem edita os parâmetros emite; a verificação do servidor da SEFAZ nunca é desligada; o XML autorizado segue o alcance do pedido", () => {
+  const action = readFileSync(new URL("../src/app/(app)/pedidos/nfe-actions.ts", import.meta.url), "utf8");
+  assert.ok(action.indexOf('await requirePermission("parametros")') < action.indexOf("issueOrderNfe("));
+  assert.ok(action.includes("vaultKey(process.env.ERP_CERT_KEY)"));
+  const sources = ["src/lib/fiscal/sefaz.ts", "src/lib/db/issue-nfe.ts", "src/app/(app)/pedidos/nfe-actions.ts"].map((file) => readFileSync(new URL(`../${file}`, import.meta.url), "utf8"));
+  for (const code of sources) {
+    assert.doesNotMatch(code, /rejectUnauthorized:\s*false|NODE_TLS_REJECT_UNAUTHORIZED/);
+    // A senha e o arquivo do certificado nunca vão para log nem para mensagem.
+    assert.doesNotMatch(code, /console\.\w+\([^)]*(passphrase|password|pfx)/);
+  }
+  assert.ok(sources[0].includes("rejectUnauthorized: true"));
+  const route = readFileSync(`${API_DIR}pedidos/[numero]/nfe/route.ts`, "utf8");
+  assert.ok(route.indexOf("await getSession()") < route.indexOf("getOrder("));
+  assert.ok(route.includes("sellerEmail: seesAllOrders(session.role) ? null : session.email"));
+  assert.ok(route.indexOf("getOrder(") < route.indexOf("loadAuthorizedXml("));
 });

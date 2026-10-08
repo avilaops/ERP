@@ -1115,3 +1115,73 @@ test("nota fiscal de conferência: pedido fechado, com os cadastros preenchidos,
   const { rows } = await db.pool.query("SELECT nfe_next_number FROM company_settings");
   assert.equal(rows[0].nfe_next_number, 42);
 });
+
+test("emissão: guarda a nota assinada antes de enviar; rejeitada reemite com o mesmo número; autorizada grava protocolo e não se repete", { skip }, async () => {
+  const { issueOrderNfe, IssueError } = await import("@/lib/db/issue-nfe");
+  const { saveCertificate } = await import("@/lib/db/fiscal");
+  const { listOrderInvoices, loadAuthorizedXml } = await import("@/lib/db/invoices");
+  const { SefazError } = await import("@/lib/fiscal/sefaz");
+  const { testPfx } = await import("./fiscal-helpers.ts");
+  const { randomBytes } = await import("node:crypto");
+
+  const closed = await db.pool.query(
+    `SELECT o.id, o.number FROM orders o JOIN customers c ON c.id = o.customer_id
+      WHERE o.status = 'fechado' AND c.uf = o.delivery_uf ORDER BY o.id LIMIT 1`,
+  );
+  const { id: orderId, number } = closed.rows[0];
+  const now = new Date("2026-10-08T13:00:00Z");
+  const vault = randomBytes(32);
+  const who = "diretoria@teste.local";
+  const never = async () => {
+    throw new Error("não era para enviar");
+  };
+
+  // Sem certificado não há o que assinar, e nenhum número é gasto.
+  await assert.rejects(() => issueOrderNfe(number, who, now, vault, never, db.pool), /certificado digital A1/);
+  await saveCertificate(testPfx({ name: "EMPRESA DE TESTE LTDA:11222333000181" }), "senha-de-teste", vault, who, now, db.pool);
+
+  const answer = (key: string, code: string, reason: string) =>
+    `<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope"><soap:Body><retEnviNFe versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe"><cStat>104</cStat><xMotivo>Lote processado</xMotivo>` +
+    `<protNFe versao="4.00"><infProt><tpAmb>2</tpAmb><verAplic>T</verAplic><chNFe>${key}</chNFe><dhRecbto>2026-10-08T10:00:05-03:00</dhRecbto>${code === "100" ? "<nProt>135260000000001</nProt><digVal>x=</digVal>" : ""}<cStat>${code}</cStat><xMotivo>${reason}</xMotivo></infProt></protNFe></retEnviNFe></soap:Body></soap:Envelope>`;
+  const keyOf = (envelope: string) => /Id="NFe(\d{44})"/.exec(envelope)![1];
+  const sent: string[] = [];
+
+  // 1. A rede cai: a nota fica guardada, aguardando resposta, com o número 42.
+  await assert.rejects(
+    () => issueOrderNfe(number, who, now, vault, async (_url, _action, envelope) => { sent.push(envelope); throw new SefazError("A SEFAZ não respondeu a tempo."); }, db.pool),
+    (error: Error) => error instanceof IssueError && /aguardando resposta/.test(error.message),
+  );
+  let invoices = await listOrderInvoices(orderId, db.pool);
+  assert.deepEqual(invoices.map((invoice) => [invoice.number, invoice.status]), [[42, "assinada"]]);
+
+  // 2. De novo: vai a mesma nota, byte a byte, e a SEFAZ rejeita.
+  const rejected = await issueOrderNfe(number, who, now, vault, async (url, _action, envelope) => {
+    sent.push(envelope);
+    assert.match(url, /homologacao\.nfe\.fazenda\.sp\.gov\.br/);
+    return answer(keyOf(envelope), "225", "Rejeição: Falha no Schema XML da NFe");
+  }, db.pool);
+  assert.equal(sent[1].replace(/<idLote>\d+<\/idLote>/, ""), sent[0].replace(/<idLote>\d+<\/idLote>/, ""));
+  assert.deepEqual([rejected.invoice.status, rejected.invoice.statusCode, rejected.invoice.number], ["rejeitada", "225", 42]);
+  assert.match(rejected.message, /o número é o mesmo/);
+
+  // 3. Corrigida, sai com o mesmo número e outra chave; agora autorizada.
+  const authorized = await issueOrderNfe(number, who, new Date("2026-10-08T14:00:00Z"), vault, async (_url, _action, envelope) => {
+    sent.push(envelope);
+    return answer(keyOf(envelope), "100", "Autorizado o uso da NF-e");
+  }, db.pool);
+  assert.deepEqual([authorized.invoice.status, authorized.invoice.number, authorized.invoice.protocol], ["autorizada", 42, "135260000000001"]);
+  assert.notEqual(keyOf(sent[2]), keyOf(sent[0]));
+  invoices = await listOrderInvoices(orderId, db.pool);
+  assert.equal(invoices.length, 1);
+  const file = await loadAuthorizedXml(orderId, db.pool);
+  assert.ok(file?.xml.includes("<nfeProc ") && file.xml.includes("<nProt>135260000000001</nProt>") && file.xml.includes("<Signature "));
+  assert.equal(file?.accessKey, authorized.invoice.accessKey);
+
+  // 4. Já autorizada: não emite de novo. O contador da empresa andou uma vez só.
+  await assert.rejects(() => issueOrderNfe(number, who, now, vault, never, db.pool), /já tem nota autorizada/);
+  const { rows } = await db.pool.query("SELECT nfe_next_number FROM company_settings");
+  assert.equal(rows[0].nfe_next_number, 43);
+  // Nada do certificado vai para a tabela das notas.
+  const dump = await db.pool.query("SELECT signed_xml || coalesce(authorized_xml, '') AS text FROM fiscal_invoices");
+  assert.doesNotMatch(dump.rows[0].text, /PRIVATE KEY|senha-de-teste/);
+});

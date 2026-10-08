@@ -8,6 +8,7 @@ import { completenessText, isComplete, isRequired, normalizeDocument, taxpayerFr
 import type { CustomerKind } from "@/lib/customer";
 import { CUSTOMER_FIELDS, customerToForm } from "@/lib/customer-form";
 import { lastDecision } from "@/lib/db/approvals";
+import { listOrderInvoices } from "@/lib/db/invoices";
 import { previewOrderNfe } from "@/lib/db/order-nfe";
 import { findCustomerByDocument } from "@/lib/db/customers";
 import { getOrder, listPaymentMethods, loadOrderStanding } from "@/lib/db/orders";
@@ -23,6 +24,7 @@ import { CopyButton } from "@/components/CopyButton";
 import { DiscountFields } from "@/components/DiscountFields";
 import { proposalText } from "@/lib/quote/text";
 import { decideApprovalAction } from "../../aprovacoes/actions";
+import { issueNfeAction } from "../nfe-actions";
 import { CustomerForm } from "../../clientes/CustomerForm";
 import { ActionForm } from "../ActionForm";
 import {
@@ -66,6 +68,14 @@ const moneyOrNone = (value: number) => (value === 0 ? NONE : showMoney(value));
 
 const requiredOf = (kind: CustomerKind) =>
   [...CUSTOMER_FIELDS[kind].main, ...CUSTOMER_FIELDS[kind].address].map(({ key }) => key).filter((key) => isRequired(kind, key));
+
+const INVOICE_LABELS = { assinada: "aguardando resposta da SEFAZ", autorizada: "autorizada", rejeitada: "rejeitada", denegada: "denegada" } as const;
+const INVOICE_COLORS = {
+  assinada: "border-amber-300 bg-amber-50 text-amber-900",
+  autorizada: "border-emerald-300 bg-emerald-50 text-emerald-900",
+  rejeitada: "border-red-300 bg-red-50 text-red-900",
+  denegada: "border-red-300 bg-red-50 text-red-900",
+} as const;
 
 export default async function PedidoPage({
   params,
@@ -127,6 +137,7 @@ export default async function PedidoPage({
   }
   // The conference of the invoice: only for a closed order and for who edits the fiscal parameters.
   const invoice = order.status === "fechado" && allows(session, "parametros") ? await previewOrderNfe(order.number, new Date(), conn) : null;
+  const invoices = invoice ? await listOrderInvoices(order.id, conn) : [];
   // What "Copiar proposta" puts in the clipboard: only what the customer reads in the PDF.
   const proposal = proposalText({
     company: session.tenant.name,
@@ -228,9 +239,29 @@ export default async function PedidoPage({
             Nota fiscal
           </h2>
           <p className="mt-1 text-slate-600">
-            Conferência da nota deste pedido, para o contador. A emissão ainda não está ligada: nada aqui é enviado à SEFAZ nem consome
-            número de nota.
+            A conferência não envia nada nem consome número. Emitir assina com o certificado da empresa e envia à SEFAZ, no ambiente
+            escolhido em Parâmetros → Fiscal ({invoice.input.environment === "producao" ? "produção: nota com valor fiscal" : "homologação: nota de teste, sem valor fiscal"}).
           </p>
+          {invoices.length > 0 && (
+            <ul className="mt-3 flex flex-col gap-2">
+              {invoices.map((item) => (
+                <li key={item.id} className={`rounded border px-3 py-2 ${INVOICE_COLORS[item.status]}`}>
+                  <strong>
+                    Nota {item.number} · série {item.series} · {INVOICE_LABELS[item.status]}
+                  </strong>
+                  {item.environment === "homologacao" && " · homologação"}
+                  {item.protocol && ` · protocolo ${item.protocol}`}
+                  {item.statusReason && <span className="block">{item.statusCode}: {item.statusReason}</span>}
+                  <span className="block break-all text-xs">Chave {item.accessKey} · {showDateTime(item.issuedAt)}</span>
+                  {item.status === "autorizada" && (
+                    <a href={`/api/pedidos/${order.number}/nfe`} className="font-medium underline">
+                      Baixar XML autorizado
+                    </a>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
           {invoice.problems.length > 0 ? (
             <>
               <p className="mt-3 font-medium">Para montar a nota, falta:</p>
@@ -266,6 +297,16 @@ export default async function PedidoPage({
                 </a>{" "}
                 <span className="text-slate-600">(sem assinatura e sem valor fiscal)</span>
               </p>
+              {!invoices.some((item) => item.status === "autorizada" && item.environment === invoice.input.environment) && (
+                <ActionForm action={issueNfeAction} className="mt-3">
+                  <input type="hidden" name="number" value={order.number} />
+                  <ConfirmButton
+                    label={invoices.some((item) => item.status === "assinada") ? "Reenviar a nota à SEFAZ" : "Emitir nota fiscal"}
+                    confirmLabel="Confirmar: assinar e enviar à SEFAZ"
+                    className="rounded bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark"
+                  />
+                </ActionForm>
+              )}
             </>
           )}
         </section>
