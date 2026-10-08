@@ -21,6 +21,7 @@ import { compareByCode } from "@/lib/products-view";
 import { CopyButton } from "@/components/CopyButton";
 import { DiscountFields } from "@/components/DiscountFields";
 import { proposalText } from "@/lib/quote/text";
+import { decideApprovalAction } from "../../aprovacoes/actions";
 import { CustomerForm } from "../../clientes/CustomerForm";
 import { ActionForm } from "../ActionForm";
 import {
@@ -186,11 +187,37 @@ export default async function PedidoPage({
         </p>
       )}
       {order.status === "aguardando_aprovacao" && allows(session, "aprovacoes") && (
-        <p className="mt-3 text-sm">
-          <Link href={menuItem("aprovacoes").href} className="font-medium text-brand underline">
-            Decidir em Aprovações
-          </Link>
-        </p>
+        <section className="mt-3 rounded-lg border border-brand bg-white p-4" aria-labelledby="sua-decisao">
+          <h2 id="sua-decisao" className="text-sm font-semibold uppercase tracking-wide">
+            Sua decisão
+          </h2>
+          {reasons.length > 0 && (
+            <p className="mt-1 text-sm text-slate-600">
+              <strong>Pede aprovação por:</strong> {reasons.map((reason) => REASON_TEXT[reason]).join("; ")}.
+            </p>
+          )}
+          {authority !== null && (
+            <p className="mt-1 text-sm text-slate-600">
+              Desconto do pedido: {showPercent(order.discount)}. Você pode aprovar até {showPercent(authority)} neste destino.
+            </p>
+          )}
+          {/* The same action of Aprovações: the server checks again who may approve what. */}
+          <ActionForm action={decideApprovalAction} className="mt-3 flex flex-wrap items-end gap-3">
+            <input type="hidden" name="number" value={order.number} />
+            <div className="min-w-0 flex-1">
+              <label htmlFor="decision-comment" className="block text-sm font-medium">
+                Nota para o vendedor <span className="font-normal text-slate-500">(obrigatória para recusar)</span>
+              </label>
+              <input id="decision-comment" name="comment" type="text" placeholder="Ex.: fechar com entrada de 50%" className={`${INPUT} mt-1 w-full`} />
+            </div>
+            <button type="submit" name="decision" value="aprovar" className="rounded bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark">
+              Aprovar {showPercent(order.discount)}
+            </button>
+            <button type="submit" name="decision" value="recusar" className="rounded border border-red-300 bg-white px-4 py-2 font-medium text-red-700 hover:bg-red-50">
+              Recusar
+            </button>
+          </ActionForm>
+        </section>
       )}
       {!editable && (
         <div className="mt-3 rounded border border-slate-300 bg-slate-100 px-4 py-3 text-sm text-slate-700">

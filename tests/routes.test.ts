@@ -421,3 +421,12 @@ test("linhas de produto: nas telas, parâmetros, custos, tabela mais nova e publ
   }
   assert.ok(calls >= 12, `só ${calls} chamadas conferidas`);
 });
+
+test("dashboard: o filtro de vendedor só escolhe entre os pedidos que a pessoa já recebe; pedido: a decisão usa a ação de Aprovações", () => {
+  const dashboard = readFileSync(new URL("../src/app/(app)/dashboard/page.tsx", import.meta.url), "utf8");
+  assert.ok(dashboard.includes("listDashboardOrders({ sellerEmail: everyone ? null : session.email }, conn)"));
+  assert.ok(dashboard.includes("sellers.find(([email]) => email === first(query.vendedor))"));
+  const order = readFileSync(new URL("../src/app/(app)/pedidos/[numero]/page.tsx", import.meta.url), "utf8");
+  assert.ok(order.includes('order.status === "aguardando_aprovacao" && allows(session, "aprovacoes")'));
+  assert.ok(order.includes("<ActionForm action={decideApprovalAction}"));
+});

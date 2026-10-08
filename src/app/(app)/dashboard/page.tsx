@@ -25,12 +25,24 @@ const NONE = "—";
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const session = await requirePermission("dashboard");
   const conn = tenantDb(session.tenant.slug);
-  const period = parsePeriod(first((await searchParams).periodo));
+  const query = await searchParams;
+  const period = parsePeriod(first(query.periodo));
 
   const today = isoDate(new Date());
   // A seller receives only their own orders from the database; the others, the whole team's.
   const everyone = seesAllOrders(session.role);
-  const view = dashboardView(await listDashboardOrders({ sellerEmail: everyone ? null : session.email }, conn), period, today);
+  const orders = await listDashboardOrders({ sellerEmail: everyone ? null : session.email }, conn);
+  // "Toda a equipe" or one seller: a filter over what this person may already see, never a wider read.
+  const sellers = everyone ? [...new Map(orders.map((order) => [order.sellerEmail, order.sellerName])).entries()].sort((a, b) => a[1].localeCompare(b[1], "pt-BR")) : [];
+  const seller = sellers.find(([email]) => email === first(query.vendedor))?.[0] ?? null;
+  const view = dashboardView(seller ? orders.filter((order) => order.sellerEmail === seller) : orders, period, today);
+  const periodHref = (key: string) => {
+    const params = new URLSearchParams();
+    if (key !== "mes") params.set("periodo", key);
+    if (seller) params.set("vendedor", seller);
+    const text = params.toString();
+    return text === "" ? HERE : `${HERE}?${text}`;
+  };
   const periodLabel = PERIODS.find((item) => item.key === period)?.label.toLowerCase() ?? "";
 
   // Profit is read only for who may see costs.
@@ -52,7 +64,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           {PERIODS.map((item) => (
             <Link
               key={item.key}
-              href={item.key === "mes" ? HERE : `${HERE}?periodo=${item.key}`}
+              href={periodHref(item.key)}
               aria-current={item.key === period ? "page" : undefined}
               className={`rounded-md px-3 py-1.5 font-medium ${item.key === period ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100"}`}
             >
@@ -61,6 +73,25 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           ))}
         </nav>
       </div>
+      {sellers.length > 1 && (
+        <form method="get" action={HERE} className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+          {period !== "mes" && <input type="hidden" name="periodo" value={period} />}
+          <label htmlFor="vendedor" className="text-slate-600">
+            Vendedor
+          </label>
+          <select id="vendedor" name="vendedor" defaultValue={seller ?? ""} className="rounded border border-slate-300 bg-white px-3 py-1.5">
+            <option value="">Toda a equipe</option>
+            {sellers.map(([email, name]) => (
+              <option key={email} value={email}>
+                {name}
+              </option>
+            ))}
+          </select>
+          <button type="submit" className="rounded border border-slate-300 bg-white px-3 py-1.5 font-medium hover:bg-slate-50">
+            Ver
+          </button>
+        </form>
+      )}
 
       <dl className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <Kpi label="Vendas fechadas" value={showMoney(view.closed.total)} note={`${view.closed.count} ${view.closed.count === 1 ? "pedido" : "pedidos"} · com IPI`} />

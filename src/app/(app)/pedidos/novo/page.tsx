@@ -8,7 +8,7 @@ import { menuItem, seesCosts } from "@/lib/auth/permissions";
 import { latestVersion, loadPublishedTable } from "@/lib/db/price-table";
 import { showMoney } from "@/lib/format";
 import { compareByCode } from "@/lib/products-view";
-import { ActionForm } from "../ActionForm";
+import { EquipmentSearch } from "../EquipmentSearch";
 import { createOrderAction } from "../actions";
 
 export const metadata = { title: "Novo pedido · ERP" };
@@ -30,7 +30,7 @@ export default async function NovoPedidoPage({ searchParams }: { searchParams: P
     <>
       <h1 className="text-2xl font-semibold">Novo pedido</h1>
       <p className="mt-1 text-slate-600">
-        Escolha o primeiro equipamento. O pedido recebe um número e fica salvo enquanto você preenche o resto.
+        Busque o primeiro equipamento. O pedido recebe um número e abre inteiro numa tela só: itens, cliente, desconto e pagamento.
       </p>
       <LineTabs lines={lines} current={line.id} path="/pedidos/novo" />
       {lines.length > 1 && <p className="mt-2 text-sm text-slate-600">O pedido é de uma linha só: os equipamentos e os preços são os da linha {line.name}.</p>}
@@ -68,42 +68,16 @@ export default async function NovoPedidoPage({ searchParams }: { searchParams: P
           </h2>
           <p className="text-xs text-slate-600">Tabela v{table.version}</p>
         </div>
-        <ActionForm action={createOrderAction} className="flex flex-wrap items-end gap-3 p-5">
-          <input type="hidden" name="version" value={table.version} />
-          <div className="min-w-0 flex-1">
-            <label htmlFor="productId" className="block text-sm font-medium">
-              Equipamento
-            </label>
-            <select
-              id="productId"
-              name="productId"
-              required
-              className="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-brand"
-            >
-              {items.map((item) => (
-                <option key={item.productId} value={item.productId}>
-                  {[item.code, item.name, table.ipi > 0 ? `${showMoney(item.tableWithIpi)} c/ IPI` : showMoney(item.table)].filter(Boolean).join(" · ")}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label htmlFor="quantity" className="block text-sm font-medium">
-              Qtd
-            </label>
-            <input
-              id="quantity"
-              name="quantity"
-              type="text"
-              inputMode="numeric"
-              defaultValue="1"
-              className="mt-1 w-20 rounded border border-slate-300 px-3 py-2 text-right outline-none focus:ring-2 focus:ring-brand"
-            />
-          </div>
-          <button type="submit" className="rounded bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark">
-            Adicionar
-          </button>
-        </ActionForm>
+        <EquipmentSearch
+          version={table.version}
+          action={createOrderAction}
+          items={items.map((item) => ({
+            id: item.productId,
+            name: item.name,
+            code: item.code,
+            price: table.ipi > 0 ? `${showMoney(item.tableWithIpi)} c/ IPI` : showMoney(item.table),
+          }))}
+        />
       </section>
     </>
   );
