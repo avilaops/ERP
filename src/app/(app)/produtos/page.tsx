@@ -57,6 +57,7 @@ function toRow(product: Product, params: PricingParams): ProductRowData {
     id: product.id,
     active: product.active,
     values: productToRow(product),
+    hasPhoto: product.hasPhoto,
     supplier: supplierLine(product),
     realCost: prices ? money(prices.realCost) : NONE,
     table: prices ? money(prices.table) : NONE,

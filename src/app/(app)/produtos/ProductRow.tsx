@@ -10,6 +10,8 @@ export type ProductRowData = {
   active: boolean;
   /** What the database holds, as text for the fields. */
   values: ProductFormValues<RowKey>;
+  /** Whether there is a photo: the list shows it small, served by its own route. */
+  hasPhoto: boolean;
   /** `DHZ · SM5001 · US$ 605`, or empty. */
   supplier: string;
   realCost: string;
@@ -79,10 +81,30 @@ export function ProductRow({
           <form id={form} action={formAction} noValidate>
             <input type="hidden" name="id" value={row.id} />
           </form>
-          {field("name", "font-medium")}
-          <div className="mt-1.5 flex items-center gap-2">
-            {field("code", "max-w-28 shrink-0")}
-            {row.supplier && <span className="whitespace-nowrap text-xs text-slate-500">{row.supplier}</span>}
+          <div className="flex gap-3">
+            {/* The photo opens the screen of the equipment: photo, description, supplier and fiscal data. */}
+            <a
+              href={`/produtos/${row.id}`}
+              aria-label={`Abrir ${name}`}
+              className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded border border-slate-200 bg-white text-[10px] text-slate-400 hover:border-brand"
+            >
+              {row.hasPhoto ? (
+                // eslint-disable-next-line @next/next/no-img-element -- served by the app itself, per company and per session
+                <img src={`/api/produtos/${row.id}/foto`} alt="" loading="lazy" className="h-full w-full object-contain" />
+              ) : (
+                "sem foto"
+              )}
+            </a>
+            <div className="min-w-0 flex-1">
+              {field("name", "font-medium")}
+              <div className="mt-1.5 flex items-center gap-2">
+                {field("code", "max-w-28 shrink-0")}
+                {row.supplier && <span className="whitespace-nowrap text-xs text-slate-500">{row.supplier}</span>}
+                <a href={`/produtos/${row.id}`} className="whitespace-nowrap text-xs font-medium text-brand underline">
+                  abrir
+                </a>
+              </div>
+            </div>
           </div>
         </td>
         <td className="px-2 py-3">{field("advisoryCost", "text-right", "decimal")}</td>
