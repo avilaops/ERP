@@ -41,7 +41,7 @@ test("assinatura: a nota assinada passa inteira no esquema oficial, sem nenhuma 
 function verifies(signed: string): boolean {
   const signature = /<Signature xmlns="http:\/\/www.w3.org\/2000\/09\/xmldsig#">[\s\S]*<\/Signature>/.exec(signed)?.[0];
   if (!signature) return false;
-  const checker = new SignedXml({ publicCert: `-----BEGIN CERTIFICATE-----\n${key.certificateBase64}\n-----END CERTIFICATE-----`, idAttribute: "Id" });
+  const checker = new SignedXml({ publicCert: `-----BEGIN CERTIFICATE-----\n${key.certificateBase64}\n-----END CERTIFICATE-----` });
   checker.loadSignature(signature);
   try {
     return checker.checkSignature(signed);
