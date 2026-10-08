@@ -464,6 +464,13 @@ ainda não existe.** Regras do cofre, que não se quebram:
    STARTTLS não envia); **falha de e-mail nunca desfaz a autorização da nota**: toda tentativa que
    chega a um servidor é gravada em `fiscal_invoice_mails`, com o resultado. Sem dependência nova:
    o cliente SMTP e a montagem MIME são deste repositório e testados contra um servidor falso.
+7. **DANFE da reforma** (NT 2026.010, migração `0028`): `renderDanfe(data, { reform })` tem os dois
+   leiautes; o novo traz o regime do emitente, o bloco "Total do IBS / CBS / IS" e, em cada item,
+   classificação tributária, base, alíquotas e valores de CBS, IBS UF e IBS Município, cada um
+   com o nome ao lado. Vale pela **data de emissão da nota** contra `nfe_danfe_reform_from`
+   (Parâmetros → Fiscal; nasce em 01/12/2026, a data oficial), nunca por data fixa no código.
+   O papel só mostra o que o XML traz: campo sem informação fica em branco, nada é calculado no
+   DANFE. O campo "Tipo de regime de apuração" é reservado pela NT e fica vazio.
 
 ## Contas a pagar e fornecedores
 

@@ -13,14 +13,21 @@ import { code128cWidths } from "@/lib/fiscal/barcode";
 export type DanfeItem = {
   code: string; name: string; ncm: string; taxCode: string; cfop: string; unit: string;
   quantity: number; unitPrice: number; total: number; icmsBase: number; icms: number; ipi: number; icmsRate: number; ipiRate: number;
+  /** Base of the IPI as the invoice has it; zero when the item has no taxed IPI. */
+  ipiBase: number;
+  /** IBS and CBS of the item (group UB of the layout), or `null` when the invoice does not carry them. Rates in percent, as in the XML. */
+  reform: { classCode: string; base: number; ibsStateRate: number; ibsState: number; ibsCityRate: number; ibsCity: number; cbsRate: number; cbs: number } | null;
 };
-type Party = { name: string; document: string; registration: string; street: string; district: string; cep: string; city: string; uf: string; phone: string };
+type Party = { /** `CRT` of the issuer; blank on the recipient. */ regime: string; name: string; document: string; registration: string; street: string; district: string; cep: string; city: string; uf: string; phone: string };
 export type DanfeData = {
   key: string; number: string; series: string; issuedAt: string; nature: string; homologation: boolean;
   protocol: string | null; authorizedAt: string | null;
   issuer: Party; recipient: Party;
   items: DanfeItem[];
-  totals: { icmsBase: number; icms: number; products: number; freight: number; discount: number; ipi: number; invoice: number; difal: number; fcp: number; ibs: number; cbs: number };
+  totals: { icmsBase: number; icms: number; products: number; freight: number; discount: number; ipi: number; invoice: number; difal: number; fcp: number; ibs: number; cbs: number;
+    /** The totals of IBS and CBS, apart, or `null` when the invoice has no such group. */
+    reform: { ibsState: number; ibsCity: number; cbs: number } | null;
+  };
   freightMode: string; info: string;
   /** The place of delivery, when it is not the recipient's address: already as the line the paper shows. */
   delivery: string | null;
@@ -36,6 +43,7 @@ const number = (xml: string, name: string) => Number(value(xml, name) || 0);
 function party(xml: string, address: string): Party {
   const place = block(xml, address);
   return {
+    regime: value(xml, "CRT"),
     name: value(xml, "xNome"),
     document: value(xml, "CNPJ") || value(xml, "CPF"),
     registration: value(xml.replace(place, ""), "IE"),
@@ -69,11 +77,23 @@ export function danfeData(xml: string): DanfeData {
   const items = [...xml.matchAll(/<det nItem="\d+">[\s\S]*?<\/det>/g)].map(([item]) => {
     const icms = block(item, "ICMS");
     const ipi = block(item, "IPI");
+    const reform = block(item, "IBSCBS");
+    // With a reduction the paper shows the effective rate (NT 2026.010, 4.3); this system does not issue one, but reads it.
+    const shown = (groupName: string, rateName: string) => {
+      const part = block(reform, groupName);
+      return block(part, "gRed") ? number(block(part, "gRed"), "pAliqEfet") : number(part, rateName);
+    };
     return {
+      reform: reform === "" ? null : {
+        classCode: value(reform, "cClassTrib"), base: number(block(reform, "gIBSCBS"), "vBC"),
+        ibsStateRate: shown("gIBSUF", "pIBSUF"), ibsState: number(block(reform, "gIBSUF"), "vIBSUF"),
+        ibsCityRate: shown("gIBSMun", "pIBSMun"), ibsCity: number(block(reform, "gIBSMun"), "vIBSMun"),
+        cbsRate: shown("gCBS", "pCBS"), cbs: number(block(reform, "gCBS"), "vCBS"),
+      },
       code: value(item, "cProd"), name: value(item, "xProd"), ncm: value(item, "NCM"),
       taxCode: `${value(icms, "orig")}${value(icms, "CST") || value(icms, "CSOSN")}`,
       cfop: value(item, "CFOP"), unit: value(item, "uCom"), quantity: number(item, "qCom"), unitPrice: number(item, "vUnCom"), total: number(item, "vProd"),
-      icmsBase: number(icms, "vBC"), icms: number(icms, "vICMS"), icmsRate: number(icms, "pICMS"), ipi: number(ipi, "vIPI"), ipiRate: number(ipi, "pIPI"),
+      icmsBase: number(icms, "vBC"), icms: number(icms, "vICMS"), icmsRate: number(icms, "pICMS"), ipi: number(ipi, "vIPI"), ipiRate: number(ipi, "pIPI"), ipiBase: number(ipi, "vBC"),
     };
   });
   return {
@@ -85,6 +105,9 @@ export function danfeData(xml: string): DanfeData {
       icmsBase: number(totals, "vBC"), icms: number(totals, "vICMS"), products: number(totals, "vProd"), freight: number(totals, "vFrete"), discount: number(totals, "vDesc"),
       ipi: number(totals, "vIPI"), invoice: number(totals, "vNF"), difal: number(totals, "vICMSUFDest"), fcp: number(totals, "vFCPUFDest"),
       ibs: number(block(block(xml, "IBSCBSTot"), "gIBS"), "vIBS"), cbs: number(block(block(xml, "IBSCBSTot"), "gCBS"), "vCBS"),
+      reform: block(xml, "IBSCBSTot") === "" ? null : {
+        ibsState: number(block(block(xml, "IBSCBSTot"), "gIBSUF"), "vIBSUF"), ibsCity: number(block(block(xml, "IBSCBSTot"), "gIBSMun"), "vIBSMun"), cbs: number(block(block(xml, "IBSCBSTot"), "gCBS"), "vCBS"),
+      },
     },
     freightMode: value(block(xml, "transp"), "modFrete"), info: value(block(xml, "infAdic"), "infCpl"),
     delivery: deliveryLine(xml),
@@ -104,10 +127,24 @@ const money = (amount: number) => amount.toLocaleString("pt-BR", { minimumFracti
 const dateTime = (iso: string) => (iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)} ${iso.slice(11, 19)}` : "");
 const formattedKey = (key: string) => key.match(/\d{4}/g)!.join(" ");
 
-/** Rows of the table of items that fit on the first page and on the following ones. */
 const ROW = 17;
+/** In the layout of the tax reform each item lists its taxes one under the other. */
+const REFORM_ROW = 37;
+const REGIMES: Record<string, string> = { "1": "1 - SIMPLES NACIONAL", "2": "2 - SIMPLES NACIONAL, EXCESSO DE SUBLIMITE DE RECEITA BRUTA", "3": "3 - REGIME NORMAL", "4": "4 - SIMPLES NACIONAL - MICROEMPREENDEDOR INDIVIDUAL (MEI)" };
 
-export async function renderDanfe(data: DanfeData): Promise<Uint8Array> {
+/**
+ * Whether an invoice is printed in the layout of the tax reform (NT 2026.010):
+ * by the date it was issued, against the date the company keeps in Parâmetros →
+ * Fiscal (01/12/2026, when the layout becomes mandatory, until someone changes it).
+ */
+export const usesReformLayout = (issuedAt: string, from: string | null): boolean => from !== null && issuedAt.slice(0, 10) >= from;
+
+/**
+ * Draws the DANFE. `reform` chooses the layout of NT 2026.010: the regime of the
+ * issuer, the block "Total do IBS / CBS / IS" and the taxes of the reform in
+ * each item. What the XML does not carry is left blank, never calculated here.
+ */
+export async function renderDanfe(data: DanfeData, { reform = false }: { reform?: boolean } = {}): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
   pdf.setTitle(`DANFE ${data.number}`);
   pdf.setCreator("ERP");
@@ -208,7 +245,10 @@ export async function renderDanfe(data: DanfeData): Promise<Uint8Array> {
 
     let y = top - height;
     y = row(y, [["NATUREZA DA OPERAÇÃO", data.nature, 0.56], ["PROTOCOLO DE AUTORIZAÇÃO DE USO", data.protocol ? `${data.protocol} - ${dateTime(data.authorizedAt ?? "")}` : "SEM AUTORIZAÇÃO DE USO", 0.44]]);
-    y = row(y, [["INSCRIÇÃO ESTADUAL", data.issuer.registration, 0.5], ["CNPJ", formatDocument(data.issuer.document), 0.5]]);
+    if (!reform) return row(y, [["INSCRIÇÃO ESTADUAL", data.issuer.registration, 0.5], ["CNPJ", formatDocument(data.issuer.document), 0.5]]);
+    y = row(y, [["INSCRIÇÃO ESTADUAL", data.issuer.registration, 0.34], ["INSCRIÇÃO ESTADUAL DO SUBSTITUTO TRIBUTÁRIO", "", 0.33], ["CNPJ / CPF", formatDocument(data.issuer.document), 0.33]]);
+    // The second field is reserved by the technical note: nothing is printed in it until its source is published.
+    y = row(y, [["CÓDIGO DO REGIME TRIBUTÁRIO", REGIMES[data.issuer.regime] ?? data.issuer.regime, 0.5], ["TIPO DE REGIME DE APURAÇÃO DO IBS E DA CBS", "", 0.5]]);
     return y;
   };
 
@@ -217,11 +257,18 @@ export async function renderDanfe(data: DanfeData): Promise<Uint8Array> {
     page.drawText("SEM VALOR FISCAL", { x: 92, y: 250, size: 58, font: bold, color: GRAY, rotate: degrees(45), opacity: 0.55 });
   };
 
+  const REFORM_COLUMNS: [string, number, "left" | "right"][] = [
+    ["DESCRIÇÃO DO PRODUTO / SERVIÇO", 0.29, "left"], ["CST / CFOP", 0.065, "left"], ["QTD / UN", 0.085, "right"], ["VLR UNIT", 0.095, "right"], ["VLR TOTAL", 0.095, "right"],
+    ["BASES DE CÁLCULO", 0.13, "left"], ["ALÍQUOTAS", 0.105, "left"], ["VALOR DOS TRIBUTOS", 0.135, "left"],
+  ];
+  const columns = reform ? REFORM_COLUMNS : COLUMNS;
+  const rowHeight = reform ? REFORM_ROW : ROW;
+
   const tableHead = (top: number) => {
     heading("DADOS DOS PRODUTOS / SERVIÇOS", top);
     let x = MARGIN;
     const y = top - 9;
-    for (const [label, share, align] of COLUMNS) {
+    for (const [label, share, align] of columns) {
       box(x, y, WIDTH * share, 12);
       text(label, x + (align === "right" ? 0 : 2), y - 8.5, 5, bold, align, align === "right" ? WIDTH * share : 0);
       x += WIDTH * share;
@@ -231,8 +278,12 @@ export async function renderDanfe(data: DanfeData): Promise<Uint8Array> {
 
   // How many rows fit: the first page carries the customer, the taxes and the carrier above the table.
   const FOOT = 64;
-  const firstRows = Math.max(1, Math.floor((PAGE.height - MARGIN - 84 - 44 - 9 - 66 - 9 - 44 - 9 - 66 - 21 - FOOT - 12 - MARGIN) / ROW));
-  const otherRows = Math.floor((PAGE.height - MARGIN - 84 - 44 - 21 - FOOT - 12 - MARGIN) / ROW);
+  const block3 = 9 + 66;
+  const hasDifal = data.totals.difal > 0 || data.totals.fcp > 0;
+  const headHeight = 84 + 44 + (reform ? 22 : 0);
+  const firstBlocks = reform ? block3 + (9 + 44) + (9 + 22 + (hasDifal ? 22 : 0)) + (9 + 22) + block3 : block3 + (9 + 44) + block3;
+  const firstRows = Math.max(1, Math.floor((PAGE.height - MARGIN - headHeight - firstBlocks - 21 - FOOT - 12 - MARGIN) / rowHeight));
+  const otherRows = Math.floor((PAGE.height - MARGIN - headHeight - 21 - FOOT - 12 - MARGIN) / rowHeight);
   const pages = Math.max(1, 1 + Math.ceil(Math.max(0, data.items.length - firstRows) / otherRows));
 
   let index = 0;
@@ -249,11 +300,27 @@ export async function renderDanfe(data: DanfeData): Promise<Uint8Array> {
       y = row(y, [["ENDEREÇO", to.street, 0.55], ["BAIRRO / DISTRITO", to.district, 0.3], ["CEP", formatCep(to.cep), 0.15]]);
       y = row(y, [["MUNICÍPIO", to.city, 0.45], ["UF", to.uf, 0.07], ["FONE", to.phone ? formatPhone(to.phone) : "", 0.2], ["INSCRIÇÃO ESTADUAL", to.registration, 0.28]]);
 
-      heading("CÁLCULO DO IMPOSTO", y);
-      y -= 9;
       const t = data.totals;
-      y = row(y, [["BASE DE CÁLCULO DO ICMS", money(t.icmsBase), 0.2, "right"], ["VALOR DO ICMS", money(t.icms), 0.2, "right"], ["BASE DE CÁLC. ICMS S.T.", money(0), 0.2, "right"], ["VALOR DO ICMS SUBST.", money(0), 0.2, "right"], ["VALOR TOTAL DOS PRODUTOS", money(t.products), 0.2, "right"]]);
-      y = row(y, [["VALOR DO FRETE", money(t.freight), 0.16, "right"], ["VALOR DO SEGURO", money(0), 0.16, "right"], ["DESCONTO", money(t.discount), 0.16, "right"], ["OUTRAS DESPESAS", money(0), 0.16, "right"], ["VALOR DO IPI", money(t.ipi), 0.16, "right"], ["VALOR TOTAL DA NOTA", money(t.invoice), 0.2, "right"]]);
+      if (!reform) {
+        heading("CÁLCULO DO IMPOSTO", y);
+        y -= 9;
+        y = row(y, [["BASE DE CÁLCULO DO ICMS", money(t.icmsBase), 0.2, "right"], ["VALOR DO ICMS", money(t.icms), 0.2, "right"], ["BASE DE CÁLC. ICMS S.T.", money(0), 0.2, "right"], ["VALOR DO ICMS SUBST.", money(0), 0.2, "right"], ["VALOR TOTAL DOS PRODUTOS", money(t.products), 0.2, "right"]]);
+        y = row(y, [["VALOR DO FRETE", money(t.freight), 0.16, "right"], ["VALOR DO SEGURO", money(0), 0.16, "right"], ["DESCONTO", money(t.discount), 0.16, "right"], ["OUTRAS DESPESAS", money(0), 0.16, "right"], ["VALOR DO IPI", money(t.ipi), 0.16, "right"], ["VALOR TOTAL DA NOTA", money(t.invoice), 0.2, "right"]]);
+      } else {
+        heading("TOTAL DOS PRODUTOS E TOTAL DA NOTA", y);
+        y -= 9;
+        y = row(y, [["VALOR TOTAL DOS PRODUTOS", money(t.products), 0.2, "right"], ["VALOR DO FRETE", money(t.freight), 0.2, "right"], ["VALOR DO SEGURO", money(0), 0.2, "right"], ["DESCONTO", money(t.discount), 0.2, "right"], ["OUTRAS DESPESAS", money(0), 0.2, "right"]]);
+        y = row(y, [["VALOR TOTAL DA NOTA", money(t.invoice), 1, "right"]]);
+        heading("TOTAL DO ICMS / IPI", y);
+        y -= 9;
+        y = row(y, [["BASE DE CÁLCULO DO ICMS", money(t.icmsBase), 0.2, "right"], ["VALOR DO ICMS", money(t.icms), 0.2, "right"], ["BASE DE CÁLCULO DO ICMS ST", money(0), 0.2, "right"], ["VALOR DO ICMS ST", money(0), 0.2, "right"], ["VALOR DO IPI", money(t.ipi), 0.2, "right"]]);
+        // Optional fields of the note (4.4): printed only when the XML carries them.
+        if (hasDifal) y = row(y, [["VALOR DO DIFAL NA UF DE DESTINO", money(t.difal), 0.5, "right"], ["VALOR DO FCP NA UF DE DESTINO", money(t.fcp), 0.5, "right"]]);
+        heading("TOTAL DO IBS / CBS / IS", y);
+        y -= 9;
+        const r = t.reform;
+        y = row(y, [["VALOR DA CBS", r ? money(r.cbs) : "", 0.25, "right"], ["VALOR DO IBS UF", r ? money(r.ibsState) : "", 0.25, "right"], ["VALOR DO IBS MUNICÍPIO", r ? money(r.ibsCity) : "", 0.25, "right"], ["VALOR DO IMPOSTO SELETIVO", "", 0.25, "right"]]);
+      }
 
       heading("TRANSPORTADOR / VOLUMES TRANSPORTADOS", y);
       y -= 9;
@@ -266,13 +333,49 @@ export async function renderDanfe(data: DanfeData): Promise<Uint8Array> {
 
     y = tableHead(y);
     const rows = pageNumber === 1 ? firstRows : otherRows;
+    const percent = (rate: number) => `${rate.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 4 })}%`;
     for (let drawn = 0; drawn < rows && index < data.items.length; drawn += 1, index += 1) {
       const item = data.items[index];
+      let x = MARGIN;
+      if (reform) {
+        const quantity = item.quantity.toLocaleString("pt-BR", { maximumFractionDigits: 4 });
+        const tax = item.reform;
+        // Each tax on its own line, with its name: no value is told apart by its position alone.
+        const stacks: [string, string][][] = [
+          [["ICMS", money(item.icmsBase)], ["IPI", item.ipiBase > 0 ? money(item.ipiBase) : ""], ["IBS / CBS", tax ? money(tax.base) : ""]],
+          [["ICMS", percent(item.icmsRate)], ["IPI", percent(item.ipiRate)], ["CBS", tax ? percent(tax.cbsRate) : ""], ["IBS UF", tax ? percent(tax.ibsStateRate) : ""], ["IBS MUN", tax ? percent(tax.ibsCityRate) : ""]],
+          [["ICMS", money(item.icms)], ["IPI", money(item.ipi)], ["CBS", tax ? money(tax.cbs) : ""], ["IBS UF", tax ? money(tax.ibsState) : ""], ["IBS MUN", tax ? money(tax.ibsCity) : ""]],
+        ];
+        REFORM_COLUMNS.forEach(([, share], column) => {
+          const width = WIDTH * share;
+          box(x, y, width, REFORM_ROW);
+          if (column === 0) {
+            wrap(item.name, regular, 6.5, width - 4, 3).forEach((line, at) => text(line, x + 2, y - 7 - at * 7, 6.5));
+            text([`[Cód. ${item.code}]`, `[NCM ${item.ncm}]`, tax ? `[cClassTrib ${tax.classCode}]` : ""].filter(Boolean).join(" "), x + 2, y - REFORM_ROW + 3.5, 5.5, regular, "left", width);
+          } else if (column === 1) {
+            text(`CST ${item.taxCode}`, x + 2, y - 8, 6, regular, "left", width);
+            text(`CFOP ${item.cfop}`, x + 2, y - 15, 6, regular, "left", width);
+          } else if (column === 2) {
+            text(quantity, x, y - 8, 6.5, regular, "right", width);
+            text(item.unit, x, y - 15, 6, regular, "right", width);
+          } else if (column === 3 || column === 4) {
+            text(money(column === 3 ? item.unitPrice : item.total), x, y - 8, 6.5, regular, "right", width);
+          } else {
+            stacks[column - 5].forEach(([label, content], at) => {
+              if (content === "") return;
+              text(label, x + 2, y - 7 - at * 6.8, 5.5);
+              text(content, x, y - 7 - at * 6.8, 5.5, regular, "right", width);
+            });
+          }
+          x += width;
+        });
+        y -= REFORM_ROW;
+        continue;
+      }
       const cells = [
         item.code, item.name, item.ncm, item.taxCode, item.cfop, item.unit, item.quantity.toLocaleString("pt-BR", { maximumFractionDigits: 4 }), money(item.unitPrice), money(item.total),
         money(item.icmsBase), money(item.icms), money(item.ipi), item.icmsRate.toLocaleString("pt-BR", { maximumFractionDigits: 2 }), item.ipiRate.toLocaleString("pt-BR", { maximumFractionDigits: 2 }),
       ];
-      let x = MARGIN;
       COLUMNS.forEach(([, share, align], column) => {
         const width = WIDTH * share;
         box(x, y, width, ROW);
@@ -290,8 +393,8 @@ export async function renderDanfe(data: DanfeData): Promise<Uint8Array> {
     const extra = [
       data.homologation ? "NF-e EMITIDA EM AMBIENTE DE HOMOLOGAÇÃO - SEM VALOR FISCAL." : "",
       data.delivery ? `LOCAL DE ENTREGA: ${data.delivery}.` : "",
-      data.totals.difal > 0 || data.totals.fcp > 0 ? `ICMS devido ao estado de destino (DIFAL): R$ ${money(data.totals.difal)}; Fundo de Combate à Pobreza: R$ ${money(data.totals.fcp)}.` : "",
-      data.totals.ibs > 0 || data.totals.cbs > 0 ? `Reforma tributária: IBS R$ ${money(data.totals.ibs)}; CBS R$ ${money(data.totals.cbs)} (não somam ao total da nota em 2026).` : "",
+      !reform && (data.totals.difal > 0 || data.totals.fcp > 0) ? `ICMS devido ao estado de destino (DIFAL): R$ ${money(data.totals.difal)}; Fundo de Combate à Pobreza: R$ ${money(data.totals.fcp)}.` : "",
+      !reform && (data.totals.ibs > 0 || data.totals.cbs > 0) ? `Reforma tributária: IBS R$ ${money(data.totals.ibs)}; CBS R$ ${money(data.totals.cbs)} (não somam ao total da nota em 2026).` : "",
       data.info,
     ].filter(Boolean).join(" ");
     wrap(extra, regular, 7, WIDTH - 8, 6).forEach((line, at) => text(line, MARGIN + 3, foot - 15 - at * 8, 7));

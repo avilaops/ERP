@@ -3,7 +3,8 @@ import { allows, seesAllOrders } from "@/lib/auth/permissions";
 import { loadAuthorizedXml } from "@/lib/db/invoices";
 import { getOrder } from "@/lib/db/orders";
 import { tenantDb } from "@/lib/db/pool";
-import { danfeData, renderDanfe } from "@/lib/fiscal/danfe";
+import { loadDanfeReformDate } from "@/lib/db/fiscal";
+import { danfeData, renderDanfe, usesReformLayout } from "@/lib/fiscal/danfe";
 import { ORDER_NUMBER } from "@/lib/order-number";
 
 /**
@@ -32,7 +33,7 @@ export async function GET(_request: Request, context: Context): Promise<Response
   if (!file) return text("Este pedido ainda não tem nota autorizada.", 404);
 
   const data = danfeData(file.xml);
-  return new Response(Buffer.from(await renderDanfe(data)), {
+  return new Response(Buffer.from(await renderDanfe(data, { reform: usesReformLayout(data.issuedAt, await loadDanfeReformDate(conn)) })), {
     headers: {
       "Content-Type": "application/pdf",
       "Content-Disposition": `inline; filename="danfe-${data.number}.pdf"`,

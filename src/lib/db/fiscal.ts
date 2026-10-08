@@ -214,3 +214,18 @@ export async function saveProductFiscal(productId: number, input: ProductFiscal,
   );
   if (rows.length === 0) throw new FiscalError("Equipamento não encontrado.");
 }
+
+/** From which date of issue the DANFE is printed in the layout of the tax reform (NT 2026.010). `AAAA-MM-DD`. */
+export async function loadDanfeReformDate(conn: Queryable): Promise<string> {
+  const { rows } = await conn.query("SELECT nfe_danfe_reform_from::text AS day FROM company_settings");
+  return String(rows[0]?.day ?? "2026-12-01");
+}
+
+export async function saveDanfeReformDate(day: string, updatedBy: string, conn: Queryable): Promise<void> {
+  const date = new Date(`${day}T00:00:00Z`);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== day || day < "2026-01-01" || day > "2099-12-31") {
+    throw new FiscalError("Data do DANFE da reforma: informe uma data válida, de 2026 em diante.");
+  }
+  if (updatedBy.trim() === "") throw new Error("Falta dizer quem está alterando.");
+  await conn.query("UPDATE company_settings SET nfe_danfe_reform_from = $1::date", [day]);
+}

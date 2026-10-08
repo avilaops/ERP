@@ -1,6 +1,7 @@
 import { DEFAULT_NFE_BODY, DEFAULT_NFE_SUBJECT, fillMailText, loadMailInfo, mailChannel } from "@/lib/db/mail";
 import type { Queryable } from "@/lib/db/pool";
-import { danfeData, renderDanfe } from "@/lib/fiscal/danfe";
+import { loadDanfeReformDate } from "@/lib/db/fiscal";
+import { danfeData, renderDanfe, usesReformLayout } from "@/lib/fiscal/danfe";
 import { buildMessage, isMailAddress, MailError } from "@/lib/mail/message";
 import type { MailAttachment } from "@/lib/mail/message";
 import type { SmtpConfig } from "@/lib/mail/smtp";
@@ -71,7 +72,7 @@ export async function sendInvoiceMail(request: SendInvoiceMail, conn: Queryable)
     text = `Olá,\n\nA nota fiscal eletrônica nº ${words.numero}, série ${words.serie}, emitida por ${words.empresa} para ${words.cliente}, foi CANCELADA.\n\nChave de acesso: ${words.chave}${event.rows[0] ? `\nProtocolo do cancelamento: ${event.rows[0].protocol}` : ""}\n\nO XML da nota e o do cancelamento estão em anexo.`;
     if (event.rows[0]) attachments.push({ filename: `Cancelamento-NFe${invoice.access_key}.xml`, contentType: "application/xml", content: Buffer.from(String(event.rows[0].signed_xml), "utf8") });
   } else {
-    attachments.push({ filename: `DANFE-${invoice.number}.pdf`, contentType: "application/pdf", content: await renderDanfe(data) });
+    attachments.push({ filename: `DANFE-${invoice.number}.pdf`, contentType: "application/pdf", content: await renderDanfe(data, { reform: usesReformLayout(data.issuedAt, await loadDanfeReformDate(conn)) }) });
   }
   if (data.homologation) text += "\n\nNOTA EMITIDA EM AMBIENTE DE HOMOLOGAÇÃO: SEM VALOR FISCAL.";
 

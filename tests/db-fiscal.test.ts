@@ -103,3 +103,13 @@ test("dados fiscais do equipamento: NCM, origem, CEST e unidade", { skip }, asyn
   await assert.rejects(() => saveProductFiscal(999999, { ncm: null, origin: null, cest: null, unit: "UN" }, BOSS, db.pool), /não encontrado/);
   assert.equal(await loadProductFiscal(999999, db.pool), null);
 });
+
+test("DANFE da reforma: a data de virada nasce em 01/12/2026 e é da empresa; data inválida é recusada", { skip }, async () => {
+  const { loadDanfeReformDate, saveDanfeReformDate } = await import("@/lib/db/fiscal");
+  assert.equal(await loadDanfeReformDate(db.pool), "2026-12-01");
+  for (const wrong of ["", "01/12/2026", "2026-02-30", "2025-12-31"]) {
+    await assert.rejects(() => saveDanfeReformDate(wrong, BOSS, db.pool), /data válida/, wrong);
+  }
+  await saveDanfeReformDate("2026-10-08", BOSS, db.pool);
+  assert.equal(await loadDanfeReformDate(db.pool), "2026-10-08");
+});

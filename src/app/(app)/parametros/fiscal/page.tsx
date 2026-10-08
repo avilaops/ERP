@@ -7,7 +7,7 @@ import Link from "next/link";
 import { requirePermission } from "@/lib/auth";
 import { menuItem } from "@/lib/auth/permissions";
 import { formatDocument } from "@/lib/customer";
-import { loadCertificateInfo, loadFiscalSettings, missingFiscalData, TAX_REGIMES } from "@/lib/db/fiscal";
+import { loadCertificateInfo, loadDanfeReformDate, loadFiscalSettings, missingFiscalData, TAX_REGIMES } from "@/lib/db/fiscal";
 import { tenantDb } from "@/lib/db/pool";
 import { formatPercent, isoDate, showDate, showDateTime } from "@/lib/format";
 import { UF_NAMES } from "@/lib/order-form";
@@ -15,7 +15,7 @@ import { parseDate } from "@/lib/pricing/payment";
 import { UFS } from "@/lib/pricing/states";
 import { ActionForm } from "../../pedidos/ActionForm";
 import { ConfirmButton } from "../../pedidos/ConfirmButton";
-import { removeCertificateAction, saveCertificateAction, saveFiscalRulesAction, saveFiscalSettingsAction, savePaymentCodeAction, voidNumbersAction } from "./actions";
+import { removeCertificateAction, saveCertificateAction, saveDanfeReformDateAction, saveFiscalRulesAction, saveFiscalSettingsAction, savePaymentCodeAction, voidNumbersAction } from "./actions";
 
 export const metadata = { title: "Fiscal · ERP" };
 export const dynamic = "force-dynamic";
@@ -38,6 +38,7 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
   const missingRules = missingFiscalRules(rules);
   const paymentCodes = await listPaymentCodes(conn);
   const voids = await listNumberVoids(conn);
+  const reformFrom = await loadDanfeReformDate(conn);
   const simples = settings.taxRegime === 1;
   const ruleFields = [
     ["operationNature", "Natureza da operação", rules.operationNature, "Ex.: Venda de mercadoria", "sm:col-span-2"],
@@ -250,6 +251,28 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
               Salvar regras fiscais
             </button>
           </div>
+        </ActionForm>
+      </section>
+
+      <section className={`${CARD} mt-6 p-5`} aria-labelledby="danfe-reforma">
+        <h2 id="danfe-reforma" className="text-sm font-semibold uppercase tracking-wide">
+          DANFE da reforma tributária
+        </h2>
+        <p className="mt-1 max-w-3xl text-sm text-slate-600">
+          A partir desta data de emissão, o DANFE sai no leiaute novo (Nota Técnica 2026.010): regime tributário do emitente, bloco &quot;Total do IBS / CBS / IS&quot; e
+          os tributos da reforma em cada item. A SEFAZ tornou o leiaute obrigatório em 01/12/2026; pode ser adiantado para conferir. Só o papel muda: o XML da
+          nota é o mesmo.
+        </p>
+        <ActionForm action={saveDanfeReformDateAction} className="mt-4 flex flex-wrap items-end gap-3">
+          <div>
+            <label htmlFor="reformFrom" className={LABEL}>
+              Leiaute novo para notas emitidas a partir de
+            </label>
+            <input key={reformFrom} id="reformFrom" name="reformFrom" type="date" defaultValue={reformFrom} className={INPUT} />
+          </div>
+          <button type="submit" className="rounded bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark">
+            Salvar data
+          </button>
         </ActionForm>
       </section>
 

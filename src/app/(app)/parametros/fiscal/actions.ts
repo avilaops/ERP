@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/auth";
-import { FiscalError, removeCertificate, saveCertificate, saveFiscalSettings, saveProductFiscal } from "@/lib/db/fiscal";
+import { FiscalError, removeCertificate, saveCertificate, saveDanfeReformDate, saveFiscalSettings, saveProductFiscal } from "@/lib/db/fiscal";
 import { saveFiscalRules, savePaymentCode } from "@/lib/db/fiscal-rules";
 import { IssueError, voidInvoiceNumbers } from "@/lib/db/issue-nfe";
 import { tenantDb } from "@/lib/db/pool";
@@ -204,6 +204,19 @@ export async function voidNumbersAction(_previous: ActionState, formData: FormDa
   } catch (error) {
     if (error instanceof IssueError) return { error: error.message };
     return problem("inutilizar a numeração", error);
+  }
+  revalidatePath(HERE);
+  return OK;
+}
+
+/** "Salvar data": from when the DANFE is printed in the layout of the tax reform. */
+export async function saveDanfeReformDateAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
+  const session = await requirePermission("parametros");
+  const conn = tenantDb(session.tenant.slug);
+  try {
+    await saveDanfeReformDate(reader(formData)("reformFrom"), session.email, conn);
+  } catch (error) {
+    return problem("gravar a data do DANFE", error);
   }
   revalidatePath(HERE);
   return OK;

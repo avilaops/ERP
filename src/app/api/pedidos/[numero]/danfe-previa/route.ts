@@ -2,7 +2,8 @@ import { getSession } from "@/lib/auth/index";
 import { allows } from "@/lib/auth/permissions";
 import { previewOrderNfe } from "@/lib/db/order-nfe";
 import { tenantDb } from "@/lib/db/pool";
-import { danfeData, renderDanfe } from "@/lib/fiscal/danfe";
+import { loadDanfeReformDate } from "@/lib/db/fiscal";
+import { danfeData, renderDanfe, usesReformLayout } from "@/lib/fiscal/danfe";
 import { buildNfeXml } from "@/lib/fiscal/nfe";
 import { ORDER_NUMBER } from "@/lib/order-number";
 
@@ -25,12 +26,13 @@ export async function GET(_request: Request, context: Context): Promise<Response
 
   const { numero } = await context.params;
   if (!ORDER_NUMBER.test(numero)) return text("Pedido não encontrado.", 404);
-  const preview = await previewOrderNfe(numero, new Date(), tenantDb(session.tenant.slug));
+  const conn = tenantDb(session.tenant.slug);
+  const preview = await previewOrderNfe(numero, new Date(), conn);
   if (!preview) return text("Pedido não encontrado ou ainda não fechado.", 404);
   if (preview.problems.length > 0) return text(`A nota ainda não pode ser montada. Falta:\n- ${preview.problems.join("\n- ")}`, 409);
 
   const data = danfeData(buildNfeXml(preview.input).xml);
-  return new Response(Buffer.from(await renderDanfe(data)), {
+  return new Response(Buffer.from(await renderDanfe(data, { reform: usesReformLayout(data.issuedAt, await loadDanfeReformDate(conn)) })), {
     headers: { "Content-Type": "application/pdf", "Content-Disposition": `inline; filename="conferencia-danfe-${numero}.pdf"`, "Cache-Control": "private, no-store" },
   });
 }
