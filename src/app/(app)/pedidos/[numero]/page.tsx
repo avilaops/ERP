@@ -254,9 +254,14 @@ export default async function PedidoPage({
                   {item.statusReason && <span className="block">{item.statusCode}: {item.statusReason}</span>}
                   <span className="block break-all text-xs">Chave {item.accessKey} · {showDateTime(item.issuedAt)}</span>
                   {item.status === "autorizada" && (
-                    <a href={`/api/pedidos/${order.number}/nfe`} className="font-medium underline">
-                      Baixar XML autorizado
-                    </a>
+                    <span className="flex flex-wrap gap-x-4">
+                      <a href={`/api/pedidos/${order.number}/danfe`} target="_blank" rel="noopener" className="font-medium underline">
+                        DANFE (PDF)
+                      </a>
+                      <a href={`/api/pedidos/${order.number}/nfe`} className="font-medium underline">
+                        Baixar XML autorizado
+                      </a>
+                    </span>
                   )}
                 </li>
               ))}
@@ -296,6 +301,10 @@ export default async function PedidoPage({
                   Baixar XML de conferência
                 </a>{" "}
                 <span className="text-slate-600">(sem assinatura e sem valor fiscal)</span>
+                {" · "}
+                <a href={`/api/pedidos/${order.number}/danfe-previa`} target="_blank" rel="noopener" className="font-medium text-brand underline">
+                  DANFE de conferência
+                </a>
               </p>
               {!invoices.some((item) => item.status === "autorizada" && item.environment === invoice.input.environment) && (
                 <ActionForm action={issueNfeAction} className="mt-3">

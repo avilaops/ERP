@@ -460,3 +460,12 @@ test("nota fiscal: só quem edita os parâmetros emite; a verificação do servi
   assert.ok(route.includes("sellerEmail: seesAllOrders(session.role) ? null : session.email"));
   assert.ok(route.indexOf("getOrder(") < route.indexOf("loadAuthorizedXml("));
 });
+
+test("DANFE: segue o alcance do pedido; a conferência é só de quem edita os parâmetros", () => {
+  const route = readFileSync(`${API_DIR}pedidos/[numero]/danfe/route.ts`, "utf8");
+  assert.ok(route.indexOf("await getSession()") < route.indexOf("getOrder("));
+  assert.ok(route.includes("sellerEmail: seesAllOrders(session.role) ? null : session.email"));
+  assert.ok(route.indexOf("getOrder(") < route.indexOf("loadAuthorizedXml("));
+  const preview = readFileSync(`${API_DIR}pedidos/[numero]/danfe-previa/route.ts`, "utf8");
+  assert.ok(preview.indexOf('allows(session, "parametros")') < preview.indexOf("previewOrderNfe("));
+});

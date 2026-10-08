@@ -223,7 +223,12 @@ funções puras, sem banco e sem tela, conferidas com os números dos prints do 
     servidor nunca se desliga**; as raízes da ICP-Brasil vão num arquivo PEM apontado por
     `NFE_CA_FILE`. O ambiente (homologação ou produção) é o de Parâmetros → Fiscal. **Nada disso foi
     exercitado contra a SEFAZ de verdade**: os testes usam um servidor local que exige certificado.
-    DANFE, consulta de protocolo, cancelamento e carta de correção ainda não existem.
+    **O DANFE** (`src/lib/fiscal/danfe.ts`, `/api/pedidos/[numero]/danfe`) é desenhado a partir do
+    XML da própria nota, nunca do pedido, com o código de barras da chave (Code 128 C,
+    `barcode.ts`, conferido contra o `jsbarcode`); sem protocolo ou em homologação leva o carimbo
+    "SEM VALOR FISCAL". A conferência tem rota própria (`danfe-previa`), porque rota de API não lê
+    parâmetro do endereço. Consulta de protocolo, cancelamento e carta de correção ainda não
+    existem.
 
 10. **Provisões e taxa fixa por pedido são parâmetros** (migração `0013`): perdas, garantia e
     inadimplência somam em `channelRate`; a taxa fixa sai do lucro do pedido uma vez, junto com o
