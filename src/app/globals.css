@@ -9,9 +9,103 @@
   --font-sans: var(--font-plex-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
+:root {
+  color-scheme: light;
+  --page-bg: #edefeb;
+  --page-ink: #172120;
+}
+
+/*
+ * Escuro. The screens are written once, with the names of the light palette
+ * (bg-white, text-slate-600…); here those names take the dark values, so every
+ * screen follows without knowing about themes. "white" is the surface of cards
+ * and fields, and the slate scale is turned upside down. Two copies on purpose:
+ * the choice of the person (data-theme) and, without a choice, the device.
+ */
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --page-bg: #0f1413;
+  --page-ink: #e8ecea;
+  --color-white: #171d1c;
+  --color-slate-50: #1c2322;
+  --color-slate-100: #222a29;
+  --color-slate-200: #2a3231;
+  --color-slate-300: #3a4443;
+  --color-slate-400: #6b7774;
+  --color-slate-500: #8d9895;
+  --color-slate-600: #a7b1ae;
+  --color-slate-700: #c5cdca;
+  --color-slate-800: #dde3e1;
+  --color-slate-900: #eef1f0;
+  --color-brand: #8b9cf0;
+  --color-brand-dark: #a5b3f5;
+  --color-brand-soft: #232a4a;
+  --color-red-50: #2a1616;
+  --color-red-100: #3a1c1c;
+  --color-red-300: #7a2e2e;
+  --color-red-500: #ef6a6a;
+  --color-red-700: #f08a8a;
+  --color-red-900: #fbd0d0;
+  --color-emerald-50: #10261d;
+  --color-emerald-100: #153326;
+  --color-emerald-300: #1f6b4b;
+  --color-emerald-500: #34c58a;
+  --color-emerald-600: #3fd197;
+  --color-emerald-800: #a5ecd0;
+  --color-emerald-900: #c5f3e0;
+  --color-amber-50: #2a2110;
+  --color-amber-100: #3a2d14;
+  --color-amber-300: #7a5c1c;
+  --color-amber-900: #f5dfa8;
+  --color-amber-950: #fbeecb;
+  --color-indigo-100: #1f2547;
+  --color-indigo-900: #cfd6ff;
+}
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme]) {
+    color-scheme: dark;
+    --page-bg: #0f1413;
+    --page-ink: #e8ecea;
+    --color-white: #171d1c;
+    --color-slate-50: #1c2322;
+    --color-slate-100: #222a29;
+    --color-slate-200: #2a3231;
+    --color-slate-300: #3a4443;
+    --color-slate-400: #6b7774;
+    --color-slate-500: #8d9895;
+    --color-slate-600: #a7b1ae;
+    --color-slate-700: #c5cdca;
+    --color-slate-800: #dde3e1;
+    --color-slate-900: #eef1f0;
+    --color-brand: #8b9cf0;
+    --color-brand-dark: #a5b3f5;
+    --color-brand-soft: #232a4a;
+    --color-red-50: #2a1616;
+    --color-red-100: #3a1c1c;
+    --color-red-300: #7a2e2e;
+    --color-red-500: #ef6a6a;
+    --color-red-700: #f08a8a;
+    --color-red-900: #fbd0d0;
+    --color-emerald-50: #10261d;
+    --color-emerald-100: #153326;
+    --color-emerald-300: #1f6b4b;
+    --color-emerald-500: #34c58a;
+    --color-emerald-600: #3fd197;
+    --color-emerald-800: #a5ecd0;
+    --color-emerald-900: #c5f3e0;
+    --color-amber-50: #2a2110;
+    --color-amber-100: #3a2d14;
+    --color-amber-300: #7a5c1c;
+    --color-amber-900: #f5dfa8;
+    --color-amber-950: #fbeecb;
+    --color-indigo-100: #1f2547;
+    --color-indigo-900: #cfd6ff;
+  }
+}
+
 body {
-  background: #edefeb;
-  color: #172120;
+  background: var(--page-bg);
+  color: var(--page-ink);
   font-variant-numeric: tabular-nums;
 }
 

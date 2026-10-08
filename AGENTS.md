@@ -188,6 +188,13 @@ funções puras, sem banco e sem tela, conferidas com os números dos prints do 
     dos parâmetros de outra; só sai a que não tem equipamento nem tabela publicada. Com uma linha
     só, nenhuma tela mostra o seletor (`LineTabs`).
 
+14. **Tema claro e escuro são do `globals.css`, não das telas.** As telas são escritas uma vez, com
+    os nomes da paleta clara (`bg-white`, `text-slate-600`…); no escuro esses nomes recebem outros
+    valores (`html[data-theme="dark"]` e, sem escolha, `prefers-color-scheme`, os dois blocos
+    iguais; teste em `tests/theme.test.ts`). Cor nova numa tela precisa do valor no escuro. A
+    escolha (Claro / Escuro / Sistema, no rodapé do menu) é da pessoa e do navegador: cookie
+    `erp_theme`, lido no `layout.tsx` raiz e em `ThemeChoice`; não vai para o banco nem para a sessão.
+
 10. **Provisões e taxa fixa por pedido são parâmetros** (migração `0013`): perdas, garantia e
     inadimplência somam em `channelRate`; a taxa fixa sai do lucro do pedido uma vez, junto com o
     frete (`quoteOrder`, `orderMaxDiscounts`). Entram com zero, e "Outras taxas da venda" segue

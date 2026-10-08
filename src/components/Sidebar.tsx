@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { MobileMenu } from "@/components/MobileMenu";
+import { ThemeChoice } from "@/components/ThemeChoice";
 import type { Session } from "@/lib/auth";
 import { localProvider } from "@/lib/auth/local-provider";
 import { allows, menuOf } from "@/lib/auth/permissions";
@@ -50,6 +51,7 @@ export async function Sidebar({ session }: { session: Session }) {
       </nav>
 
       <div className="mt-auto flex flex-col gap-2 text-sm">
+        <ThemeChoice />
         {session.companies > 1 && (
           <Link href="/empresa" className="text-slate-600 underline">
             Trocar de empresa

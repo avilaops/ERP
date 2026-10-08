@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Barlow_Condensed, IBM_Plex_Sans } from "next/font/google";
 import { APP_DESCRIPTION, APP_NAME, APP_SHORT_NAME, THEME_COLOR } from "@/lib/app-identity";
+import { cookies } from "next/headers";
+import { parseTheme, THEME_COOKIE } from "@/lib/theme";
 import "./globals.css";
 
 // The two families of the prototype. Served by the application itself: nothing is fetched from Google at run time.
@@ -17,9 +19,11 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = { themeColor: THEME_COLOR };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Claro or Escuro chosen by the person; without a choice the attribute is left out and the device decides (globals.css).
+  const theme = parseTheme((await cookies()).get(THEME_COOKIE)?.value);
   return (
-    <html lang="pt-BR" className={`${display.variable} ${body.variable}`}>
+    <html lang="pt-BR" data-theme={theme === "system" ? undefined : theme} className={`${display.variable} ${body.variable}`}>
       <body className="min-h-screen font-sans antialiased">{children}</body>
     </html>
   );

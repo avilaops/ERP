@@ -25,7 +25,8 @@ test("identidade do aplicativo: é a do produto, e as cores são as da tela", ()
   assert.equal(APP_DESCRIPTION, "Sistema comercial.");
   const css = read("src/app/globals.css");
   assert.ok(css.includes(`--color-brand: ${ICON_COLOR};`));
-  assert.ok(css.includes(`background: ${BACKGROUND_COLOR};`));
+  assert.ok(css.includes(`--page-bg: ${BACKGROUND_COLOR};`));
+  assert.ok(css.includes("background: var(--page-bg);"));
   assert.equal(THEME_COLOR, ICON_COLOR);
 });
 
