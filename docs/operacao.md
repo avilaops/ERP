@@ -86,8 +86,8 @@ Cada arquivo de teste de banco cria um esquema `test_…` só dele, aplica as mi
 - O banco começa vazio, só com os parâmetros iniciais (migração `0002`). **Não há carga de
   equipamentos:** o protótipo não traz os dados (ficam no banco do artifact do Rogério), e a
   carga dos 133 equipamentos com custo é a fase 3 do roadmap.
-- O banco `erp` de desenvolvimento **não tem backup**. Antes de receber dado real precisa entrar
-  no backup diário do servidor.
+- O banco `erp` de desenvolvimento (servidor `creators`) **não tem backup**, de propósito: só tem
+  dado de teste. O de produção tem; ver "Backup e restauração".
 
 ## Integração contínua
 
@@ -169,3 +169,29 @@ Se a migração falhar, a versão antiga continua no ar.
 - Deploy automático pelo GitHub Actions (hoje é o script, à mão).
 - Backup diário do banco `erp` de produção, com restauração testada.
 - Usuários e empresas em tela, em vez de variável de ambiente.
+
+## Backup e restauração
+
+- **Onde**: o banco `erp` de produção (servidor `applications`) entra no
+  `/usr/local/bin/backup-todos-bancos.sh`, todo dia às 03:30 UTC. O arquivo é
+  `/opt/backups/db/host-erp-AAAAMMDD.sql.gz` (texto, `pg_dump`), guardado 7 dias no servidor.
+- **Conferência**: o próprio script só dá nome final ao dump depois de `gzip -t`, tamanho e marcador
+  de fim; a rodada grava `saida=N` em `/var/log/backup-bancos.log`, e o vigia de saúde do
+  `creators` abre tarefa se a saída não for 0 ou se passar de 26 h sem rodada.
+- **Fora do servidor**: `sync-r2.sh` copia `/opt/backups/db` para `r2:avilaops-backups/db/`, sem
+  expiração.
+- **O dump das 03:30 não tem o que entrou depois**: antes de carga ou exclusão em produção, faça um
+  dump na hora (`pg_dump -Fc -f /opt/backups/erp-antes-<motivo>-<data>.dump`), como nas cargas de
+  08/10/2026.
+- **Restaurar** (num banco vazio; a role `erp` precisa existir para os donos ficarem certos):
+  `createdb -O erp erp_novo && zcat host-erp-AAAAMMDD.sql.gz | psql -d erp_novo`, conferir
+  `SELECT max(name) FROM tenant_<empresa>.schema_migrations` e as contagens, apontar o
+  `DATABASE_URL` de `/opt/erp/.env` para ele e recriar o contêiner. As fotos dos equipamentos, o
+  logo e o certificado cifrado vão no dump; a chave `ERP_CERT_KEY` não vai: ela só existe no
+  `.env` e, sem ela, o certificado e a senha da caixa de e-mail guardados não abrem.
+- **Teste de restauração de 08/10/2026**: o dump `host-erp-20261008.sql.gz` (16 MB, mesmo SHA-256
+  na origem e no destino) foi restaurado num banco temporário no `apps-noclient` (PostgreSQL 18.6):
+  32 tabelas em `tenant_ludus`, migrações até a `0017`, 95 equipamentos, 94 fotos (7 MB), 119 itens
+  do catálogo do fornecedor — o estado da madrugada, antes das migrações do dia. Os únicos erros
+  foram os 33 `role "erp" does not exist`, esperados num servidor sem a role. Banco temporário e
+  arquivo apagados. No R2 estão os dumps de 06, 07 e 08/10 com o mesmo tamanho dos locais.
