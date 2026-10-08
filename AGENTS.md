@@ -208,8 +208,13 @@ funções puras, sem banco e sem tela, conferidas com os números dos prints do 
     campo novo para o cliente. `orderNfe` (`src/lib/fiscal/order-nfe.ts`) é a ponte pedido → nota.
     **Hoje só existe a conferência:** no pedido fechado, quem edita os parâmetros vê os totais e
     baixa o XML sem assinatura (`/api/pedidos/[numero]/nfe-previa`), que não consome número, não
-    assina e não envia. Assinatura, transmissão à SEFAZ, DANFE, cancelamento e carta de correção
-    ainda não existem.
+    assina e não envia. **A assinatura existe como biblioteca** (`src/lib/fiscal/sign.ts`: XML-DSig
+    envelopada, C14N 1.0, SHA-1 e RSA-SHA1, com a chave tirada do A1): o montador já escreve o XML
+    na forma canônica, então assinar não interpreta XML, e só assina o que este sistema montou. O
+    teste confere a nota assinada no XSD oficial (zero pendências) e numa implementação
+    independente (`xml-crypto`). Quem mexer em `tag`/`escape`/`group` do montador muda os bytes
+    assinados: rode `tests/nfe-sign.test.ts`. Transmissão à SEFAZ, DANFE, cancelamento e carta de
+    correção ainda não existem, e nenhuma tela assina.
 
 10. **Provisões e taxa fixa por pedido são parâmetros** (migração `0013`): perdas, garantia e
     inadimplência somam em `channelRate`; a taxa fixa sai do lucro do pedido uma vez, junto com o

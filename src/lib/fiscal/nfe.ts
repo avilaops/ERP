@@ -129,7 +129,8 @@ const rate = (value: number) => (Math.round(value * 1e6) / 1e4).toFixed(4);
 function clean(text: string, max: number): string {
   return text.replace(/\s+/g, " ").trim().slice(0, max).trim();
 }
-const escape = (text: string) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+/** Only what a text node needs, which is also its canonical form: the signature is calculated over these exact bytes. */
+const escape = (text: string) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 /** `<name>value</name>`, or nothing for `null`: an empty tag is refused by the schema. */
 function tag(name: string, value: string | number | null | undefined): string {
