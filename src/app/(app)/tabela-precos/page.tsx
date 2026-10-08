@@ -1,6 +1,6 @@
 import { LineTabs } from "@/components/LineTabs";
 import { listLines } from "@/lib/db/product-lines";
-import { LINE_PARAM, pickLine } from "@/lib/lines-view";
+import { LINE_PARAM, lineHref, pickLine } from "@/lib/lines-view";
 import { ActionForm } from "../pedidos/ActionForm";
 import { createOrderAction } from "../pedidos/actions";
 import Link from "next/link";
@@ -51,6 +51,14 @@ export default async function TabelaPrecosPage({
       <h1 className="text-2xl font-semibold">{ITEM.label}</h1>
       <p className="mt-1 text-slate-600">A tabela publicada, que a equipe usa para vender.</p>
       <LineTabs lines={lines} current={line.id} path={ITEM.href} />
+      {costs && (
+        <p className="mt-3 text-sm">
+          {/* The published table is never edited: the directors change the cost and publish a new version. */}
+          <Link href={lineHref(menuItem("produtos").href, line.id)} className="font-medium text-brand underline">
+            Editar custos e publicar nova tabela
+          </Link>
+        </p>
+      )}
     </>
   );
 
