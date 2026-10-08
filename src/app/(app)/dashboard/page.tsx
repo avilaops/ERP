@@ -64,6 +64,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
       <dl className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <Kpi label="Vendas fechadas" value={showMoney(view.closed.total)} note={`${view.closed.count} ${view.closed.count === 1 ? "pedido" : "pedidos"} · com IPI`} />
+        <Kpi label="Em negociação" value={showMoney(view.open.total)} note={`${view.open.count} ${view.open.count === 1 ? "pedido em aberto" : "pedidos em aberto"} · hoje`} />
         <Kpi label="Ticket médio" value={view.averageTicket === null ? NONE : showMoney(view.averageTicket)} note="por pedido fechado" />
         <Kpi label="Conversão" value={view.conversion === null ? NONE : showPercent(view.conversion, 0)} note="fechados sobre fechados e perdidos" />
         <Kpi label="Desconto médio" value={view.averageDiscount === null ? NONE : showPercent(view.averageDiscount)} note="nos pedidos fechados" />
@@ -125,6 +126,36 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           <Bars bars={view.byState} format={showMoney} empty="Nenhuma venda no período." />
         </section>
       </div>
+
+      <section className={`${CARD} mt-6`} aria-labelledby="em-aberto">
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 id="em-aberto" className={TITLE}>
+            Orçamentos em aberto por idade
+          </h2>
+          <p className="text-sm text-slate-600">{showMoney(view.open.total)} em negociação</p>
+        </div>
+        <p className="mb-4 text-xs text-slate-600">em negociação ou aguardando aprovação, hoje · dias desde que o pedido foi aberto</p>
+        {view.open.byAge.length === 0 ? (
+          <p className="text-sm text-slate-600">Nenhum orçamento em aberto.</p>
+        ) : (
+          <ul className="flex flex-col gap-3">
+            {view.open.byAge.map((age) => (
+              <li key={age.label} className="grid grid-cols-[7rem_minmax(0,1fr)_auto] items-center gap-3 text-sm">
+                <span>{age.label}</span>
+                <span className="h-2.5 overflow-hidden rounded-full bg-slate-100">
+                  <span className="block h-full rounded-full bg-brand" style={{ width: `${view.open.total > 0 ? (age.value / view.open.total) * 100 : 0}%` }} />
+                </span>
+                <span className="text-right">
+                  <strong className="block">{showMoney(age.value)}</strong>
+                  <span className="text-xs text-slate-600">
+                    {age.count} {age.count === 1 ? "pedido" : "pedidos"}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       {(receivables || payables) && (
         <div className="mt-6 grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-2">

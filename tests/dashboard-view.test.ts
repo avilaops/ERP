@@ -73,3 +73,22 @@ test("metas do mês: a equipe primeiro, depois quem tem meta ou vendeu", () => {
   );
   assert.deepEqual(goalsView([], [], sellers, "2026-10"), [{ label: "Toda a equipe", sellerEmail: null, goal: 0, closed: 0, rate: null }]);
 });
+
+test("em aberto por idade: o que está em negociação ou esperando aprovação hoje, pelo tempo desde a abertura", () => {
+  const open = (number: string, createdOn: string, status: DashboardOrder["status"] = "em_negociacao") =>
+    order({ number, status, createdOn, closedOn: null, ipi: 0 });
+  const view = dashboardView(
+    [open("A", "2026-10-06"), open("B", "2026-09-29", "aguardando_aprovacao"), open("C", "2026-09-20"), open("D", "2026-08-01"), order({}), order({ number: "L", status: "perdido", closedOn: null })],
+    "mes",
+    "2026-10-06",
+  );
+  assert.deepEqual(view.open, {
+    total: 4000,
+    count: 4,
+    byAge: [
+      { label: "Até 7 dias", value: 2000, count: 2 },
+      { label: "16 a 30 dias", value: 1000, count: 1 },
+      { label: "Mais de 30 dias", value: 1000, count: 1 },
+    ],
+  });
+});

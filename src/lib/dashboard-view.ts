@@ -56,7 +56,19 @@ export type DashboardView = {
   byState: Bar[];
   /** The numbers of the orders closed in the period, for the profit the directors see. */
   closedNumbers: string[];
+  /** What is open today, whatever the period: in negotiation or waiting for approval, with IPI, by how old the order is. */
+  open: { total: number; count: number; byAge: { label: string; value: number; count: number }[] };
 };
+
+/** The ages of an open order, in days since it was created. The last one has no end. */
+const AGES: [string, number][] = [
+  ["Até 7 dias", 7],
+  ["8 a 15 dias", 15],
+  ["16 a 30 dias", 30],
+  ["Mais de 30 dias", Infinity],
+];
+const DAY_MS = 86_400_000;
+const daysBetween = (from: string, to: string) => Math.round((Date.parse(`${to}T12:00:00Z`) - Date.parse(`${from}T12:00:00Z`)) / DAY_MS);
 
 const ranked = (totals: Map<string, number>, limit = Infinity): Bar[] =>
   [...totals.entries()]
@@ -104,7 +116,21 @@ export function dashboardView(orders: DashboardOrder[], period: PeriodKey, today
     if (key !== null && monthly.has(key)) add(monthly, key, worth(order).invoiceTotal);
   }
 
+  const ages = AGES.map(([label]) => ({ label, value: 0, count: 0 }));
+  let openTotal = 0;
+  let openCount = 0;
+  for (const order of orders) {
+    if (order.status !== "em_negociacao" && order.status !== "aguardando_aprovacao") continue;
+    const { invoiceTotal } = worth(order);
+    const age = ages[AGES.findIndex(([, limit]) => daysBetween(order.createdOn, today) <= limit)];
+    age.value += invoiceTotal;
+    age.count += 1;
+    openTotal += invoiceTotal;
+    openCount += 1;
+  }
+
   return {
+    open: { total: roundCents(openTotal), count: openCount, byAge: ages.filter((age) => age.count > 0).map((age) => ({ ...age, value: roundCents(age.value) })) },
     closed: { total: roundCents(total), count: closed.length },
     averageTicket: closed.length === 0 ? null : roundCents(total / closed.length),
     conversion: decided === 0 ? null : count("fechado") / decided,
