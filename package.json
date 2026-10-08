@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --disable-warning=ExperimentalWarning --env-file-if-exists=.env.test.local --import ./tests/register.mjs --test \"tests/*.test.ts\"",
     "db:migrate": "node --experimental-strip-types --disable-warning=ExperimentalWarning --env-file-if-exists=.env.local scripts/db-migrate.ts",
+    "db:import-supplier-catalog": "node --experimental-strip-types --disable-warning=ExperimentalWarning --env-file-if-exists=.env.local --import ./scripts/register.mjs scripts/db-import-supplier-catalog.ts",
     "db:import-products": "node --experimental-strip-types --disable-warning=ExperimentalWarning --env-file-if-exists=.env.local --import ./scripts/register.mjs scripts/db-import-products.ts"
   },
   "dependencies": {

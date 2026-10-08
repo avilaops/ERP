@@ -45,6 +45,9 @@ export function ProductTools({
               {label}
             </button>
           ))}
+          <Link href="/produtos/catalogo-fornecedor" className="rounded border border-slate-300 bg-white px-4 py-2 font-medium hover:bg-slate-50">
+            Catálogo do fornecedor
+          </Link>
           {/* On a phone a new equipment has a screen of its own. */}
           <Link href="/produtos/novo" className="rounded bg-brand px-4 py-2 font-medium text-white md:hidden">
             + Equipamento

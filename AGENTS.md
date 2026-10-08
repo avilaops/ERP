@@ -300,6 +300,17 @@ metas de venda (`sales_goals`, uma da equipe e uma por vendedor em cada mês) s�
 Diretoria (`setsGoals`), sempre para o mês corrente. Os gráficos são `src/components/Charts.tsx`,
 componentes de servidor em CSS, sem biblioteca.
 
+## Catálogo do fornecedor
+
+O que o fornecedor vende (`supplier_items`, migração `0017`): código dele, catálogo, medidas,
+peso, foto normalizada e o código do equipamento da empresa a que corresponde (`product_code`,
+texto: o vínculo é pelo código). **É informação de fornecedor: só quem tem Produtos e custos
+vê**, na tela `/produtos/catalogo-fornecedor`, no quadro "No fornecedor" do equipamento e na rota
+`/api/fornecedor-itens/[id]/foto`. Tabela de preços, pedido e simulador não leem nada disso
+(`tests/routes.test.ts`). A carga é `npm run db:import-supplier-catalog -- <arquivo.json>
+<pasta-das-fotos> --empresa <identificador>`; sem `--apply` só confere, e com ele grava tudo
+numa transação.
+
 ## Fiscal e certificado digital (base da NF-e)
 
 A Ávila Ops emite a nota direto na SEFAZ: o ERP guarda e usa o certificado A1 da empresa.

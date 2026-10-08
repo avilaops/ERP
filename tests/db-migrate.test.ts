@@ -47,6 +47,7 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "0014_regras_de_aprovacao.sql",
     "0015_telas_por_pessoa.sql",
     "0016_cadastro_fiscal_e_certificado.sql",
+    "0017_catalogo_do_fornecedor.sql",
   ]);
 
   const second = await withClient((client) => migrate(client, MIGRATIONS_DIR));
@@ -89,6 +90,7 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "sales_goals",
     "schema_migrations",
     "state_tax_rates",
+    "supplier_items",
     "suppliers",
     "users",
   ]);

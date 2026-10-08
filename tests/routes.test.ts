@@ -271,6 +271,17 @@ test("certificado digital: só a diretoria envia; arquivo e senha não voltam pa
   assert.deepEqual(users.map(([file]) => file), ["lib/fiscal/certificate.ts"]);
 });
 
+test("catálogo do fornecedor: tela e foto só para quem tem Produtos e custos", () => {
+  assert.ok(source("/produtos/catalogo-fornecedor").includes('await requirePermission("produtos")'));
+  const route = readFileSync(`${API_DIR}fornecedor-itens/[id]/foto/route.ts`, "utf8");
+  assert.ok(route.includes('if (!allows(session, "produtos")) return'));
+  assert.ok(route.indexOf('allows(session, "produtos")') < route.indexOf("loadSupplierItemPhoto("));
+  // Quem não vê custo não recebe nada do catálogo do fornecedor: nem a tabela de preços nem o pedido o leem.
+  for (const page of ["/tabela-precos", "/pedidos/[numero]", "/pedidos", "/simulador"]) {
+    assert.doesNotMatch(source(page), /supplier-items|listSupplierItems|fornecedor-itens/, page);
+  }
+});
+
 test("formas de pagamento: só quem tem Parâmetros altera", () => {
   assert.ok(source("/parametros/formas-de-pagamento").includes('await requirePermission("parametros")'));
   const actions = readFileSync(`${APP_DIR}parametros/formas-de-pagamento/actions.ts`, "utf8");
@@ -285,7 +296,7 @@ test("não existe página no grupo protegido sem requirePermission", () => {
   const all = pages();
   // The menu items, plus /pedidos/novo, one order, the record of one customer and of one supplier,
   // and the users, the forms of payment and the categories of bills of the company.
-  assert.equal(all.length, MENU_ITEMS.length + 13);
+  assert.equal(all.length, MENU_ITEMS.length + 14);
   for (const route of all) {
     assert.match(source(route), /await requirePermission\(/, route);
   }
