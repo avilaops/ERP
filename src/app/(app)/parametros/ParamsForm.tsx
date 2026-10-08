@@ -5,6 +5,9 @@ import { IDLE_FORM_STATE, PARAM_SECTIONS, STATE_RATE_COLUMNS } from "@/lib/param
 import type { ParamField, ParamsFormState, ParamsFormValues, StateRateKey } from "@/lib/params-form";
 import { UFS } from "@/lib/pricing/states";
 
+/** The names of the columns of the rates by state, short enough to sit on top of a narrow field. */
+const SHORT: Record<string, string> = { icms: "Interno", fcp: "FCP", saida: "Saída" };
+
 const UNIT: Record<ParamField["kind"], string> = { rate: "%", days: "dias", money: "R$" };
 
 type SaveAction = (state: ParamsFormState, formData: FormData) => Promise<ParamsFormState>;
@@ -97,38 +100,54 @@ export function ParamsForm({ saved, action, lineId }: { saved: ParamsFormValues;
             geral; produto nacional usa 7% ou 12% conforme o destino. Confirme os números com o contador; se a lei mudar,
             é aqui que se altera.
           </p>
-          <div className="mt-4 grid gap-x-10 gap-y-2 md:grid-cols-2">
-            {UFS.map((uf) => (
-              <div key={uf} className="flex items-center gap-2">
-                <span className="w-8 font-semibold">{uf}</span>
-                {STATE_RATE_COLUMNS.map(({ prefix, label }) => {
-                  const key = `${prefix}-${uf}` as StateRateKey;
-                  const invalid = state.invalid.includes(key);
-                  return (
-                    <label key={key} className="flex items-center gap-1 whitespace-nowrap text-xs text-slate-500">
-                      {label}
-                      <span
-                        className={`flex items-center rounded border bg-white focus-within:ring-2 focus-within:ring-brand ${
-                          invalid ? "border-red-500" : "border-slate-300"
-                        }`}
-                      >
-                        <input
-                          name={key}
-                          type="text"
-                          inputMode="decimal"
-                          autoComplete="off"
-                          size={1}
-                          defaultValue={values[key]}
-                          aria-label={`${label} de ${uf}`}
-                          aria-invalid={invalid || undefined}
-                          className="w-14 min-w-0 bg-transparent px-2 py-1 text-right text-sm text-slate-900 outline-none"
-                        />
-                        <span className="pr-2">%</span>
-                      </span>
-                    </label>
-                  );
-                })}
-              </div>
+          {/* The names of the columns once, on top of each block of nine states: the rows are only the numbers. */}
+          <p className="mt-4 text-xs font-medium text-slate-600">Em %: Interno = ICMS interno do estado · FCP · Saída = ICMS de saída para o estado</p>
+          <div className="mt-2 grid grid-cols-[minmax(0,1fr)] gap-x-8 gap-y-6 sm:grid-cols-2 xl:grid-cols-3">
+            {[0, 9, 18].map((start) => (
+              <table key={start} className="w-full min-w-0 table-fixed border-separate border-spacing-x-1.5 border-spacing-y-1.5 text-sm">
+                <thead>
+                  <tr className="text-xs font-medium text-slate-500">
+                    <th scope="col" className="w-8 text-left font-medium">
+                      UF
+                    </th>
+                    {STATE_RATE_COLUMNS.map(({ prefix, label }) => (
+                      <th key={prefix} scope="col" title={label} className="whitespace-nowrap pr-2 text-right font-medium">
+                        {SHORT[prefix]}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {UFS.slice(start, start + 9).map((uf) => (
+                    <tr key={uf}>
+                      <th scope="row" className="text-left font-semibold">
+                        {uf}
+                      </th>
+                      {STATE_RATE_COLUMNS.map(({ prefix, label }) => {
+                        const key = `${prefix}-${uf}` as StateRateKey;
+                        const invalid = state.invalid.includes(key);
+                        return (
+                          <td key={key}>
+                            <input
+                              name={key}
+                              type="text"
+                              inputMode="decimal"
+                              autoComplete="off"
+                              size={1}
+                              defaultValue={values[key]}
+                              aria-label={`${label} de ${uf}`}
+                              aria-invalid={invalid || undefined}
+                              className={`w-full min-w-0 rounded border bg-white px-2 py-1 text-right text-slate-900 outline-none focus:ring-2 focus:ring-brand ${
+                                invalid ? "border-red-500" : "border-slate-300"
+                              }`}
+                            />
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             ))}
           </div>
         </div>
