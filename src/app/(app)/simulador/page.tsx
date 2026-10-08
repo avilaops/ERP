@@ -68,7 +68,7 @@ export default async function SimuladorPage({ searchParams }: { searchParams: Pr
   const sale = saleOf(simulatedOrder(simulation, new Date()), table);
   const band = await simulationBand(latest.version, simulation, conn);
   // The profile comes from the session. Costs are read only for who may see them.
-  const snapshot = seesCosts(session.role) ? await loadPublishedSnapshot(latest.version, conn) : null;
+  const snapshot = seesCosts(session) ? await loadPublishedSnapshot(latest.version, conn) : null;
   const board = snapshot ? directorOf(simulatedOrder(simulation, new Date()), snapshot) : null;
   // Where each real goes, for the directors: the board opened line by line.
   const breakdown = board && snapshot ? saleBreakdown(board.quote, snapshot.params, { uf: deliveryUf, taxpayer: simulation.taxpayer }) : null;

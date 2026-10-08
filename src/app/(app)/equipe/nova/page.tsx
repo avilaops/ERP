@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { requirePermission } from "@/lib/auth";
 import { menuItem } from "@/lib/auth/permissions";
+import { listProfiles } from "@/lib/db/access-profiles";
+import { tenantDb } from "@/lib/db/pool";
 import { ActionForm } from "../../pedidos/ActionForm";
 import { inviteUserAction } from "../actions";
 import { BOTTOM_BAR, PersonFields, PRIMARY_BUTTON } from "../PersonFields";
@@ -8,7 +10,8 @@ import { BOTTOM_BAR, PersonFields, PRIMARY_BUTTON } from "../PersonFields";
 export const metadata = { title: "Convidar pessoa · ERP" };
 
 export default async function NovaPessoaPage() {
-  await requirePermission("equipe");
+  const session = await requirePermission("equipe");
+  const profiles = await listProfiles(tenantDb(session.tenant.slug));
   return (
     <div className="mx-auto max-w-xl">
       <div className="flex items-center gap-3">
@@ -19,7 +22,7 @@ export default async function NovaPessoaPage() {
       </div>
       <ActionForm action={inviteUserAction} className="mt-3 flex flex-col gap-3">
         <input type="hidden" name="active" value="sim" />
-        <PersonFields saved={null} />
+        <PersonFields saved={null} profiles={profiles} />
         <div className={BOTTOM_BAR}>
           <button type="submit" className={PRIMARY_BUTTON}>
             Convidar

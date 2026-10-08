@@ -29,7 +29,7 @@ export async function Sidebar({ session }: { session: Session }) {
         <p className="text-xs uppercase tracking-wide text-slate-500">Seu acesso</p>
         <p className="truncate font-display text-lg font-semibold uppercase leading-tight">{session.name}</p>
         <p className="text-sm text-slate-600">
-          {ROLE_LABELS[session.role]} · {session.tenant.name}
+          {session.profile ?? ROLE_LABELS[session.role]} · {session.tenant.name}
         </p>
       </section>
 

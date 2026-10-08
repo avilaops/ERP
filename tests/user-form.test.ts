@@ -8,12 +8,17 @@ const form = (values: Partial<Record<UserField, string>>) => (key: UserField) =>
 test("usuário: nome, e-mail em minúsculas, perfil da lista e a caixa Pode entrar", () => {
   assert.deepEqual(parseUserForm(form({ email: " Ana@Ludus.com.br ", name: " Ana ", role: "VENDEDOR", active: "sim" }), { withEmail: true }), {
     ok: true,
-    user: { email: "ana@ludus.com.br", name: "Ana", role: "VENDEDOR", active: true },
+    user: { email: "ana@ludus.com.br", name: "Ana", role: "VENDEDOR", active: true, profileId: null },
   });
   // Caixa desmarcada não vem no formulário; ao alterar, o e-mail não é lido.
   assert.deepEqual(parseUserForm(form({ name: "Ana", role: "FINANCEIRO" }), { withEmail: false }), {
     ok: true,
-    user: { email: "", name: "Ana", role: "FINANCEIRO", active: false },
+    user: { email: "", name: "Ana", role: "FINANCEIRO", active: false, profileId: null },
+  });
+  // Perfil da empresa no lugar de um dos quatro tipos: o tipo de verdade vem do perfil, no banco.
+  assert.deepEqual(parseUserForm(form({ name: "Ana", role: "perfil:12", active: "sim" }), { withEmail: false }), {
+    ok: true,
+    user: { email: "", name: "Ana", role: "VENDEDOR", active: true, profileId: 12 },
   });
 });
 
@@ -23,7 +28,7 @@ test("usuário: cada problema com o rótulo do campo, todos de uma vez", () => {
     errors: [
       '"E-mail": informe um e-mail válido (ex.: nome@empresa.com.br).',
       '"Nome": informe o nome da pessoa.',
-      '"Perfil": escolha um da lista (4 perfis).',
+      '"Perfil": escolha um da lista (4 tipos do sistema, ou um perfil da empresa).',
     ],
   });
 });

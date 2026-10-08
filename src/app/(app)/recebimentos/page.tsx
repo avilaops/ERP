@@ -28,7 +28,7 @@ export default async function RecebimentosPage() {
   const receipts = await listReceipts(20, conn);
   const methods = await listPaymentMethods(conn);
   const refunds = await listPendingRefunds(conn);
-  const decides = confirmsRefunds(session.role);
+  const decides = confirmsRefunds(session);
   const summary = receivablesSummary(open, today, addDays(today, 30));
   const received = await receivedInMonth(today.slice(0, 7), conn);
 

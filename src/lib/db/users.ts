@@ -16,13 +16,22 @@ export type AppUser = {
   active: boolean;
   /** The screens left to the person inside the profile; `null` is all of the profile's. */
   items: string[] | null;
+  /** The profile of the company the person has, or `null` for one of the four types as they are. */
+  profileId: number | null;
+  profileName: string | null;
+  /** The powers of the type the profile gave up; empty without a profile. */
+  denied: string[];
   updatedAt: Date;
 };
 
-export type UserInput = { email: string; name: string; role: Role; items?: string[] | null };
+export type UserInput = { email: string; name: string; role: Role; items?: string[] | null; /** A profile of the company: then the type and the screens are the profile's. */ profileId?: number | null };
 
 const UNIQUE_VIOLATION = "23505";
-const COLUMNS = "id, email, name, role, active, allowed_items, updated_at";
+/** With a profile of the company, the screens and what was given up come from it; the type is its type of origin. */
+const COLUMNS = `users.id, users.email, users.name, users.role, users.active, users.updated_at, users.profile_id,
+  COALESCE((SELECT p.items FROM access_profiles p WHERE p.id = users.profile_id), users.allowed_items) AS allowed_items,
+  (SELECT p.name FROM access_profiles p WHERE p.id = users.profile_id) AS profile_name,
+  COALESCE((SELECT p.denied FROM access_profiles p WHERE p.id = users.profile_id), '{}') AS denied`;
 const EMAIL_SHAPE = /^[^\s@:;,]+@[^\s@:;,]+\.[^\s@:;,]+$/;
 
 const user = (row: Record<string, unknown>): AppUser => {
@@ -34,6 +43,9 @@ const user = (row: Record<string, unknown>): AppUser => {
     role: row.role,
     active: row.active === true,
     items: (row.allowed_items as string[] | null) ?? null,
+    profileId: row.profile_id == null ? null : Number(row.profile_id),
+    profileName: row.profile_name == null ? null : String(row.profile_name),
+    denied: (row.denied as string[] | null) ?? [],
     updatedAt: row.updated_at as Date,
   };
 };
@@ -57,26 +69,40 @@ function screens(role: Role, items: string[] | null | undefined): string[] | nul
   return kept;
 }
 
+/**
+ * The type and the screens to store for a person. With a profile of the
+ * company, the type is the profile's type of origin and no screen list is kept
+ * on the person: the profile says. Without one, the type chosen and the
+ * person's own narrowing of it.
+ */
+async function accessOf(input: { role: Role; items?: string[] | null; profileId?: number | null }, conn: Queryable): Promise<{ role: Role; items: string[] | null; profileId: number | null }> {
+  if (input.profileId == null) return { role: input.role, items: screens(input.role, input.items), profileId: null };
+  const { rows } = await conn.query("SELECT base_role FROM access_profiles WHERE id = $1", [input.profileId]);
+  if (!rows[0] || !isRole(rows[0].base_role)) throw new UserError("Perfil não encontrado. Recarregue a página.");
+  return { role: rows[0].base_role, items: null, profileId: input.profileId };
+}
+
 /** Everyone registered in the company, active first, by name. */
 export async function listUsers(conn: Queryable): Promise<AppUser[]> {
-  const { rows } = await conn.query(`SELECT ${COLUMNS} FROM users ORDER BY active DESC, lower(name), id`);
+  const { rows } = await conn.query(`SELECT ${COLUMNS} FROM users ORDER BY users.active DESC, lower(users.name), users.id`);
   return rows.map(user);
 }
 
 /** Who the login asks about: the active user with this e-mail, or `null`. */
 export async function findActiveUser(email: string, conn: Queryable): Promise<AppUser | null> {
-  const { rows } = await conn.query(`SELECT ${COLUMNS} FROM users WHERE email = $1 AND active`, [normalize(email)]);
+  const { rows } = await conn.query(`SELECT ${COLUMNS} FROM users WHERE users.email = $1 AND users.active`, [normalize(email)]);
   return rows.length === 0 ? null : user(rows[0]);
 }
 
 export async function createUser(input: UserInput, who: string, conn: Queryable): Promise<AppUser> {
   check(input, who);
   const email = normalize(input.email);
+  const access = await accessOf(input, conn);
   if (!EMAIL_SHAPE.test(email)) throw new UserError("Informe um e-mail válido (ex.: nome@empresa.com.br).");
   try {
     const { rows } = await conn.query(
-      `INSERT INTO users (email, name, role, allowed_items, updated_by) VALUES ($1, $2, $3, $4, $5) RETURNING ${COLUMNS}`,
-      [email, input.name.trim(), input.role, screens(input.role, input.items), who],
+      `INSERT INTO users (email, name, role, allowed_items, updated_by, profile_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING ${COLUMNS}`,
+      [email, input.name.trim(), access.role, access.items, who, access.profileId],
     );
     return user(rows[0]);
   } catch (error) {
@@ -92,27 +118,30 @@ export async function createUser(input: UserInput, who: string, conn: Queryable)
  */
 export async function updateUser(
   id: number,
-  change: { name: string; role: Role; active: boolean; items?: string[] | null },
+  change: { name: string; role: Role; active: boolean; items?: string[] | null; profileId?: number | null },
   who: string,
   conn: Queryable,
 ): Promise<AppUser> {
   check(change, who);
+  const access = await accessOf(change, conn);
   // One statement: the row only changes when it is not the own access being cut.
   const { rows } = await conn.query(
-    `WITH target AS (SELECT id, email, role FROM users WHERE id = $1),
+    `WITH target AS (SELECT id, email, role, profile_id FROM users WHERE id = $1),
           changed AS (
             UPDATE users u
-               SET name = $2, role = $3, active = $4, allowed_items = $7, updated_at = now(), updated_by = $5
+               SET name = $2, role = $3, active = $4, allowed_items = $7, profile_id = $8, updated_at = now(), updated_by = $5
               FROM target
-             WHERE u.id = target.id AND NOT (target.email = $6 AND (NOT $4 OR target.role <> $3 OR $7::text[] IS NOT NULL))
-             RETURNING u.id, u.email, u.name, u.role, u.active, u.allowed_items, u.updated_at
+             WHERE u.id = target.id
+               AND NOT (target.email = $6 AND (NOT $4 OR target.role <> $3 OR $7::text[] IS NOT NULL OR target.profile_id IS DISTINCT FROM $8::integer))
+             RETURNING u.id
           )
-     SELECT (SELECT count(*)::int FROM target) AS found, changed.* FROM (SELECT 1) one LEFT JOIN changed ON true`,
-    [id, change.name.trim(), change.role, change.active, who, normalize(who), screens(change.role, change.items)],
+     SELECT (SELECT count(*)::int FROM target) AS found, (SELECT id FROM changed) AS id`,
+    [id, change.name.trim(), access.role, change.active, who, normalize(who), access.items, access.profileId],
   );
   if (Number(rows[0].found) === 0) throw new UserError("Usuário não encontrado.");
   if (rows[0].id === null) throw new UserError("Você não pode mudar o próprio perfil nem desativar o próprio acesso, nem tirar telas de si. Peça a outra pessoa da diretoria.");
-  return user(rows[0]);
+  const saved = await conn.query(`SELECT ${COLUMNS} FROM users WHERE id = $1`, [id]);
+  return user(saved.rows[0]);
 }
 
 /**

@@ -37,7 +37,7 @@ const FAILED = "Não foi possível gravar agora. Nada foi alterado; tente de nov
 const OK: ActionState = { error: null };
 
 /** A seller reaches only their own orders; who sees all of them is decided in one place. */
-const scopeOf = (session: Session): OrderScope => ({ sellerEmail: seesAllOrders(session.role) ? null : session.email });
+const scopeOf = (session: Session): OrderScope => ({ sellerEmail: seesAllOrders(session) ? null : session.email });
 
 const reader = (formData: FormData) => (key: string) => {
   const value = formData.get(key);
@@ -185,7 +185,7 @@ export async function closeOrderAction(_previous: ActionState, formData: FormDat
   const number = reader(formData)("number") ?? "";
   try {
     // Whether the closer is a director comes from the session: the company decides what that is worth.
-    const result = await closeOrder(number, session.email, scopeOf(session), conn, { isDirector: approvesAtLoss(session.role) });
+    const result = await closeOrder(number, session.email, scopeOf(session), conn, { isDirector: approvesAtLoss(session) });
     if (result.missing.length > 0) return { error: `Para fechar: ${result.missing.join(" ")}` };
   } catch (error) {
     return { error: problem("fechar o pedido", error) };

@@ -41,7 +41,7 @@ export async function GET(_request: Request, context: Context): Promise<Response
   if (!ORDER_NUMBER.test(numero)) return NOT_FOUND();
 
   const conn = tenantDb(session.tenant.slug);
-  const order = await getOrder(numero, { sellerEmail: seesAllOrders(session.role) ? null : session.email }, conn);
+  const order = await getOrder(numero, { sellerEmail: seesAllOrders(session) ? null : session.email }, conn);
   if (!order) return NOT_FOUND();
   if (order.items.length === 0) return text(NO_ITEMS_MESSAGE, 409);
   const table = await loadPublishedTable(order.priceTableVersion, conn);

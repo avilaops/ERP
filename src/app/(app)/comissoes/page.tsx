@@ -31,7 +31,7 @@ export default async function ComissoesPage({ searchParams }: { searchParams: Pr
   const query = await searchParams;
 
   // A seller receives only their own lines from the database; who manages, everyone's.
-  const manages = managesCommissions(session.role);
+  const manages = managesCommissions(session);
   const scope = manages ? null : session.email;
   const current = isoDate(new Date()).slice(0, 7);
   const months = await listCommissionMonths(scope, conn);

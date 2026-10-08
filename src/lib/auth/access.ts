@@ -9,6 +9,10 @@ export type Session = {
   role: Role;
   /** The screens left to this person inside the profile; `null` is all of the profile's. */
   items: string[] | null;
+  /** The powers of the type that the person's profile of the company gave up. Empty for the four types as they are. */
+  denied: string[];
+  /** Name of the profile of the company the person has, or `null` for one of the four types. */
+  profile: string | null;
   /** The company this request is for. Every read and write of the request happens in its database. */
   tenant: { slug: string; name: string };
   /** How many companies the person belongs to: with more than one they may switch. */
@@ -34,12 +38,14 @@ export type AccessDecision =
 
 export function sessionFrom(identity: Identity): Session | null {
   if (!identity.authenticated || !identity.user) return null;
-  const { email, name, role, tenant, items } = identity.user;
+  const { email, name, role, tenant, items, denied, profile } = identity.user;
   return {
     email,
     name: identity.displayName ?? name,
     role,
     items: items ?? null,
+    denied: denied ?? [],
+    profile: profile ?? null,
     tenant: { slug: tenant.slug, name: tenant.name },
     companies: identity.companies ?? 1,
   };

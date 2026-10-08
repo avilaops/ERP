@@ -70,7 +70,7 @@ export async function requestRefundAction(_previous: ActionState, formData: Form
 export async function decideRefundAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
   const session = await requirePermission("recebimentos");
   const conn = tenantDb(session.tenant.slug);
-  if (!confirmsRefunds(session.role)) return { error: "Só a diretoria confirma ou recusa estorno." };
+  if (!confirmsRefunds(session)) return { error: "Só a diretoria confirma ou recusa estorno." };
 
   const decision = field(formData, "decision");
   if (decision !== "confirmar" && decision !== "recusar") return { error: "Escolha confirmar ou recusar." };

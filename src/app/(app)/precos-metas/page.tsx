@@ -56,10 +56,10 @@ export default async function PrecosMetasPage({ searchParams }: { searchParams: 
   const latestStats = latest ? (stats.get(latest.version) ?? null) : null;
   // Whole days between the day of the publication and today, both in São Paulo.
   const tableAge = latest ? Math.round((parseDate(today) - parseDate(isoDate(latest.publishedAt))) / DAY_MS) : null;
-  const mayEdit = setsGoals(session.role);
+  const mayEdit = setsGoals(session);
 
   // Everything below is read only for who may see costs: target, multiplier, profit and what the company owes.
-  const director = seesCosts(session.role)
+  const director = seesCosts(session)
     ? await (async () => {
         const params = await loadParams(conn, line.id);
         const result = paramsResult(params, await listProductCosts(conn, line.id));

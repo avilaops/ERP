@@ -45,9 +45,14 @@ export default async function EquipePage() {
           <h1 className="text-2xl font-semibold">{menuItem("equipe").label}</h1>
           <p className="mt-1 text-slate-600">Quem entra em {session.tenant.name}, o que cada tipo de acesso vê e quem está vendendo.</p>
         </div>
-        <Link href={NEW} className="w-full rounded-lg bg-brand px-4 py-3 text-center font-semibold text-white hover:bg-brand-dark sm:w-auto">
-          Convidar pessoa
-        </Link>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+          <Link href={`${menuItem("equipe").href}/perfis`} className="rounded-lg border border-slate-300 bg-white px-4 py-3 text-center font-semibold hover:bg-slate-50">
+            Perfis da empresa
+          </Link>
+          <Link href={NEW} className="rounded-lg bg-brand px-4 py-3 text-center font-semibold text-white hover:bg-brand-dark">
+            Convidar pessoa
+          </Link>
+        </div>
       </div>
 
       <section className={`${CARD} mt-6`} aria-labelledby="pessoas">
@@ -69,7 +74,7 @@ export default async function EquipePage() {
                     <span className="block truncate text-xs text-slate-500">{user.email}</span>
                   </span>
                   <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium ${user.active ? "bg-brand-soft text-brand" : "bg-slate-200 text-slate-600"}`}>
-                    {user.active ? `${ROLE_LABELS[user.role]}${user.items ? ` · ${user.items.length} telas` : ""}` : "Sem acesso"}
+                    {user.active ? `${user.profileName ?? ROLE_LABELS[user.role]}${user.items ? ` · ${user.items.length} telas` : ""}` : "Sem acesso"}
                   </span>
                 </Link>
               </li>

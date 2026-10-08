@@ -26,7 +26,7 @@ export default async function AprovacoesPage() {
 
   const pending = await listPendingApprovals(conn);
   const decisions = await listPastDecisions(20, conn);
-  const atLoss = approvesAtLoss(session.role);
+  const atLoss = approvesAtLoss(session);
   // The same text of the orders list: total from the engine, no cost.
   const { rows } = ordersView(
     pending.map((item) => item.order),

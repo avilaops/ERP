@@ -12,7 +12,7 @@ import type { ActionState } from "@/lib/order-form";
 export async function saveGoalAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
   const session = await requirePermission("precos-metas");
   const conn = tenantDb(session.tenant.slug);
-  if (!setsGoals(session.role)) return { error: "Só a diretoria define metas." };
+  if (!setsGoals(session)) return { error: "Só a diretoria define metas." };
 
   const text = (key: string) => {
     const value = formData.get(key);

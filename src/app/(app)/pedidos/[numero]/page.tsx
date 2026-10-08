@@ -98,7 +98,7 @@ export default async function PedidoPage({
   const conn = tenantDb(session.tenant.slug);
   if (!wellFormed) notFound();
 
-  const scope = { sellerEmail: seesAllOrders(session.role) ? null : session.email };
+  const scope = { sellerEmail: seesAllOrders(session) ? null : session.email };
   const order = await getOrder(numero, scope, conn);
   if (!order) notFound();
   const decision = await lastDecision(order.number, scope, conn);
@@ -108,7 +108,7 @@ export default async function PedidoPage({
   if (!table) notFound();
   const standing = await loadOrderStanding(order, conn);
   // The profile comes from the session. Costs are read only for who may see them.
-  const costs = seesCosts(session.role);
+  const costs = seesCosts(session);
   const snapshot = costs ? await loadPublishedSnapshot(order.priceTableVersion, conn) : null;
   const board = snapshot ? directorOf(order, snapshot) : null;
 

@@ -30,7 +30,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
   const today = isoDate(new Date());
   // A seller receives only their own orders from the database; the others, the whole team's.
-  const everyone = seesAllOrders(session.role);
+  const everyone = seesAllOrders(session);
   const orders = await listDashboardOrders({ sellerEmail: everyone ? null : session.email }, conn);
   // "Toda a equipe" or one seller: a filter over what this person may already see, never a wider read.
   const sellers = everyone ? [...new Map(orders.map((order) => [order.sellerEmail, order.sellerName])).entries()].sort((a, b) => a[1].localeCompare(b[1], "pt-BR")) : [];
@@ -46,7 +46,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const periodLabel = PERIODS.find((item) => item.key === period)?.label.toLowerCase() ?? "";
 
   // Profit is read only for who may see costs.
-  const director = seesCosts(session.role);
+  const director = seesCosts(session);
   const profit = director ? await ordersProfit(view.closedNumbers, conn) : null;
   const profitBefore = director ? await ordersProfit(view.previous.closedNumbers, conn) : null;
   // Net profit of each of the twelve months of the chart, for the directors only.

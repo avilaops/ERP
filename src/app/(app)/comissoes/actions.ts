@@ -13,7 +13,7 @@ const FAILED = "Não foi possível gravar agora. Nada foi alterado; tente de nov
 export async function payCommissionsAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
   const session = await requirePermission("comissoes");
   const conn = tenantDb(session.tenant.slug);
-  if (!managesCommissions(session.role)) return { error: "Seu perfil não marca comissão como paga." };
+  if (!managesCommissions(session)) return { error: "Seu perfil não marca comissão como paga." };
 
   const text = (key: string) => {
     const value = formData.get(key);

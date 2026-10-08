@@ -23,7 +23,7 @@ const PRODUCTION = {
 };
 
 const user = (role: Role) => ({ email: EMAILS[role], name: EMAILS[role], role, tenant: LUDUS });
-const COMPANY = { items: null, tenant: { slug: "ludus", name: "Ludus Equipamentos" }, companies: 1 };
+const COMPANY = { items: null, denied: [], profile: null, tenant: { slug: "ludus", name: "Ludus Equipamentos" }, companies: 1 };
 
 test("decisão: sem sessão do SSO vai para o login, qualquer que seja o item", () => {
   for (const item of MENU_ITEMS) {

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-export type AccessOption = { role: string; label: string; note: string };
+export type AccessOption = { role: string; label: string; note: string; /** A profile of the company: its screens are the profile's, not chosen per person. */ fixed?: boolean };
 export type ScreenOption = { key: string; label: string; roles: readonly string[] };
 
 /**
@@ -74,7 +74,7 @@ export function AccessPicker({
                   type="checkbox"
                   name="items"
                   value={screen.key}
-                  disabled={!possible}
+                  disabled={!possible || chosen?.fixed === true}
                   checked={possible && !off.includes(screen.key)}
                   onChange={(event) => setOff(event.target.checked ? off.filter((key) => key !== screen.key) : [...off, screen.key])}
                   className="h-5 w-5 shrink-0"
@@ -84,7 +84,11 @@ export function AccessPicker({
             );
           })}
         </div>
-        <p className="mt-1 hidden text-xs text-slate-500 md:block">As telas em cinza não fazem parte deste tipo de acesso. Para liberar, escolha outro tipo.</p>
+        <p className="mt-1 hidden text-xs text-slate-500 md:block">
+          {chosen?.fixed
+            ? "As telas deste perfil são as mesmas para todos que o têm. Para mudar, altere o perfil em Equipe → Perfis da empresa."
+            : "As telas em cinza não fazem parte deste tipo de acesso. Para liberar, escolha outro tipo."}
+        </p>
       </fieldset>
     </div>
   );

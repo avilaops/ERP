@@ -3,6 +3,7 @@ import { requirePermission } from "@/lib/auth";
 import { menuItem } from "@/lib/auth/permissions";
 import { ROLE_LABELS, ROLES } from "@/lib/auth/roles";
 import { tenantDb } from "@/lib/db/pool";
+import { listProfiles } from "@/lib/db/access-profiles";
 import { listUsers } from "@/lib/db/users";
 import { showDateTime } from "@/lib/format";
 import { ActionForm } from "../../pedidos/ActionForm";
@@ -19,6 +20,8 @@ export default async function UsuariosPage() {
   const session = await requirePermission("parametros");
   const conn = tenantDb(session.tenant.slug);
   const users = await listUsers(conn);
+  // The profiles of the company are one more choice of access (Equipe → Perfis da empresa).
+  const profiles = await listProfiles(conn);
 
   return (
     <>
@@ -58,6 +61,11 @@ export default async function UsuariosPage() {
               {ROLES.map((role) => (
                 <option key={role} value={role}>
                   {ROLE_LABELS[role]}
+                </option>
+              ))}
+              {profiles.map((profile) => (
+                <option key={profile.id} value={`perfil:${profile.id}`}>
+                  {profile.name} (perfil da empresa)
                 </option>
               ))}
             </select>
@@ -102,10 +110,21 @@ export default async function UsuariosPage() {
                     <label htmlFor={`role-${user.id}`} className="block text-xs font-medium text-slate-600">
                       Perfil
                     </label>
-                    <select key={user.role} id={`role-${user.id}`} name="role" defaultValue={user.role} className={`${INPUT} mt-1`}>
+                    <select
+                      key={`${user.role}-${user.profileId ?? ""}`}
+                      id={`role-${user.id}`}
+                      name="role"
+                      defaultValue={user.profileId != null ? `perfil:${user.profileId}` : user.role}
+                      className={`${INPUT} mt-1`}
+                    >
                       {ROLES.map((role) => (
                         <option key={role} value={role}>
                           {ROLE_LABELS[role]}
+                        </option>
+                      ))}
+                      {profiles.map((profile) => (
+                        <option key={profile.id} value={`perfil:${profile.id}`}>
+                          {profile.name} (perfil da empresa)
                         </option>
                       ))}
                     </select>

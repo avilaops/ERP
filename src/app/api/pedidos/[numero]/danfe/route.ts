@@ -26,7 +26,7 @@ export async function GET(_request: Request, context: Context): Promise<Response
   const { numero } = await context.params;
   if (!ORDER_NUMBER.test(numero)) return text("Pedido não encontrado.", 404);
   const conn = tenantDb(session.tenant.slug);
-  const order = await getOrder(numero, { sellerEmail: seesAllOrders(session.role) ? null : session.email }, conn);
+  const order = await getOrder(numero, { sellerEmail: seesAllOrders(session) ? null : session.email }, conn);
   if (!order) return text("Pedido não encontrado.", 404);
 
   const file = await loadAuthorizedXml(order.id, conn);

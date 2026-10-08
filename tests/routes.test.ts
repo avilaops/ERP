@@ -113,12 +113,12 @@ test("Tabela de preços: custo só é lido para quem pode ver, e nada da pasta v
   assert.ok(code.includes('export const dynamic = "force-dynamic"'));
   assert.ok(code.includes('const session = await requirePermission("tabela-precos")'));
 
-  const decides = code.indexOf("seesCosts(session.role)");
-  assert.ok(decides > 0, "quem vê custo tem de sair de seesCosts(session.role)");
+  const decides = code.indexOf("seesCosts(session)");
+  assert.ok(decides > 0, "quem vê custo tem de sair de seesCosts(session)");
   assert.equal(code.split("loadPublishedSnapshot(").length - 1, 1, "loadPublishedSnapshot( tem de aparecer uma vez só");
   assert.ok(code.indexOf("loadPublishedSnapshot(") > decides);
   // O perfil e "ver custo" nunca vêm do endereço.
-  assert.doesNotMatch(code, /seesCosts\((?!session\.role\))/);
+  assert.doesNotMatch(code, /seesCosts\((?!session\))/);
 });
 
 test("Pedido: custo só é lido para quem pode ver, e nada dele vai para componente de navegador", () => {
@@ -130,12 +130,12 @@ test("Pedido: custo só é lido para quem pode ver, e nada dele vai para compone
   }
 
   // O escopo e "ver custo" saem da sessão; o pedido é lido antes de qualquer custo.
-  assert.ok(code.includes("seesAllOrders(session.role) ? null : session.email"));
+  assert.ok(code.includes("seesAllOrders(session) ? null : session.email"));
   const permission = code.indexOf("await requirePermission(");
-  const decides = code.indexOf("seesCosts(session.role)");
+  const decides = code.indexOf("seesCosts(session)");
   assert.ok(decides > permission && permission > 0);
-  assert.doesNotMatch(code, /seesCosts\((?!session\.role\))/);
-  assert.doesNotMatch(code, /seesAllOrders\((?!session\.role\))/);
+  assert.doesNotMatch(code, /seesCosts\((?!session\))/);
+  assert.doesNotMatch(code, /seesAllOrders\((?!session\))/);
   assert.equal(code.split("loadPublishedSnapshot(").length - 1, 1, "loadPublishedSnapshot( tem de aparecer uma vez só");
   assert.ok(code.indexOf("loadPublishedSnapshot(") > decides);
   for (const read of ["getOrder(", "loadPublishedTable(", "loadOrderStanding("]) {
@@ -158,14 +158,14 @@ test("Pedido: custo só é lido para quem pode ver, e nada dele vai para compone
   // A fila de aprovações também não: quem decide e se pode aprovar prejuízo sai da sessão.
   const approvals = source("/aprovacoes");
   assert.doesNotMatch(approvals, /loadPublishedSnapshot|seesCosts|directorOf|DirectorBoard|"DIRETORIA"/);
-  assert.ok(approvals.includes("approvesAtLoss(session.role)"));
+  assert.ok(approvals.includes("approvesAtLoss(session)"));
   const deciding = readFileSync(`${APP_DIR}aprovacoes/actions.ts`, "utf8");
-  assert.ok(deciding.includes("approvesAtLoss: approvesAtLoss(session.role)"));
+  assert.ok(deciding.includes("approvesAtLoss: approvesAtLoss(session)"));
   assert.doesNotMatch(deciding, /formData\.get\("(role|email|approvesAtLoss)"\)|text\("(role|email|approvesAtLoss)"\)/);
   // A lista de pedidos não lê custo nenhum, e o escopo dela sai da sessão.
   const list = source("/pedidos");
   assert.doesNotMatch(list, /loadPublishedSnapshot|loadOrderStanding|seesCosts|directorOf|DirectorBoard/);
-  assert.ok(list.includes("seesAllOrders(session.role)"));
+  assert.ok(list.includes("seesAllOrders(session)"));
   assert.ok(list.includes("listOrders({ sellerEmail: everyone ? null : session.email }, conn)"));
 });
 
@@ -219,8 +219,8 @@ test("Dashboard, Preços e metas e Simulador: custo e lucro só para quem pode v
     const code = source(route);
     assert.ok(code.includes('export const dynamic = "force-dynamic"'), route);
     assert.doesNotMatch(code, /"DIRETORIA"|use cache|unstable_cache/, route);
-    assert.doesNotMatch(code, /seesCosts\((?!session\.role\))/, route);
-    const decides = code.indexOf("seesCosts(session.role)");
+    assert.doesNotMatch(code, /seesCosts\((?!session\))/, route);
+    const decides = code.indexOf("seesCosts(session)");
     assert.ok(decides > code.indexOf("await requirePermission("), route);
     // Tudo o que revela custo ou lucro vem depois da decisão, e só dentro dela.
     for (const costly of ["ordersProfit(", "loadPublishedSnapshot(", "loadParams(", "listProductCosts(", "listCommissionsDue("]) {
@@ -228,15 +228,15 @@ test("Dashboard, Preços e metas e Simulador: custo e lucro só para quem pode v
       if (at !== -1 && route !== "/dashboard") assert.ok(at > decides, `${route}: ${costly} antes de seesCosts`);
     }
   }
-  assert.ok(source("/dashboard").indexOf("ordersProfit(") > source("/dashboard").indexOf("seesCosts(session.role)"));
+  assert.ok(source("/dashboard").indexOf("ordersProfit(") > source("/dashboard").indexOf("seesCosts(session)"));
   // O vendedor tem o dashboard, mas só com os pedidos dele: o escopo sai da sessão.
   assert.ok(source("/dashboard").includes("listDashboardOrders({ sellerEmail: everyone ? null : session.email }, conn)"));
-  assert.ok(source("/dashboard").includes("const everyone = seesAllOrders(session.role);"));
+  assert.ok(source("/dashboard").includes("const everyone = seesAllOrders(session);"));
   // No simulador a equipe recebe só o nome da faixa.
   assert.ok(source("/simulador").includes("simulationBand(latest.version, simulation, conn)"));
   const goals = readFileSync(`${APP_DIR}precos-metas/actions.ts`, "utf8");
-  assert.ok(goals.includes("if (!setsGoals(session.role)) return"));
-  assert.ok(goals.indexOf("setsGoals(session.role)") < goals.indexOf("saveGoal("));
+  assert.ok(goals.includes("if (!setsGoals(session)) return"));
+  assert.ok(goals.indexOf("setsGoals(session)") < goals.indexOf("saveGoal("));
   assert.doesNotMatch(goals, /text\("month"\)/);
 });
 
@@ -250,16 +250,16 @@ test("Tabela de preços: a alçada por destino é só para quem aprova, e sai pr
 
 test("comissões e estorno: o escopo e quem decide saem da sessão", () => {
   const page = source("/comissoes");
-  assert.ok(page.includes("const manages = managesCommissions(session.role);"));
+  assert.ok(page.includes("const manages = managesCommissions(session);"));
   assert.ok(page.includes("const scope = manages ? null : session.email;"));
   // Toda leitura de comissão passa o escopo: nenhuma chamada com `null` fixo.
   assert.doesNotMatch(page, /list(Commissions|CommissionMonths|CarriedBalances)\([^)]*\bnull\b/);
   const paying = readFileSync(`${APP_DIR}comissoes/actions.ts`, "utf8");
-  assert.ok(paying.includes("if (!managesCommissions(session.role)) return"));
-  assert.ok(paying.indexOf("managesCommissions(session.role)") < paying.indexOf("payCommissions("));
+  assert.ok(paying.includes("if (!managesCommissions(session)) return"));
+  assert.ok(paying.indexOf("managesCommissions(session)") < paying.indexOf("payCommissions("));
   const refunds = readFileSync(`${APP_DIR}recebimentos/actions.ts`, "utf8");
-  assert.ok(refunds.includes("if (!confirmsRefunds(session.role)) return"));
-  assert.ok(refunds.indexOf("confirmsRefunds(session.role)") < refunds.indexOf("decideRefund("));
+  assert.ok(refunds.includes("if (!confirmsRefunds(session)) return"));
+  assert.ok(refunds.indexOf("confirmsRefunds(session)") < refunds.indexOf("decideRefund("));
 });
 
 test("certificado digital: só a diretoria envia; arquivo e senha não voltam para a tela nem vão para o log", () => {
@@ -325,8 +325,8 @@ test("/pedidos/novo é protegida pelo item Pedidos", () => {
 test("não existe página no grupo protegido sem requirePermission", () => {
   const all = pages();
   // The menu items, plus /pedidos/novo, one order, the record of one customer and of one supplier,
-  // and the users, the forms of payment and the categories of bills of the company, its product lines, its carriers and the e-mail of the invoices.
-  assert.equal(all.length, MENU_ITEMS.length + 19);
+  // and the users, the forms of payment and the categories of bills of the company, its product lines, its carriers, the e-mail of the invoices and its access profiles.
+  assert.equal(all.length, MENU_ITEMS.length + 20);
   for (const route of all) {
     assert.match(source(route), /await requirePermission\(/, route);
   }
@@ -392,8 +392,8 @@ test("orçamento em PDF: sai da conta da equipe, nunca lê custo, e o escopo vem
     assert.ok(!route.includes(forbidden), `a rota do orçamento contém ${forbidden}`);
   }
   assert.ok(route.includes('allows(session, "pedidos")'));
-  assert.ok(route.includes("getOrder(numero, { sellerEmail: seesAllOrders(session.role) ? null : session.email }, conn)"));
-  assert.doesNotMatch(route, /seesAllOrders\((?!session\.role\))|canAccess\((?!session\.role,)/);
+  assert.ok(route.includes("getOrder(numero, { sellerEmail: seesAllOrders(session) ? null : session.email }, conn)"));
+  assert.doesNotMatch(route, /seesAllOrders\((?!session\))|canAccess\((?!session\.role,)/);
   // Nada do pedido HTTP é lido: nem endereço, nem cabeçalho, nem corpo. E só existe o GET.
   assert.doesNotMatch(route, /\brequest\b|\.headers\b|\.url\b|\.json\(|arrayBuffer\(|cookies\(/);
   assert.deepEqual([...route.matchAll(/export (?:async )?function (\w+)/g)].map(([, name]) => name), ["GET"]);
@@ -477,14 +477,14 @@ test("nota fiscal: só quem edita os parâmetros emite; a verificação do servi
   assert.ok(sources[0].includes("rejectUnauthorized: true"));
   const route = readFileSync(`${API_DIR}pedidos/[numero]/nfe/route.ts`, "utf8");
   assert.ok(route.indexOf("await getSession()") < route.indexOf("getOrder("));
-  assert.ok(route.includes("sellerEmail: seesAllOrders(session.role) ? null : session.email"));
+  assert.ok(route.includes("sellerEmail: seesAllOrders(session) ? null : session.email"));
   assert.ok(route.indexOf("getOrder(") < route.indexOf("loadAuthorizedXml("));
 });
 
 test("DANFE: segue o alcance do pedido; a conferência é só de quem edita os parâmetros", () => {
   const route = readFileSync(`${API_DIR}pedidos/[numero]/danfe/route.ts`, "utf8");
   assert.ok(route.indexOf("await getSession()") < route.indexOf("getOrder("));
-  assert.ok(route.includes("sellerEmail: seesAllOrders(session.role) ? null : session.email"));
+  assert.ok(route.includes("sellerEmail: seesAllOrders(session) ? null : session.email"));
   assert.ok(route.indexOf("getOrder(") < route.indexOf("loadAuthorizedXml("));
   const preview = readFileSync(`${API_DIR}pedidos/[numero]/danfe-previa/route.ts`, "utf8");
   assert.ok(preview.indexOf('allows(session, "parametros")') < preview.indexOf("previewOrderNfe("));

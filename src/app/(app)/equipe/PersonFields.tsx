@@ -1,4 +1,5 @@
-import { MENU_ITEMS } from "@/lib/auth/permissions";
+import { MENU_ITEMS, POWERS } from "@/lib/auth/permissions";
+import type { AccessProfile } from "@/lib/db/access-profiles";
 import { ROLE_LABELS, ROLES } from "@/lib/auth/roles";
 import type { Role } from "@/lib/auth/roles";
 import type { AppUser } from "@/lib/db/users";
@@ -19,7 +20,9 @@ const INPUT = "mt-1 w-full rounded-lg border border-slate-300 bg-white px-4 py-2
  * of the system with its box. Compact on purpose: it is to fit a phone without
  * scrolling through explanations.
  */
-export function PersonFields({ saved }: { saved: AppUser | null }) {
+export function PersonFields({ saved, profiles }: { saved: AppUser | null; profiles: AccessProfile[] }) {
+  // A profile of the company is one more choice of access, with its own screens.
+  const profileKey = (id: number) => `perfil:${id}`;
   return (
     <>
       <div>
@@ -39,10 +42,22 @@ export function PersonFields({ saved }: { saved: AppUser | null }) {
         )}
       </div>
       <AccessPicker
-        options={ROLES.map((role) => ({ role, label: ROLE_LABELS[role], note: ROLE_NOTES[role] }))}
-        screens={MENU_ITEMS.map((item) => ({ key: item.key, label: item.label, roles: item.roles }))}
-        role={saved?.role ?? "VENDEDOR"}
-        items={saved?.items ?? null}
+        options={[
+          ...ROLES.map((role) => ({ role: role as string, label: ROLE_LABELS[role], note: ROLE_NOTES[role] })),
+          ...profiles.map((profile) => ({
+            role: profileKey(profile.id),
+            label: profile.name,
+            note: `Perfil da empresa, a partir de ${ROLE_LABELS[profile.baseRole]}.${profile.denied.length > 0 ? ` Sem: ${POWERS.filter((power) => profile.denied.includes(power.key)).map((power) => power.label.toLowerCase()).join("; ")}.` : ""}`,
+            fixed: true,
+          })),
+        ]}
+        screens={MENU_ITEMS.map((item) => ({
+          key: item.key,
+          label: item.label,
+          roles: [...item.roles, ...profiles.filter((profile) => profile.items.includes(item.key)).map((profile) => profileKey(profile.id))],
+        }))}
+        role={saved?.profileId != null ? profileKey(saved.profileId) : (saved?.role ?? "VENDEDOR")}
+        items={saved?.profileId != null ? null : (saved?.items ?? null)}
       />
     </>
   );

@@ -410,6 +410,25 @@ metas de venda (`sales_goals`, uma da equipe e uma por vendedor em cada mês) s�
 Diretoria (`setsGoals`), sempre para o mês corrente. Os gráficos são `src/components/Charts.tsx`,
 componentes de servidor em CSS, sem biblioteca.
 
+## Perfis de acesso da empresa: só tiram, nunca dão
+
+Além dos quatro tipos do sistema (`ROLES`), a empresa cria perfis próprios em Equipe → Perfis da
+empresa (migração `0031`, `src/lib/db/access-profiles.ts`). Regras que não se quebram:
+
+1. **Um perfil parte de um tipo e só abre mão**: de telas e de poderes (`POWERS` em
+   `src/lib/auth/permissions.ts`). Nunca alcança o que o tipo de origem não tem; `cleanProfile`
+   descarta o que vier a mais, e o tipo de origem não muda depois de criado.
+2. **Quem decide é a sessão, não o tipo**: `seesCosts(session)`, `seesAllOrders(session)`,
+   `approvesAtLoss(session)`, `setsGoals(session)`, `managesCommissions(session)` e
+   `confirmsRefunds(session)`. Passar só `session.role` ignora o que o perfil abriu mão;
+   `tests/routes.test.ts` barra isso nas telas que leem custo.
+3. **Tela que mostra custo para quem a abre** (`COST_SCREENS`: Produtos e custos, Parâmetros) não
+   entra em perfil sem o poder de ver custo. Tela nova que mostre custo sem perguntar
+   `seesCosts(session)` entra nessa lista.
+4. A pessoa com perfil guarda `users.profile_id`; telas, poderes e nome vêm do perfil a cada
+   login, então mudar o perfil muda para todos. Ninguém altera o perfil que tem, e perfil com
+   gente não é removido.
+
 ## Linha importada ou nacional: só as palavras mudam
 
 Cada linha de produto diz de onde compra (`product_lines.imported`, migração `0030`, editável em

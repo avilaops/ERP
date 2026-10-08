@@ -31,7 +31,7 @@ export async function decideApprovalAction(_previous: ActionState, formData: For
     await decideApproval(
       number,
       { approve: decision === "aprovar", comment: text("comment") },
-      { email: session.email, role: session.role, approvesAtLoss: approvesAtLoss(session.role) },
+      { email: session.email, role: session.role, approvesAtLoss: approvesAtLoss(session) },
       conn,
     );
   } catch (error) {

@@ -83,37 +83,69 @@ export function menuFor(role: Role): MenuItem[] {
 }
 
 /**
+ * What a profile may do beyond opening screens. Each power belongs to some of
+ * the four types; a profile of the company (Equipe → Perfis) may give up powers
+ * of its type of origin, never gain one it does not have.
+ */
+export const POWERS = [
+  { key: "custos", label: "Vê custo, margem e lucro", roles: ["DIRETORIA"] },
+  { key: "pedidos-da-equipe", label: "Vê os pedidos de toda a equipe", roles: ["DIRETORIA", "GERENTE_COMERCIAL"] },
+  { key: "aprova-prejuizo", label: "Aprova pedido com prejuízo", roles: ["DIRETORIA"] },
+  { key: "metas", label: "Define as metas de venda", roles: ["DIRETORIA"] },
+  { key: "comissoes", label: "Vê as comissões de todos e marca como pagas", roles: ["DIRETORIA", "FINANCEIRO"] },
+  { key: "estornos", label: "Confirma ou recusa estorno de recebimento", roles: ["DIRETORIA"] },
+] as const satisfies readonly { key: string; label: string; roles: readonly Role[] }[];
+
+export type PowerKey = (typeof POWERS)[number]["key"];
+
+/** Who is asking about a power: a bare type, or a session, whose profile may have given powers up. */
+export type Powered = Role | { role: Role; denied?: readonly string[] | null };
+
+function has(who: Powered, power: PowerKey): boolean {
+  const role = typeof who === "string" ? who : who.role;
+  const denied = typeof who === "string" ? null : who.denied;
+  const roles: readonly Role[] = POWERS.find((item) => item.key === power)?.roles ?? [];
+  return roles.includes(role) && !(denied ?? []).includes(power);
+}
+
+/** The powers a type has, in the order of the list. */
+export const powersOf = (role: Role) => POWERS.filter((power) => (power.roles as readonly Role[]).includes(role));
+
+/** Screens that show cost whoever opens them: a profile without the power of seeing costs cannot have them. */
+export const COST_SCREENS: readonly MenuItemKey[] = ["produtos", "parametros"];
+
+/**
  * Who sees cost, real cost, largest discounts and profit. The single source for
  * "só o diretor vê": pages ask this, never compare the profile themselves.
  */
-export function seesCosts(role: Role): boolean {
-  return role === "DIRETORIA";
+export function seesCosts(who: Powered): boolean {
+  return has(who, "custos");
 }
 
 /** Who sees the commissions of every seller and marks them as paid. A seller sees only their own. */
-export function managesCommissions(role: Role): boolean {
-  return role === "DIRETORIA" || role === "FINANCEIRO";
+export function managesCommissions(who: Powered): boolean {
+  return has(who, "comissoes");
 }
 
 /** Who confirms or refuses a refund asked for in Recebimentos. Whoever has the screen may ask. */
-export function confirmsRefunds(role: Role): boolean {
-  return role === "DIRETORIA";
+export function confirmsRefunds(who: Powered): boolean {
+  return has(who, "estornos");
 }
 
 /** Who sets the sales goals. Everyone else with Preços e metas only follows them. */
-export function setsGoals(role: Role): boolean {
-  return role === "DIRETORIA";
+export function setsGoals(who: Powered): boolean {
+  return has(who, "metas");
 }
 
 /** Who may approve an order that gives a loss. Everyone else with Aprovações decides only orders with profit. */
-export function approvesAtLoss(role: Role): boolean {
-  return role === "DIRETORIA";
+export function approvesAtLoss(who: Powered): boolean {
+  return has(who, "aprova-prejuizo");
 }
 
 /**
  * Who sees the orders of the whole team. A seller sees only their own. Pages and
  * actions build the scope of the orders from this, never from the profile itself.
  */
-export function seesAllOrders(role: Role): boolean {
-  return role === "DIRETORIA" || role === "GERENTE_COMERCIAL";
+export function seesAllOrders(who: Powered): boolean {
+  return has(who, "pedidos-da-equipe");
 }

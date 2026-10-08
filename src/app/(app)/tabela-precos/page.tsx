@@ -34,7 +34,7 @@ export default async function TabelaPrecosPage({
   const query = await searchParams;
   const search = (first(query.q) ?? "").trim();
   // The profile comes from the session. Nothing in the address turns costs on.
-  const costs = seesCosts(session.role);
+  const costs = seesCosts(session);
 
   // One product line at a time: each has its own published table.
   const lines = await listLines(conn);

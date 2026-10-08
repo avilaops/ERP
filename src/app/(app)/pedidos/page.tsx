@@ -30,7 +30,7 @@ export default async function PedidosPage({ searchParams }: { searchParams: Prom
   const tab = parseOrderTab(first(query.aba));
   const search = (first(query.busca) ?? "").trim();
   // A seller receives only their own orders from the database; the others, all of them.
-  const everyone = seesAllOrders(session.role);
+  const everyone = seesAllOrders(session);
   const orders = await listOrders({ sellerEmail: everyone ? null : session.email }, conn);
   const { rows, counts, indicators } = ordersView(orders, { tab, search, me: session.email, month: isoDate(new Date()).slice(0, 7) });
 

@@ -43,7 +43,7 @@ export default async function NovoPedidoPage({ searchParams }: { searchParams: P
         {heading}
         <p className={`${CARD} p-6 text-slate-600`}>
           Nenhuma tabela publicada ainda. Sem ela não há preço para vender.
-          {seesCosts(session.role) && (
+          {seesCosts(session) && (
             <>
               {" "}
               <Link href={menuItem("produtos").href} className="text-brand underline">
