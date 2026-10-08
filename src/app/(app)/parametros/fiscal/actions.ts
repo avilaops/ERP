@@ -3,7 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/auth";
 import { FiscalError, removeCertificate, saveCertificate, saveFiscalSettings, saveProductFiscal } from "@/lib/db/fiscal";
+import { saveFiscalRules, savePaymentCode } from "@/lib/db/fiscal-rules";
 import { tenantDb } from "@/lib/db/pool";
+import { listLines } from "@/lib/db/product-lines";
+import { cityCode } from "@/lib/fiscal/cities";
+import { parsePercent } from "@/lib/format";
+import { exactLine } from "@/lib/lines-view";
 import { CertificateError, vaultKey } from "@/lib/fiscal/certificate";
 import type { ActionState } from "@/lib/order-form";
 
@@ -40,7 +45,8 @@ export async function saveFiscalSettingsAction(_previous: ActionState, formData:
         streetNumber: text("streetNumber") || null,
         district: text("district") || null,
         city: text("city") || null,
-        cityCode: text("cityCode") || null,
+        // Left blank, the code is found by the name of the city and the state (IBGE list).
+        cityCode: text("cityCode") || cityCode(text("city"), text("uf").toUpperCase()),
         uf: text("uf") || null,
         cep: text("cep") || null,
         series: whole(text("series")),
@@ -116,5 +122,60 @@ export async function saveProductFiscalAction(_previous: ActionState, formData: 
     return problem("gravar os dados fiscais do equipamento", error);
   }
   revalidatePath(`/produtos/${text("id")}`);
+  return OK;
+}
+
+/** "Salvar regras fiscais" of one product line: what the accountant defines for the invoice. */
+export async function saveFiscalRulesAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
+  const session = await requirePermission("parametros");
+  const conn = tenantDb(session.tenant.slug);
+  const text = reader(formData);
+  const percent = (key: string, label: string) => {
+    const value = text(key) === "" ? 0 : parsePercent(text(key).replace(/\s*%$/, ""));
+    if (value === null) throw new FiscalError(`${label}: informe um percentual (ex.: 0,65).`);
+    return value;
+  };
+  try {
+    const line = exactLine(await listLines(conn), formData.get("lineId"));
+    if (!line) return { error: "A linha de produto desta tela não existe mais. Recarregue a página." };
+    await saveFiscalRules(
+      line.id,
+      {
+        operationNature: text("operationNature") || null,
+        cfopInternal: text("cfopInternal") || null,
+        cfopInterstate: text("cfopInterstate") || null,
+        cfopInterstateNonTaxpayer: text("cfopInterstateNonTaxpayer") || null,
+        icmsCode: text("icmsCode") || null,
+        ipiCst: text("ipiCst") || null,
+        ipiFrameCode: text("ipiFrameCode") || "999",
+        pisCst: text("pisCst") || null,
+        pisRate: percent("pisRate", "Alíquota do PIS"),
+        cofinsCst: text("cofinsCst") || null,
+        cofinsRate: percent("cofinsRate", "Alíquota da COFINS"),
+        finalConsumer: text("finalConsumer") !== "",
+        ipiInIcmsBase: text("ipiInIcmsBase") !== "",
+        additionalInfo: text("additionalInfo") || null,
+      },
+      session.email,
+      conn,
+    );
+  } catch (error) {
+    return problem("gravar as regras fiscais", error);
+  }
+  revalidatePath(HERE);
+  return OK;
+}
+
+/** How one form of payment of the company is named in the invoice. */
+export async function savePaymentCodeAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
+  const session = await requirePermission("parametros");
+  const conn = tenantDb(session.tenant.slug);
+  const text = reader(formData);
+  try {
+    await savePaymentCode(whole(text("id")), text("code") || null, session.email, conn);
+  } catch (error) {
+    return problem("gravar a forma de pagamento da nota", error);
+  }
+  revalidatePath(HERE);
   return OK;
 }

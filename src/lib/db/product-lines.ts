@@ -108,6 +108,8 @@ export async function deleteLine(id: number, conn: Queryable): Promise<void> {
          DELETE FROM state_tax_rates WHERE line_id IN (SELECT id FROM free) RETURNING line_id
        ), params AS (
          DELETE FROM pricing_params WHERE line_id IN (SELECT id FROM free) RETURNING line_id
+       ), fiscal AS (
+         DELETE FROM fiscal_rules WHERE line_id IN (SELECT id FROM free) RETURNING line_id
        ), gone AS (
          DELETE FROM product_lines WHERE id IN (SELECT id FROM free) RETURNING id
        )

@@ -1068,3 +1068,50 @@ test("indicadores: recebido no mês não conta estorno confirmado; comissão fut
   assert.equal(team > 0, stillOpen > 0);
   assert.equal(await futureCommission("ninguem@teste.local", db.pool), 0);
 });
+
+test("nota fiscal de conferência: pedido fechado, com os cadastros preenchidos, monta o XML; sem eles, lista o que falta", { skip }, async () => {
+  const { previewOrderNfe } = await import("@/lib/db/order-nfe");
+  const { saveFiscalSettings, saveProductFiscal } = await import("@/lib/db/fiscal");
+  const { saveFiscalRules, EMPTY_FISCAL_RULES } = await import("@/lib/db/fiscal-rules");
+  const { buildNfeXml } = await import("@/lib/fiscal/nfe");
+  const { readFileSync: readFile } = await import("node:fs");
+  const cities = JSON.parse(readFile(new URL("../src/lib/fiscal/municipios.json", import.meta.url), "utf8")) as Record<string, string[][]>;
+
+  const closed = await db.pool.query(
+    `SELECT o.number, c.id AS customer_id, c.uf FROM orders o JOIN customers c ON c.id = o.customer_id
+      WHERE o.status = 'fechado' AND c.uf = o.delivery_uf ORDER BY o.id LIMIT 1`,
+  );
+  assert.equal(closed.rows.length, 1, "o preparo precisa de um pedido fechado com cliente");
+  const { number, customer_id: customerId, uf } = closed.rows[0];
+  const now = new Date("2026-10-08T13:00:00Z");
+
+  const before = await previewOrderNfe(number, now, db.pool);
+  assert.ok(before);
+  for (const piece of ["Empresa: CNPJ", "natureza da operação", "NCM com oito dígitos"]) {
+    assert.ok(before.problems.some((problem) => problem.includes(piece)), piece);
+  }
+  assert.equal(await previewOrderNfe("999999-ZZZZ", now, db.pool), null);
+
+  await saveFiscalSettings(
+    { legalName: "Empresa de Teste Ltda", cnpj: "11222333000181", stateRegistration: "110042490114", taxRegime: 3, street: "Rua Um", streetNumber: "10", district: "Centro",
+      city: "São José do Rio Preto", cityCode: "3549805", uf: "SP", cep: "15035000", series: 1, nextNumber: 42, environment: "homologacao" },
+    "diretoria@teste.local",
+    db.pool,
+  );
+  await saveFiscalRules(1, { ...EMPTY_FISCAL_RULES, operationNature: "Venda de mercadoria", cfopInternal: "5102", cfopInterstate: "6102", cfopInterstateNonTaxpayer: "6108", icmsCode: "00", ipiCst: "50", pisCst: "01", pisRate: 0.0065, cofinsCst: "01", cofinsRate: 0.03 }, "diretoria@teste.local", db.pool);
+  const products = await db.pool.query("SELECT id FROM products");
+  for (const row of products.rows) await saveProductFiscal(Number(row.id), { ncm: "95069100", origin: 1, cest: null, unit: "UN" }, "diretoria@teste.local", db.pool);
+  const city = cities[uf][0][0];
+  await db.pool.query("UPDATE customers SET city = $2, cep = '01001000', street = 'Rua A', street_number = '1', district = 'Centro' WHERE id = $1", [customerId, city]);
+  await db.pool.query("UPDATE payment_methods SET nfe_code = COALESCE(nfe_code, '99')");
+
+  const ready = await previewOrderNfe(number, now, db.pool);
+  assert.ok(ready);
+  assert.deepEqual(ready.problems, []);
+  const { xml, key } = buildNfeXml(ready.input);
+  assert.equal(key.length, 44);
+  assert.ok(xml.includes("<nNF>42</nNF>") && xml.includes("<dhEmi>2026-10-08T10:00:00-03:00</dhEmi>") && xml.includes(`Pedido ${number}`));
+  // Conferência não consome o número.
+  const { rows } = await db.pool.query("SELECT nfe_next_number FROM company_settings");
+  assert.equal(rows[0].nfe_next_number, 42);
+});

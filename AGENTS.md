@@ -195,6 +195,22 @@ funções puras, sem banco e sem tela, conferidas com os números dos prints do 
     escolha (Claro / Escuro / Sistema, no rodapé do menu) é da pessoa e do navegador: cookie
     `erp_theme`, lido no `layout.tsx` raiz e em `ThemeChoice`; não vai para o banco nem para a sessão.
 
+15. **NF-e: a nota é montada por função pura e todo código fiscal é parâmetro.**
+    `src/lib/fiscal/nfe.ts` monta o XML do modelo 55, leiaute 4.00 (chave de acesso, itens, ICMS,
+    IPI, PIS, COFINS, DIFAL, totais, pagamento), sem banco, certificado ou rede; `nfeProblems` lista
+    tudo o que falta, dizendo em qual cadastro se corrige, e nota com falta não sai. O teste valida
+    o XML contra o **XSD oficial** (`tests/fixtures/nfe-xsd/`, `xmllint-wasm`): passa inteiro, só
+    falta a assinatura. CFOP, CST/CSOSN, PIS, COFINS, IPI e "consumidor final" ficam em
+    `fiscal_rules`, **por linha de produto** (migração `0020`, Parâmetros → Fiscal); nenhum código
+    vem do programa, nem como valor inicial. ICMS e IPI vêm dos parâmetros **da versão do pedido**.
+    A forma de pagamento da nota (`tPag`) é coluna de `payment_methods`. O código do município no
+    IBGE sai do nome da cidade e da UF (`src/lib/fiscal/cities.ts`, lista do IBGE embutida), sem
+    campo novo para o cliente. `orderNfe` (`src/lib/fiscal/order-nfe.ts`) é a ponte pedido → nota.
+    **Hoje só existe a conferência:** no pedido fechado, quem edita os parâmetros vê os totais e
+    baixa o XML sem assinatura (`/api/pedidos/[numero]/nfe-previa`), que não consome número, não
+    assina e não envia. Assinatura, transmissão à SEFAZ, DANFE, cancelamento e carta de correção
+    ainda não existem.
+
 10. **Provisões e taxa fixa por pedido são parâmetros** (migração `0013`): perdas, garantia e
     inadimplência somam em `channelRate`; a taxa fixa sai do lucro do pedido uma vez, junto com o
     frete (`quoteOrder`, `orderMaxDiscounts`). Entram com zero, e "Outras taxas da venda" segue

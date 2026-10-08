@@ -1,16 +1,20 @@
+import { LineTabs } from "@/components/LineTabs";
+import { loadFiscalRules, listPaymentCodes, missingFiscalRules, PAYMENT_CODES } from "@/lib/db/fiscal-rules";
+import { listLines } from "@/lib/db/product-lines";
+import { LINE_PARAM, pickLine } from "@/lib/lines-view";
 import Link from "next/link";
 import { requirePermission } from "@/lib/auth";
 import { menuItem } from "@/lib/auth/permissions";
 import { formatDocument } from "@/lib/customer";
 import { loadCertificateInfo, loadFiscalSettings, missingFiscalData, TAX_REGIMES } from "@/lib/db/fiscal";
 import { tenantDb } from "@/lib/db/pool";
-import { isoDate, showDate, showDateTime } from "@/lib/format";
+import { formatPercent, isoDate, showDate, showDateTime } from "@/lib/format";
 import { UF_NAMES } from "@/lib/order-form";
 import { parseDate } from "@/lib/pricing/payment";
 import { UFS } from "@/lib/pricing/states";
 import { ActionForm } from "../../pedidos/ActionForm";
 import { ConfirmButton } from "../../pedidos/ConfirmButton";
-import { removeCertificateAction, saveCertificateAction, saveFiscalSettingsAction } from "./actions";
+import { removeCertificateAction, saveCertificateAction, saveFiscalRulesAction, saveFiscalSettingsAction, savePaymentCodeAction } from "./actions";
 
 export const metadata = { title: "Fiscal · ERP" };
 export const dynamic = "force-dynamic";
@@ -20,12 +24,32 @@ const INPUT = "mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2 ou
 const LABEL = "block text-sm font-medium";
 const DAY_MS = 86_400_000;
 
-export default async function FiscalPage() {
+export default async function FiscalPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const session = await requirePermission("parametros");
   const conn = tenantDb(session.tenant.slug);
   const settings = await loadFiscalSettings(conn);
   const certificate = await loadCertificateInfo(conn);
   const missing = missingFiscalData(settings);
+  // The rules of the invoice are of one product line: imported and national goods are taxed differently.
+  const lines = await listLines(conn);
+  const line = pickLine(lines, (await searchParams)[LINE_PARAM]);
+  const rules = await loadFiscalRules(line.id, conn);
+  const missingRules = missingFiscalRules(rules);
+  const paymentCodes = await listPaymentCodes(conn);
+  const simples = settings.taxRegime === 1;
+  const ruleFields = [
+    ["operationNature", "Natureza da operação", rules.operationNature, "Ex.: Venda de mercadoria", "sm:col-span-2"],
+    ["cfopInternal", "CFOP dentro do estado", rules.cfopInternal, "Ex.: 5102", ""],
+    ["cfopInterstate", "CFOP para contribuinte de outro estado", rules.cfopInterstate, "Ex.: 6102", ""],
+    ["cfopInterstateNonTaxpayer", "CFOP para não contribuinte de outro estado", rules.cfopInterstateNonTaxpayer, "Ex.: 6108", ""],
+    ["icmsCode", simples ? "CSOSN do ICMS (Simples Nacional)" : "CST do ICMS", rules.icmsCode, simples ? "Ex.: 102" : "Ex.: 00", ""],
+    ["ipiCst", "CST do IPI (em branco: nota sem IPI)", rules.ipiCst, "Ex.: 50", ""],
+    ["ipiFrameCode", "Código de enquadramento do IPI", rules.ipiFrameCode, "999", ""],
+    ["pisCst", "CST do PIS", rules.pisCst, "Ex.: 01", ""],
+    ["pisRate", "Alíquota do PIS (%)", formatPercent(rules.pisRate), "Ex.: 0,65", ""],
+    ["cofinsCst", "CST da COFINS", rules.cofinsCst, "Ex.: 01", ""],
+    ["cofinsRate", "Alíquota da COFINS (%)", formatPercent(rules.cofinsRate), "Ex.: 3", ""],
+  ] as const;
   const today = isoDate(new Date());
   const daysLeft = certificate ? Math.round((parseDate(isoDate(certificate.validUntil)) - parseDate(today)) / DAY_MS) : null;
 
@@ -38,7 +62,7 @@ export default async function FiscalPage() {
     ["district", "Bairro", settings.district, ""],
     ["cep", "CEP", settings.cep, ""],
     ["city", "Cidade", settings.city, ""],
-    ["cityCode", "Código IBGE da cidade (7 dígitos)", settings.cityCode, ""],
+    ["cityCode", "Código IBGE da cidade (em branco: acha pelo nome)", settings.cityCode, ""],
   ] as const;
 
   return (
@@ -171,6 +195,86 @@ export default async function FiscalPage() {
             </button>
           </div>
         </ActionForm>
+      </section>
+
+      <section className={`${CARD} mt-6 p-5`} aria-labelledby="regras">
+        <h2 id="regras" className="text-sm font-semibold uppercase tracking-wide">
+          Regras fiscais da nota{lines.length > 1 ? ` · linha ${line.name}` : ""}
+        </h2>
+        <p className="mt-1 max-w-3xl text-sm text-slate-600">
+          O que o contador define para a venda desta linha. Os exemplos são só o formato: nenhum código vem preenchido pelo sistema. As
+          alíquotas de ICMS e o IPI vêm dos Parâmetros da linha.
+        </p>
+        <LineTabs lines={lines} current={line.id} path="/parametros/fiscal" />
+        {missingRules.length > 0 && (
+          <p className="mt-3 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            Para emitir nota desta linha, faltam: {missingRules.join(", ")}.
+          </p>
+        )}
+        <ActionForm key={line.id} action={saveFiscalRulesAction} className="mt-4 grid gap-4 sm:grid-cols-2">
+          <input type="hidden" name="lineId" value={line.id} />
+          {ruleFields.map(([key, label, value, placeholder, span]) => (
+            <div key={key} className={span}>
+              <label htmlFor={key} className={LABEL}>
+                {label}
+              </label>
+              <input id={key} name={key} type="text" defaultValue={value ?? ""} placeholder={placeholder} autoComplete="off" className={INPUT} />
+            </div>
+          ))}
+          <label className="flex items-start gap-2 text-sm sm:col-span-2">
+            <input type="checkbox" name="finalConsumer" value="sim" defaultChecked={rules.finalConsumer} className="mt-1" />
+            <span>
+              O cliente é consumidor final (usa o equipamento, não revende). É o que leva o DIFAL para a nota quando ele não é contribuinte e
+              está em outro estado.
+            </span>
+          </label>
+          <label className="flex items-start gap-2 text-sm sm:col-span-2">
+            <input type="checkbox" name="ipiInIcmsBase" value="sim" defaultChecked={rules.ipiInIcmsBase} className="mt-1" />
+            <span>Na venda para consumidor final, o IPI entra na base de cálculo do ICMS.</span>
+          </label>
+          <div className="sm:col-span-2">
+            <label htmlFor="additionalInfo" className={LABEL}>
+              Informações complementares (texto fixo da nota)
+            </label>
+            <textarea id="additionalInfo" name="additionalInfo" rows={3} defaultValue={rules.additionalInfo ?? ""} className={INPUT} />
+          </div>
+          <div className="sm:col-span-2">
+            <button type="submit" className="rounded bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark">
+              Salvar regras fiscais
+            </button>
+          </div>
+        </ActionForm>
+      </section>
+
+      <section className={`${CARD} mt-6`} aria-labelledby="pagamento-na-nota">
+        <h2 id="pagamento-na-nota" className="border-b border-slate-200 px-5 py-3 text-sm font-semibold uppercase tracking-wide">
+          Forma de pagamento na nota
+        </h2>
+        <p className="px-5 pt-3 text-sm text-slate-600">Como cada forma de pagamento da empresa aparece na nota fiscal.</p>
+        <ul className="px-5 pb-3">
+          {paymentCodes.map((method) => (
+            <li key={method.id} className="border-t border-slate-200 py-3 first:border-t-0">
+              <ActionForm action={savePaymentCodeAction} className="flex flex-wrap items-center gap-3">
+                <input type="hidden" name="id" value={method.id} />
+                <span className="min-w-0 flex-1 font-medium">
+                  {method.label}
+                  {!method.active && <span className="ml-2 text-xs font-normal text-slate-500">desligada</span>}
+                </span>
+                <select key={method.code ?? ""} name="code" defaultValue={method.code ?? ""} aria-label={`Forma na nota de ${method.label}`} className="rounded border border-slate-300 bg-white px-3 py-2">
+                  <option value="">— escolher —</option>
+                  {PAYMENT_CODES.map(([code, label]) => (
+                    <option key={code} value={code}>
+                      {code} · {label}
+                    </option>
+                  ))}
+                </select>
+                <button type="submit" className="rounded border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50">
+                  Salvar
+                </button>
+              </ActionForm>
+            </li>
+          ))}
+        </ul>
       </section>
     </>
   );

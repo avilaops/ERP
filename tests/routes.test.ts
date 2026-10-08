@@ -430,3 +430,15 @@ test("dashboard: o filtro de vendedor só escolhe entre os pedidos que a pessoa 
   assert.ok(order.includes('order.status === "aguardando_aprovacao" && allows(session, "aprovacoes")'));
   assert.ok(order.includes("<ActionForm action={decideApprovalAction}"));
 });
+
+test("nota fiscal: a conferência do XML só sai para quem edita os parâmetros, de pedido fechado, e não assina nem envia", () => {
+  const route = readFileSync(`${API_DIR}pedidos/[numero]/nfe-previa/route.ts`, "utf8");
+  assert.ok(route.indexOf("await getSession()") < route.indexOf('allows(session, "parametros")'));
+  assert.ok(route.indexOf('allows(session, "parametros")') < route.indexOf("previewOrderNfe("));
+  assert.doesNotMatch(route, /certificate|vaultKey|fetch\(|sefaz/i);
+  const order = readFileSync(new URL("../src/app/(app)/pedidos/[numero]/page.tsx", import.meta.url), "utf8");
+  assert.ok(order.includes('order.status === "fechado" && allows(session, "parametros") ? await previewOrderNfe('));
+  const loader = readFileSync(new URL("../src/lib/db/order-nfe.ts", import.meta.url), "utf8");
+  assert.ok(loader.includes('order.status !== "fechado"'));
+  assert.doesNotMatch(loader, /UPDATE|INSERT|DELETE/);
+});

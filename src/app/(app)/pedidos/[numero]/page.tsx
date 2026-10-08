@@ -8,6 +8,7 @@ import { completenessText, isComplete, isRequired, normalizeDocument, taxpayerFr
 import type { CustomerKind } from "@/lib/customer";
 import { CUSTOMER_FIELDS, customerToForm } from "@/lib/customer-form";
 import { lastDecision } from "@/lib/db/approvals";
+import { previewOrderNfe } from "@/lib/db/order-nfe";
 import { findCustomerByDocument } from "@/lib/db/customers";
 import { getOrder, listPaymentMethods, loadOrderStanding } from "@/lib/db/orders";
 import { loadApprovalPolicy } from "@/lib/db/company";
@@ -124,6 +125,8 @@ export default async function PedidoPage({
     const key = limits?.keyOf({ uf: order.deliveryUf, taxpayer: order.taxpayer });
     authority = limits?.limits.find((limit) => limit.label === key)?.[upTo] ?? null;
   }
+  // The conference of the invoice: only for a closed order and for who edits the fiscal parameters.
+  const invoice = order.status === "fechado" && allows(session, "parametros") ? await previewOrderNfe(order.number, new Date(), conn) : null;
   // What "Copiar proposta" puts in the clipboard: only what the customer reads in the PDF.
   const proposal = proposalText({
     company: session.tenant.name,
@@ -217,6 +220,54 @@ export default async function PedidoPage({
               Recusar
             </button>
           </ActionForm>
+        </section>
+      )}
+      {invoice && (
+        <section className="mt-3 rounded-lg border border-slate-200 bg-white p-4 text-sm" aria-labelledby="nota-fiscal">
+          <h2 id="nota-fiscal" className="text-sm font-semibold uppercase tracking-wide">
+            Nota fiscal
+          </h2>
+          <p className="mt-1 text-slate-600">
+            Conferência da nota deste pedido, para o contador. A emissão ainda não está ligada: nada aqui é enviado à SEFAZ nem consome
+            número de nota.
+          </p>
+          {invoice.problems.length > 0 ? (
+            <>
+              <p className="mt-3 font-medium">Para montar a nota, falta:</p>
+              <ul className="mt-1 list-disc pl-5 text-slate-700">
+                {invoice.problems.map((problem) => (
+                  <li key={problem}>{problem}</li>
+                ))}
+              </ul>
+            </>
+          ) : (
+            <>
+              <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1 sm:grid-cols-4">
+                {(
+                  [
+                    ["Produtos", invoice.totals.products],
+                    ["IPI", invoice.totals.ipi],
+                    ["ICMS", invoice.totals.icms],
+                    ["DIFAL + FCP", invoice.totals.difal + invoice.totals.fcp],
+                    ["PIS", invoice.totals.pis],
+                    ["COFINS", invoice.totals.cofins],
+                    ["Total da nota", invoice.totals.invoice],
+                  ] as const
+                ).map(([label, value]) => (
+                  <div key={label}>
+                    <dt className="text-xs text-slate-500">{label}</dt>
+                    <dd className="font-semibold">{formatMoney(value)}</dd>
+                  </div>
+                ))}
+              </dl>
+              <p className="mt-3">
+                <a href={`/api/pedidos/${order.number}/nfe-previa`} className="font-medium text-brand underline">
+                  Baixar XML de conferência
+                </a>{" "}
+                <span className="text-slate-600">(sem assinatura e sem valor fiscal)</span>
+              </p>
+            </>
+          )}
         </section>
       )}
       {!editable && (
