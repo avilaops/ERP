@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { lineWords } from "@/lib/line-words";
 import { IDLE_FORM_STATE, PARAM_SECTIONS, STATE_RATE_COLUMNS } from "@/lib/params-form";
 import type { ParamField, ParamsFormState, ParamsFormValues, StateRateKey } from "@/lib/params-form";
 import { UFS } from "@/lib/pricing/states";
@@ -18,7 +19,15 @@ type SaveAction = (state: ParamsFormState, formData: FormData) => Promise<Params
  * what was typed; otherwise they follow `saved`, which the page refreshes after
  * a save and after the "usar" button.
  */
-export function ParamsForm({ saved, action, lineId }: { saved: ParamsFormValues; action: SaveAction; lineId: number }) {
+export function ParamsForm({ saved, action, lineId, imported }: { saved: ParamsFormValues; action: SaveAction; lineId: number; imported: boolean }) {
+  // The fields whose name depends on where the line is bought.
+  const words = lineWords(imported);
+  const worded: Partial<Record<string, { label?: string; help?: string }>> = {
+    safetyMargin: { label: words.safetyLabel, help: words.safetyHelp },
+    minDownPayment: { help: words.downPaymentHelp },
+    ipi: { help: words.ipiHelp },
+    icmsInterstate: { label: words.interstateLabel },
+  };
   const [state, formAction, pending] = useActionState(action, IDLE_FORM_STATE);
   const values = state.status === "error" && state.values ? state.values : saved;
 
@@ -49,7 +58,8 @@ export function ParamsForm({ saved, action, lineId }: { saved: ParamsFormValues;
             {section.title}
           </h2>
           <div className="grid gap-5 p-5 sm:grid-cols-2">
-            {section.fields.map((field) => {
+            {section.fields.map((plain) => {
+              const field = { ...plain, ...worded[plain.key] };
               const invalid = state.invalid.includes(field.key);
               return (
                 <div key={field.key}>

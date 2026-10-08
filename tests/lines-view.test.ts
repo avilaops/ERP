@@ -3,8 +3,8 @@ import { test } from "node:test";
 import { lineHref, pickLine } from "@/lib/lines-view";
 
 const LINES = [
-  { id: 1, name: "Importada", products: 0, versions: 0 },
-  { id: 4, name: "Nacional", products: 0, versions: 0 },
+  { id: 1, name: "Importada", imported: true, products: 0, versions: 0 },
+  { id: 4, name: "Nacional", imported: false, products: 0, versions: 0 },
 ];
 
 test("linha da tela: a pedida no endereço, ou a primeira quando não vem ou não existe", () => {

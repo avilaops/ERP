@@ -1,5 +1,6 @@
 "use client";
 
+import { lineWords } from "@/lib/line-words";
 import { useActionState } from "react";
 import { IDLE_PASTE } from "@/lib/advisory-paste";
 import type { Change, InvalidLine, PasteState } from "@/lib/advisory-paste";
@@ -39,19 +40,20 @@ function InvalidLines({ lines }: { lines: InvalidLine[] }) {
  * saves nothing; Aplicar only appears with at least one valid line. Every figure
  * comes as text from the server.
  */
-export function PasteCostsForm({ action, onClose }: { action: PasteAction; onClose: () => void }) {
+export function PasteCostsForm({ action, onClose, imported }: { action: PasteAction; onClose: () => void; imported: boolean }) {
+  const words = lineWords(imported);
   const [state, formAction, pending] = useActionState(action, IDLE_PASTE);
   const preview = state.status === "preview";
 
   return (
     <form id="colar-custos" action={formAction} noValidate className="mt-4 rounded-lg border border-slate-200 bg-white">
       <h2 className="border-b border-slate-200 px-5 py-3 text-sm font-semibold uppercase tracking-wide">
-        Colar custos da assessoria
+        {words.pasteButton}
       </h2>
       <div className="flex flex-col gap-4 p-5">
         <p id="colar-ajuda" className="max-w-3xl text-sm text-slate-600">
           Copie as linhas da planilha e cole aqui, uma por equipamento, com as colunas nesta ordem:{" "}
-          <strong>código do equipamento</strong>, <strong>custo assessoria R$</strong>, crédito % (opcional) e embalagem R$
+          <strong>código do equipamento</strong>, <strong>{words.pasteColumn}</strong>, crédito % (opcional) e embalagem R$
           (opcional). Números com vírgula, como 8.146,64 e 28,11565. Coluna opcional em branco mantém o valor atual. O
           código precisa já estar cadastrado: a colagem não cria equipamento.
         </p>
@@ -101,7 +103,7 @@ export function PasteCostsForm({ action, onClose }: { action: PasteAction; onClo
                       <th scope="col" className="px-3 py-2 text-left font-semibold">
                         Equipamento
                       </th>
-                      {["Custo assessoria R$", "Crédito imp.", "Embalagem R$"].map((column) => (
+                      {[words.cost, "Crédito imp.", "Embalagem R$"].map((column) => (
                         <th key={column} scope="col" className="px-3 py-2 text-right font-semibold">
                           {column}
                         </th>

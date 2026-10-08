@@ -44,12 +44,15 @@ export function ProductScreen({
   setActive: RowAction;
   remove: RowAction;
   /** The product lines of the company and the one of this equipment. */
-  lines: { id: number; name: string }[];
+  lines: { id: number; name: string; imported: boolean }[];
   lineId: number;
 }) {
   const router = useRouter();
   const form = useRef<HTMLFormElement>(null);
   const [errors, setErrors] = useState<string[]>([]);
+  // The cost is called by what the line chosen buys: it follows the select.
+  const [chosenLine, setChosenLine] = useState(lineId);
+  const imported = lines.find((line) => line.id === chosenLine)?.imported ?? true;
   const [invalid, setInvalid] = useState<NewProductKey[]>([]);
   const [preview, setPreview] = useState<string | null>(photo);
   const [file, setFile] = useState<File | null>(null);
@@ -110,7 +113,7 @@ export function ProductScreen({
   const field = (key: NewProductKey) => (
     <div key={key}>
       <label htmlFor={key} className="block font-medium">
-        {fieldLabel(key)}
+        {fieldLabel(key, imported)}
         {key === "name" && <span className="font-normal text-slate-500"> (obrigatório)</span>}
       </label>
       <input
@@ -138,12 +141,13 @@ export function ProductScreen({
       className="mx-auto flex max-w-xl flex-col gap-5"
     >
       {id !== null && <input type="hidden" name="id" value={id} />}
+      <input type="hidden" name="wording" value={imported ? "importada" : "nacional"} />
       {lines.length > 1 ? (
         <div>
           <label htmlFor="lineId" className="block font-medium">
             Linha de produto
           </label>
-          <select id="lineId" name="lineId" defaultValue={lineId} className={`${INPUT} border-slate-300`}>
+          <select id="lineId" name="lineId" value={chosenLine} onChange={(event) => setChosenLine(Number(event.target.value))} className={`${INPUT} border-slate-300`}>
             {lines.map((line) => (
               <option key={line.id} value={line.id}>
                 {line.name}

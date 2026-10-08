@@ -6,7 +6,14 @@ const COLUMN_LIST = PARAM_COLUMN_LIST;
 const UNIQUE_VIOLATION = "23505";
 const FOREIGN_KEY_VIOLATION = "23503";
 
-export type ProductLine = { id: number; name: string; products: number; versions: number };
+export type ProductLine = {
+  id: number;
+  name: string;
+  /** Bought abroad (import advisory, payment in China) or in the country. Only the wording of the screens depends on it. */
+  imported: boolean;
+  products: number;
+  versions: number;
+};
 
 /** A problem the directors can fix on the screen. */
 export class ProductLineError extends Error {}
@@ -17,6 +24,7 @@ const IN_USE = "Esta linha tem equipamentos ou tabela publicada: mova os equipam
 const toLine = (row: Record<string, unknown>): ProductLine => ({
   id: Number(row.id),
   name: String(row.name),
+  imported: row.imported === undefined ? true : Boolean(row.imported),
   products: Number(row.products ?? 0),
   versions: Number(row.versions ?? 0),
 });
@@ -24,7 +32,7 @@ const toLine = (row: Record<string, unknown>): ProductLine => ({
 /** Every line, the oldest first, with how many equipments and publications each has. */
 export async function listLines(conn: Queryable): Promise<ProductLine[]> {
   const { rows } = await conn.query(
-    `SELECT l.id, l.name,
+    `SELECT l.id, l.name, l.imported,
             (SELECT count(*) FROM products p WHERE p.line_id = l.id) AS products,
             (SELECT count(*) FROM price_table_versions v WHERE v.line_id = l.id) AS versions
        FROM product_lines l ORDER BY l.id`,
@@ -52,9 +60,9 @@ export async function createLine(name: string, copyFrom: number, updatedBy: stri
       `WITH source AS (
          SELECT ${COLUMN_LIST} FROM pricing_params WHERE line_id = $2
        ), created AS (
-         INSERT INTO product_lines (name, updated_by)
-         SELECT $1, $3 WHERE EXISTS (SELECT 1 FROM source)
-         RETURNING id, name
+         INSERT INTO product_lines (name, imported, updated_by)
+         SELECT $1, (SELECT imported FROM product_lines WHERE id = $2), $3 WHERE EXISTS (SELECT 1 FROM source)
+         RETURNING id, name, imported
        ), params AS (
          INSERT INTO pricing_params (line_id, ${COLUMN_LIST}, updated_by)
          SELECT created.id, ${COLUMN_LIST}, $3 FROM created, source
@@ -65,7 +73,7 @@ export async function createLine(name: string, copyFrom: number, updatedBy: stri
            FROM created, state_tax_rates rate WHERE rate.line_id = $2
          RETURNING line_id
        )
-       SELECT id, name FROM created WHERE EXISTS (SELECT 1 FROM params) AND EXISTS (SELECT 1 FROM rates)`,
+       SELECT id, name, imported FROM created WHERE EXISTS (SELECT 1 FROM params) AND EXISTS (SELECT 1 FROM rates)`,
       [clean, copyFrom, updatedBy],
     );
     if (!rows[0]) throw new ProductLineError("A linha de origem dos parâmetros não existe mais. Recarregue a página.");
@@ -76,12 +84,13 @@ export async function createLine(name: string, copyFrom: number, updatedBy: stri
   }
 }
 
-export async function renameLine(id: number, name: string, updatedBy: string, conn: Queryable): Promise<ProductLine> {
+/** Changes the name of a line and, when given, whether it is bought abroad. */
+export async function renameLine(id: number, name: string, updatedBy: string, conn: Queryable, imported?: boolean): Promise<ProductLine> {
   const clean = assertNameAndAuthor(name, updatedBy);
   try {
     const { rows } = await conn.query(
-      "UPDATE product_lines SET name = $2, updated_at = now(), updated_by = $3 WHERE id = $1 RETURNING id, name",
-      [id, clean, updatedBy],
+      "UPDATE product_lines SET name = $2, imported = COALESCE($4, imported), updated_at = now(), updated_by = $3 WHERE id = $1 RETURNING id, name, imported",
+      [id, clean, updatedBy, imported ?? null],
     );
     if (!rows[0]) throw new ProductLineError("Linha não encontrada. Recarregue a página.");
     return toLine(rows[0]);

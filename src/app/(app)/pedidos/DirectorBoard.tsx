@@ -1,4 +1,5 @@
 import { showMoney, showPercent } from "@/lib/format";
+import { lineWords } from "@/lib/line-words";
 import type { DirectorBoard as Board } from "@/lib/order-quote";
 
 /** `– R$ 7.304,31`: what leaves the sale. */
@@ -24,7 +25,8 @@ function Rows({ rows }: { rows: Row[] }) {
  * needs. A server component on purpose: it is rendered only when the page has a
  * board, and the page only has one for who `seesCosts`.
  */
-export function DirectorBoard({ board }: { board: Board }) {
+/** `imported`: whether the line of the order is bought abroad; it names what the down payment pays first. */
+export function DirectorBoard({ board, imported = true }: { board: Board; imported?: boolean }) {
   const { quote, max, targetNetProfit } = board;
   const target = showPercent(targetNetProfit, 0);
 
@@ -44,7 +46,7 @@ export function DirectorBoard({ board }: { board: Board }) {
     ["Desconto máx. sem prejuízo", showPercent(max.noLoss)],
   ];
   const downPayment: Row[] = [
-    ["Pagar na China", showMoney(quote.chinaPayment)],
+    [lineWords(imported).pay, showMoney(quote.chinaPayment)],
     [`Lucro líquido da meta (${target})`, showMoney(quote.targetNetProfit)],
     ["Comissão sobre a entrada", showMoney(quote.downPaymentCommission)],
     ["Entrada mínima", `${showMoney(quote.requiredDownPayment)} · ${showPercent(quote.requiredDownPaymentRate, 0)} da nota`, true],

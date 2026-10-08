@@ -10,6 +10,8 @@ import { CUSTOMER_FIELDS, customerToForm } from "@/lib/customer-form";
 import { lastDecision } from "@/lib/db/approvals";
 import { listCarriers, loadOrderTransport } from "@/lib/db/carriers";
 import { loadOrderDelivery } from "@/lib/db/order-delivery";
+import { listLines } from "@/lib/db/product-lines";
+import { lineWords } from "@/lib/line-words";
 import { listOrderInvoiceMails } from "@/lib/db/send-nfe-mail";
 import { listOrderInvoiceEvents, listOrderInvoices } from "@/lib/db/invoices";
 import { previewOrderNfe } from "@/lib/db/order-nfe";
@@ -112,6 +114,8 @@ export default async function PedidoPage({
 
   // The newest table of the line of this order: another line publishing does not make this one old.
   const latest = await latestVersion(conn, table.lineId);
+  // How the cost of this line is called: bought abroad or in the country.
+  const lineImported = (await listLines(conn)).find((line) => line.id === table.lineId)?.imported ?? true;
   const sale = saleOf(order, table);
   const today = isoDate(new Date());
   const dates = dueDates(order, table, today);
@@ -1185,10 +1189,10 @@ export default async function PedidoPage({
               </dl>
             </section>
 
-            {board && <DirectorBoard board={board} />}
+            {board && <DirectorBoard board={board} imported={lineImported} />}
             {board && shortOfRequired > 0 && (
               <p className="rounded-lg border border-dashed border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                Faltam <strong>{showMoney(shortOfRequired)}</strong> de entrada para cobrir a China, o lucro da meta e a comissão.
+                Faltam <strong>{showMoney(shortOfRequired)}</strong> de entrada para cobrir {lineWords(lineImported).payShort}, o lucro da meta e a comissão.
               </p>
             )}
           </div>

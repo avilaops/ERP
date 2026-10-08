@@ -43,7 +43,8 @@ export async function renameLineAction(_previous: ActionState, formData: FormDat
   try {
     const line = exactLine(await listLines(conn), formData.get("id"));
     if (!line) return { error: NO_LINE };
-    await renameLine(line.id, text(formData, "name"), session.email, conn);
+    const origin = text(formData, "origin");
+    await renameLine(line.id, text(formData, "name"), session.email, conn, origin === "importada" ? true : origin === "nacional" ? false : undefined);
   } catch (error) {
     return { error: problem(error) };
   }

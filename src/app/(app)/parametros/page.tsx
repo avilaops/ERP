@@ -199,7 +199,7 @@ export default async function ParametrosPage({ searchParams }: { searchParams: P
               </div>
             </ActionForm>
           </section>
-          <ParamsForm key={line.id} lineId={line.id} saved={form} action={saveParamsAction} />
+          <ParamsForm key={line.id} lineId={line.id} imported={line.imported} saved={form} action={saveParamsAction} />
         </div>
 
         <aside className="rounded-lg border border-slate-200 bg-white" aria-labelledby="resultado">

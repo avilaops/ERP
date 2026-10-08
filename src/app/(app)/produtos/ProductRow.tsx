@@ -37,7 +37,10 @@ export function ProductRow({
   save,
   setActive,
   remove,
+  imported,
 }: {
+  /** Whether the line of the list is bought abroad: it is how the cost is called. */
+  imported: boolean;
   row: ProductRowData;
   save: RowAction;
   setActive: RowAction;
@@ -68,7 +71,7 @@ export function ProductRow({
       inputMode={inputMode}
       autoComplete="off"
       defaultValue={values[key]}
-      aria-label={`${fieldLabel(key)} de ${name}`}
+      aria-label={`${fieldLabel(key, imported)} de ${name}`}
       aria-invalid={state.invalid.includes(key) || undefined}
       className={`${INPUT} ${className} ${state.invalid.includes(key) ? "border-red-500" : "border-slate-300"}`}
     />
@@ -80,6 +83,7 @@ export function ProductRow({
         <td className="px-2 py-3 pl-4">
           <form id={form} action={formAction} noValidate>
             <input type="hidden" name="id" value={row.id} />
+            <input type="hidden" name="wording" value={imported ? "importada" : "nacional"} />
           </form>
           <div className="flex gap-3">
             {/* The photo opens the screen of the equipment: photo, description, supplier and fiscal data. */}

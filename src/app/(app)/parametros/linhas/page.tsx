@@ -78,6 +78,15 @@ export default async function LinhasPage() {
                     </label>
                     <input key={line.name} id={`name-${line.id}`} name="name" type="text" maxLength={60} defaultValue={line.name} className={`${INPUT} mt-1 w-full`} />
                   </div>
+                  <div>
+                    <label htmlFor={`origin-${line.id}`} className="block text-xs font-medium text-slate-600">
+                      De onde vem
+                    </label>
+                    <select key={String(line.imported)} id={`origin-${line.id}`} name="origin" defaultValue={line.imported ? "importada" : "nacional"} className={`${INPUT} mt-1`}>
+                      <option value="importada">Importada (assessoria, pagamento no exterior)</option>
+                      <option value="nacional">Nacional (fornecedor do país)</option>
+                    </select>
+                  </div>
                   <button type="submit" className="rounded border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50">
                     Salvar
                   </button>

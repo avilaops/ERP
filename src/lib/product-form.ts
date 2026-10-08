@@ -1,5 +1,6 @@
 import type { Product, ProductInput } from "@/lib/db/products";
 import { formatMoney, formatPercent, parseMoney, parsePercent } from "@/lib/format";
+import { lineWords } from "@/lib/line-words";
 
 type FieldKind = "name" | "text" | "usd" | "cost" | "rate" | "money";
 
@@ -34,7 +35,8 @@ export const ROW_FIELDS = ["name", "code", "advisoryCost", "taxCredit", "packagi
 export type NewProductKey = (typeof NEW_PRODUCT_FIELDS)[number];
 export type RowKey = (typeof ROW_FIELDS)[number];
 
-export const fieldLabel = (key: ProductFieldKey): string => FIELDS[key].label;
+/** The label of a field. The cost is called by what the product line buys: from the import advisory or from a supplier in the country. */
+export const fieldLabel = (key: ProductFieldKey, imported = true): string => (key === "advisoryCost" ? lineWords(imported).cost : FIELDS[key].label);
 
 const INVALID: Record<Exclude<FieldKind, "text">, string> = {
   name: "informe o nome do equipamento",
@@ -90,12 +92,13 @@ export type ParsedProductForm<Key extends ProductFieldKey> =
 export function parseProductForm<Key extends ProductFieldKey>(
   fields: readonly Key[],
   read: (key: Key) => string | null,
+  imported = true,
 ): ParsedProductForm<Key> {
   const errors: string[] = [];
   const invalid: Key[] = [];
   const input: Partial<Record<Key, string | number | null>> = {};
   for (const key of fields) {
-    const result = readField(FIELDS[key].kind, FIELDS[key].label, (read(key) ?? "").trim());
+    const result = readField(FIELDS[key].kind, fieldLabel(key, imported), (read(key) ?? "").trim());
     if ("error" in result) {
       errors.push(result.error);
       invalid.push(key);

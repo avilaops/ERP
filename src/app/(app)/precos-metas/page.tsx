@@ -1,4 +1,5 @@
 import { LineTabs } from "@/components/LineTabs";
+import { lineWords } from "@/lib/line-words";
 import { listLines } from "@/lib/db/product-lines";
 import { LINE_PARAM, pickLine } from "@/lib/lines-view";
 import Link from "next/link";
@@ -83,7 +84,7 @@ export default async function PrecosMetasPage({ searchParams }: { searchParams: 
   const alerts = [
     withoutCost > 0 && { text: `${withoutCost} equipamento(s) sem custo: ficam fora da tabela da equipe.`, href: menuItem("produtos").href, action: "Completar custos" },
     withoutCode > 0 && { text: `${withoutCode} equipamento(s) sem código: o vendedor encontra pelo nome, mas o código evita confusão.`, href: menuItem("produtos").href, action: "Preencher" },
-    tableAge !== null && tableAge > STALE_DAYS && { text: `Tabela publicada há ${tableAge} dias. Dólar e frete mudam: revise os custos com a assessoria.`, href: menuItem("produtos").href, action: "Revisar" },
+    tableAge !== null && tableAge > STALE_DAYS && { text: `Tabela publicada há ${tableAge} dias. ${lineWords(line.imported).reviseCosts}`, href: menuItem("produtos").href, action: "Revisar" },
     latest === null && { text: "Nenhuma tabela publicada ainda: sem ela não há preço para vender.", href: menuItem("produtos").href, action: "Publicar" },
   ].filter((alert): alert is { text: string; href: string; action: string } => Boolean(alert));
 

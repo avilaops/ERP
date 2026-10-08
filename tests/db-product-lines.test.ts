@@ -20,7 +20,7 @@ after(async () => {
 });
 
 test("linhas: a empresa nasce com uma; a nova copia parâmetros e alíquotas e depois segue sozinha", { skip }, async () => {
-  assert.deepEqual(await listLines(db.pool), [{ id: 1, name: "Importada", products: 0, versions: 0 }]);
+  assert.deepEqual(await listLines(db.pool), [{ id: 1, name: "Importada", imported: true, products: 0, versions: 0 }]);
   const national = await createLine(" Nacional ", 1, WHO, db.pool);
   assert.equal(national.name, "Nacional");
   assert.deepEqual(await loadParams(db.pool, national.id), await loadParams(db.pool, 1));
@@ -39,6 +39,12 @@ test("linhas: nome repetido, em branco e origem inexistente são recusados", { s
   await assert.rejects(() => createLine("Outra", 99, WHO, db.pool), ProductLineError);
   await assert.rejects(() => renameLine(1, "NACIONAL", WHO, db.pool), ProductLineError);
   assert.equal((await renameLine(1, "Linha importada", WHO, db.pool)).name, "Linha importada");
+  // De onde a linha vem: nasce importada, a nova copia a da origem, e a tela muda sem mexer no nome.
+  const made = (await listLines(db.pool)).find((line) => line.name === "Nacional")!;
+  assert.equal(made.imported, true);
+  assert.equal((await renameLine(made.id, "Nacional", WHO, db.pool, false)).imported, false);
+  assert.equal((await renameLine(made.id, "Nacional", WHO, db.pool)).imported, false);
+  assert.deepEqual((await listLines(db.pool)).map((line) => [line.name, line.imported]), [["Linha importada", true], ["Nacional", false]]);
   assert.equal((await listLines(db.pool)).length, 2);
 });
 

@@ -410,6 +410,15 @@ metas de venda (`sales_goals`, uma da equipe e uma por vendedor em cada mês) s�
 Diretoria (`setsGoals`), sempre para o mês corrente. Os gráficos são `src/components/Charts.tsx`,
 componentes de servidor em CSS, sem biblioteca.
 
+## Linha importada ou nacional: só as palavras mudam
+
+Cada linha de produto diz de onde compra (`product_lines.imported`, migração `0030`, editável em
+Parâmetros → Linhas de produto). **A conta é a mesma; só os textos das telas mudam**, e saem de um
+lugar só, `src/lib/line-words.ts` (`lineWords(imported)`): "Custo assessoria" e "Pagar na China"
+na importada, "Custo de compra" e "Pagar ao fornecedor" na nacional. Tela nova que fale de custo
+de compra, margem de segurança ou do que a entrada cobre usa `lineWords`; não escreva "assessoria"
+ou "China" direto na tela.
+
 ## Todo cadastro tem adicionar, editar e remover
 
 Pedido do Nicolas em 08/10/2026: **toda lista que a empresa mantém tem as três operações na

@@ -1,4 +1,5 @@
 import { LineTabs } from "@/components/LineTabs";
+import { lineWords } from "@/lib/line-words";
 import { listLines } from "@/lib/db/product-lines";
 import { LINE_PARAM, pickLine } from "@/lib/lines-view";
 import Link from "next/link";
@@ -36,8 +37,8 @@ export const dynamic = "force-dynamic";
 
 const NONE = "—";
 /** The typed columns keep room for `11.571,09` and for the credit in full precision; their titles may wrap. */
-const COLUMNS: [string, string][] = [
-  ["Custo assessoria R$", "min-w-24"],
+const COLUMNS = (cost: string): [string, string][] => [
+  [cost, "min-w-24"],
   ["Crédito imp. %", "min-w-24"],
   ["Embalagem R$", "min-w-20"],
   ["Custo real · Tabela s/IPI", "min-w-28"],
@@ -99,17 +100,19 @@ export default async function ProdutosPage({
   const notice = publishNotice(draft, latest, pendingChanges(draft, published), nextNumber);
   const rows = viewProducts(products, { tab, search }).map((product) => toRow(product, params));
 
+  const words = lineWords(line.imported);
   return (
     <>
       <ProductTools
         create={createProductAction}
         paste={pasteAdvisoryCostsAction}
         lineId={line.id}
+        imported={line.imported}
         heading={
           <>
             <h1 className="text-2xl font-semibold">{ITEM.label}</h1>
             <p className="mt-1 max-w-2xl text-slate-600">
-              Digite o custo que a assessoria passar. Preço e alçadas recalculam ao salvar a linha; a equipe só vê
+              {words.costIntro} Preço e alçadas recalculam ao salvar a linha; a equipe só vê
               depois que você publicar.
             </p>
           </>
@@ -186,7 +189,7 @@ export default async function ProdutosPage({
                   <th scope="col" className="min-w-40 px-2 py-2 pl-4 text-left align-bottom font-semibold">
                     Equipamento
                   </th>
-                  {COLUMNS.map(([column, width]) => (
+                  {COLUMNS(words.cost).map(([column, width]) => (
                     <th key={column} scope="col" className={`${width || "whitespace-nowrap"} px-2 py-2 text-right align-bottom font-semibold`}>
                       {column}
                     </th>
@@ -202,6 +205,7 @@ export default async function ProdutosPage({
                   <ProductRow
                     key={row.id}
                     row={row}
+                    imported={line.imported}
                     save={updateProductAction}
                     setActive={setProductActiveAction}
                     remove={deleteProductAction}

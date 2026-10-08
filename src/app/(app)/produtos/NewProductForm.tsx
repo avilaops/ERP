@@ -22,7 +22,7 @@ const HELP: Partial<Record<NewProductKey, string>> = {
  * The form "+ Equipamento" opens in the page itself. After an error the fields
  * keep what was typed; after a save they come back blank, ready for the next one.
  */
-export function NewProductForm({ action, onClose, lineId }: { action: CreateAction; onClose: () => void; lineId: number }) {
+export function NewProductForm({ action, onClose, lineId, imported }: { action: CreateAction; onClose: () => void; lineId: number; imported: boolean }) {
   const [state, formAction, pending] = useActionState(action, IDLE_NEW_PRODUCT);
   const values = state.status === "error" && state.values ? state.values : EMPTY_NEW_PRODUCT;
 
@@ -35,6 +35,7 @@ export function NewProductForm({ action, onClose, lineId }: { action: CreateActi
     >
       {/* The product line the equipment is created in: the one the list shows. */}
       <input type="hidden" name="lineId" value={lineId} />
+      <input type="hidden" name="wording" value={imported ? "importada" : "nacional"} />
       <h2 className="border-b border-slate-200 px-5 py-3 text-sm font-semibold uppercase tracking-wide">
         Novo equipamento
       </h2>
@@ -63,7 +64,7 @@ export function NewProductForm({ action, onClose, lineId }: { action: CreateActi
             return (
               <div key={key} className={key === "name" ? "sm:col-span-2" : undefined}>
                 <label htmlFor={id} className="block text-sm font-medium">
-                  {fieldLabel(key)}
+                  {fieldLabel(key, imported)}
                 </label>
                 <input
                   id={id}

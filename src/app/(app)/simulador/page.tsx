@@ -238,7 +238,7 @@ export default async function SimuladorPage({ searchParams }: { searchParams: Pr
                 {hasIpi ? "Preço mínimo na meta, com IPI:" : "Preço mínimo na meta:"}{" "}
                 <strong>{showMoney(roundCents((sale.tableTotal / simulation.quantity) * (1 - Math.max(0, board.max.atTarget)) * (1 + table.ipi)))}</strong> por unidade.
               </p>
-              <DirectorBoard board={board} />
+              <DirectorBoard board={board} imported={productLine.imported} />
             </>
           )}
         </div>

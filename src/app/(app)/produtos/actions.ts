@@ -61,7 +61,7 @@ export async function createProductAction(_previous: NewProductState, formData: 
 
   const read = reader(formData);
   const typed = rawProductValues(NEW_PRODUCT_FIELDS, read);
-  const parsed = parseProductForm(NEW_PRODUCT_FIELDS, read);
+  const parsed = parseProductForm(NEW_PRODUCT_FIELDS, read, formData.get("wording") !== "nacional");
   if (!parsed.ok) return { status: "error", errors: parsed.errors, invalid: parsed.invalid, values: typed };
 
   try {
@@ -83,7 +83,7 @@ export async function updateProductAction(_previous: RowState, formData: FormDat
 
   const read = reader(formData);
   const typed = rawProductValues(ROW_FIELDS, read);
-  const parsed = parseProductForm(ROW_FIELDS, read);
+  const parsed = parseProductForm(ROW_FIELDS, read, formData.get("wording") !== "nacional");
   if (!parsed.ok) return { status: "error", errors: parsed.errors, invalid: parsed.invalid, values: typed };
 
   try {
@@ -248,7 +248,7 @@ export async function saveProductScreenAction(formData: FormData): Promise<Produ
   const conn = tenantDb(session.tenant.slug);
 
   const read = reader(formData);
-  const parsed = parseProductForm(NEW_PRODUCT_FIELDS, read);
+  const parsed = parseProductForm(NEW_PRODUCT_FIELDS, read, formData.get("wording") !== "nacional");
   if (!parsed.ok) return { ok: false, errors: parsed.errors, invalid: parsed.invalid };
 
   const id = read("id");
