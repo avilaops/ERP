@@ -23,6 +23,7 @@ Todas descritas em `.env.example`. Nenhuma tem valor real no repositório.
 | `ERP_USERS` | Quem entra, com qual perfil e em qual empresa (`email:PERFIL@empresa`, separados por vírgula) | Obrigatória; entrada inválida impede a subida |
 | `ERP_CERT_KEY` | Chave do cofre do certificado digital A1 (32 bytes em base64). Fica só no servidor; sem ela o envio do certificado é recusado e o resto do sistema segue | Opcional para subir; necessária para o Fiscal |
 | `NFE_CA_FILE` | Arquivo PEM que substitui a raiz da ICP-Brasil embutida, para a conexão com a SEFAZ ao emitir nota. A verificação do servidor nunca é desligada | Opcional; sem ele vale a raiz v10 embutida (vence em 01/07/2032) |
+| `ERP_SMTP_HOST`, `ERP_SMTP_PORT`, `ERP_SMTP_USER`, `ERP_SMTP_PASSWORD`, `ERP_MAIL_FROM` | Caixa de e-mail da Ávila Ops por onde saem o XML e o DANFE das notas de quem não cadastrou caixa própria. Porta 465 (TLS direto) quando `ERP_SMTP_PORT` falta; outra porta usa STARTTLS | Opcionais; sem as quatro (servidor, usuário, senha, remetente) a tela avisa que não há caixa de saída e nenhum e-mail é enviado |
 | `ERP_LOCAL_LOGIN` | `1` liga o login local de teste (`/dev/login`) | Ignorada: o login local não existe em produção |
 | `ERP_TEST_DATABASE_URL` | Banco dos testes; o nome tem de terminar em `_test` | Não se usa |
 

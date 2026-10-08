@@ -27,3 +27,19 @@ export function testPfx({
   const asn1 = forge.pkcs12.toPkcs12Asn1(withKey ? keys.privateKey : null, [certificate], password, { algorithm: "3des" });
   return new Uint8Array(Buffer.from(forge.asn1.toDer(asn1).getBytes(), "binary"));
 }
+
+/** A certificate for `localhost`, with its key in PEM: the stand-in for a server the system talks to over TLS. */
+export function serverIdentity(): { key: string; cert: string } {
+  const keys = forge.pki.rsa.generateKeyPair({ bits: 2048, e: 0x10001 });
+  const certificate = forge.pki.createCertificate();
+  certificate.publicKey = keys.publicKey;
+  certificate.serialNumber = "03";
+  certificate.validity.notBefore = new Date(Date.now() - 86_400_000);
+  certificate.validity.notAfter = new Date(Date.now() + 86_400_000);
+  const name = [{ name: "commonName", value: "localhost" }];
+  certificate.setSubject(name);
+  certificate.setIssuer(name);
+  certificate.setExtensions([{ name: "subjectAltName", altNames: [{ type: 2, value: "localhost" }] }, { name: "basicConstraints", cA: true }]);
+  certificate.sign(keys.privateKey, forge.md.sha256.create());
+  return { key: forge.pki.privateKeyToPem(keys.privateKey), cert: forge.pki.certificateToPem(certificate) };
+}

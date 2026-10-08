@@ -77,6 +77,10 @@ export default async function ParametrosPage({ searchParams }: { searchParams: P
           Transportadoras
         </Link>
         {" · "}
+        <Link href="/parametros/email" className="font-medium text-brand underline">
+          E-mail das notas
+        </Link>
+        {" · "}
         <Link href="/parametros/fiscal" className="font-medium text-brand underline">
           Fiscal e certificado digital
         </Link>

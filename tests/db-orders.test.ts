@@ -1263,7 +1263,62 @@ test("nota autorizada: carta de correção numera 1, 2…; cancelamento grava o 
   );
   assert.equal((await listOrderInvoices(orderId, db.pool))[0].status, "autorizada");
 
+  // E-mail da nota: sem caixa nenhuma não envia nem registra; com a caixa padrão, vai o XML e o DANFE e a tentativa fica registrada.
+  const { sendInvoiceMail, listOrderInvoiceMails, MAIL_NOT_SET } = await import("@/lib/db/send-nfe-mail");
+  const { loadMailInfo, mailChannel, removeOwnMailbox, saveMailTexts, saveOwnMailbox, MailSettingsError } = await import("@/lib/db/mail");
+  const { MailError } = await import("@/lib/mail/message");
+  const invoiceId = (await listOrderInvoices(orderId, db.pool))[0].id;
+  const outbox: { host: string; from: string; to: string; message: string }[] = [];
+  const deliver = async (config: { host: string }, envelope: { from: string; to: string }, message: string) => void outbox.push({ host: config.host, ...envelope, message });
+  const env = { ERP_SMTP_HOST: "mail.avilaops.com", ERP_SMTP_USER: "notas@avilaops.com", ERP_SMTP_PASSWORD: "segredo-padrao", ERP_MAIL_FROM: "notas@avilaops.com" };
+  const request = { invoiceId, to: null, sentBy: who, now, env, key: () => vault, send: deliver };
+  await db.pool.query("UPDATE customers SET email = 'compras@cliente.test' WHERE id = (SELECT customer_id FROM orders WHERE id = $1)", [orderId]);
+  await assert.rejects(() => sendInvoiceMail({ ...request, env: {} }, db.pool), (error: unknown) => error instanceof MailError && error.message === MAIL_NOT_SET);
+  await assert.rejects(() => sendInvoiceMail({ ...request, to: "sem-arroba" }, db.pool), /destinatário inválido/);
+  assert.deepEqual(await listOrderInvoiceMails(orderId, db.pool), []);
+  assert.deepEqual(await loadMailInfo(db.pool), { subject: null, body: null, replyTo: null, autoSend: true, own: null });
+
+  assert.deepEqual(await sendInvoiceMail(request, db.pool), { status: "enviado", recipient: "compras@cliente.test", detail: null });
+  assert.deepEqual([outbox[0].host, outbox[0].from, outbox[0].to], ["mail.avilaops.com", "notas@avilaops.com", "compras@cliente.test"]);
+  assert.match(outbox[0].message, /^From: "Empresa de Teste Ltda" <notas@avilaops\.com>\r\n/);
+  assert.match(outbox[0].message, /filename="NFe\d{44}\.xml"/);
+  assert.match(outbox[0].message, /filename="DANFE-42\.pdf"/);
+  assert.ok(!outbox[0].message.includes("segredo-padrao"));
+
+  // Texto e resposta da empresa; e a caixa própria passa a ser a de saída, com a senha cifrada no banco.
+  await assert.rejects(() => saveMailTexts({ subject: "x", body: "curto", replyTo: "errado", autoSend: true }, who, db.pool), (error: unknown) => error instanceof MailSettingsError && /Assunto/.test(error.message) && /Texto/.test(error.message) && /Responder para/.test(error.message));
+  await saveMailTexts({ subject: "NF {numero} da {empresa}", body: "Segue a nota {numero}, chave {chave}.", replyTo: "Fiscal@Empresa.test", autoSend: false }, who, db.pool);
+  await assert.rejects(() => saveOwnMailbox({ host: "", port: 465, username: "u", password: "p", from: "x" }, vault, who, db.pool), MailSettingsError);
+  await saveOwnMailbox({ host: "SMTP.Empresa.test", port: 587, username: "fiscal@empresa.test", password: "senha-da-empresa", from: "Fiscal@Empresa.test" }, vault, who, db.pool);
+  assert.deepEqual(await loadMailInfo(db.pool), { subject: "NF {numero} da {empresa}", body: "Segue a nota {numero}, chave {chave}.", replyTo: "fiscal@empresa.test", autoSend: false, own: { host: "smtp.empresa.test", port: 587, username: "fiscal@empresa.test", from: "fiscal@empresa.test" } });
+  const stored = await db.pool.query("SELECT smtp_password FROM mail_settings");
+  assert.ok(!(stored.rows[0].smtp_password as Buffer).toString("utf8").includes("senha-da-empresa"));
+  assert.deepEqual(await mailChannel(db.pool, env, () => vault), { channel: "empresa", smtp: { host: "smtp.empresa.test", port: 587, username: "fiscal@empresa.test", password: "senha-da-empresa" }, from: "fiscal@empresa.test" });
+  await assert.rejects(() => mailChannel(db.pool, env, () => randomBytes(32)), /chave do cofre/);
+
+  // Falha do servidor de e-mail fica registrada como falha; a nota segue autorizada.
+  const failed = await sendInvoiceMail({ ...request, to: " Outro@Cliente.test ", send: async () => { throw new MailError("O servidor de e-mail recusou (destinatário): 550 caixa inexistente"); } }, db.pool);
+  assert.deepEqual(failed, { status: "falhou", recipient: "outro@cliente.test", detail: "O servidor de e-mail recusou (destinatário): 550 caixa inexistente" });
+  await sendInvoiceMail(request, db.pool);
+  assert.match(outbox[1].message, /^From: "Empresa de Teste Ltda" <fiscal@empresa\.test>\r\nTo: compras@cliente\.test\r\nReply-To: fiscal@empresa\.test\r\nSubject: NF 42 da Empresa de Teste Ltda\r\n/);
+  assert.deepEqual((await listOrderInvoiceMails(orderId, db.pool)).map((mail) => [mail.kind, mail.recipient, mail.channel, mail.status]), [
+    ["nota", "compras@cliente.test", "empresa", "enviado"], ["nota", "outro@cliente.test", "empresa", "falhou"], ["nota", "compras@cliente.test", "avilaops", "enviado"],
+  ]);
+  assert.equal((await listOrderInvoices(orderId, db.pool))[0].status, "autorizada");
+  await removeOwnMailbox(who, db.pool);
+  assert.equal((await mailChannel(db.pool, env, () => vault))?.channel, "avilaops");
+  assert.equal((await loadMailInfo(db.pool)).subject, "NF {numero} da {empresa}");
+
   assert.match((await registerOrderNfeEvent(number, "cancelamento", "Cliente desistiu da compra antes da saída.", who, now, vault, accept, db.pool)).message, /cancelada/);
+  // Cancelada: o e-mail leva o XML da nota e o do cancelamento, sem DANFE.
+  await sendInvoiceMail(request, db.pool);
+  assert.match(outbox[2].message, /Subject: =\?UTF-8\?B\?Q2FuY2VsYW1lbnRv/);
+  assert.match(outbox[2].message, /filename="Cancelamento-NFe\d{44}\.xml"/);
+  assert.doesNotMatch(outbox[2].message, /DANFE-42\.pdf/);
+  assert.equal((await listOrderInvoiceMails(orderId, db.pool))[0].kind, "cancelamento");
+  const rejectedInvoice = await db.pool.query("SELECT id FROM fiscal_invoices WHERE status NOT IN ('autorizada', 'cancelada') LIMIT 1");
+  if (rejectedInvoice.rows[0]) await assert.rejects(() => sendInvoiceMail({ ...request, invoiceId: Number(rejectedInvoice.rows[0].id) }, db.pool), /Só nota autorizada ou cancelada/);
+
   assert.ok(sent.at(-1)!.includes("<tpEvento>110111</tpEvento>") && sent.at(-1)!.includes("<nProt>135260000000001</nProt>"));
   assert.equal((await listOrderInvoices(orderId, db.pool))[0].status, "cancelada");
   assert.deepEqual((await listOrderInvoiceEvents(orderId, db.pool)).map((event) => [event.kind, event.sequence]), [["correcao", 1], ["correcao", 2], ["cancelamento", 1]]);

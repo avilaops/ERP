@@ -139,7 +139,7 @@ export async function registerOrderNfeEvent(
   vault: Buffer,
   send: Send,
   conn: Queryable,
-): Promise<{ message: string }> {
+): Promise<{ invoiceId: number; message: string }> {
   const order = await getOrder(orderNumber, { sellerEmail: null }, conn);
   if (!order) throw new IssueError("Pedido não encontrado.");
   const settings = await loadFiscalSettings(conn);
@@ -172,7 +172,7 @@ export async function registerOrderNfeEvent(
   if (!result.registered) throw new IssueError(`A SEFAZ não registrou (${result.code}): ${result.reason}`);
 
   await recordInvoiceEvent({ invoiceId: invoice.id, kind, sequence, text: text.replace(/\s+/g, " ").trim(), signedXml: signed, protocol: result.protocol, statusCode: result.code, createdBy: who }, conn);
-  return { message: kind === "cancelamento" ? `Nota ${invoice.number} cancelada. Protocolo ${result.protocol}.` : `Carta de correção ${sequence} registrada. Protocolo ${result.protocol}.` };
+  return { invoiceId: invoice.id, message: kind === "cancelamento" ? `Nota ${invoice.number} cancelada. Protocolo ${result.protocol}.` : `Carta de correção ${sequence} registrada. Protocolo ${result.protocol}.` };
 }
 
 /**

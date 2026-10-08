@@ -10,6 +10,7 @@ import { CUSTOMER_FIELDS, customerToForm } from "@/lib/customer-form";
 import { lastDecision } from "@/lib/db/approvals";
 import { listCarriers, loadOrderTransport } from "@/lib/db/carriers";
 import { loadOrderDelivery } from "@/lib/db/order-delivery";
+import { listOrderInvoiceMails } from "@/lib/db/send-nfe-mail";
 import { listOrderInvoiceEvents, listOrderInvoices } from "@/lib/db/invoices";
 import { previewOrderNfe } from "@/lib/db/order-nfe";
 import { findCustomerByDocument } from "@/lib/db/customers";
@@ -27,7 +28,7 @@ import { DiscountFields } from "@/components/DiscountFields";
 import { proposalText } from "@/lib/quote/text";
 import { decideApprovalAction } from "../../aprovacoes/actions";
 import { FREIGHT_MODES } from "@/lib/fiscal/nfe";
-import { issueNfeAction, registerNfeEventAction, saveDeliveryAction, saveTransportAction } from "../nfe-actions";
+import { issueNfeAction, registerNfeEventAction, saveDeliveryAction, saveTransportAction, sendNfeMailAction } from "../nfe-actions";
 import { CustomerForm } from "../../clientes/CustomerForm";
 import { ActionForm } from "../ActionForm";
 import {
@@ -143,6 +144,7 @@ export default async function PedidoPage({
   const invoice = order.status === "fechado" && allows(session, "parametros") ? await previewOrderNfe(order.number, new Date(), conn) : null;
   const invoices = invoice ? await listOrderInvoices(order.id, conn) : [];
   const events = invoice ? await listOrderInvoiceEvents(order.id, conn) : [];
+  const mails = invoice ? await listOrderInvoiceMails(order.id, conn) : [];
   const carriers = invoice ? await listCarriers(conn) : [];
   const transport = await loadOrderTransport(order.id, conn);
   const delivery = invoice ? await loadOrderDelivery(order.id, conn) : null;
@@ -278,6 +280,29 @@ export default async function PedidoPage({
                         Baixar XML autorizado
                       </a>
                     </span>
+                  )}
+                  {mails
+                    .filter((mail) => mail.invoiceId === item.id)
+                    .map((mail) => (
+                      <span key={mail.id} className="mt-1 block border-t border-current/20 pt-1 text-xs">
+                        E-mail {mail.kind === "cancelamento" ? "do cancelamento" : "da nota"} para {mail.recipient} · {showDateTime(mail.sentAt)} ·{" "}
+                        {mail.status === "enviado" ? "enviado" : `não saiu: ${mail.detail ?? "falha"}`} · pela caixa {mail.channel === "empresa" ? "da empresa" : "da Ávila Ops"}
+                      </span>
+                    ))}
+                  {(item.status === "autorizada" || item.status === "cancelada") && (
+                    <ActionForm action={sendNfeMailAction} className="mt-2 flex flex-wrap items-end gap-2 text-slate-900">
+                      <input type="hidden" name="number" value={order.number} />
+                      <input type="hidden" name="invoiceId" value={item.id} />
+                      <div>
+                        <label htmlFor={`email-${item.id}`} className="block text-xs font-medium">
+                          Enviar {item.status === "cancelada" ? "o cancelamento" : "XML e DANFE"} por e-mail para
+                        </label>
+                        <input key={order.customer?.email ?? ""} id={`email-${item.id}`} name="to" type="email" defaultValue={order.customer?.email ?? ""} autoComplete="off" className={`${INPUT} mt-1 w-72 max-w-full`} />
+                      </div>
+                      <button type="submit" className="rounded border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50">
+                        Enviar por e-mail
+                      </button>
+                    </ActionForm>
                   )}
                   {item.status === "autorizada" && item.environment === invoice.input.environment && (
                     <details className="mt-2">

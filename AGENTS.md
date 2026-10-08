@@ -453,6 +453,17 @@ ainda não existe.** Regras do cofre, que não se quebram:
    (regras E12-30, E12-40, NA01-20 e NA01-30 do MOC 7.0, Anexo I). Nunca compare só a UF do
    cliente com a do emitente. O estado da entrega da nota tem de ser o `delivery_uf` do pedido,
    que formou o preço; diferente disso é pendência, não ajuste automático.
+6. **E-mail da nota** (migração `0027`, `src/lib/mail/`, `src/lib/db/mail.ts`, `src/lib/db/send-nfe-mail.ts`,
+   tela Parâmetros → E-mail das notas): o XML autorizado e o DANFE vão ao cliente; nota cancelada
+   manda o XML do cancelamento a quem recebeu a nota. Sai pela caixa da empresa quando ela cadastra
+   uma, senão pela da Ávila Ops (`ERP_SMTP_HOST`, `ERP_SMTP_PORT`, `ERP_SMTP_USER`,
+   `ERP_SMTP_PASSWORD`, `ERP_MAIL_FROM` no ambiente do servidor); sem nenhuma, a tela avisa e nada
+   é enviado. Regras: a senha da caixa da empresa só existe cifrada (`sealSecret`, chave
+   `ERP_CERT_KEY`) e só `lib/db/mail.ts` a abre; nenhuma tela ou log a mostra; a conexão é sempre
+   TLS com o certificado do servidor conferido (porta 465 direto, as outras com STARTTLS, e sem
+   STARTTLS não envia); **falha de e-mail nunca desfaz a autorização da nota**: toda tentativa que
+   chega a um servidor é gravada em `fiscal_invoice_mails`, com o resultado. Sem dependência nova:
+   o cliente SMTP e a montagem MIME são deste repositório e testados contra um servidor falso.
 
 ## Contas a pagar e fornecedores
 

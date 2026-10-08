@@ -5,7 +5,7 @@ import { UFS } from "@/lib/pricing/states";
 import type { Uf } from "@/lib/pricing/states";
 
 /** What an action of the order answers to its form. */
-export type ActionState = { error: string | null };
+export type ActionState = { error: string | null; /** What went through and is worth saying: "mensagem enviada para…". */ notice?: string | null };
 
 export const IDLE_ACTION: ActionState = { error: null };
 

@@ -54,9 +54,14 @@ export function ActionForm({
       className={className}
     >
       {children}
-      {state.error && (
+      {state.error && !pending && (
         <p role="alert" className="mt-2 basis-full rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-900">
           <span className="font-semibold">Nada foi gravado.</span> {state.error}
+        </p>
+      )}
+      {!state.error && state.notice && !pending && (
+        <p role="status" className="mt-2 basis-full rounded border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+          {state.notice}
         </p>
       )}
     </form>

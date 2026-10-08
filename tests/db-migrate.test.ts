@@ -57,6 +57,7 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "0024_frete_da_nota_e_inutilizacao.sql",
     "0025_transportadoras_e_volumes.sql",
     "0026_local_de_entrega_da_nota.sql",
+    "0027_email_da_nota.sql",
   ]);
 
   const second = await withClient((client) => migrate(client, MIGRATIONS_DIR));
@@ -77,12 +78,14 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "customers",
     "fiscal_certificates",
     "fiscal_invoice_events",
+    "fiscal_invoice_mails",
     "fiscal_invoices",
     "fiscal_number_voids",
     "fiscal_rules",
     "fixed_expenses",
     "idempotency_keys",
     "lost_reasons",
+    "mail_settings",
     "order_approvals",
     "order_closings",
     "order_items",

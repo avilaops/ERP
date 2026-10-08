@@ -280,6 +280,26 @@ test("certificado digital: só a diretoria envia; arquivo e senha não voltam pa
   assert.deepEqual(users.map(([file]) => file).sort(), ["lib/db/issue-nfe.ts", "lib/fiscal/certificate.ts"]);
 });
 
+test("e-mail das notas: a senha da caixa só é aberta para enviar, nunca volta à tela nem vai a log", () => {
+  const page = source("/parametros/email");
+  const actions = readFileSync(`${APP_DIR}parametros/email/actions.ts`, "utf8");
+  assert.ok(page.includes('await requirePermission("parametros")'));
+  assert.ok(actions.includes("vaultKey(process.env.ERP_CERT_KEY)"));
+  // A tela só conhece a ficha da caixa (servidor, usuário, remetente).
+  assert.doesNotMatch(page, /openSecret|smtp_password|ERP_CERT_KEY|ERP_SMTP_PASSWORD|mailChannel/);
+  assert.doesNotMatch(page, /name="password"[^>]*defaultValue/);
+  for (const file of ["parametros/email/actions.ts", "pedidos/nfe-actions.ts"]) {
+    for (const line of readFileSync(`${APP_DIR}${file}`, "utf8").split("\n").filter((text) => /console\.(info|error|log|warn)/.test(text))) {
+      assert.doesNotMatch(line, /password|input\b|channel|smtp/i, line.trim());
+    }
+  }
+  // Só a camada que resolve a caixa de saída abre a senha guardada.
+  const users = SOURCES_UNDER_SRC().filter(([, code]) => code.includes("openSecret("));
+  assert.deepEqual(users.map(([file]) => file).sort(), ["lib/db/mail.ts", "lib/mail/vault.ts"]);
+  // O certificado do servidor de e-mail é sempre conferido.
+  assert.doesNotMatch(readFileSync(new URL("../src/lib/mail/smtp.ts", import.meta.url), "utf8"), /rejectUnauthorized: false/);
+});
+
 test("catálogo do fornecedor: tela e foto só para quem tem Produtos e custos", () => {
   assert.ok(source("/produtos/catalogo-fornecedor").includes('await requirePermission("produtos")'));
   const route = readFileSync(`${API_DIR}fornecedor-itens/[id]/foto/route.ts`, "utf8");
@@ -305,8 +325,8 @@ test("/pedidos/novo é protegida pelo item Pedidos", () => {
 test("não existe página no grupo protegido sem requirePermission", () => {
   const all = pages();
   // The menu items, plus /pedidos/novo, one order, the record of one customer and of one supplier,
-  // and the users, the forms of payment and the categories of bills of the company, its product lines and its carriers.
-  assert.equal(all.length, MENU_ITEMS.length + 18);
+  // and the users, the forms of payment and the categories of bills of the company, its product lines, its carriers and the e-mail of the invoices.
+  assert.equal(all.length, MENU_ITEMS.length + 19);
   for (const route of all) {
     assert.match(source(route), /await requirePermission\(/, route);
   }
