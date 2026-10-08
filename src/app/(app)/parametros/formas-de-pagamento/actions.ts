@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/auth";
-import { createPaymentMethod, PaymentMethodError, updatePaymentMethod } from "@/lib/db/payment-methods";
+import { createPaymentMethod, PaymentMethodError, updatePaymentMethod, deletePaymentMethod } from "@/lib/db/payment-methods";
 import { tenantDb } from "@/lib/db/pool";
 import type { ActionState } from "@/lib/order-form";
 
@@ -44,6 +44,19 @@ export async function updatePaymentMethodAction(_previous: ActionState, formData
       session.email,
       conn,
     );
+  } catch (error) {
+    return { error: problem(error) };
+  }
+  revalidatePath(HERE);
+  return { error: null };
+}
+
+/** "Remover": what already used the name keeps it; only the list changes. */
+export async function deletePaymentMethodAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
+  const session = await requirePermission("parametros");
+  const conn = tenantDb(session.tenant.slug);
+  try {
+    await deletePaymentMethod(Number(text(formData, "id")), conn);
   } catch (error) {
     return { error: problem(error) };
   }

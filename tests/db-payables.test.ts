@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
-import { createFixedExpense, launchFixedExpenses, listFixedExpenses, updateFixedExpense } from "@/lib/db/fixed-expenses";
+import { createFixedExpense, deleteFixedExpense, launchFixedExpenses, listFixedExpenses, updateFixedExpense } from "@/lib/db/fixed-expenses";
 import { loadParams } from "@/lib/db/params";
+import { deletePayableCategory } from "@/lib/db/payable-categories";
 import { createPayableCategory, listAllPayableCategories, listPayableCategories, updatePayableCategory } from "@/lib/db/payable-categories";
 import { createPayable, deletePayable, listCommissionsDue, listPayables, payPayable, unpayPayable, updatePayable } from "@/lib/db/payables";
 import type { PayableInput } from "@/lib/db/payables";
-import { createSupplier, getSupplier, listSuppliers, updateSupplier } from "@/lib/db/suppliers";
+import { createSupplier, deleteSupplier, getSupplier, listSuppliers, updateSupplier } from "@/lib/db/suppliers";
 import type { SupplierInput } from "@/lib/db/suppliers";
 import { openTestDb, SKIP_WITHOUT_DB } from "./db-helpers.ts";
 import type { TestDb } from "./db-helpers.ts";
@@ -139,4 +140,31 @@ test("despesas fixas: a soma das que estão em uso é o parâmetro, e o lançame
   assert.deepEqual(await launchFixedExpenses("2026-12", WHO, db.pool), { launched: 2 });
   assert.equal((await listPayables(db.pool)).length, before + 5);
   await assert.rejects(() => launchFixedExpenses("11/2026", WHO, db.pool), /Mês inválido/);
+});
+
+test("remover: categoria sai sempre; despesa fixa e fornecedor só saem sem histórico", { skip }, async () => {
+  const category = await createPayableCategory("Temporária", WHO, db.pool);
+  await deletePayableCategory(category.id, db.pool);
+  await assert.rejects(() => deletePayableCategory(category.id, db.pool), /não encontrada/);
+
+  // Despesa já lançada tem contas apontando para ela: fica, e o parâmetro não muda.
+  const before = (await loadParams(db.pool)).fixedMonthlyExpenses;
+  const launched = (await listFixedExpenses(db.pool)).find((item) => item.label === "Aluguel");
+  assert.ok(launched);
+  await assert.rejects(() => deleteFixedExpense(launched.id, db.pool), /já teve contas lançadas/);
+  assert.equal((await loadParams(db.pool)).fixedMonthlyExpenses, before);
+  // Nunca lançada: sai, e a soma acompanha.
+  await createFixedExpense({ label: "Seguro", category: "Outros", amount: 100, dueDay: 15, active: true }, WHO, db.pool);
+  assert.equal((await loadParams(db.pool)).fixedMonthlyExpenses, before + 100);
+  const fresh = (await listFixedExpenses(db.pool)).find((item) => item.label === "Seguro");
+  assert.ok(fresh);
+  await deleteFixedExpense(fresh.id, db.pool);
+  assert.equal((await loadParams(db.pool)).fixedMonthlyExpenses, before);
+  await assert.rejects(() => deleteFixedExpense(fresh.id, db.pool), /não encontrada/);
+
+  // A fábrica tem conta lançada: não sai. Um fornecedor novo, sem conta, sai.
+  await assert.rejects(() => deleteSupplier(factory, db.pool), /tem contas lançadas/);
+  const unused = await createSupplier({ ...BLANK, kind: "EX", name: "Sem uso", country: "China" }, WHO, db.pool);
+  assert.deepEqual(await deleteSupplier(unused.id, db.pool), { name: "Sem uso" });
+  await assert.rejects(() => deleteSupplier(unused.id, db.pool), /não encontrado/);
 });

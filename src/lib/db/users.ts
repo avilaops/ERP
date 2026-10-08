@@ -114,3 +114,20 @@ export async function updateUser(
   if (rows[0].id === null) throw new UserError("Você não pode mudar o próprio perfil nem desativar o próprio acesso, nem tirar telas de si. Peça a outra pessoa da diretoria.");
   return user(rows[0]);
 }
+
+/**
+ * Removes a person from the company's register: they no longer get in. Orders
+ * and records keep the e-mail they were written with. Nobody removes themselves.
+ */
+export async function deleteUser(id: number, who: string, conn: Queryable): Promise<{ email: string }> {
+  if (who.trim() === "") throw new Error("Falta dizer quem está removendo o usuário.");
+  const { rows } = await conn.query(
+    `WITH target AS (SELECT id, email FROM users WHERE id = $1),
+          removed AS (DELETE FROM users u USING target WHERE u.id = target.id AND target.email <> $2 RETURNING u.email)
+     SELECT (SELECT count(*)::int FROM target) AS found, (SELECT email FROM removed) AS email`,
+    [id, normalize(who)],
+  );
+  if (Number(rows[0].found) === 0) throw new UserError("Usuário não encontrado.");
+  if (rows[0].email === null) throw new UserError("Você não pode remover o próprio cadastro. Peça a outra pessoa da diretoria.");
+  return { email: String(rows[0].email) };
+}

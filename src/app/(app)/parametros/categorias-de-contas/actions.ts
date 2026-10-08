@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/auth";
-import { createPayableCategory, PayableCategoryError, updatePayableCategory } from "@/lib/db/payable-categories";
+import { createPayableCategory, PayableCategoryError, updatePayableCategory, deletePayableCategory } from "@/lib/db/payable-categories";
 import { tenantDb } from "@/lib/db/pool";
 import type { ActionState } from "@/lib/order-form";
 
@@ -44,6 +44,19 @@ export async function updatePayableCategoryAction(_previous: ActionState, formDa
       session.email,
       conn,
     );
+  } catch (error) {
+    return { error: problem(error) };
+  }
+  revalidatePath(HERE);
+  return { error: null };
+}
+
+/** "Remover": what already used the name keeps it; only the list changes. */
+export async function deletePayableCategoryAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
+  const session = await requirePermission("parametros");
+  const conn = tenantDb(session.tenant.slug);
+  try {
+    await deletePayableCategory(Number(text(formData, "id")), conn);
   } catch (error) {
     return { error: problem(error) };
   }

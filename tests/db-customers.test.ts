@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { after, before, test } from "node:test";
 import type { CustomerInput } from "@/lib/customer";
-import { createCustomer, findCustomerByDocument, getCustomer, listCustomers, updateCustomer } from "@/lib/db/customers";
+import { createCustomer, deleteCustomer, findCustomerByDocument, getCustomer, listCustomers, updateCustomer } from "@/lib/db/customers";
 import { openTestDb, SKIP_WITHOUT_DB } from "./db-helpers.ts";
 import type { TestDb } from "./db-helpers.ts";
 
@@ -138,9 +138,19 @@ test("o banco recusa o que não é cliente válido, mesmo sem passar pela camada
   assert.equal((await findCustomerByDocument("11222333000181", db.pool))?.name, "X");
 });
 
-test("cliente não se apaga: a camada de banco não tem como, e a migração não apaga em cascata", () => {
+test("cliente só se apaga sem pedido: um único DELETE, por id, e a migração não apaga em cascata", () => {
   const source = readFileSync(new URL("../src/lib/db/customers.ts", import.meta.url), "utf8");
-  assert.doesNotMatch(source, /\bDELETE\b|\bTRUNCATE\b/);
+  // Remover existe desde 08/10/2026 (todo cadastro tem adicionar, editar e remover); quem tem pedido é segurado pela chave estrangeira.
+  assert.equal(source.split(/\bDELETE\b/).length - 1, 1);
+  assert.ok(source.includes("DELETE FROM customers WHERE id = $1"));
+  assert.doesNotMatch(source, /\bTRUNCATE\b/);
   const migration = readFileSync(new URL("../db/migrations/0004_clientes.sql", import.meta.url), "utf8");
   assert.doesNotMatch(migration, /ON DELETE/i);
+});
+
+test("remover cliente sem pedido: sai do cadastro", { skip }, async () => {
+  const extra = await createCustomer({ ...COMPANY, document: "60701190000104", name: "Para remover" }, WHO, db.pool);
+  assert.deepEqual(await deleteCustomer(extra.id, db.pool), { name: "Para remover" });
+  assert.equal(await getCustomer(extra.id, db.pool), null);
+  await assert.rejects(() => deleteCustomer(extra.id, db.pool), /Cliente não encontrado/);
 });

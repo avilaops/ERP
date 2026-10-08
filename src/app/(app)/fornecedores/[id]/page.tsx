@@ -6,7 +6,8 @@ import { tenantDb } from "@/lib/db/pool";
 import { getSupplier } from "@/lib/db/suppliers";
 import { showDateTime } from "@/lib/format";
 import { ActionForm } from "../../pedidos/ActionForm";
-import { updateSupplierAction } from "../actions";
+import { ConfirmButton } from "../../pedidos/ConfirmButton";
+import { deleteSupplierAction, updateSupplierAction } from "../actions";
 import { SupplierFields } from "../SupplierFields";
 
 export const metadata = { title: "Fornecedor · ERP" };
@@ -42,6 +43,10 @@ export default async function FornecedorPage({ params }: { params: Promise<{ id:
               Salvar alterações
             </button>
           </div>
+        </ActionForm>
+        <ActionForm action={deleteSupplierAction} className="border-t border-slate-200 px-5 py-3">
+          <input type="hidden" name="id" value={supplier.id} />
+          <ConfirmButton label="Remover fornecedor" confirmLabel="Confirmar: remover" className="rounded px-2 py-1 text-sm text-red-700 hover:bg-red-50" />
         </ActionForm>
       </section>
     </>

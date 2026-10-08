@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/auth";
 import { menuItem } from "@/lib/auth/permissions";
 import { tenantDb } from "@/lib/db/pool";
-import { createSupplier, SupplierError, updateSupplier } from "@/lib/db/suppliers";
+import { createSupplier, deleteSupplier, SupplierError, updateSupplier } from "@/lib/db/suppliers";
 import type { ActionState } from "@/lib/order-form";
 import { readSupplierForm } from "@/lib/payable-form";
 
@@ -42,6 +42,20 @@ export async function updateSupplierAction(_previous: ActionState, formData: For
   const read = reader(formData);
   try {
     await updateSupplier(Number(read("id")), readSupplierForm(read), session.email, conn);
+  } catch (error) {
+    return { error: problem(error) };
+  }
+  revalidatePath(HERE);
+  redirect(HERE);
+}
+
+/** "Remover fornecedor": only one never used in a bill. Leaves a line in the log. */
+export async function deleteSupplierAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
+  const session = await requirePermission("fornecedores");
+  const conn = tenantDb(session.tenant.slug);
+  try {
+    const { name } = await deleteSupplier(Number(reader(formData)("id")), conn);
+    console.info(`[fornecedores] ${session.email} removeu o fornecedor "${name}" em ${session.tenant.slug}`);
   } catch (error) {
     return { error: problem(error) };
   }

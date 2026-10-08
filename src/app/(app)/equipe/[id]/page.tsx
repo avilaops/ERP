@@ -5,7 +5,8 @@ import { menuItem } from "@/lib/auth/permissions";
 import { tenantDb } from "@/lib/db/pool";
 import { listUsers } from "@/lib/db/users";
 import { ActionForm } from "../../pedidos/ActionForm";
-import { saveUserAction } from "../actions";
+import { ConfirmButton } from "../../pedidos/ConfirmButton";
+import { deleteUserAction, saveUserAction } from "../actions";
 import { BOTTOM_BAR, PersonFields, PRIMARY_BUTTON } from "../PersonFields";
 
 export const metadata = { title: "Pessoa · ERP" };
@@ -44,6 +45,12 @@ export default async function PessoaPage({ params }: { params: Promise<{ id: str
           </button>
         </div>
       </ActionForm>
+      {!self && (
+        <ActionForm action={deleteUserAction} className="mt-4">
+          <input type="hidden" name="id" value={user.id} />
+          <ConfirmButton label="Remover pessoa" confirmLabel="Confirmar: remover" className="rounded px-2 py-1 text-sm text-red-700 hover:bg-red-50" />
+        </ActionForm>
+      )}
     </div>
   );
 }

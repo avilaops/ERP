@@ -78,3 +78,9 @@ export async function listPayableCategories(conn: Queryable): Promise<string[]> 
   const { rows } = await conn.query("SELECT label FROM payable_categories WHERE active ORDER BY position, label");
   return rows.map((row) => String(row.label));
 }
+
+/** Removes a category. Bills keep the name they were written with, so nothing else changes. */
+export async function deletePayableCategory(id: number, conn: Queryable): Promise<void> {
+  const { rows } = await conn.query("DELETE FROM payable_categories WHERE id = $1 RETURNING id", [id]);
+  if (rows.length === 0) throw new PayableCategoryError("Categoria não encontrada.");
+}

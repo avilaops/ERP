@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { listPaymentMethods } from "@/lib/db/orders";
-import { createPaymentMethod, listAllPaymentMethods, updatePaymentMethod } from "@/lib/db/payment-methods";
+import { createPaymentMethod, deletePaymentMethod, listAllPaymentMethods, updatePaymentMethod } from "@/lib/db/payment-methods";
 import { openTestDb, SKIP_WITHOUT_DB } from "./db-helpers.ts";
 import type { TestDb } from "./db-helpers.ts";
 
@@ -44,4 +44,11 @@ test("formas de pagamento: a diretoria acrescenta, renomeia, reordena e desliga;
   assert.ok(!(await listPaymentMethods(db.pool)).includes("Cheque"));
   assert.deepEqual((await listAllPaymentMethods(db.pool)).find((item) => item.label === "Cheque")?.active, false);
   assert.equal((await listAllPaymentMethods(db.pool)).length, 9);
+});
+
+test("formas de pagamento: remover tira da lista, e só existe uma vez", { skip }, async () => {
+  const extra = await createPaymentMethod("Permuta", WHO, db.pool);
+  await deletePaymentMethod(extra.id, db.pool);
+  assert.ok(!(await listAllPaymentMethods(db.pool)).some((item) => item.label === "Permuta"));
+  await assert.rejects(() => deletePaymentMethod(extra.id, db.pool), /não encontrada/);
 });

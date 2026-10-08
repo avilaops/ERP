@@ -8,7 +8,9 @@ import { completenessText, isComplete, isRequired } from "@/lib/customer";
 import type { CustomerKind } from "@/lib/customer";
 import { CUSTOMER_FIELDS, customerToForm } from "@/lib/customer-form";
 import { getCustomer } from "@/lib/db/customers";
-import { saveCustomerAction } from "../actions";
+import { saveCustomerAction, deleteCustomerAction } from "../actions";
+import { ActionForm } from "../../pedidos/ActionForm";
+import { ConfirmButton } from "../../pedidos/ConfirmButton";
 import { CustomerForm } from "../CustomerForm";
 
 const ITEM = menuItem("clientes");
@@ -87,6 +89,10 @@ export default async function ClientePage({
           cepNote={uf && `Pelo CEP, o estado é ${uf}. Preencha rua, bairro e cidade.`}
           action={saveCustomerAction}
         />
+        <ActionForm action={deleteCustomerAction} className="mt-4">
+          <input type="hidden" name="id" value={customer.id} />
+          <ConfirmButton label="Remover cliente" confirmLabel="Confirmar: remover" className="rounded px-2 py-1 text-sm text-red-700 hover:bg-red-50" />
+        </ActionForm>
       </div>
     </>
   );

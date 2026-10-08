@@ -300,6 +300,15 @@ metas de venda (`sales_goals`, uma da equipe e uma por vendedor em cada mês) s�
 Diretoria (`setsGoals`), sempre para o mês corrente. Os gráficos são `src/components/Charts.tsx`,
 componentes de servidor em CSS, sem biblioteca.
 
+## Todo cadastro tem adicionar, editar e remover
+
+Pedido do Nicolas em 08/10/2026: **toda lista que a empresa mantém tem as três operações na
+tela**, não só carga em lote nem só "desligar". Remover é função da camada de banco, com botão
+de confirmação (`ConfirmButton`) e, quando apaga algo com nome, uma linha no log. O que tem
+histórico preso a ele não se apaga e a recusa diz o que fazer: cliente com pedido, fornecedor com
+conta, despesa fixa já lançada (o banco recusa pela chave estrangeira, sem cascata). Forma de
+pagamento e categoria saem sempre, porque o que as usou guardou o nome. Ninguém remove a si mesmo.
+
 ## Catálogo do fornecedor
 
 O que o fornecedor vende (`supplier_items`, migração `0017`): código dele, catálogo, medidas,

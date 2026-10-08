@@ -4,7 +4,8 @@ import { menuItem } from "@/lib/auth/permissions";
 import { listAllPaymentMethods } from "@/lib/db/payment-methods";
 import { tenantDb } from "@/lib/db/pool";
 import { ActionForm } from "../../pedidos/ActionForm";
-import { createPaymentMethodAction, updatePaymentMethodAction } from "./actions";
+import { ConfirmButton } from "../../pedidos/ConfirmButton";
+import { createPaymentMethodAction, updatePaymentMethodAction, deletePaymentMethodAction } from "./actions";
 
 export const metadata = { title: "Formas de pagamento · ERP" };
 export const dynamic = "force-dynamic";
@@ -91,6 +92,10 @@ export default async function FormasDePagamentoPage() {
                 <button type="submit" className="rounded border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50">
                   Salvar
                 </button>
+              </ActionForm>
+              <ActionForm action={deletePaymentMethodAction} className="mt-1">
+                <input type="hidden" name="id" value={method.id} />
+                <ConfirmButton label="Remover" confirmLabel="Confirmar: remover" className="rounded px-2 py-1 text-sm text-red-700 hover:bg-red-50" />
               </ActionForm>
             </li>
           ))}

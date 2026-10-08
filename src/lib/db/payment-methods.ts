@@ -72,3 +72,9 @@ export async function updatePaymentMethod(
     throw error;
   }
 }
+
+/** Removes a form of payment. Orders keep the name they were written with, so nothing else changes. */
+export async function deletePaymentMethod(id: number, conn: Queryable): Promise<void> {
+  const { rows } = await conn.query("DELETE FROM payment_methods WHERE id = $1 RETURNING id", [id]);
+  if (rows.length === 0) throw new PaymentMethodError("Forma de pagamento não encontrada.");
+}

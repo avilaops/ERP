@@ -4,7 +4,8 @@ import { menuItem } from "@/lib/auth/permissions";
 import { listAllPayableCategories } from "@/lib/db/payable-categories";
 import { tenantDb } from "@/lib/db/pool";
 import { ActionForm } from "../../pedidos/ActionForm";
-import { createPayableCategoryAction, updatePayableCategoryAction } from "./actions";
+import { ConfirmButton } from "../../pedidos/ConfirmButton";
+import { createPayableCategoryAction, updatePayableCategoryAction, deletePayableCategoryAction } from "./actions";
 
 export const metadata = { title: "Categorias de contas · ERP" };
 export const dynamic = "force-dynamic";
@@ -91,6 +92,10 @@ export default async function CategoriasDeContasPage() {
                 <button type="submit" className="rounded border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50">
                   Salvar
                 </button>
+              </ActionForm>
+              <ActionForm action={deletePayableCategoryAction} className="mt-1">
+                <input type="hidden" name="id" value={category.id} />
+                <ConfirmButton label="Remover" confirmLabel="Confirmar: remover" className="rounded px-2 py-1 text-sm text-red-700 hover:bg-red-50" />
               </ActionForm>
             </li>
           ))}

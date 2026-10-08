@@ -38,7 +38,12 @@ export default async function CatalogoFornecedorPage({ searchParams }: { searchP
           ← {menuItem("produtos").label}
         </Link>
       </p>
-      <h1 className="mt-2 text-2xl font-semibold">Catálogo do fornecedor</h1>
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-semibold">Catálogo do fornecedor</h1>
+        <Link href={`${HERE}/novo`} className="rounded-lg bg-brand px-4 py-2.5 font-semibold text-white hover:bg-brand-dark">
+          + Adicionar item
+        </Link>
+      </div>
       <p className="mt-1 max-w-3xl text-slate-600">
         O que o fornecedor vende, com o código dele e o equipamento da empresa a que corresponde. Só a diretoria vê esta tela.
       </p>
@@ -89,7 +94,9 @@ export default async function CatalogoFornecedorPage({ searchParams }: { searchP
                 )}
               </div>
               <div className="min-w-0 text-sm">
-                <p className="font-semibold leading-tight">{item.name}</p>
+                <Link href={`${HERE}/${item.id}`} className="font-semibold leading-tight text-brand underline-offset-2 hover:underline">
+                  {item.name}
+                </Link>
                 <p className="text-xs text-slate-500">
                   {item.code} · {item.catalog}
                 </p>

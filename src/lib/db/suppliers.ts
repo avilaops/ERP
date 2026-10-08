@@ -139,3 +139,19 @@ export async function updateSupplier(id: number, input: SupplierInput, who: stri
     throw error;
   }
 }
+
+const FOREIGN_KEY_VIOLATION = "23503";
+
+/** Removes a supplier never used. One with bills has history: it is turned off instead. */
+export async function deleteSupplier(id: number, conn: Queryable): Promise<{ name: string }> {
+  try {
+    const { rows } = await conn.query("DELETE FROM suppliers WHERE id = $1 RETURNING name", [id]);
+    if (rows.length === 0) throw new SupplierError("Fornecedor não encontrado.");
+    return { name: String(rows[0].name) };
+  } catch (error) {
+    if (pgErrorCode(error) === FOREIGN_KEY_VIOLATION) {
+      throw new SupplierError("Este fornecedor tem contas lançadas e não pode ser removido. Desmarque “Em uso” para ele sair das listas.");
+    }
+    throw error;
+  }
+}

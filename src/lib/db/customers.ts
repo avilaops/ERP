@@ -138,3 +138,15 @@ export async function listCustomers(conn: Queryable): Promise<Customer[]> {
   const { rows } = await conn.query(`SELECT ${COLUMNS} FROM customers ORDER BY name, id`);
   return rows.map(toCustomer);
 }
+
+/** Removes a customer with no order. One that has orders has history and stays. */
+export async function deleteCustomer(id: number, conn: Queryable): Promise<{ name: string }> {
+  try {
+    const { rows } = await conn.query("DELETE FROM customers WHERE id = $1 RETURNING name", [id]);
+    if (rows.length === 0) throw new CustomerError("Cliente não encontrado.");
+    return { name: String(rows[0].name) };
+  } catch (error) {
+    if (pgErrorCode(error) === "23503") throw new CustomerError("Este cliente tem pedidos e não pode ser removido.");
+    throw error;
+  }
+}

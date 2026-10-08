@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/auth";
 import { menuItem } from "@/lib/auth/permissions";
-import { createFixedExpense, FixedExpenseError, updateFixedExpense } from "@/lib/db/fixed-expenses";
+import { createFixedExpense, deleteFixedExpense, FixedExpenseError, updateFixedExpense } from "@/lib/db/fixed-expenses";
 import type { FixedExpenseInput } from "@/lib/db/fixed-expenses";
 import { listAllPayableCategories } from "@/lib/db/payable-categories";
 import { tenantDb } from "@/lib/db/pool";
@@ -65,6 +65,18 @@ export async function updateFixedExpenseAction(_previous: ActionState, formData:
     const input = read(formData, (await listAllPayableCategories(conn)).map((category) => category.label));
     if (typeof input === "string") return { error: input };
     await updateFixedExpense(Number(formData.get("id")), input, session.email, conn);
+  } catch (error) {
+    return problem(error);
+  }
+  return refresh();
+}
+
+/** "Remover": only an expense never launched; the others are turned off. */
+export async function deleteFixedExpenseAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
+  const session = await requirePermission("parametros");
+  const conn = tenantDb(session.tenant.slug);
+  try {
+    await deleteFixedExpense(Number(formData.get("id")), conn);
   } catch (error) {
     return problem(error);
   }

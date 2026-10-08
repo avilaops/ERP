@@ -5,7 +5,17 @@ import path from "node:path";
 import { after, before, test } from "node:test";
 import sharp from "sharp";
 import { createProduct } from "@/lib/db/products";
-import { listSupplierItems, listSupplierItemsOf, loadSupplierItemPhoto, upsertSupplierItem } from "@/lib/db/supplier-items";
+import {
+  createSupplierItem,
+  deleteSupplierItem,
+  getSupplierItem,
+  listSupplierItems,
+  listSupplierItemsOf,
+  loadSupplierItemPhoto,
+  saveSupplierItemPhoto,
+  updateSupplierItem,
+  upsertSupplierItem,
+} from "@/lib/db/supplier-items";
 import type { SupplierItemInput } from "@/lib/db/supplier-items";
 import { readSupplierCatalog, runSupplierCatalogImport } from "@/lib/import/supplier-catalog";
 import { openTestDb, SKIP_WITHOUT_DB } from "./db-helpers.ts";
@@ -104,4 +114,34 @@ test("carga do catálogo: confere antes, não grava sem --apply, e foto que falt
   }
   const loaded = (await listSupplierItems(db.pool)).filter((item) => item.catalog === "Cable Motion");
   assert.deepEqual(loaded.map((item) => [item.code, item.hasPhoto, item.productCode]), [["E7016", true, "LD-B038"], ["U2016", false, null]]);
+});
+
+test("catálogo do fornecedor pela tela: adicionar, editar o vínculo, trocar a foto e remover", { skip }, async () => {
+  const typed: SupplierItemInput = { ...ITEM, catalog: "Cable Motion", code: "U2017", name: "Functional Trainer", productCode: null };
+  const { id } = await createSupplierItem(typed, WHO, db.pool);
+  let item = await getSupplierItem(id, db.pool);
+  assert.deepEqual([item?.code, item?.productCode, item?.hasPhoto], ["U2017", null, false]);
+  // Adicionar o que já existe é recusado, não sobrescreve.
+  await assert.rejects(() => createSupplierItem(typed, WHO, db.pool), /Já existe um item com este código neste catálogo/);
+  await assert.rejects(() => createSupplierItem({ ...typed, code: "X1", name: " " }, WHO, db.pool), /Informe o nome/);
+  await assert.rejects(() => createSupplierItem({ ...typed, code: "X1", weightKg: -1 }, WHO, db.pool), /Peso: informe um número maior que zero/);
+
+  // A empresa passa a vender o item: liga ao código dela, em maiúsculas.
+  await updateSupplierItem(id, { ...typed, name: "Functional Trainer U", productCode: " ld-b039 ", lengthMm: 1200.4 }, WHO, db.pool);
+  item = await getSupplierItem(id, db.pool);
+  assert.deepEqual([item?.name, item?.productCode, item?.lengthMm, item?.productId], ["Functional Trainer U", "LD-B039", 1200, null]);
+  // Mudar para um código que já existe no mesmo catálogo é recusado.
+  await createSupplierItem({ ...typed, code: "U3017" }, WHO, db.pool);
+  await assert.rejects(() => updateSupplierItem(id, { ...typed, code: "U3017" }, WHO, db.pool), /Já existe um item/);
+  await assert.rejects(() => updateSupplierItem(999999, typed, WHO, db.pool), /Item não encontrado/);
+
+  await saveSupplierItemPhoto(id, png, WHO, db.pool);
+  assert.equal((await getSupplierItem(id, db.pool))?.hasPhoto, true);
+  await assert.rejects(() => saveSupplierItemPhoto(id, Buffer.from("x"), WHO, db.pool), /Formato de imagem não aceito/);
+  await assert.rejects(() => saveSupplierItemPhoto(999999, png, WHO, db.pool), /Item não encontrado/);
+
+  assert.deepEqual(await deleteSupplierItem(id, db.pool), { code: "U2017" });
+  assert.equal(await getSupplierItem(id, db.pool), null);
+  assert.equal(await loadSupplierItemPhoto(id, db.pool), null);
+  await assert.rejects(() => deleteSupplierItem(id, db.pool), /Item não encontrado/);
 });

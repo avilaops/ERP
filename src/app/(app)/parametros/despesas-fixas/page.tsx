@@ -8,7 +8,8 @@ import { tenantDb } from "@/lib/db/pool";
 import { formatMoney, showMoney } from "@/lib/format";
 import { roundCents } from "@/lib/pricing/money";
 import { ActionForm } from "../../pedidos/ActionForm";
-import { createFixedExpenseAction, updateFixedExpenseAction } from "./actions";
+import { ConfirmButton } from "../../pedidos/ConfirmButton";
+import { createFixedExpenseAction, deleteFixedExpenseAction, updateFixedExpenseAction } from "./actions";
 
 export const metadata = { title: "Despesas fixas · ERP" };
 export const dynamic = "force-dynamic";
@@ -121,6 +122,10 @@ export default async function DespesasFixasPage() {
                   <button type="submit" className="rounded border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50">
                     Salvar
                   </button>
+                </ActionForm>
+                <ActionForm action={deleteFixedExpenseAction} className="mt-1">
+                  <input type="hidden" name="id" value={expense.id} />
+                  <ConfirmButton label="Remover" confirmLabel="Confirmar: remover" className="rounded px-2 py-1 text-sm text-red-700 hover:bg-red-50" />
                 </ActionForm>
               </li>
             ))}

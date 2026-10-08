@@ -285,7 +285,8 @@ test("catálogo do fornecedor: tela e foto só para quem tem Produtos e custos",
 test("formas de pagamento: só quem tem Parâmetros altera", () => {
   assert.ok(source("/parametros/formas-de-pagamento").includes('await requirePermission("parametros")'));
   const actions = readFileSync(`${APP_DIR}parametros/formas-de-pagamento/actions.ts`, "utf8");
-  assert.equal(actions.split('await requirePermission("parametros")').length - 1, 2);
+  // Adicionar, editar e remover.
+  assert.equal(actions.split('await requirePermission("parametros")').length - 1, 3);
 });
 
 test("/pedidos/novo é protegida pelo item Pedidos", () => {
@@ -296,7 +297,7 @@ test("não existe página no grupo protegido sem requirePermission", () => {
   const all = pages();
   // The menu items, plus /pedidos/novo, one order, the record of one customer and of one supplier,
   // and the users, the forms of payment and the categories of bills of the company.
-  assert.equal(all.length, MENU_ITEMS.length + 14);
+  assert.equal(all.length, MENU_ITEMS.length + 16);
   for (const route of all) {
     assert.match(source(route), /await requirePermission\(/, route);
   }

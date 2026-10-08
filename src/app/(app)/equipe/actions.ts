@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/auth";
 import { menuItem } from "@/lib/auth/permissions";
 import { tenantDb } from "@/lib/db/pool";
-import { createUser, updateUser, UserError } from "@/lib/db/users";
+import { createUser, deleteUser, updateUser, UserError } from "@/lib/db/users";
 import type { ActionState } from "@/lib/order-form";
 import { parseUserForm } from "@/lib/user-form";
 import type { UserField } from "@/lib/user-form";
@@ -56,6 +56,19 @@ export async function saveUserAction(_previous: ActionState, formData: FormData)
   if (!parsed.ok) return { error: parsed.errors.join(" ") };
   try {
     await updateUser(Number(read("id")), { ...parsed.user, items: screensOf(formData) }, session.email, conn);
+  } catch (error) {
+    return problem(error);
+  }
+  done();
+}
+
+/** "Remover pessoa": she no longer gets in, and leaves the list. Leaves a line in the log. */
+export async function deleteUserAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
+  const session = await requirePermission("equipe");
+  const conn = tenantDb(session.tenant.slug);
+  try {
+    const { email } = await deleteUser(Number(reader(formData)("id")), session.email, conn);
+    console.info(`[equipe] ${session.email} removeu ${email} de ${session.tenant.slug}`);
   } catch (error) {
     return problem(error);
   }

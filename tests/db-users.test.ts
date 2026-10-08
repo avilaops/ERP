@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
-import { createUser, findActiveUser, listUsers, updateUser } from "@/lib/db/users";
+import { createUser, deleteUser, findActiveUser, listUsers, updateUser } from "@/lib/db/users";
 import { openTestDb, SKIP_WITHOUT_DB } from "./db-helpers.ts";
 import type { TestDb } from "./db-helpers.ts";
 
@@ -61,4 +61,15 @@ test("telas por pessoa: guardam-se só as do perfil; todas marcadas é sem restr
   const boss = (await listUsers(db.pool)).find((user) => user.email === BOSS);
   assert.ok(boss);
   await assert.rejects(() => updateUser(boss.id, { name: boss.name, role: "DIRETORIA", active: true, items: ["pedidos"] }, BOSS, db.pool), /nem tirar telas de si/);
+});
+
+test("remover pessoa: sai da lista e não entra mais; ninguém remove a si mesmo", { skip }, async () => {
+  const temp = await createUser({ email: "temp@teste.local", name: "Temporária", role: "VENDEDOR" }, BOSS, db.pool);
+  assert.deepEqual(await deleteUser(temp.id, BOSS, db.pool), { email: "temp@teste.local" });
+  assert.equal(await findActiveUser("temp@teste.local", db.pool), null);
+  await assert.rejects(() => deleteUser(temp.id, BOSS, db.pool), /não encontrado/);
+  const boss = (await listUsers(db.pool)).find((user) => user.email === BOSS);
+  assert.ok(boss);
+  await assert.rejects(() => deleteUser(boss.id, " Diretoria@Teste.Local ", db.pool), /não pode remover o próprio cadastro/);
+  assert.ok((await listUsers(db.pool)).some((user) => user.email === BOSS));
 });

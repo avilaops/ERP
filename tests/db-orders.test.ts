@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { after, before, test } from "node:test";
 import { decideApproval, lastDecision, listPastDecisions, listPendingApprovals } from "@/lib/db/approvals";
-import { createCustomer } from "@/lib/db/customers";
+import { createCustomer, deleteCustomer } from "@/lib/db/customers";
 import { listDashboardOrders, ordersProfit } from "@/lib/db/dashboard";
 import {
   addOrderItem,
@@ -1035,6 +1035,11 @@ test("recebimento parcial: a parcela fica em aberto pelo que falta, e a comissã
   await decideRefund(request.id, true, DIRECTOR, "2026-10-06", db.pool);
   const back = (await listOpenReceivables(db.pool)).find((item) => item.id === down.id);
   assert.deepEqual([back?.amount, back?.open], [20000, 5000]);
+});
+
+test("cliente com pedido não se remove", { skip }, async () => {
+  await assert.rejects(() => deleteCustomer(customerMa, db.pool), /tem pedidos e não pode ser removido/);
+  assert.equal((await order("260930-BBMN")).customer?.id, customerMa);
 });
 
 test("a migração dos pedidos não tem cascata nem coluna de preço, custo ou total", () => {

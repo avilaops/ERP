@@ -103,3 +103,19 @@ export async function launchFixedExpenses(month: string, who: string, conn: Quer
   );
   return { launched: rows.length };
 }
+
+const FOREIGN_KEY_VIOLATION = "23503";
+
+/** Removes a fixed expense never launched. One with bills already launched has history: it is turned off instead. */
+export async function deleteFixedExpense(id: number, conn: Queryable): Promise<void> {
+  try {
+    const { rows } = await conn.query("DELETE FROM fixed_expenses WHERE id = $1 RETURNING id", [id]);
+    if (rows.length === 0) throw new FixedExpenseError("Despesa fixa não encontrada.");
+    await conn.query(SYNC);
+  } catch (error) {
+    if (pgErrorCode(error) === FOREIGN_KEY_VIOLATION) {
+      throw new FixedExpenseError("Esta despesa já teve contas lançadas e não pode ser removida. Desmarque “Em uso” para ela sair dos próximos meses.");
+    }
+    throw error;
+  }
+}
