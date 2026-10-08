@@ -1,3 +1,5 @@
+import { ActionForm } from "../pedidos/ActionForm";
+import { createOrderAction } from "../pedidos/actions";
 import Link from "next/link";
 import { requirePermission } from "@/lib/auth";
 import { tenantDb } from "@/lib/db/pool";
@@ -67,6 +69,8 @@ export default async function TabelaPrecosPage({
   // Who approves orders sees how far the discount may go by destination. The percentages are
   // calculated on the server from the parameters of the version; no cost and no target leave.
   const approves = allows(session, "aprovacoes");
+  // Who sells opens an order straight from the line of the equipment.
+  const sells = allows(session, "pedidos");
   const board = approves ? await loadDiscountLimits(table.version, conn) : null;
   // The directors' own limit is the target; the manager's is what the company lets them approve alone.
   const upTo = costs || (approves && (await loadApprovalPolicy(conn)).managerLimit === "meta") ? "atTarget" : "noLoss";
@@ -192,6 +196,11 @@ export default async function TabelaPrecosPage({
                       {column}
                     </th>
                   ))}
+                  {sells && (
+                    <th scope="col" className="px-4 py-2">
+                      <span className="sr-only">Abrir pedido</span>
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -209,6 +218,19 @@ export default async function TabelaPrecosPage({
                         {cell}
                       </td>
                     ))}
+                    {sells && (
+                      <td className="px-4 py-2 text-right">
+                        {/* Opens an order with one unit of this equipment, at the version on the screen. */}
+                        <ActionForm action={createOrderAction}>
+                          <input type="hidden" name="version" value={table.version} />
+                          <input type="hidden" name="productId" value={row.id} />
+                          <input type="hidden" name="quantity" value="1" />
+                          <button type="submit" className="whitespace-nowrap rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold hover:bg-slate-100">
+                            + Pedido
+                          </button>
+                        </ActionForm>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

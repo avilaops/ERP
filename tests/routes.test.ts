@@ -395,3 +395,10 @@ test("orçamento em PDF: sai da conta da equipe, nunca lê custo, e o escopo vem
   assert.ok(page.slice(link - 120, link).includes("order.items.length > 0"));
   assert.match(page.slice(link, link + 200), /target="_blank" rel="noopener"[^>]*>\s*Salvar PDF/);
 });
+
+test("tabela de preços: o + Pedido de cada linha só aparece para quem vende e usa a ação de criar pedido", () => {
+  const page = readFileSync(new URL("../src/app/(app)/tabela-precos/page.tsx", import.meta.url), "utf8");
+  assert.ok(page.includes('const sells = allows(session, "pedidos");'));
+  assert.ok(page.includes("{sells && ("));
+  assert.ok(page.includes("<ActionForm action={createOrderAction}>"));
+});
