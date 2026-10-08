@@ -43,7 +43,12 @@ function sameParams(a: PricingParams, b: PricingParams): boolean {
   const { stateRates: ratesB, ...scalarsB } = b;
   const keys = Object.keys(scalarsA) as (keyof typeof scalarsA)[];
   if (keys.some((key) => scalarsA[key] !== scalarsB[key])) return false;
-  return UFS.every((uf) => ratesA[uf].internalIcms === ratesB[uf].internalIcms && ratesA[uf].fcp === ratesB[uf].fcp);
+  return UFS.every(
+    (uf) =>
+      ratesA[uf].internalIcms === ratesB[uf].internalIcms &&
+      ratesA[uf].fcp === ratesB[uf].fcp &&
+      (ratesA[uf].outboundIcms ?? null) === (ratesB[uf].outboundIcms ?? null),
+  );
 }
 
 export type PendingChanges = {

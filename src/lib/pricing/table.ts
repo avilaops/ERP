@@ -1,9 +1,11 @@
 import { assertAmount, RATE_EPSILON } from "@/lib/pricing/money";
+import { validateParams } from "@/lib/pricing/params";
 import type { PricingParams } from "@/lib/pricing/params";
 import { realCost } from "@/lib/pricing/product";
 import type { ProductCost } from "@/lib/pricing/product";
 import { ORIGIN_UF, UFS } from "@/lib/pricing/states";
-import { preTaxProfit, totalRate, worstCase } from "@/lib/pricing/taxes";
+import type { Uf } from "@/lib/pricing/states";
+import { outboundIcms, preTaxProfit, totalRate, worstCase } from "@/lib/pricing/taxes";
 import type { Destination } from "@/lib/pricing/taxes";
 
 /** Share of the sale left to pay the equipment; never zero or negative. */
@@ -89,5 +91,44 @@ export function productPrices(cost: ProductCost, params: PricingParams): Product
     tableWithIpi: withIpi(table, params),
     maxSp: maxDiscounts(item, params, { uf: ORIGIN_UF, taxpayer: false }).atTarget,
     maxTaxpayer: maxDiscounts(item, params, { uf: OUTSIDE_UF, taxpayer: true }).atTarget,
+  };
+}
+
+/** One destination of the board of limits: inside the origin state, a taxpayer outside it (by outbound rate), or a state without registration. */
+export type DestinationLimit = {
+  /** `SP`, `IE 7%`, `MA`… */
+  label: string;
+  /** Largest discount that keeps the target, never below zero. */
+  atTarget: number;
+  /** Largest discount without loss, never below zero. */
+  noLoss: number;
+};
+
+/**
+ * The largest discount by destination, for an order without freight or fixed
+ * fee. The table price is the cost times one multiplier, so the limit is the
+ * same for every equipment. First the origin state, then one line for each
+ * outbound rate a taxpayer outside it may have, then every other state for a
+ * customer without registration.
+ */
+export function limitsByDestination(params: PricingParams): { limits: DestinationLimit[]; keyOf: (destination: Destination) => string } {
+  validateParams(params);
+  const item = { tableTotal: tableMultiplier(params), cost: 1 };
+  const limit = (label: string, destination: Destination): DestinationLimit => {
+    const max = maxDiscounts(item, params, destination);
+    return { label, atTarget: Math.max(0, max.atTarget), noLoss: Math.max(0, max.noLoss) };
+  };
+  const taxpayerLabel = (uf: Uf) => `IE ${(Math.round(outboundIcms(params, uf) * 1000) / 10).toString().replace(".", ",")}%`;
+  const outside = UFS.filter((uf) => uf !== ORIGIN_UF);
+  const taxpayers = new Map<string, Uf>();
+  for (const uf of outside) if (!taxpayers.has(taxpayerLabel(uf))) taxpayers.set(taxpayerLabel(uf), uf);
+
+  return {
+    limits: [
+      limit(ORIGIN_UF, { uf: ORIGIN_UF, taxpayer: false }),
+      ...[...taxpayers].sort(([, a], [, b]) => outboundIcms(params, a) - outboundIcms(params, b)).map(([label, uf]) => limit(label, { uf, taxpayer: true })),
+      ...outside.map((uf) => limit(uf, { uf, taxpayer: false })),
+    ],
+    keyOf: ({ uf, taxpayer }) => (uf === ORIGIN_UF ? ORIGIN_UF : taxpayer ? taxpayerLabel(uf) : uf),
   };
 }

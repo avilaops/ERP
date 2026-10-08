@@ -39,13 +39,15 @@ export function rowsToStateRates(rows: Record<string, unknown>[]): StateRates {
   const rates: Partial<StateRates> = {};
   for (const row of rows) {
     rates[row.uf as Uf] = { internalIcms: Number(row.internal_icms), fcp: Number(row.fcp) };
+    // Only when the state has a rate of its own: without it the general interstate rate applies.
+    if (row.outbound_icms !== null && row.outbound_icms !== undefined) rates[row.uf as Uf]!.outboundIcms = Number(row.outbound_icms);
   }
   return rates as StateRates;
 }
 
 /** The three columns of the rates by state, each as an array in the order of UFS: what `unnest` takes. */
-export function stateRateArrays(rates: StateRates): [Uf[], number[], number[]] {
-  return [[...UFS], UFS.map((uf) => rates[uf].internalIcms), UFS.map((uf) => rates[uf].fcp)];
+export function stateRateArrays(rates: StateRates): [Uf[], number[], number[], (number | null)[]] {
+  return [[...UFS], UFS.map((uf) => rates[uf].internalIcms), UFS.map((uf) => rates[uf].fcp), UFS.map((uf) => rates[uf].outboundIcms ?? null)];
 }
 
 /**
@@ -72,7 +74,7 @@ export async function loadParams(conn: Queryable): Promise<PricingParams> {
   const row = rows[0];
   if (!row) throw new Error("Parâmetros não cadastrados no banco. Rode `npm run db:migrate`.");
 
-  const rates = await conn.query("SELECT uf, internal_icms, fcp FROM state_tax_rates");
+  const rates = await conn.query("SELECT uf, internal_icms, fcp, outbound_icms FROM state_tax_rates");
   return rowToParams(row, rowsToStateRates(rates.rows));
 }
 
@@ -83,7 +85,8 @@ export async function saveParams(params: PricingParams, updatedBy: string, conn:
   if (updatedBy.trim() === "") throw new Error("Falta dizer quem está gravando os parâmetros.");
 
   const values = COLUMNS.map(([field]) => params[field]);
-  const placeholders = COLUMNS.map((_, index) => `$${index + 5}`).join(", ");
+  // $1 is who saves and $2 to $5 are the four columns of the rates by state; the parameters come after.
+  const placeholders = COLUMNS.map((_, index) => `$${index + 6}`).join(", ");
   const updates = COLUMNS.map(([, column]) => `${column} = EXCLUDED.${column}`).join(", ");
   // One statement: the single row and the 27 states are written together or not at all.
   await conn.query(
@@ -93,12 +96,14 @@ export async function saveParams(params: PricingParams, updatedBy: string, conn:
        ON CONFLICT (id) DO UPDATE SET ${updates}, updated_at = now(), updated_by = EXCLUDED.updated_by
        RETURNING updated_by
      )
-     INSERT INTO state_tax_rates (uf, internal_icms, fcp, updated_by)
-     SELECT rate.uf, rate.internal_icms, rate.fcp, saved.updated_by
-       FROM saved, unnest($2::text[], $3::numeric[], $4::numeric[]) AS rate (uf, internal_icms, fcp)
+     INSERT INTO state_tax_rates (uf, internal_icms, fcp, outbound_icms, updated_by)
+     SELECT rate.uf, rate.internal_icms, rate.fcp, rate.outbound_icms, saved.updated_by
+       FROM saved, unnest($2::text[], $3::numeric[], $4::numeric[], $5::numeric[]) AS rate (uf, internal_icms, fcp, outbound_icms)
      ON CONFLICT (uf) DO UPDATE
-        SET internal_icms = EXCLUDED.internal_icms, fcp = EXCLUDED.fcp, updated_at = now(), updated_by = EXCLUDED.updated_by
-      WHERE state_tax_rates.internal_icms <> EXCLUDED.internal_icms OR state_tax_rates.fcp <> EXCLUDED.fcp`,
+        SET internal_icms = EXCLUDED.internal_icms, fcp = EXCLUDED.fcp, outbound_icms = EXCLUDED.outbound_icms,
+            updated_at = now(), updated_by = EXCLUDED.updated_by
+      WHERE state_tax_rates.internal_icms <> EXCLUDED.internal_icms OR state_tax_rates.fcp <> EXCLUDED.fcp
+         OR state_tax_rates.outbound_icms IS DISTINCT FROM EXCLUDED.outbound_icms`,
     [updatedBy, ...stateRateArrays(params.stateRates), ...values],
   );
 }

@@ -91,7 +91,9 @@ export function ParamsForm({ saved, action }: { saved: ParamsFormValues; action:
           <p className="max-w-3xl text-xs text-slate-500">
             Alíquota interna de cada estado e o Fundo de Combate à Pobreza (FCP). Na venda para cliente não contribuinte
             de outro estado, o DIFAL que fica com a empresa é a alíquota interna do destino menos a interestadual, mais o
-            FCP. Confirme os números com o contador; se a lei mudar, é aqui que se altera.
+            FCP. O ICMS de saída é o que a venda para aquele estado paga na origem: em branco vale o ICMS interestadual
+            geral; produto nacional usa 7% ou 12% conforme o destino. Confirme os números com o contador; se a lei mudar,
+            é aqui que se altera.
           </p>
           <div className="mt-4 grid gap-x-10 gap-y-2 md:grid-cols-2">
             {UFS.map((uf) => (

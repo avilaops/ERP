@@ -240,6 +240,14 @@ test("Dashboard, Preços e metas e Simulador: custo e lucro só para quem pode v
   assert.doesNotMatch(goals, /text\("month"\)/);
 });
 
+test("Tabela de preços: a alçada por destino é só para quem aprova, e sai pronta do servidor", () => {
+  const code = source("/tabela-precos");
+  assert.ok(code.includes('const approves = allows(session, "aprovacoes");'));
+  assert.ok(code.includes("approves ? await loadDiscountLimits(table.version, conn) : null"));
+  // A página não calcula alçada com parâmetros: recebe só os percentuais.
+  assert.doesNotMatch(code, /limitsByDestination|loadParams|targetNetProfit/);
+});
+
 test("comissões e estorno: o escopo e quem decide saem da sessão", () => {
   const page = source("/comissoes");
   assert.ok(page.includes("const manages = managesCommissions(session.role);"));

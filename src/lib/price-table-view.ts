@@ -21,15 +21,25 @@ const NONE = "—";
  * cannot reach the browser. With it, those columns are calculated by the engine
  * from the costs and the parameters of that same version, never from the draft.
  */
-export function priceTableView(table: PublishedTable, snapshot: PublishedSnapshot | null, search: string): PriceTableView {
+export function priceTableView(
+  table: PublishedTable,
+  snapshot: PublishedSnapshot | null,
+  search: string,
+  /** For who approves orders: the largest discount of the destination chosen. `null` for the rest of the team. */
+  authority: number | null = null,
+): PriceTableView {
   const costs = new Map(snapshot?.items.map((item) => [item.productId, item]));
   const freeDiscount = `${formatPercent(table.freeDiscount)}%`;
+  const authorityColumns = authority === null ? [] : [`Com ${freeDiscount} de desconto`, "Máx. sua alçada", "Menor preço"];
 
   const rows = table.items
     .filter((item) => matchesText([item.name, item.code], search))
     .sort((a, b) => compareByCode(a, b) || a.productId - b.productId)
     .map((item) => {
       const cells = [showMoney(item.table), showMoney(item.tableWithIpi), freeDiscount];
+      if (authority !== null) {
+        cells.push(showMoney(roundCents(item.table * (1 - table.freeDiscount))), showPercent(authority), showMoney(roundCents(item.table * (1 - authority))));
+      }
       if (snapshot) {
         const cost = costs.get(item.productId);
         const prices = cost ? productPrices(cost, snapshot.params) : null;
@@ -43,7 +53,7 @@ export function priceTableView(table: PublishedTable, snapshot: PublishedSnapsho
     });
 
   return {
-    columns: snapshot ? [...TEAM_COLUMNS, ...DIRECTOR_COLUMNS] : TEAM_COLUMNS,
+    columns: [...TEAM_COLUMNS, ...authorityColumns, ...(snapshot ? DIRECTOR_COLUMNS : [])],
     rows,
     counter: rows.length === 1 ? "1 equipamento" : `${rows.length} equipamentos`,
   };

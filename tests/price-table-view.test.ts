@@ -122,3 +122,15 @@ test("qual versão aparece: só quem pode escolher sai da mais nova", () => {
   assert.equal(chosenVersion(true, "1", []), null);
   assert.equal(chosenVersion(false, undefined, []), null);
 });
+
+test("quem aprova vê, para o destino escolhido, o preço com o desconto livre, a alçada e o menor preço", () => {
+  const view = priceTableView(TABLE, null, "", 0.378);
+  assert.deepEqual(view.columns.slice(3), [`Com ${view.rows[0].cells[2]} de desconto`, "Máx. sua alçada", "Menor preço"]);
+  const [first] = TABLE.items.filter((item) => item.productId === view.rows[0].id);
+  const money = (value: number) => (Math.round(value * 100) / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  assert.equal(view.rows[0].cells[3].replace("R$ ", ""), money(first.table * (1 - TABLE.freeDiscount)));
+  assert.equal(view.rows[0].cells[4], "37,8%");
+  assert.equal(view.rows[0].cells[5].replace("R$ ", ""), money(first.table * (1 - 0.378)));
+  // Sem alçada (vendedor), as colunas não existem.
+  assert.equal(priceTableView(TABLE, null, "").columns.length, 3);
+});

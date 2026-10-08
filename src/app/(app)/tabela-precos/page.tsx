@@ -1,9 +1,13 @@
 import Link from "next/link";
 import { requirePermission } from "@/lib/auth";
 import { tenantDb } from "@/lib/db/pool";
-import { menuItem, seesCosts } from "@/lib/auth/permissions";
-import { latestVersion, listVersions, loadPublishedSnapshot, loadPublishedTable } from "@/lib/db/price-table";
-import { showDate } from "@/lib/format";
+import { allows, menuItem, seesCosts } from "@/lib/auth/permissions";
+import { loadApprovalPolicy } from "@/lib/db/company";
+import { latestVersion, listVersions, loadDiscountLimits, loadPublishedSnapshot, loadPublishedTable } from "@/lib/db/price-table";
+import { showDate, showPercent } from "@/lib/format";
+import { UF_NAMES } from "@/lib/order-form";
+import { ORIGIN_UF, UFS } from "@/lib/pricing/states";
+import type { Uf } from "@/lib/pricing/states";
 import { chosenVersion, priceTableView } from "@/lib/price-table-view";
 
 const ITEM = menuItem("tabela-precos");
@@ -60,11 +64,55 @@ export default async function TabelaPrecosPage({
     );
   }
 
-  const view = priceTableView(table, snapshot, search);
+  // Who approves orders sees how far the discount may go by destination. The percentages are
+  // calculated on the server from the parameters of the version; no cost and no target leave.
+  const approves = allows(session, "aprovacoes");
+  const board = approves ? await loadDiscountLimits(table.version, conn) : null;
+  // The directors' own limit is the target; the manager's is what the company lets them approve alone.
+  const upTo = costs || (approves && (await loadApprovalPolicy(conn)).managerLimit === "meta") ? "atTarget" : "noLoss";
+  const typedUf = (first(query.uf) ?? "").toUpperCase();
+  const destinationUf: Uf = (UFS as readonly string[]).includes(typedUf) ? (typedUf as Uf) : ORIGIN_UF;
+  const taxpayer = first(query.ie) === "sim";
+  const chosen = board ? (board.limits.find((limit) => limit.label === board.keyOf({ uf: destinationUf, taxpayer })) ?? null) : null;
+  const view = priceTableView(table, snapshot, search, chosen ? chosen[upTo] : null);
+  const top = board ? Math.max(...board.limits.map((limit) => limit[upTo]), table.freeDiscount) : 0;
 
   return (
     <>
       {heading}
+
+      {board && (
+        <section className="mt-6 rounded-lg border border-slate-200 bg-white" aria-labelledby="alcada">
+          <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-slate-200 px-5 py-3">
+            <h2 id="alcada" className="text-sm font-semibold uppercase tracking-wide">
+              {costs ? "Desconto máximo na meta, por destino" : "Sua alçada de desconto por destino"}
+            </h2>
+            <p className="text-xs text-slate-600">sem frete por nossa conta · a linha marca os {showPercent(table.freeDiscount, 0)} livres do vendedor</p>
+          </div>
+          <ul className="grid gap-x-8 gap-y-1.5 p-5 sm:grid-cols-2 xl:grid-cols-3">
+            {board.limits.map((limit) => {
+              const value = limit[upTo];
+              return (
+                <li key={limit.label} className="flex items-center gap-3 text-sm">
+                  <span className="w-14 shrink-0 font-medium">{limit.label}</span>
+                  <span className="relative h-2.5 flex-1 rounded bg-slate-100">
+                    <span
+                      className={`absolute inset-y-0 left-0 rounded ${value > table.freeDiscount + 0.0001 ? "bg-emerald-500" : "bg-slate-400"}`}
+                      style={{ width: `${top > 0 ? (value / top) * 100 : 0}%` }}
+                    />
+                    <span className="absolute -inset-y-0.5 w-px bg-slate-700" style={{ left: `${top > 0 ? (table.freeDiscount / top) * 100 : 0}%` }} />
+                  </span>
+                  <span className="w-14 shrink-0 text-right font-semibold">{showPercent(value)}</span>
+                </li>
+              );
+            })}
+          </ul>
+          <p className="border-t border-slate-200 px-5 py-3 text-xs text-slate-600">
+            As linhas “IE …%” são venda para outro estado com cliente contribuinte (tem inscrição estadual), conforme o ICMS de saída para
+            o destino. As siglas são cliente sem inscrição estadual naquele estado.
+          </p>
+        </section>
+      )}
 
       <section className="mt-6 rounded-lg border border-slate-200 bg-white" aria-label="Tabela publicada">
         <div className="flex flex-wrap items-end justify-between gap-4 p-4">
@@ -96,8 +144,33 @@ export default async function TabelaPrecosPage({
                 aria-label="Buscar nome ou código"
                 className="min-w-0 flex-1 rounded border border-slate-300 px-3 py-2 text-sm sm:w-72 sm:flex-none outline-none focus:ring-2 focus:ring-brand"
               />
+              {board && (
+                <>
+                  <select
+                    name="uf"
+                    defaultValue={destinationUf}
+                    aria-label="Estado de destino"
+                    className="rounded border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand"
+                  >
+                    {UFS.map((uf) => (
+                      <option key={uf} value={uf}>
+                        {uf} — {UF_NAMES[uf]}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    name="ie"
+                    defaultValue={taxpayer ? "sim" : "nao"}
+                    aria-label="Cliente tem inscrição estadual?"
+                    className="rounded border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand"
+                  >
+                    <option value="nao">Sem IE</option>
+                    <option value="sim">Com IE</option>
+                  </select>
+                </>
+              )}
               <button type="submit" className="rounded border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50">
-                Buscar
+                {board ? "Ver" : "Buscar"}
               </button>
             </form>
           </div>

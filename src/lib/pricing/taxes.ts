@@ -20,10 +20,15 @@ export type SaleTaxes = {
 export function saleTaxes(params: PricingParams, destination: Destination): SaleTaxes {
   if (!UFS.includes(destination.uf)) throw new Error(`UF de destino inválida: "${destination.uf}".`);
   if (destination.uf === ORIGIN_UF) return { icms: params.icmsSp, difal: 0 };
-  const icms = params.icmsInterstate;
-  if (destination.taxpayer) return { icms, difal: 0 };
   const state = params.stateRates[destination.uf];
+  const icms = outboundIcms(params, destination.uf);
+  if (destination.taxpayer) return { icms, difal: 0 };
   return { icms, difal: Math.max(0, state.internalIcms - icms) + state.fcp };
+}
+
+/** The ICMS a sale to another state leaves with: the one of that destination, or the general interstate rate. */
+export function outboundIcms(params: PricingParams, uf: Uf): number {
+  return params.stateRates[uf].outboundIcms ?? params.icmsInterstate;
 }
 
 /** What every sale pays over the value without IPI, whatever the destination. */

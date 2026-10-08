@@ -15,6 +15,12 @@ export type StateRate = {
   internalIcms: number;
   /** Fundo de Combate à Pobreza of the state, paid together with the DIFAL. */
   fcp: number;
+  /**
+   * ICMS the sale leaves the origin state with when it goes to this state: a
+   * national product pays 7% or 12% depending on the destination. `null` or
+   * absent: the general interstate rate of the parameters.
+   */
+  outboundIcms?: number | null;
 };
 
 export type StateRates = Record<Uf, StateRate>;

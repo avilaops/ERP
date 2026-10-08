@@ -1,3 +1,6 @@
+import { limitsByDestination } from "@/lib/pricing/table";
+import type { DestinationLimit } from "@/lib/pricing/table";
+import type { Destination } from "@/lib/pricing/taxes";
 import { PARAM_COLUMN_LIST, PARAM_COLUMNS, rowsToStateRates, rowToParams, stateRateArrays } from "@/lib/db/params";
 import { pgErrorCode } from "@/lib/db/pool";
 import type { Queryable } from "@/lib/db/pool";
@@ -81,7 +84,7 @@ export async function loadPublishedSnapshot(version: number, conn: Queryable): P
        FROM price_table_items WHERE version = $1 ORDER BY product_id`,
     [version],
   );
-  const rates = await conn.query("SELECT uf, internal_icms, fcp FROM price_table_state_rates WHERE version = $1", [version]);
+  const rates = await conn.query("SELECT uf, internal_icms, fcp, outbound_icms FROM price_table_state_rates WHERE version = $1", [version]);
   return {
     ...toVersion(rows[0]),
     params: rowToParams(rows[0], rowsToStateRates(rates.rows)),
@@ -139,8 +142,8 @@ export async function publishPriceTable(
   assertDraft(draft, version, publishedBy);
 
   const items = draft.items;
-  // $1 to $13 are the version, who publishes, the items and the rates by state; the fifteen parameters come after.
-  const placeholders = PARAM_COLUMNS.map((_, index) => `$${index + 14}::numeric`).join(", ");
+  // $1 to $14 are the version, who publishes, the items and the rates by state; the parameters come after.
+  const placeholders = PARAM_COLUMNS.map((_, index) => `$${index + 15}::numeric`).join(", ");
   try {
     const { rows } = await conn.query(
       `WITH published AS (
@@ -158,9 +161,9 @@ export async function publishPriceTable(
                   AS item (product_id, code, name, advisory_cost, tax_credit, packaging, table_price, table_price_with_ipi)
          RETURNING version
        ), rates AS (
-         INSERT INTO price_table_state_rates (version, uf, internal_icms, fcp)
-         SELECT published.version, rate.uf, rate.internal_icms, rate.fcp
-           FROM published, unnest($11::text[], $12::numeric[], $13::numeric[]) AS rate (uf, internal_icms, fcp)
+         INSERT INTO price_table_state_rates (version, uf, internal_icms, fcp, outbound_icms)
+         SELECT published.version, rate.uf, rate.internal_icms, rate.fcp, rate.outbound_icms
+           FROM published, unnest($11::text[], $12::numeric[], $13::numeric[], $14::numeric[]) AS rate (uf, internal_icms, fcp, outbound_icms)
          RETURNING version
        )
        SELECT version, published_at, published_by FROM published
@@ -224,6 +227,22 @@ export async function loadPublishedTable(version: number, conn: Queryable): Prom
       tableWithIpi: Number(row.table_price_with_ipi),
     })),
   };
+}
+
+/** The board of discount limits of one version: percentages by destination, nothing else. */
+export type DiscountLimits = { limits: DestinationLimit[]; keyOf: (destination: Destination) => string };
+
+/**
+ * How much discount an order may have by destination, in one version, for who
+ * approves orders. The parameters of the version (target included) are used
+ * here, on the server, and only the percentages leave: no cost and no target.
+ */
+export async function loadDiscountLimits(version: number, conn: Queryable): Promise<DiscountLimits | null> {
+  if (!Number.isSafeInteger(version) || version <= 0) return null;
+  const { rows } = await conn.query(`SELECT ${COLUMN_LIST} FROM price_table_versions WHERE version = $1`, [version]);
+  if (!rows[0]) return null;
+  const rates = await conn.query("SELECT uf, internal_icms, fcp, outbound_icms FROM price_table_state_rates WHERE version = $1", [version]);
+  return limitsByDestination(rowToParams(rows[0], rowsToStateRates(rates.rows)));
 }
 
 /** Every publication, from the newest to the oldest. */

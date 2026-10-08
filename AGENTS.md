@@ -161,6 +161,14 @@ funções puras, sem banco e sem tela, conferidas com os números dos prints do 
 8. O quadro Resultado da tela de Parâmetros (multiplicador, pior destino, equilíbrio e
    entrada mínima sugerida) é `paramsResult`, em `results.ts`.
 
+11. **O ICMS de saída é por estado de destino** (migração `0018`, `outboundIcms` em `stateRates`):
+    produto nacional sai com 7% ou 12% conforme o destino; em branco vale o "ICMS interestadual"
+    geral (importado com FCI). `saleTaxes` e o DIFAL usam o do destino. **A alçada por destino**
+    é `limitsByDestination` (origem, uma linha "IE x%" por alíquota de saída e cada estado sem
+    IE): na Tabela de preços só quem aprova a recebe, já em percentuais
+    (`loadDiscountLimits`), sem custo e sem meta. Conferido contra o motor do protótipo
+    "Ludus Nacional" rodando isolado: multiplicador, os 29 destinos e um pedido inteiro batem.
+
 10. **Provisões e taxa fixa por pedido são parâmetros** (migração `0013`): perdas, garantia e
     inadimplência somam em `channelRate`; a taxa fixa sai do lucro do pedido uma vez, junto com o
     frete (`quoteOrder`, `orderMaxDiscounts`). Entram com zero, e "Outras taxas da venda" segue

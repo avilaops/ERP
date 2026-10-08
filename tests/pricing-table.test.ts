@@ -5,7 +5,7 @@ import { DEFAULT_PARAMS, validateParams } from "@/lib/pricing/params";
 import type { PricingParams } from "@/lib/pricing/params";
 import { chinaPayment, realCost } from "@/lib/pricing/product";
 import { DEFAULT_STATE_RATES, UFS } from "@/lib/pricing/states";
-import { discountedMultiplier, maxDiscounts, productPrices, tableMultiplier, tablePrice, withIpi } from "@/lib/pricing/table";
+import { discountedMultiplier, maxDiscounts, productPrices, tableMultiplier, tablePrice, withIpi, limitsByDestination } from "@/lib/pricing/table";
 import { channelRate, preTaxProfit, saleTaxes, worstCase } from "@/lib/pricing/taxes";
 
 const P = DEFAULT_PARAMS;
@@ -287,4 +287,42 @@ test("desconto máximo por destino (colunas Máx. SP e Máx. c/IE)", () => {
 
 test("desconto máximo: total de tabela zerado dá erro", () => {
   assert.throws(() => maxDiscounts({ tableTotal: 0, cost: 10 }, P, { uf: "SP", taxpayer: true }), /maior que zero/);
+});
+
+test("alçada por destino, importado: uma linha de IE só, e o pior destino fica no desconto livre", () => {
+  const { limits, keyOf } = limitsByDestination(P);
+  assert.deepEqual(limits.slice(0, 3).map((limit) => limit.label), ["SP", "IE 4%", "AC"]);
+  assert.equal(limits.length, 2 + 26);
+  // A tabela é feita para o pior destino (MA sem IE) aguentar o desconto livre na meta.
+  const ma = limits.find((limit) => limit.label === "MA");
+  assert.equal(ma?.atTarget.toFixed(4), P.freeDiscount.toFixed(4));
+  assert.ok(limits.every((limit) => limit.atTarget >= P.freeDiscount - 1e-9 && limit.noLoss > limit.atTarget));
+  assert.deepEqual([keyOf({ uf: "SP", taxpayer: true }), keyOf({ uf: "MA", taxpayer: true }), keyOf({ uf: "MA", taxpayer: false })], ["SP", "IE 4%", "MA"]);
+});
+
+test("produto nacional: o ICMS de saída é do destino (7% ou 12%), e o DIFAL é o que a alíquota interna passa dele", () => {
+  const north = ["AC", "AL", "AM", "AP", "BA", "CE", "DF", "ES", "GO", "MA", "MS", "MT", "PA", "PB", "PE", "PI", "RN", "RO", "RR", "SE", "TO"];
+  const stateRates = Object.fromEntries(
+    Object.entries(P.stateRates).map(([uf, rate]) => [uf, uf === "SP" ? rate : { ...rate, outboundIcms: north.includes(uf) ? 0.07 : 0.12 }]),
+  ) as typeof P.stateRates;
+  const national = { ...P, stateRates };
+
+  assert.deepEqual(saleTaxes(national, { uf: "SP", taxpayer: false }), { icms: 0.18, difal: 0 });
+  // MA: sai com 7%, interna de 23% → DIFAL de 16%. Com IE não há DIFAL.
+  const ma = saleTaxes(national, { uf: "MA", taxpayer: false });
+  assert.deepEqual([ma.icms, ma.difal.toFixed(4)], [0.07, "0.1600"]);
+  assert.deepEqual(saleTaxes(national, { uf: "MA", taxpayer: true }), { icms: 0.07, difal: 0 });
+  // RJ: sai com 12%, interna de 22% → DIFAL de 10%.
+  const rj = saleTaxes(national, { uf: "RJ", taxpayer: false });
+  assert.deepEqual([rj.icms, rj.difal.toFixed(4)], [0.12, "0.1000"]);
+  // Estado sem alíquota própria continua na interestadual geral.
+  assert.equal(saleTaxes(P, { uf: "MA", taxpayer: true }).icms, P.icmsInterstate);
+
+  const { limits, keyOf } = limitsByDestination(national);
+  assert.deepEqual(limits.slice(0, 4).map((limit) => limit.label), ["SP", "IE 7%", "IE 12%", "AC"]);
+  assert.deepEqual([keyOf({ uf: "MA", taxpayer: true }), keyOf({ uf: "RJ", taxpayer: true }), keyOf({ uf: "RJ", taxpayer: false })], ["IE 7%", "IE 12%", "RJ"]);
+  // Quem paga menos imposto no destino aguenta mais desconto: IE 7% > IE 12% > SP.
+  const of = (label: string) => limits.find((limit) => limit.label === label)?.atTarget ?? 0;
+  assert.ok(of("IE 7%") > of("IE 12%") && of("IE 12%") > of("SP"));
+  assert.throws(() => limitsByDestination({ ...national, stateRates: { ...stateRates, MA: { ...stateRates.MA, outboundIcms: 1 } } }), /ICMS de saída para MA/);
 });

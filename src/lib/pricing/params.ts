@@ -130,6 +130,9 @@ export function validateParams(params: PricingParams): void {
     if (!isRate(state.internalIcms)) {
       throw new Error(`Parâmetro inválido: "ICMS interno de ${uf}" precisa ser uma taxa de 0% até menos de 100%.`);
     }
+    if (state.outboundIcms != null && !isRate(state.outboundIcms)) {
+      throw new Error(`Parâmetro inválido: "ICMS de saída para ${uf}" precisa ser uma taxa de 0% até menos de 100%, ou ficar em branco.`);
+    }
     if (!isRate(state.fcp)) {
       throw new Error(`Parâmetro inválido: "FCP de ${uf}" precisa ser uma taxa de 0% até menos de 100%.`);
     }

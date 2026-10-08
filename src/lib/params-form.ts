@@ -6,8 +6,8 @@ import type { StateRates, Uf } from "@/lib/pricing/states";
 /** A field that is one number of the parameters. */
 export type ParamKey = keyof ScalarParams;
 
-/** A cell of the table of rates by state: `icms-MA` or `fcp-MA`. */
-export type StateRateKey = `icms-${Uf}` | `fcp-${Uf}`;
+/** A cell of the table of rates by state: `icms-MA`, `fcp-MA` or `saida-MA`. */
+export type StateRateKey = `icms-${Uf}` | `fcp-${Uf}` | `saida-${Uf}`;
 
 /** Any field of the form. */
 export type FormKey = ParamKey | StateRateKey;
@@ -15,9 +15,11 @@ export type FormKey = ParamKey | StateRateKey;
 export const STATE_RATE_COLUMNS = [
   { prefix: "icms", label: "ICMS interno", field: "internalIcms" },
   { prefix: "fcp", label: "FCP", field: "fcp" },
+  // Blank is "the general interstate rate": a national product fills it with 7% or 12% by destination.
+  { prefix: "saida", label: "ICMS de saída", field: "outboundIcms" },
 ] as const;
 
-const stateKey = (prefix: "icms" | "fcp", uf: Uf) => `${prefix}-${uf}` as StateRateKey;
+const stateKey = (prefix: "icms" | "fcp" | "saida", uf: Uf) => `${prefix}-${uf}` as StateRateKey;
 type FieldKind = "rate" | "days" | "money";
 
 export type ParamField = {
@@ -148,7 +150,10 @@ export function paramsToForm(params: PricingParams): ParamsFormValues {
   const values: Partial<ParamsFormValues> = {};
   for (const field of PARAM_FIELDS) values[field.key] = FORMATTERS[field.kind](params[field.key]);
   for (const uf of UFS) {
-    for (const { prefix, field } of STATE_RATE_COLUMNS) values[stateKey(prefix, uf)] = formatPercent(params.stateRates[uf][field]);
+    for (const { prefix, field } of STATE_RATE_COLUMNS) {
+      const rate = params.stateRates[uf][field];
+      values[stateKey(prefix, uf)] = rate === null || rate === undefined ? "" : formatPercent(rate);
+    }
   }
   return values as ParamsFormValues;
 }
@@ -178,10 +183,12 @@ export function parseParamsForm(read: (key: FormKey) => string | null): ParsedPa
 
   const stateRates: Partial<StateRates> = {};
   for (const uf of UFS) {
-    const rate = { internalIcms: 0, fcp: 0 };
+    const rate: { internalIcms: number; fcp: number; outboundIcms?: number } = { internalIcms: 0, fcp: 0 };
     for (const { prefix, label, field } of STATE_RATE_COLUMNS) {
       const key = stateKey(prefix, uf);
       const text = (read(key) ?? "").trim();
+      // Blank outbound rate is "use the general one": nothing to read.
+      if (text === "" && field === "outboundIcms") continue;
       const value = text === "" && field === "fcp" ? 0 : parsePercent(text);
       if (value === null) {
         errors.push(`"${label} de ${uf}": ${EXPECTED.rate}.`);
