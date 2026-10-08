@@ -74,7 +74,7 @@ export default async function NovoPedidoPage() {
             >
               {items.map((item) => (
                 <option key={item.productId} value={item.productId}>
-                  {[item.code, item.name, `${showMoney(item.tableWithIpi)} c/ IPI`].filter(Boolean).join(" · ")}
+                  {[item.code, item.name, table.ipi > 0 ? `${showMoney(item.tableWithIpi)} c/ IPI` : showMoney(item.table)].filter(Boolean).join(" · ")}
                 </option>
               ))}
             </select>

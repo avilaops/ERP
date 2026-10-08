@@ -202,3 +202,19 @@ test("o orçamento não carrega custo, lucro, comissão, DIFAL nem faixa do desc
   const code = readFileSync(new URL("../src/lib/quote/document.ts", import.meta.url), "utf8");
   assert.doesNotMatch(code, /loadPublishedSnapshot|directorOf|engineOrder|quoteOrder|realCost|advisoryCost|next\/|process\.env|new Date|Date\.now/);
 });
+
+test("empresa sem IPI: o orçamento não traz linha de IPI nem de valor sem IPI", () => {
+  const table = { ...TABLE, ipi: 0 };
+  const document = quoteDocument({
+    company: "Ludus Equipamentos",
+    order: ORDER,
+    table,
+    sale: saleOf(ORDER, table),
+    dates: dueDates(ORDER, table, TODAY),
+    products: PRODUCTS,
+    today: TODAY,
+  });
+  assert.equal(document.hasIpi, false);
+  assert.ok(document.totals.every((total) => !total.label.includes("IPI")));
+  assert.equal(document.totals.at(-1)?.label, "Total da nota");
+});

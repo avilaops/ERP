@@ -1,3 +1,4 @@
+import { DiscountFields } from "@/components/DiscountFields";
 import { requirePermission } from "@/lib/auth";
 import { menuItem, seesCosts } from "@/lib/auth/permissions";
 import { simulationBand } from "@/lib/db/orders";
@@ -65,11 +66,11 @@ export default async function SimuladorPage({ searchParams }: { searchParams: Pr
   const policyDownPayment = roundCents(table.minDownPayment * sale.invoiceTotal);
   const [line] = sale.lines;
 
+  const hasIpi = table.ipi > 0;
   const summary = [
-    ["Preço de tabela (unidade, sem IPI)", showMoney(line.unitPrice + line.unitDiscount)],
+    [hasIpi ? "Preço de tabela (unidade, sem IPI)" : "Preço de tabela (unidade)", showMoney(line.unitPrice)],
     [`Desconto (${showPercent(sale.discount)})`, `– ${showMoney(sale.tableTotal - sale.netSale)}`],
-    ["Valor sem IPI", showMoney(sale.netSale)],
-    [`IPI (${formatPercent(table.ipi)}%)`, showMoney(sale.ipi)],
+    ...(hasIpi ? ([["Valor sem IPI", showMoney(sale.netSale)], [`IPI (${formatPercent(table.ipi)}%)`, showMoney(sale.ipi)]] as const) : []),
   ] as const;
 
   return (
@@ -121,12 +122,12 @@ export default async function SimuladorPage({ searchParams }: { searchParams: Pr
               </label>
               <input id="qtd" name="qtd" type="text" inputMode="numeric" defaultValue={simulation.quantity} className={`${INPUT} text-right`} />
             </div>
-            <div>
-              <label htmlFor="desconto" className={LABEL}>
-                Desconto (%)
-              </label>
-              <input id="desconto" name="desconto" type="text" inputMode="decimal" defaultValue={formatPercent(simulation.discount)} className={`${INPUT} text-right`} />
-            </div>
+            <DiscountFields
+              key={`${simulation.productId}:${simulation.quantity}:${simulation.discount}`}
+              name="desconto"
+              percent={formatPercent(simulation.discount)}
+              tableTotal={sale.tableTotal}
+            />
             <div>
               <label htmlFor="frete" className={LABEL}>
                 Frete por nossa conta (R$)
@@ -170,7 +171,7 @@ export default async function SimuladorPage({ searchParams }: { searchParams: Pr
                 <dd className="border-t border-slate-200 pt-3 text-right text-2xl font-bold">{showMoney(sale.invoiceTotal)}</dd>
               </div>
               <div className="contents">
-                <dt className="text-slate-600">Preço por unidade, com IPI</dt>
+                <dt className="text-slate-600">{hasIpi ? "Preço por unidade, com IPI" : "Preço por unidade"}</dt>
                 <dd className="text-right font-medium">{showMoney(line.unitWithIpi)}</dd>
                 <dt className="text-slate-600">Entrada mínima da política ({showPercent(table.minDownPayment, 0)})</dt>
                 <dd className="text-right font-medium">{showMoney(policyDownPayment)}</dd>
@@ -194,7 +195,7 @@ export default async function SimuladorPage({ searchParams }: { searchParams: Pr
           {board && (
             <>
               <p className={`${CARD} p-4 text-sm`}>
-                Preço mínimo na meta, com IPI:{" "}
+                {hasIpi ? "Preço mínimo na meta, com IPI:" : "Preço mínimo na meta:"}{" "}
                 <strong>{showMoney(roundCents((sale.tableTotal / simulation.quantity) * (1 - Math.max(0, board.max.atTarget)) * (1 + table.ipi)))}</strong> por unidade.
               </p>
               <DirectorBoard board={board} />

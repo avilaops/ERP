@@ -134,3 +134,9 @@ test("quem aprova vê, para o destino escolhido, o preço com o desconto livre, 
   // Sem alçada (vendedor), as colunas não existem.
   assert.equal(priceTableView(TABLE, null, "").columns.length, 3);
 });
+
+test("empresa sem IPI: um preço só, sem a coluna c/IPI", () => {
+  const view = priceTableView({ ...TABLE, ipi: 0 }, null, "");
+  assert.deepEqual(view.columns, ["Preço de tabela", "Desconto livre"]);
+  assert.ok(view.rows.every((row) => row.cells.length === 2));
+});

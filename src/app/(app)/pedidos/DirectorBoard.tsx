@@ -29,7 +29,7 @@ export function DirectorBoard({ board }: { board: Board }) {
   const target = showPercent(targetNetProfit, 0);
 
   const result: Row[] = [
-    ["Valor sem IPI", showMoney(quote.netSale)],
+    [quote.invoiceTotal > quote.netSale ? "Valor sem IPI" : "Valor da venda", showMoney(quote.netSale)],
     [`Impostos e taxas (${showPercent(quote.taxRate)})`, minus(quote.taxes)],
     ...(quote.difalRate > 0 ? [[`DIFAL (${showPercent(quote.difalRate)})`, minus(quote.difal)] as Row] : []),
     ["Custo dos equipamentos", minus(quote.equipmentCost)],

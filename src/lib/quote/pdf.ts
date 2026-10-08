@@ -91,11 +91,11 @@ const COLUMN_GAP = 10;
 function numericColumns(document: QuoteDocument, fonts: Fonts): Column[] {
   const columns: (Omit<Column, "width" | "bold"> & { bold?: boolean })[] = [
     { label: "Qtd", value: (item) => String(item.quantity) },
-    { label: "Unit. s/ IPI", value: (item) => item.unitPrice },
+    ...(document.hasIpi ? [{ label: "Unit. s/ IPI", value: (item: QuoteItem) => item.unitPrice }] : []),
     ...(document.hasDiscount ? [{ label: "Desconto", value: (item: QuoteItem) => item.unitDiscount ?? "" }] : []),
-    { label: "IPI unit.", value: (item) => item.unitIpi },
-    { label: "Unit. c/ IPI", value: (item) => item.unitWithIpi },
-    { label: "Total c/ IPI", value: (item) => item.totalWithIpi, bold: true },
+    ...(document.hasIpi ? [{ label: "IPI unit.", value: (item: QuoteItem) => item.unitIpi }] : []),
+    { label: document.hasIpi ? "Unit. c/ IPI" : "Valor unit.", value: (item) => item.unitWithIpi },
+    { label: document.hasIpi ? "Total c/ IPI" : "Total", value: (item) => item.totalWithIpi, bold: true },
   ];
   return columns.map(({ label, value, bold = false }) => {
     const font = bold ? fonts.bold : fonts.regular;

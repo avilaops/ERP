@@ -41,6 +41,7 @@ const DOCUMENT: QuoteDocument = {
   notes: "Entrega no térreo.",
   items: [item(1, { name: "Supino reto", description: "Estofado preto." }), item(2, { name: "Leg press 45°" })],
   hasDiscount: true,
+  hasIpi: true,
   totals: [
     { label: "Total de tabela", value: "R$ 20.000", strong: false },
     { label: "Desconto (5,0%)", value: "– R$ 1.000", strong: false },

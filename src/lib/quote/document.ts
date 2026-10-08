@@ -60,6 +60,8 @@ export type QuoteDocument = {
   items: QuoteItem[];
   /** Whether the items show the column of the discount. */
   hasDiscount: boolean;
+  /** `false` for a company without IPI: the proposal shows no column nor line of it. */
+  hasIpi: boolean;
   /** The summary of the screen, from the table total down to `Total da nota`. */
   totals: QuoteTotal[];
   /** Sum of the quantities. */
@@ -91,6 +93,7 @@ export function quoteDocument({ company, order, table, sale, dates, products, to
   if (sale.lines.length !== order.items.length) throw new Error("A conta do pedido não tem uma linha por equipamento.");
 
   const hasDiscount = sale.discount > 0;
+  const hasIpi = table.ipi > 0;
   const published = new Map(table.items.map((item) => [item.productId, item]));
   const items = order.items
     .map(({ productId, quantity }, index) => {
@@ -119,7 +122,7 @@ export function quoteDocument({ company, order, table, sale, dates, products, to
     { label: "Valor sem IPI", value: showMoney(sale.netSale), strong: false },
     { label: `IPI (${formatPercent(table.ipi)}%)`, value: showMoney(sale.ipi), strong: false },
     { label: "Total da nota", value: showMoney(sale.invoiceTotal), strong: true },
-  ].filter((_, index) => hasDiscount || index !== 1);
+  ].filter((_, index) => (hasDiscount || index !== 1) && (hasIpi || (index !== 2 && index !== 3)));
 
   return {
     company,
@@ -141,6 +144,7 @@ export function quoteDocument({ company, order, table, sale, dates, products, to
     notes: blankToNull(order.notes),
     items,
     hasDiscount,
+    hasIpi,
     totals,
     units: order.items.reduce((total, item) => total + item.quantity, 0),
   };

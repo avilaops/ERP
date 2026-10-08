@@ -169,6 +169,11 @@ funções puras, sem banco e sem tela, conferidas com os números dos prints do 
     (`loadDiscountLimits`), sem custo e sem meta. Conferido contra o motor do protótipo
     "Ludus Nacional" rodando isolado: multiplicador, os 29 destinos e um pedido inteiro batem.
 
+12. **Empresa sem IPI não mostra IPI.** Com o parâmetro IPI em zero (linha nacional), pedido,
+    simulador, tabela de preços, novo pedido e o PDF do orçamento saem sem coluna nem linha de
+    IPI (`hasIpi = table.ipi > 0`); nada disso é fixo por empresa. **O desconto se digita em % ou
+    em R$** (`DiscountFields` + `src/lib/discount-entry.ts`): só o percentual é enviado e gravado.
+
 10. **Provisões e taxa fixa por pedido são parâmetros** (migração `0013`): perdas, garantia e
     inadimplência somam em `channelRate`; a taxa fixa sai do lucro do pedido uma vez, junto com o
     frete (`quoteOrder`, `orderMaxDiscounts`). Entram com zero, e "Outras taxas da venda" segue

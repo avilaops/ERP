@@ -12,6 +12,8 @@ export type PriceTableView = {
 };
 
 const TEAM_COLUMNS = ["Tabela s/IPI", "c/IPI", "Desconto livre"];
+/** A company without IPI (national line): one price, no "c/IPI". */
+const TEAM_COLUMNS_WITHOUT_IPI = ["Preço de tabela", "Desconto livre"];
 const DIRECTOR_COLUMNS = ["Custo real", "Máx. SP", "Máx. c/IE"];
 const NONE = "—";
 
@@ -30,13 +32,14 @@ export function priceTableView(
 ): PriceTableView {
   const costs = new Map(snapshot?.items.map((item) => [item.productId, item]));
   const freeDiscount = `${formatPercent(table.freeDiscount)}%`;
+  const hasIpi = table.ipi > 0;
   const authorityColumns = authority === null ? [] : [`Com ${freeDiscount} de desconto`, "Máx. sua alçada", "Menor preço"];
 
   const rows = table.items
     .filter((item) => matchesText([item.name, item.code], search))
     .sort((a, b) => compareByCode(a, b) || a.productId - b.productId)
     .map((item) => {
-      const cells = [showMoney(item.table), showMoney(item.tableWithIpi), freeDiscount];
+      const cells = hasIpi ? [showMoney(item.table), showMoney(item.tableWithIpi), freeDiscount] : [showMoney(item.table), freeDiscount];
       if (authority !== null) {
         cells.push(showMoney(roundCents(item.table * (1 - table.freeDiscount))), showPercent(authority), showMoney(roundCents(item.table * (1 - authority))));
       }
@@ -53,7 +56,7 @@ export function priceTableView(
     });
 
   return {
-    columns: [...TEAM_COLUMNS, ...authorityColumns, ...(snapshot ? DIRECTOR_COLUMNS : [])],
+    columns: [...(hasIpi ? TEAM_COLUMNS : TEAM_COLUMNS_WITHOUT_IPI), ...authorityColumns, ...(snapshot ? DIRECTOR_COLUMNS : [])],
     rows,
     counter: rows.length === 1 ? "1 equipamento" : `${rows.length} equipamentos`,
   };

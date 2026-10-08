@@ -17,6 +17,7 @@ import { ORDER_NUMBER } from "@/lib/order-number";
 import { closingProblems, directorOf, dueDates, paymentOf, saleOf } from "@/lib/order-quote";
 import { UFS } from "@/lib/pricing/states";
 import { compareByCode } from "@/lib/products-view";
+import { DiscountFields } from "@/components/DiscountFields";
 import { CustomerForm } from "../../clientes/CustomerForm";
 import { ActionForm } from "../ActionForm";
 import {
@@ -102,6 +103,8 @@ export default async function PedidoPage({
   const reasons = standing.policy?.reasons ?? [];
   const shortOfRequired = board ? Math.max(0, board.quote.requiredDownPayment - plan.downPayment) : 0;
   const ipi = `${formatPercent(table.ipi)}%`;
+  // A company without IPI (national line) shows no column nor line of it.
+  const hasIpi = table.ipi > 0;
 
   const products = new Map(table.items.map((item) => [item.productId, item]));
   const catalog = [...table.items].sort((a, b) => compareByCode(a, b) || a.productId - b.productId);
@@ -215,7 +218,7 @@ export default async function PedidoPage({
                     <span className="min-w-0">
                       <span className="block font-medium">{product?.name}</span>
                       <span className="block text-xs text-slate-500">
-                        {product?.code ?? "sem código"} · {showMoney(line.unitWithIpi)} c/ IPI cada
+                        {product?.code ?? "sem código"} · {showMoney(line.unitWithIpi)} {hasIpi ? "c/ IPI cada" : "cada"}
                       </span>
                     </span>
                     <span className="shrink-0 font-semibold">{showMoney(line.totalWithIpi)}</span>
@@ -273,7 +276,10 @@ export default async function PedidoPage({
                   <th scope="col" className="px-4 py-2 text-left font-semibold">
                     Qtd
                   </th>
-                  {["Valor unit. s/ IPI", "Valor desconto", "IPI unit.", "Valor unit. c/ IPI", "Total c/ IPI"].map((column) => (
+                  {(hasIpi
+                    ? ["Valor unit. s/ IPI", "Valor desconto", "IPI unit.", "Valor unit. c/ IPI", "Total c/ IPI"]
+                    : ["Valor unit. tabela", "Valor desconto", "Valor unit. com desconto", "Total"]
+                  ).map((column) => (
                     <th key={column} scope="col" className="whitespace-nowrap px-4 py-2 text-right font-semibold">
                       {column}
                     </th>
@@ -316,10 +322,12 @@ export default async function PedidoPage({
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-right">{showMoney(line.unitPrice)}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-right">{moneyOrNone(line.unitDiscount)}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right">
-                        {showMoney(line.unitIpi)}
-                        <span className="block text-xs text-slate-500">{ipi}</span>
-                      </td>
+                      {hasIpi && (
+                        <td className="whitespace-nowrap px-4 py-3 text-right">
+                          {showMoney(line.unitIpi)}
+                          <span className="block text-xs text-slate-500">{ipi}</span>
+                        </td>
+                      )}
                       <td className="whitespace-nowrap px-4 py-3 text-right">{showMoney(line.unitWithIpi)}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-right font-semibold">{showMoney(line.totalWithIpi)}</td>
                       <td className="px-4 py-3 text-right">
@@ -341,7 +349,7 @@ export default async function PedidoPage({
                   <td className="px-4 py-3">{units} un.</td>
                   <td className="whitespace-nowrap px-4 py-3 text-right">{showMoney(sale.tableTotal)}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-right">{moneyOrNone(discountValue)}</td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right">{showMoney(sale.ipi)}</td>
+                  {hasIpi && <td className="whitespace-nowrap px-4 py-3 text-right">{showMoney(sale.ipi)}</td>}
                   <td />
                   <td className="whitespace-nowrap px-4 py-3 text-right">{showMoney(sale.invoiceTotal)}</td>
                   <td />
@@ -359,7 +367,7 @@ export default async function PedidoPage({
                 <select id="productId" name="productId" className={`${INPUT} mt-1 w-full`}>
                   {catalog.map((item) => (
                     <option key={item.productId} value={item.productId}>
-                      {[item.code, item.name, `${showMoney(item.tableWithIpi)} c/ IPI`].filter(Boolean).join(" · ")}
+                      {[item.code, item.name, hasIpi ? `${showMoney(item.tableWithIpi)} c/ IPI` : showMoney(item.table)].filter(Boolean).join(" · ")}
                     </option>
                   ))}
                 </select>
@@ -759,19 +767,18 @@ export default async function PedidoPage({
                 <p className="text-xs text-slate-600">sobre a tabela</p>
               </div>
               {/* The field belongs to the form of "Entrega e condições": one save, one account. */}
-              <div className="mt-3 flex items-center gap-2">
-                <input
+              <div className="mt-3 flex flex-col gap-3">
+                {/* The key gives a fresh field after each save: the amount in reais follows the items. */}
+                <DiscountFields
+                  key={`${order.discount}:${sale.tableTotal}`}
                   form={TERMS}
                   name="discount"
-                  type="text"
-                  inputMode="decimal"
-                  defaultValue={formatPercent(order.discount)}
-                  aria-label="Desconto sobre a tabela, em %"
-                  className={`${INPUT} w-24 text-right`}
+                  percent={formatPercent(order.discount)}
+                  tableTotal={sale.tableTotal}
+                  disabled={!editable}
                 />
-                <span className="text-sm text-slate-600">%</span>
                 {editable && (
-                  <button form={TERMS} type="submit" className={BUTTON}>
+                  <button form={TERMS} type="submit" className={`${BUTTON} self-start`}>
                     Aplicar
                   </button>
                 )}
@@ -804,8 +811,7 @@ export default async function PedidoPage({
                   [
                     ["Total de tabela", showMoney(sale.tableTotal)],
                     [`Desconto (${showPercent(sale.discount)})`, `– ${showMoney(discountValue)}`],
-                    ["Valor sem IPI", showMoney(sale.netSale)],
-                    [`IPI (${ipi})`, showMoney(sale.ipi)],
+                    ...(hasIpi ? ([["Valor sem IPI", showMoney(sale.netSale)], [`IPI (${ipi})`, showMoney(sale.ipi)]] as const) : []),
                   ] as const
                 ).map(([label, value]) => (
                   <div key={label} className="contents">
