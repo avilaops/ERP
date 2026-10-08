@@ -8,7 +8,7 @@ import { completenessText, isComplete, isRequired, normalizeDocument, taxpayerFr
 import type { CustomerKind } from "@/lib/customer";
 import { CUSTOMER_FIELDS, customerToForm } from "@/lib/customer-form";
 import { lastDecision } from "@/lib/db/approvals";
-import { listOrderInvoices } from "@/lib/db/invoices";
+import { listOrderInvoiceEvents, listOrderInvoices } from "@/lib/db/invoices";
 import { previewOrderNfe } from "@/lib/db/order-nfe";
 import { findCustomerByDocument } from "@/lib/db/customers";
 import { getOrder, listPaymentMethods, loadOrderStanding } from "@/lib/db/orders";
@@ -24,7 +24,7 @@ import { CopyButton } from "@/components/CopyButton";
 import { DiscountFields } from "@/components/DiscountFields";
 import { proposalText } from "@/lib/quote/text";
 import { decideApprovalAction } from "../../aprovacoes/actions";
-import { issueNfeAction } from "../nfe-actions";
+import { issueNfeAction, registerNfeEventAction } from "../nfe-actions";
 import { CustomerForm } from "../../clientes/CustomerForm";
 import { ActionForm } from "../ActionForm";
 import {
@@ -69,12 +69,13 @@ const moneyOrNone = (value: number) => (value === 0 ? NONE : showMoney(value));
 const requiredOf = (kind: CustomerKind) =>
   [...CUSTOMER_FIELDS[kind].main, ...CUSTOMER_FIELDS[kind].address].map(({ key }) => key).filter((key) => isRequired(kind, key));
 
-const INVOICE_LABELS = { assinada: "aguardando resposta da SEFAZ", autorizada: "autorizada", rejeitada: "rejeitada", denegada: "denegada" } as const;
+const INVOICE_LABELS = { assinada: "aguardando resposta da SEFAZ", autorizada: "autorizada", rejeitada: "rejeitada", denegada: "denegada", cancelada: "cancelada" } as const;
 const INVOICE_COLORS = {
   assinada: "border-amber-300 bg-amber-50 text-amber-900",
   autorizada: "border-emerald-300 bg-emerald-50 text-emerald-900",
   rejeitada: "border-red-300 bg-red-50 text-red-900",
   denegada: "border-red-300 bg-red-50 text-red-900",
+  cancelada: "border-slate-300 bg-slate-100 text-slate-700",
 } as const;
 
 export default async function PedidoPage({
@@ -138,6 +139,7 @@ export default async function PedidoPage({
   // The conference of the invoice: only for a closed order and for who edits the fiscal parameters.
   const invoice = order.status === "fechado" && allows(session, "parametros") ? await previewOrderNfe(order.number, new Date(), conn) : null;
   const invoices = invoice ? await listOrderInvoices(order.id, conn) : [];
+  const events = invoice ? await listOrderInvoiceEvents(order.id, conn) : [];
   // What "Copiar proposta" puts in the clipboard: only what the customer reads in the PDF.
   const proposal = proposalText({
     company: session.tenant.name,
@@ -253,6 +255,14 @@ export default async function PedidoPage({
                   {item.protocol && ` · protocolo ${item.protocol}`}
                   {item.statusReason && <span className="block">{item.statusCode}: {item.statusReason}</span>}
                   <span className="block break-all text-xs">Chave {item.accessKey} · {showDateTime(item.issuedAt)}</span>
+                  {events
+                    .filter((event) => event.invoiceId === item.id)
+                    .map((event) => (
+                      <span key={event.id} className="mt-1 block border-t border-current/20 pt-1">
+                        <strong>{event.kind === "cancelamento" ? "Cancelamento" : `Carta de correção ${event.sequence}`}</strong> · protocolo {event.protocol} ·{" "}
+                        {showDateTime(event.createdAt)}: {event.text}
+                      </span>
+                    ))}
                   {item.status === "autorizada" && (
                     <span className="flex flex-wrap gap-x-4">
                       <a href={`/api/pedidos/${order.number}/danfe`} target="_blank" rel="noopener" className="font-medium underline">
@@ -262,6 +272,29 @@ export default async function PedidoPage({
                         Baixar XML autorizado
                       </a>
                     </span>
+                  )}
+                  {item.status === "autorizada" && item.environment === invoice.input.environment && (
+                    <details className="mt-2">
+                      <summary className="cursor-pointer font-medium">Carta de correção ou cancelamento</summary>
+                      <ActionForm action={registerNfeEventAction} className="mt-2 flex flex-col gap-2">
+                        <input type="hidden" name="number" value={order.number} />
+                        <input type="hidden" name="kind" value="correcao" />
+                        <label htmlFor={`correcao-${item.id}`} className="text-xs font-medium">
+                          Carta de correção (não corrige valor, imposto, quantidade, cliente nem data)
+                        </label>
+                        <textarea id={`correcao-${item.id}`} name="text" rows={2} placeholder="Ex.: Onde se lê Rua A, 10, leia-se Rua B, 20." className={`${INPUT} w-full text-slate-900`} />
+                        <ConfirmButton label="Registrar carta de correção" confirmLabel="Confirmar: enviar à SEFAZ" className="self-start rounded border border-slate-300 bg-white px-3 py-1.5 font-medium text-slate-900 hover:bg-slate-50" />
+                      </ActionForm>
+                      <ActionForm action={registerNfeEventAction} className="mt-3 flex flex-col gap-2">
+                        <input type="hidden" name="number" value={order.number} />
+                        <input type="hidden" name="kind" value="cancelamento" />
+                        <label htmlFor={`cancelar-${item.id}`} className="text-xs font-medium">
+                          Cancelar a nota: motivo (a SEFAZ só aceita dentro do prazo legal, e não tem volta)
+                        </label>
+                        <input id={`cancelar-${item.id}`} name="text" type="text" placeholder="Ex.: Pedido cancelado pelo cliente antes da saída." className={`${INPUT} w-full text-slate-900`} />
+                        <ConfirmButton label="Cancelar nota fiscal" confirmLabel="Confirmar: cancelar na SEFAZ" className="self-start rounded border border-red-300 bg-white px-3 py-1.5 font-medium text-red-700 hover:bg-red-50" />
+                      </ActionForm>
+                    </details>
                   )}
                 </li>
               ))}

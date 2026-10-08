@@ -1,6 +1,6 @@
 import type { Queryable } from "@/lib/db/pool";
 
-export type InvoiceStatus = "assinada" | "autorizada" | "rejeitada" | "denegada";
+export type InvoiceStatus = "assinada" | "autorizada" | "rejeitada" | "denegada" | "cancelada";
 type Environment = "homologacao" | "producao";
 
 /** One attempt of issuing the invoice of an order, as the screen shows it. The XML never comes along. */
@@ -101,4 +101,50 @@ export async function loadAuthorizedXml(orderId: number, conn: Queryable): Promi
     [orderId],
   );
   return rows[0] ? { xml: String(rows[0].authorized_xml), accessKey: String(rows[0].access_key) } : null;
+}
+
+export type InvoiceEvent = { id: number; invoiceId: number; kind: "cancelamento" | "correcao"; sequence: number; text: string; protocol: string; createdAt: Date; createdBy: string };
+
+/** The events registered for the invoices of an order, the oldest first. */
+export async function listOrderInvoiceEvents(orderId: number, conn: Queryable): Promise<InvoiceEvent[]> {
+  const { rows } = await conn.query(
+    `SELECT e.id, e.invoice_id, e.kind, e.sequence, e.text, e.protocol, e.created_at, e.created_by
+       FROM fiscal_invoice_events e JOIN fiscal_invoices i ON i.id = e.invoice_id
+      WHERE i.order_id = $1 ORDER BY e.id`,
+    [orderId],
+  );
+  return rows.map((row) => ({
+    id: Number(row.id), invoiceId: Number(row.invoice_id), kind: row.kind as InvoiceEvent["kind"], sequence: Number(row.sequence),
+    text: String(row.text), protocol: String(row.protocol), createdAt: row.created_at as Date, createdBy: String(row.created_by),
+  }));
+}
+
+/** How many correction letters an invoice already has: the next one takes the following number. */
+export async function countCorrections(invoiceId: number, conn: Queryable): Promise<number> {
+  const { rows } = await conn.query("SELECT count(*)::int AS total FROM fiscal_invoice_events WHERE invoice_id = $1 AND kind = 'correcao'", [invoiceId]);
+  return Number(rows[0].total);
+}
+
+export type RegisteredEvent = { invoiceId: number; kind: InvoiceEvent["kind"]; sequence: number; text: string; signedXml: string; protocol: string; statusCode: string; createdBy: string };
+
+/**
+ * Writes an event SEFAZ registered. A cancellation also turns the invoice into
+ * cancelled, in the same statement: there is never a cancelled invoice without
+ * its event, nor the event without the invoice knowing.
+ */
+export async function recordInvoiceEvent(event: RegisteredEvent, conn: Queryable): Promise<void> {
+  const { rows } = await conn.query(
+    `WITH written AS (
+       INSERT INTO fiscal_invoice_events (invoice_id, kind, sequence, text, signed_xml, protocol, status_code, created_by)
+       SELECT i.id, $2, $3, $4, $5, $6, $7, $8 FROM fiscal_invoices i WHERE i.id = $1 AND i.status = 'autorizada'
+       RETURNING invoice_id, kind
+     ), cancelled AS (
+       UPDATE fiscal_invoices SET status = 'cancelada', updated_at = now()
+        WHERE id IN (SELECT invoice_id FROM written WHERE kind = 'cancelamento')
+       RETURNING id
+     )
+     SELECT invoice_id, (SELECT count(*) FROM cancelled) AS cancelled FROM written`,
+    [event.invoiceId, event.kind, event.sequence, event.text, event.signedXml, event.protocol, event.statusCode, event.createdBy],
+  );
+  if (!rows[0]) throw new Error("A nota não está mais autorizada; o evento não foi gravado.");
 }

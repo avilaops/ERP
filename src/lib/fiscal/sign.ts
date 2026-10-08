@@ -49,6 +49,24 @@ export function signingKeyOf(pfx: Uint8Array, password: string): SigningKey {
   };
 }
 
+/** The signature of one element, already in canonical form, referenced by its `Id`. */
+function signatureOf(canonical: string, id: string, key: SigningKey): string {
+  const digest = createHash("sha1").update(canonical, "utf8").digest("base64");
+  const signedInfo = (namespace: string) =>
+    `<SignedInfo${namespace}><CanonicalizationMethod Algorithm="${C14N}"></CanonicalizationMethod>` +
+    `<SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"></SignatureMethod>` +
+    `<Reference URI="#${id}"><Transforms><Transform Algorithm="${ENVELOPED}"></Transform><Transform Algorithm="${C14N}"></Transform></Transforms>` +
+    `<DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"></DigestMethod><DigestValue>${digest}</DigestValue></Reference></SignedInfo>`;
+  // Canonical SignedInfo carries the namespace of the Signature it lives in.
+  const value = createSign("RSA-SHA1").update(signedInfo(` xmlns="${DSIG_NS}"`), "utf8").sign(key.privateKeyPem, "base64");
+  return (
+    `<Signature xmlns="${DSIG_NS}">${signedInfo("")}<SignatureValue>${value}</SignatureValue>` +
+    `<KeyInfo><X509Data><X509Certificate>${key.certificateBase64}</X509Certificate></X509Data></KeyInfo></Signature>`
+  );
+}
+
+const NOT_CANONICAL = /<\w+\/>|<!--|<\?|<!\[CDATA\[|\r/;
+
 /**
  * Signs the `infNFe` of an invoice built by `buildNfeXml` and answers with the
  * whole `NFe`, signature inside. Anything that is not exactly that shape is
@@ -58,22 +76,18 @@ export function signNfeXml(xml: string, key: SigningKey): string {
   const match = /^(<\?xml version="1\.0" encoding="UTF-8"\?>)<NFe xmlns="http:\/\/www\.portalfiscal\.inf\.br\/nfe"><infNFe versao="4\.00" Id="(NFe\d{44})">([\s\S]*)<\/infNFe><\/NFe>$/.exec(xml);
   if (!match) throw new Error("O XML a assinar não é o que este sistema monta.");
   const [, declaration, id, body] = match;
-  if (/<\w+\/>|<!--|<\?|<!\[CDATA\[|\r/.test(body)) throw new Error("O XML a assinar não está na forma canônica.");
-
+  if (NOT_CANONICAL.test(body)) throw new Error("O XML a assinar não está na forma canônica.");
   // Canonical infNFe: the namespace it inherits written on it, then the attributes in alphabetical order.
-  const canonical = `<infNFe xmlns="${NFE_NS}" Id="${id}" versao="4.00">${body}</infNFe>`;
-  const digest = createHash("sha1").update(canonical, "utf8").digest("base64");
-
-  const signedInfo = (namespace: string) =>
-    `<SignedInfo${namespace}><CanonicalizationMethod Algorithm="${C14N}"></CanonicalizationMethod>` +
-    `<SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"></SignatureMethod>` +
-    `<Reference URI="#${id}"><Transforms><Transform Algorithm="${ENVELOPED}"></Transform><Transform Algorithm="${C14N}"></Transform></Transforms>` +
-    `<DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"></DigestMethod><DigestValue>${digest}</DigestValue></Reference></SignedInfo>`;
-  // Canonical SignedInfo carries the namespace of the Signature it lives in.
-  const value = createSign("RSA-SHA1").update(signedInfo(` xmlns="${DSIG_NS}"`), "utf8").sign(key.privateKeyPem, "base64");
-
-  const signature =
-    `<Signature xmlns="${DSIG_NS}">${signedInfo("")}<SignatureValue>${value}</SignatureValue>` +
-    `<KeyInfo><X509Data><X509Certificate>${key.certificateBase64}</X509Certificate></X509Data></KeyInfo></Signature>`;
+  const signature = signatureOf(`<infNFe xmlns="${NFE_NS}" Id="${id}" versao="4.00">${body}</infNFe>`, id, key);
   return `${declaration}<NFe xmlns="${NFE_NS}"><infNFe versao="4.00" Id="${id}">${body}</infNFe>${signature}</NFe>`;
+}
+
+/** Signs the `infEvento` of an event built by `eventXml` (cancellation, correction letter) and answers with the whole `evento`. */
+export function signEventXml(xml: string, key: SigningKey): string {
+  const match = /^<evento xmlns="http:\/\/www\.portalfiscal\.inf\.br\/nfe" versao="1\.00"><infEvento Id="(ID\d{52})">([\s\S]*)<\/infEvento><\/evento>$/.exec(xml);
+  if (!match) throw new Error("O evento a assinar não é o que este sistema monta.");
+  const [, id, body] = match;
+  if (NOT_CANONICAL.test(body)) throw new Error("O evento a assinar não está na forma canônica.");
+  const signature = signatureOf(`<infEvento xmlns="${NFE_NS}" Id="${id}">${body}</infEvento>`, id, key);
+  return `<evento xmlns="${NFE_NS}" versao="1.00"><infEvento Id="${id}">${body}</infEvento>${signature}</evento>`;
 }

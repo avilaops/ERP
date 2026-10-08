@@ -229,8 +229,11 @@ funções puras, sem banco e sem tela, conferidas com os números dos prints do 
     XML da própria nota, nunca do pedido, com o código de barras da chave (Code 128 C,
     `barcode.ts`, conferido contra o `jsbarcode`); sem protocolo ou em homologação leva o carimbo
     "SEM VALOR FISCAL". A conferência tem rota própria (`danfe-previa`), porque rota de API não lê
-    parâmetro do endereço. Consulta de protocolo, cancelamento e carta de correção ainda não
-    existem.
+    parâmetro do endereço. **Cancelamento e carta de correção** (`src/lib/fiscal/events.ts`,
+    `registerOrderNfeEvent`, migração `0022`): evento assinado, validado nos XSD oficiais, enviado
+    ao NFeRecepcaoEvento4 da SEFAZ-SP; só se grava o que a SEFAZ registrou, e o cancelamento muda a
+    nota para `cancelada` no mesmo comando (a nota fica guardada e o pedido pode ter outra). Consulta
+    de protocolo e inutilização de numeração ainda não existem.
 
 10. **Provisões e taxa fixa por pedido são parâmetros** (migração `0013`): perdas, garantia e
     inadimplência somam em `channelRate`; a taxa fixa sai do lucro do pedido uma vez, junto com o

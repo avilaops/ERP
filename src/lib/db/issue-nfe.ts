@@ -1,13 +1,15 @@
 import { randomInt } from "node:crypto";
-import { loadSealedCertificate } from "@/lib/db/fiscal";
-import { listOrderInvoices, loadSignedXml, recordVerdict, saveSignedInvoice, takeNextNumber } from "@/lib/db/invoices";
+import { loadFiscalSettings, loadSealedCertificate } from "@/lib/db/fiscal";
+import { countCorrections, listOrderInvoices, loadSignedXml, recordInvoiceEvent, recordVerdict, saveSignedInvoice, takeNextNumber } from "@/lib/db/invoices";
 import type { Invoice } from "@/lib/db/invoices";
-import { previewOrderNfe } from "@/lib/db/order-nfe";
+import { issueInstant, previewOrderNfe } from "@/lib/db/order-nfe";
+import { getOrder } from "@/lib/db/orders";
 import type { Queryable } from "@/lib/db/pool";
 import { openCertificate } from "@/lib/fiscal/certificate";
 import { NfeError, accessKey, buildNfeXml } from "@/lib/fiscal/nfe";
 import { AUTHORIZATION_ACTION, SefazError, authorizationEnvelope, authorizationUrl, nfeProcXml, parseAuthorization } from "@/lib/fiscal/sefaz";
-import { signingKeyOf, signNfeXml } from "@/lib/fiscal/sign";
+import { EVENT_ACTION, eventEnvelope, eventUrl, eventXml, parseEvent } from "@/lib/fiscal/events";
+import { signEventXml, signingKeyOf, signNfeXml } from "@/lib/fiscal/sign";
 
 /** A refusal of the issuing the user can act on. */
 export class IssueError extends Error {}
@@ -101,4 +103,54 @@ export async function issueOrderNfe(orderNumber: string, who: string, now: Date,
   }
   const saved = await recordVerdict(invoice.id, { status: "assinada", code: verdict.code, reason: verdict.reason }, conn);
   return { invoice: saved, message: `A SEFAZ ainda não deu o veredito (${verdict.code}: ${verdict.reason}). Emita de novo em instantes: a mesma nota é reenviada.` };
+}
+
+/**
+ * Registers a cancellation or a correction letter for the authorised invoice of
+ * an order, in the environment the company is in. Nothing is written unless
+ * SEFAZ registers the event.
+ */
+export async function registerOrderNfeEvent(
+  orderNumber: string,
+  kind: "cancelamento" | "correcao",
+  text: string,
+  who: string,
+  now: Date,
+  vault: Buffer,
+  send: Send,
+  conn: Queryable,
+): Promise<{ message: string }> {
+  const order = await getOrder(orderNumber, { sellerEmail: null }, conn);
+  if (!order) throw new IssueError("Pedido não encontrado.");
+  const settings = await loadFiscalSettings(conn);
+  const invoice = (await listOrderInvoices(order.id, conn)).find((item) => item.status === "autorizada" && item.environment === settings.environment);
+  if (!invoice || !invoice.protocol) throw new IssueError("Este pedido não tem nota autorizada neste ambiente.");
+
+  const sealed = await loadSealedCertificate(conn);
+  if (!sealed) throw new IssueError("Envie o certificado digital A1 em Parâmetros → Fiscal.");
+  if (sealed.validUntil.getTime() <= now.getTime()) throw new IssueError("O certificado digital venceu. Envie o certificado em vigor em Parâmetros → Fiscal.");
+  const certificate = openCertificate(sealed, vault);
+
+  const sequence = kind === "cancelamento" ? 1 : (await countCorrections(invoice.id, conn)) + 1;
+  let signed: string;
+  try {
+    const event = eventXml({ kind, environment: invoice.environment, accessKey: invoice.accessKey, cnpj: invoice.accessKey.slice(6, 20), at: issueInstant(now), sequence, protocol: invoice.protocol, text });
+    signed = signEventXml(event.xml, signingKeyOf(certificate.pfx, certificate.password));
+  } catch (error) {
+    if (error instanceof NfeError) throw new IssueError(error.message);
+    throw error;
+  }
+
+  let result;
+  try {
+    const answer = await send(eventUrl(settings.uf ?? "", invoice.environment), EVENT_ACTION, eventEnvelope(signed, String(invoice.id)), { pfx: certificate.pfx, passphrase: certificate.password });
+    result = parseEvent(answer, invoice.accessKey);
+  } catch (error) {
+    if (error instanceof SefazError) throw new IssueError(`${error.message} Nada foi gravado: confira a nota na SEFAZ antes de tentar de novo.`);
+    throw error;
+  }
+  if (!result.registered) throw new IssueError(`A SEFAZ não registrou (${result.code}): ${result.reason}`);
+
+  await recordInvoiceEvent({ invoiceId: invoice.id, kind, sequence, text: text.replace(/\s+/g, " ").trim(), signedXml: signed, protocol: result.protocol, statusCode: result.code, createdBy: who }, conn);
+  return { message: kind === "cancelamento" ? `Nota ${invoice.number} cancelada. Protocolo ${result.protocol}.` : `Carta de correção ${sequence} registrada. Protocolo ${result.protocol}.` };
 }
