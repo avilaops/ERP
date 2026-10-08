@@ -15,7 +15,7 @@ import { listOrderInvoiceEvents, listOrderInvoices } from "@/lib/db/invoices";
 import { previewOrderNfe } from "@/lib/db/order-nfe";
 import { findCustomerByDocument } from "@/lib/db/customers";
 import { getOrder, listPaymentMethods, loadOrderStanding } from "@/lib/db/orders";
-import { loadApprovalPolicy } from "@/lib/db/company";
+import { loadProposalSettings, loadApprovalPolicy } from "@/lib/db/company";
 import { latestVersion, loadDiscountLimits, loadPublishedSnapshot, loadPublishedTable } from "@/lib/db/price-table";
 import { formatMoney, formatPercent, isoDate, showDateTime, showIsoDate, showMoney, showPercent } from "@/lib/format";
 import { BAND_TEXT, REASON_TEXT, STATUS_LABELS, UF_NAMES } from "@/lib/order-form";
@@ -149,7 +149,10 @@ export default async function PedidoPage({
   const transport = await loadOrderTransport(order.id, conn);
   const delivery = invoice ? await loadOrderDelivery(order.id, conn) : null;
   // What "Copiar proposta" puts in the clipboard: only what the customer reads in the PDF.
+  const proposalSettings = await loadProposalSettings(conn);
   const proposal = proposalText({
+    manager: proposalSettings.managerName,
+    place: proposalSettings.place,
     company: session.tenant.name,
     number: order.number,
     customer: order.customer ? { name: order.customer.name, document: order.customer.document } : null,

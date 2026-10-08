@@ -1,6 +1,6 @@
 import { getSession } from "@/lib/auth/index";
 import { allows, seesAllOrders } from "@/lib/auth/permissions";
-import { loadLogo } from "@/lib/db/company";
+import { loadProposalSettings, loadLogo } from "@/lib/db/company";
 import { getOrder } from "@/lib/db/orders";
 import { tenantDb } from "@/lib/db/pool";
 import { loadPublishedTable } from "@/lib/db/price-table";
@@ -52,9 +52,12 @@ export async function GET(_request: Request, context: Context): Promise<Response
     order.items.map((item) => item.productId),
     conn,
   );
+  const proposal = await loadProposalSettings(conn);
   let document;
   try {
     document = quoteDocument({
+      manager: proposal.managerName,
+      place: proposal.place,
       company: session.tenant.name,
       order,
       table,

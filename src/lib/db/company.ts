@@ -48,6 +48,32 @@ export async function removeLogo(updatedBy: string, conn: Queryable): Promise<vo
   );
 }
 
+/** What the proposal says besides the seller: the commercial manager and where it is issued. `null`: left out. */
+export type ProposalSettings = { managerName: string | null; place: string | null };
+
+export async function loadProposalSettings(conn: Queryable): Promise<ProposalSettings> {
+  const { rows } = await conn.query("SELECT proposal_manager_name, proposal_place FROM company_settings");
+  const row = rows[0];
+  return { managerName: row?.proposal_manager_name ? String(row.proposal_manager_name) : null, place: row?.proposal_place ? String(row.proposal_place) : null };
+}
+
+/** Blank takes the field out of the proposal. Valid for the proposals generated from now on. */
+export async function saveProposalSettings(input: ProposalSettings, updatedBy: string, conn: Queryable): Promise<void> {
+  if (updatedBy.trim() === "") throw new Error("Falta dizer quem está alterando os dados da proposta.");
+  const tidy = (value: string | null) => (value?.trim() ? value.trim().replace(/\s+/g, " ") : null);
+  const managerName = tidy(input.managerName);
+  const place = tidy(input.place);
+  const problems: string[] = [];
+  if (managerName !== null && (managerName.length < 2 || managerName.length > 80)) problems.push("Gerente comercial: de 2 a 80 letras.");
+  if (place !== null && (place.length < 2 || place.length > 80)) problems.push("Local de emissão: de 2 a 80 letras (ex.: Votuporanga/SP).");
+  if (problems.length > 0) throw new CompanyError(problems.join(" "));
+  const { rows } = await conn.query(
+    "UPDATE company_settings SET proposal_manager_name = $1, proposal_place = $2, updated_at = now(), updated_by = $3 RETURNING id",
+    [managerName, place, updatedBy],
+  );
+  if (rows.length === 0) throw new Error("Dados da empresa não cadastrados no banco. Rode `npm run db:migrate`.");
+}
+
 /** The day of the month the commissions of the previous month are paid on. */
 export async function loadCommissionDay(conn: Queryable): Promise<number> {
   const { rows } = await conn.query("SELECT commission_payment_day FROM company_settings");

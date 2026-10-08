@@ -5,7 +5,7 @@ import Link from "next/link";
 import { requirePermission } from "@/lib/auth";
 import { tenantDb } from "@/lib/db/pool";
 import { menuItem } from "@/lib/auth/permissions";
-import { loadApprovalPolicy, loadCommissionDay, loadLogoVersion } from "@/lib/db/company";
+import { loadApprovalPolicy, loadCommissionDay, loadLogoVersion, loadProposalSettings } from "@/lib/db/company";
 import { ActionForm } from "../pedidos/ActionForm";
 import { loadParams } from "@/lib/db/params";
 import { listProductCosts } from "@/lib/db/products";
@@ -13,7 +13,7 @@ import { showMoney, showMultiplier, showPercent } from "@/lib/format";
 import { paramsToForm } from "@/lib/params-form";
 import { roundCents } from "@/lib/pricing/money";
 import { paramsResult } from "@/lib/pricing/results";
-import { adoptSuggestedDownPaymentAction, removeLogoAction, saveLogoAction, saveParamsAction, saveApprovalPolicyAction, saveCommissionDayAction } from "./actions";
+import { adoptSuggestedDownPaymentAction, removeLogoAction, saveLogoAction, saveParamsAction, saveApprovalPolicyAction, saveCommissionDayAction, saveProposalSettingsAction } from "./actions";
 import { LogoForm } from "./LogoForm";
 import { ParamsForm } from "./ParamsForm";
 
@@ -29,6 +29,7 @@ export default async function ParametrosPage({ searchParams }: { searchParams: P
   const line = pickLine(lines, (await searchParams)[LINE_PARAM]);
   const [params, costs, logoVersion] = await Promise.all([loadParams(conn, line.id), listProductCosts(conn, line.id), loadLogoVersion(conn)]);
   const commissionDay = await loadCommissionDay(conn);
+  const proposal = await loadProposalSettings(conn);
   const policy = await loadApprovalPolicy(conn);
   // Every figure of the board is calculated here, on the server, by the engine.
   const result = paramsResult(params, costs);
@@ -123,6 +124,32 @@ export default async function ParametrosPage({ searchParams }: { searchParams: P
               </p>
             </ActionForm>
           </section>
+          <section className="rounded-lg border border-slate-200 bg-white p-5" aria-labelledby="dados-proposta">
+            <h2 id="dados-proposta" className="text-sm font-semibold uppercase tracking-wide">
+              Proposta
+            </h2>
+            <p className="mt-1 text-sm text-slate-600">O que aparece no orçamento em PDF e no texto de &quot;Copiar proposta&quot;, além do vendedor. Em branco, não aparece.</p>
+            <ActionForm action={saveProposalSettingsAction} className="mt-3 grid gap-3 sm:grid-cols-2">
+              <div>
+                <label htmlFor="managerName" className="block text-sm font-medium">
+                  Gerente comercial
+                </label>
+                <input key={proposal.managerName ?? ""} id="managerName" name="managerName" type="text" defaultValue={proposal.managerName ?? ""} autoComplete="off" className="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-brand" />
+              </div>
+              <div>
+                <label htmlFor="place" className="block text-sm font-medium">
+                  Local de emissão (cidade/UF)
+                </label>
+                <input key={proposal.place ?? ""} id="place" name="place" type="text" defaultValue={proposal.place ?? ""} placeholder="Ex.: Votuporanga/SP" autoComplete="off" className="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-brand" />
+              </div>
+              <div className="sm:col-span-2">
+                <button type="submit" className="rounded bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark">
+                  Salvar dados da proposta
+                </button>
+              </div>
+            </ActionForm>
+          </section>
+
           <section className="rounded-lg border border-slate-200 bg-white p-5" aria-labelledby="regras-aprovacao">
             <h2 id="regras-aprovacao" className="text-sm font-semibold uppercase tracking-wide">
               Regras de aprovação

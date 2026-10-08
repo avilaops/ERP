@@ -52,6 +52,9 @@ export type QuoteDocument = {
   issuedOn: string;
   validUntil: string;
   seller: { name: string; email: string };
+  /** The commercial manager of the company and where the proposal is issued, when the company registered them. */
+  manager: string | null;
+  place: string | null;
   customer: QuoteCustomer | null;
   /** The name of the state of delivery. */
   delivery: string | null;
@@ -79,6 +82,9 @@ type QuoteInput = {
   products: Map<number, { description: string | null }>;
   /** `AAAA-MM-DD`. */
   today: string;
+  /** From the company's parameters; absent or `null`, the proposal goes without them. */
+  manager?: string | null;
+  place?: string | null;
 };
 
 const blankToNull = (value: string | null | undefined) => (value?.trim() ? value.trim() : null);
@@ -88,7 +94,7 @@ const blankToNull = (value: string | null | undefined) => (value?.trim() ? value
  * and price are the ones of the version of the order; the description is the
  * one registered today. The seller is the one of the order, whoever asks.
  */
-export function quoteDocument({ company, order, table, sale, dates, products, today }: QuoteInput): QuoteDocument {
+export function quoteDocument({ company, order, table, sale, dates, products, today, manager = null, place = null }: QuoteInput): QuoteDocument {
   if (order.items.length === 0) throw new QuoteError(NO_ITEMS_MESSAGE);
   if (sale.lines.length !== order.items.length) throw new Error("A conta do pedido não tem uma linha por equipamento.");
 
@@ -130,6 +136,8 @@ export function quoteDocument({ company, order, table, sale, dates, products, to
     issuedOn: showIsoDate(today),
     validUntil: showIsoDate(dates.proposalValidUntil),
     seller: { name: order.sellerName, email: order.sellerEmail },
+    manager: blankToNull(manager),
+    place: blankToNull(place),
     customer: customer && {
       name: customer.name,
       tradeName: customer.tradeName,

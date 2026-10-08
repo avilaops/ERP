@@ -27,6 +27,8 @@ const DOCUMENT: QuoteDocument = {
   issuedOn: "06/10/2026",
   validUntil: "12/10/2026",
   seller: { name: "Vera Vendedora", email: "vera@teste.local" },
+  manager: null,
+  place: null,
   customer: {
     name: "Academia Força Total Ltda",
     tradeName: "Força Total",
@@ -260,4 +262,17 @@ test("metadados do arquivo, e a mesma entrada dá os mesmos bytes", async () => 
 test("o desenho não conhece banco, sessão, ambiente nem relógio", () => {
   const code = readFileSync(new URL("../src/lib/quote/pdf.ts", import.meta.url), "utf8");
   assert.doesNotMatch(code, /@\/lib\/(db|auth)|next\/|process\.env|new Date\(\)|Date\.now|node:fs|readFile/);
+});
+
+test("gerente comercial e local de emissão: aparecem quando a empresa cadastrou; sem eles, a proposta é a de sempre", async () => {
+  const bare = pdfText(await renderQuotePdf(DOCUMENT, NOTHING));
+  assert.ok(bare.includes("Emissão: 06/10/2026") && !bare.includes("GERENTE COMERCIAL"));
+
+  const text = pdfText(await renderQuotePdf({ ...DOCUMENT, manager: "DANILO RODRIGUES", place: "Votuporanga/SP" }, NOTHING));
+  for (const expected of ["Votuporanga/SP, 06/10/2026", "GERENTE COMERCIAL", "DANILO RODRIGUES", "VENDEDOR", "Vera Vendedora"]) {
+    assert.ok(text.includes(expected), expected);
+  }
+  assert.ok(!text.includes("Emissão: 06/10/2026"));
+  // O gerente fica abaixo do vendedor, na mesma coluna.
+  assert.ok(text.indexOf("GERENTE COMERCIAL") > text.indexOf("Vera Vendedora"));
 });

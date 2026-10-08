@@ -841,6 +841,14 @@ test("comissões: o dia do pagamento é da empresa; cada vendedor só recebe as 
   assert.equal(await loadCommissionDay(db.pool), 5);
   await saveCommissionDay(10, DIRECTOR, db.pool);
   for (const day of [0, 29, 1.5]) await assert.rejects(() => saveCommissionDay(day, DIRECTOR, db.pool), /de 1 a 28/);
+  // Dados da proposta: nascem em branco, guardam o que a empresa digita e voltam a branco.
+  const { loadProposalSettings, saveProposalSettings } = await import("@/lib/db/company");
+  assert.deepEqual(await loadProposalSettings(db.pool), { managerName: null, place: null });
+  await assert.rejects(() => saveProposalSettings({ managerName: "D", place: "x".repeat(81) }, DIRECTOR, db.pool), (error: unknown) => error instanceof Error && /Gerente comercial/.test(error.message) && /Local de emissão/.test(error.message));
+  await saveProposalSettings({ managerName: "  DANILO   RODRIGUES ", place: "Votuporanga/SP" }, DIRECTOR, db.pool);
+  assert.deepEqual(await loadProposalSettings(db.pool), { managerName: "DANILO RODRIGUES", place: "Votuporanga/SP" });
+  await saveProposalSettings({ managerName: "", place: null }, DIRECTOR, db.pool);
+  assert.deepEqual(await loadProposalSettings(db.pool), { managerName: null, place: null });
 
   // Parcela 1/2 do pedido do print, recebida em outubro: comissão de outubro, a pagar no dia 10 de novembro.
   const [first] = (await listOpenReceivables(db.pool)).filter((item) => item.orderNumber === "260930-BBMN");

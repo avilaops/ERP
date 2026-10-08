@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/auth";
 import { tenantDb } from "@/lib/db/pool";
 import { menuItem } from "@/lib/auth/permissions";
-import { CompanyError, removeLogo, saveApprovalPolicy, saveCommissionDay, saveLogo } from "@/lib/db/company";
+import { CompanyError, removeLogo, saveApprovalPolicy, saveCommissionDay, saveLogo, saveProposalSettings } from "@/lib/db/company";
 import { loadParams, saveParams } from "@/lib/db/params";
 import type { ActionState } from "@/lib/order-form";
 import { listProductCosts } from "@/lib/db/products";
@@ -167,4 +167,23 @@ export async function saveApprovalPolicyAction(_previous: ActionState, formData:
   revalidatePath(menuItem("parametros").href);
   revalidatePath(menuItem("aprovacoes").href);
   return { error: null };
+}
+
+/** "Proposta": the commercial manager and the place of issue the proposals of the company carry. Blank takes them out. */
+export async function saveProposalSettingsAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
+  const session = await requirePermission("parametros");
+  const conn = tenantDb(session.tenant.slug);
+  const text = (key: string) => {
+    const value = formData.get(key);
+    return typeof value === "string" ? value : "";
+  };
+  try {
+    await saveProposalSettings({ managerName: text("managerName"), place: text("place") }, session.email, conn);
+  } catch (error) {
+    if (error instanceof CompanyError) return { error: error.message };
+    console.error("[parametros] falha ao gravar os dados da proposta:", error instanceof Error ? error.message : error);
+    return { error: "Não foi possível gravar agora. Nada foi alterado; tente de novo." };
+  }
+  revalidatePath(menuItem("parametros").href);
+  return { error: null, notice: "Dados da proposta gravados." };
 }

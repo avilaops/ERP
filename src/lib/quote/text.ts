@@ -18,6 +18,9 @@ export type ProposalText = {
   validUntil: string;
   production: string | null;
   notes: string | null;
+  /** The commercial manager and the place of issue of the company, when registered. */
+  manager?: string | null;
+  place?: string | null;
 };
 
 /**
@@ -50,5 +53,8 @@ export function proposalText(proposal: ProposalText): string {
   lines.push("", `Validade: ${showIsoDate(proposal.validUntil)}`);
   if (proposal.production) lines.push(`Prazo de fabricação: ${proposal.production}`);
   if (proposal.notes) lines.push(`Obs.: ${proposal.notes}`);
+  if (proposal.manager || proposal.place) lines.push("");
+  if (proposal.manager) lines.push(`Gerente comercial: ${proposal.manager}`);
+  if (proposal.place) lines.push(`Local de emissão: ${proposal.place}`);
   return lines.join("\n");
 }

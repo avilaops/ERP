@@ -173,7 +173,7 @@ export async function renderQuotePdf(document: QuoteDocument, { logo, photos }: 
     write(document.company, MARGIN, y - 18, { size: 16, bold: true });
   }
   write(document.title, right, y - 15, { size: 15, bold: true, align: "right" });
-  write(`Emissão: ${document.issuedOn}`, right, y - 30, { color: MUTED, align: "right" });
+  write(document.place ? `${document.place}, ${document.issuedOn}` : `Emissão: ${document.issuedOn}`, right, y - 30, { color: MUTED, align: "right" });
   write(`Validade: ${document.validUntil}`, right, y - 42, { color: MUTED, align: "right" });
   y -= LOGO_BOX.height + 10;
   rule(y);
@@ -181,8 +181,8 @@ export async function renderQuotePdf(document: QuoteDocument, { logo, photos }: 
 
   // Seller and customer, side by side.
   const half = CONTENT_WIDTH / 2;
-  const block = (title: string, lines: (string | null)[], x: number): number => {
-    let at = y;
+  const block = (title: string, lines: (string | null)[], x: number, top: number = y): number => {
+    let at = top;
     write(title.toUpperCase(), x, at - 7, { size: 7, bold: true, color: MUTED });
     at -= 12;
     lines
@@ -197,7 +197,8 @@ export async function renderQuotePdf(document: QuoteDocument, { logo, photos }: 
     return at;
   };
   const { customer, seller } = document;
-  const afterSeller = block("Vendedor", [seller.name, seller.email], MARGIN);
+  const afterName = block("Vendedor", [seller.name, seller.email], MARGIN);
+  const afterSeller = document.manager ? block("Gerente comercial", [document.manager], MARGIN, afterName - 6) : afterName;
   const afterCustomer = customer
     ? block(
         "Cliente",

@@ -54,3 +54,10 @@ test("proposta em texto: sem cliente, sem desconto e sem pagamento, as linhas so
   assert.doesNotMatch(text, /Cliente|Desconto|Pagamento|Prazo|Obs\./);
   assert.doesNotMatch(proposalText(BASE), /custo|margem|lucro|alçada/i);
 });
+
+test("proposta em texto: gerente comercial e local de emissão no fim, só quando a empresa cadastrou", () => {
+  assert.doesNotMatch(proposalText(BASE), /Gerente comercial|Local de emissão/);
+  const lines = proposalText({ ...BASE, manager: "DANILO RODRIGUES", place: "Votuporanga/SP" }).split("\n");
+  assert.deepEqual(lines.slice(-3), ["", "Gerente comercial: DANILO RODRIGUES", "Local de emissão: Votuporanga/SP"]);
+  assert.deepEqual(proposalText({ ...BASE, manager: null, place: "Votuporanga/SP" }).split("\n").slice(-2), ["", "Local de emissão: Votuporanga/SP"]);
+});
