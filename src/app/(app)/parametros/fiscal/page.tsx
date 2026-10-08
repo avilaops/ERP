@@ -1,5 +1,6 @@
 import { LineTabs } from "@/components/LineTabs";
 import { loadFiscalRules, listPaymentCodes, missingFiscalRules, PAYMENT_CODES } from "@/lib/db/fiscal-rules";
+import { listNumberVoids } from "@/lib/db/invoices";
 import { listLines } from "@/lib/db/product-lines";
 import { LINE_PARAM, pickLine } from "@/lib/lines-view";
 import Link from "next/link";
@@ -14,7 +15,7 @@ import { parseDate } from "@/lib/pricing/payment";
 import { UFS } from "@/lib/pricing/states";
 import { ActionForm } from "../../pedidos/ActionForm";
 import { ConfirmButton } from "../../pedidos/ConfirmButton";
-import { removeCertificateAction, saveCertificateAction, saveFiscalRulesAction, saveFiscalSettingsAction, savePaymentCodeAction } from "./actions";
+import { removeCertificateAction, saveCertificateAction, saveFiscalRulesAction, saveFiscalSettingsAction, savePaymentCodeAction, voidNumbersAction } from "./actions";
 
 export const metadata = { title: "Fiscal · ERP" };
 export const dynamic = "force-dynamic";
@@ -36,6 +37,7 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
   const rules = await loadFiscalRules(line.id, conn);
   const missingRules = missingFiscalRules(rules);
   const paymentCodes = await listPaymentCodes(conn);
+  const voids = await listNumberVoids(conn);
   const simples = settings.taxRegime === 1;
   const ruleFields = [
     ["operationNature", "Natureza da operação", rules.operationNature, "Ex.: Venda de mercadoria", "sm:col-span-2"],
@@ -249,6 +251,53 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
             </button>
           </div>
         </ActionForm>
+      </section>
+
+      <section className={`${CARD} mt-6 p-5`} aria-labelledby="inutilizar">
+        <h2 id="inutilizar" className="text-sm font-semibold uppercase tracking-wide">
+          Inutilizar numeração
+        </h2>
+        <p className="mt-1 max-w-3xl text-sm text-slate-600">
+          Para número de nota que foi pulado e nunca será emitido. A SEFAZ registra e não tem volta. Vale para o ambiente atual (
+          {settings.environment === "producao" ? "produção" : "homologação"}); o próximo número da empresa é o {settings.nextNumber}.
+        </p>
+        <ActionForm action={voidNumbersAction} className="mt-4 grid gap-4 sm:grid-cols-3">
+          {(
+            [
+              ["void-series", "series", "Série", String(settings.series)],
+              ["void-first", "first", "Do número", ""],
+              ["void-last", "last", "Até o número", ""],
+            ] as const
+          ).map(([id, name, label, value]) => (
+            <div key={id}>
+              <label htmlFor={id} className={LABEL}>
+                {label}
+              </label>
+              <input id={id} name={name} type="text" inputMode="numeric" defaultValue={value} autoComplete="off" className={INPUT} />
+            </div>
+          ))}
+          <div className="sm:col-span-3">
+            <label htmlFor="void-reason" className={LABEL}>
+              Motivo (15 a 255 letras)
+            </label>
+            <input id="void-reason" name="reason" type="text" autoComplete="off" placeholder="Ex.: Numeração pulada por falha na emissão." className={INPUT} />
+          </div>
+          <div className="sm:col-span-3">
+            <ConfirmButton label="Inutilizar numeração" confirmLabel="Confirmar: inutilizar na SEFAZ" className="rounded border border-red-300 bg-white px-4 py-2 font-medium text-red-700 hover:bg-red-50" />
+          </div>
+        </ActionForm>
+        {voids.length > 0 && (
+          <ul className="mt-4 text-sm">
+            {voids.map((item) => (
+              <li key={item.id} className="border-t border-slate-200 py-2">
+                <strong>
+                  Série {item.series}, {item.first} a {item.last}
+                </strong>
+                {item.environment === "homologacao" && " · homologação"} · protocolo {item.protocol} · {showDateTime(item.createdAt)} · {item.reason}
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       <section className={`${CARD} mt-6`} aria-labelledby="pagamento-na-nota">

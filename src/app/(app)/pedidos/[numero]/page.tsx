@@ -24,7 +24,8 @@ import { CopyButton } from "@/components/CopyButton";
 import { DiscountFields } from "@/components/DiscountFields";
 import { proposalText } from "@/lib/quote/text";
 import { decideApprovalAction } from "../../aprovacoes/actions";
-import { issueNfeAction, registerNfeEventAction } from "../nfe-actions";
+import { FREIGHT_MODES } from "@/lib/fiscal/nfe";
+import { issueNfeAction, registerNfeEventAction, saveFreightModeAction } from "../nfe-actions";
 import { CustomerForm } from "../../clientes/CustomerForm";
 import { ActionForm } from "../ActionForm";
 import {
@@ -300,6 +301,24 @@ export default async function PedidoPage({
               ))}
             </ul>
           )}
+          <ActionForm action={saveFreightModeAction} className="mt-3 flex flex-wrap items-end gap-2">
+            <input type="hidden" name="number" value={order.number} />
+            <div className="min-w-0 flex-1">
+              <label htmlFor="freightMode" className="block text-xs font-medium text-slate-600">
+                Modalidade do frete na nota
+              </label>
+              <select key={invoice.input.freightMode} id="freightMode" name="freightMode" defaultValue={invoice.input.freightMode} className={`${INPUT} mt-1 w-full`}>
+                {FREIGHT_MODES.map(([code, label]) => (
+                  <option key={code} value={code}>
+                    {code} - {label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button type="submit" className={BUTTON}>
+              Salvar frete
+            </button>
+          </ActionForm>
           {invoice.problems.length > 0 ? (
             <>
               <p className="mt-3 font-medium">Para montar a nota, falta:</p>

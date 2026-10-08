@@ -148,3 +148,58 @@ export async function recordInvoiceEvent(event: RegisteredEvent, conn: Queryable
   );
   if (!rows[0]) throw new Error("A nota não está mais autorizada; o evento não foi gravado.");
 }
+
+/**
+ * The way of freight of the invoice of an order. It is not a commercial term:
+ * choosing it does not reopen the order nor change its revision. Once the
+ * order has an authorised invoice there is nothing left to choose.
+ */
+export async function saveFreightMode(orderId: number, mode: string, conn: Queryable): Promise<void> {
+  if (!["0", "1", "2", "3", "4", "9"].includes(mode)) throw new Error("Modalidade de frete fora da lista.");
+  await conn.query(
+    `UPDATE orders SET nfe_freight_mode = $2
+      WHERE id = $1 AND NOT EXISTS (SELECT 1 FROM fiscal_invoices i WHERE i.order_id = orders.id AND i.status = 'autorizada' AND i.environment = 'producao')`,
+    [orderId, mode],
+  );
+}
+
+type Environment2 = "homologacao" | "producao";
+export type NumberVoid = { id: number; environment: Environment2; series: number; first: number; last: number; reason: string; protocol: string; createdAt: Date; createdBy: string };
+
+/** The ranges of numbers made unusable, the newest first. */
+export async function listNumberVoids(conn: Queryable): Promise<NumberVoid[]> {
+  const { rows } = await conn.query("SELECT id, environment, series, first_number, last_number, reason, protocol, created_at, created_by FROM fiscal_number_voids ORDER BY id DESC");
+  return rows.map((row) => ({
+    id: Number(row.id), environment: row.environment as Environment2, series: Number(row.series), first: Number(row.first_number), last: Number(row.last_number),
+    reason: String(row.reason), protocol: String(row.protocol), createdAt: row.created_at as Date, createdBy: String(row.created_by),
+  }));
+}
+
+export async function isNumberVoided(environment: Environment2, series: number, number: number, conn: Queryable): Promise<boolean> {
+  const { rows } = await conn.query(
+    "SELECT 1 FROM fiscal_number_voids WHERE environment = $1 AND series = $2 AND $3 BETWEEN first_number AND last_number LIMIT 1",
+    [environment, series, number],
+  );
+  return rows.length > 0;
+}
+
+/** The numbers of a range that already are an invoice SEFAZ gave a verdict on: those can never be made unusable. */
+export async function usedNumbersIn(environment: Environment2, series: number, first: number, last: number, conn: Queryable): Promise<number[]> {
+  const { rows } = await conn.query(
+    `SELECT number FROM fiscal_invoices
+      WHERE environment = $1 AND series = $2 AND number BETWEEN $3 AND $4 AND status IN ('autorizada', 'cancelada', 'denegada') ORDER BY number`,
+    [environment, series, first, last],
+  );
+  return rows.map((row) => Number(row.number));
+}
+
+export async function recordNumberVoid(
+  record: { environment: Environment2; series: number; first: number; last: number; reason: string; signedXml: string; protocol: string; createdBy: string },
+  conn: Queryable,
+): Promise<void> {
+  await conn.query(
+    `INSERT INTO fiscal_number_voids (environment, series, first_number, last_number, reason, signed_xml, protocol, created_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+    [record.environment, record.series, record.first, record.last, record.reason, record.signedXml, record.protocol, record.createdBy],
+  );
+}

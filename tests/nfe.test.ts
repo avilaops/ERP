@@ -5,6 +5,7 @@ import type { NfeInput } from "@/lib/fiscal/nfe";
 
 const INPUT: NfeInput = {
   environment: "producao",
+  freightMode: "1",
   series: 1,
   number: 123,
   randomCode: "48291736",
@@ -140,6 +141,8 @@ test("esquema oficial da NF-e 4.00 (XSD): o XML passa inteiro; só falta a assin
     { ...INPUT, environment: "homologacao", issuer: { ...INPUT.issuer, taxRegime: 1 }, rules: { ...INPUT.rules, icmsCode: "102", pisCst: "49", cofinsCst: "49", pisRate: 0, cofinsRate: 0 } },
     { ...INPUT, recipient: { ...INPUT.recipient, kind: "PF", document: "12345678909", uf: "SP", cityCode: "3550308", city: "São Paulo" }, icmsRate: 0.18, rules: { ...INPUT.rules, icmsCode: "40", pisCst: "06", cofinsCst: "06" } },
     { ...INPUT, recipient: { ...INPUT.recipient, taxpayer: true, stateRegistration: "123456789" } },
+    // CNPJ alfanumérico do cliente (NT 2026.004), o exemplo da nota técnica; frete por conta do remetente.
+    { ...INPUT, freightMode: "0", recipient: { ...INPUT.recipient, document: "12ABC34501DE35" } },
   ];
   for (const [index, input] of cases.entries()) {
     const result = await validateXML({

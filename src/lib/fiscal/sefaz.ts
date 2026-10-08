@@ -145,3 +145,128 @@ export function transmit(url: string, action: string, envelope: string, channel:
     call.end(body);
   });
 }
+
+/* ---------- Consulta de protocolo (NFeConsultaProtocolo4) ---------- */
+
+const CONSULT_WSDL = "http://www.portalfiscal.inf.br/nfe/wsdl/NFeConsultaProtocolo4";
+export const CONSULT_ACTION = `${CONSULT_WSDL}/nfeConsultaNF`;
+const CONSULT_URLS: Record<string, { homologacao: string; producao: string }> = {
+  SP: {
+    homologacao: "https://homologacao.nfe.fazenda.sp.gov.br/ws/nfeconsultaprotocolo4.asmx",
+    producao: "https://nfe.fazenda.sp.gov.br/ws/nfeconsultaprotocolo4.asmx",
+  },
+};
+
+export function consultUrl(uf: string, environment: "homologacao" | "producao"): string {
+  const urls = CONSULT_URLS[uf];
+  if (!urls) throw new SefazError(`A consulta ainda não está configurada para empresas de ${uf || "estado não informado"}: só São Paulo.`);
+  return urls[environment];
+}
+
+/** Asks SEFAZ what it knows about one access key. Nothing to sign: the certificate of the connection identifies who asks. */
+export function consultEnvelope(accessKey: string, environment: "homologacao" | "producao"): string {
+  if (!/^\d{44}$/.test(accessKey)) throw new Error("Chave de acesso inválida.");
+  return (
+    `<?xml version="1.0" encoding="UTF-8"?><soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope"><soap12:Body>` +
+    `<nfeDadosMsg xmlns="${CONSULT_WSDL}"><consSitNFe xmlns="${NFE_NS}" versao="4.00"><tpAmb>${environment === "producao" ? "1" : "2"}</tpAmb><xServ>CONSULTAR</xServ><chNFe>${accessKey}</chNFe></consSitNFe></nfeDadosMsg>` +
+    `</soap12:Body></soap12:Envelope>`
+  );
+}
+
+export type ConsultResult =
+  | { status: "autorizada"; code: string; reason: string; protocol: string; protocolXml: string }
+  | { status: "cancelada" | "denegada" | "outra"; code: string; reason: string }
+  /** SEFAZ never received this invoice: it is safe to send it. */
+  | { status: "nao-consta"; code: string; reason: string };
+
+/** Reads the answer of the consultation of `accessKey`. Cancelled: 101, 151, 155. Not in the base: 217. */
+export function parseConsult(response: string, accessKey: string): ConsultResult {
+  const body = /<retConsSitNFe[\s\S]*<\/retConsSitNFe>/.exec(response)?.[0];
+  if (!body) {
+    const fault = pick(response, "Text") ?? pick(response, "faultstring");
+    throw new SefazError(fault ? `A SEFAZ recusou a consulta: ${unescape(fault)}` : "A resposta da SEFAZ não é a esperada. Tente de novo em instantes.");
+  }
+  const withoutProtocol = body.replace(/<protNFe[\s\S]*?<\/protNFe>/, "").replace(/<procEventoNFe[\s\S]*?<\/procEventoNFe>/g, "");
+  const code = pick(withoutProtocol, "cStat") ?? "";
+  const reason = unescape(pick(withoutProtocol, "xMotivo") ?? "");
+  if ((pick(withoutProtocol, "chNFe") ?? accessKey) !== accessKey) throw new SefazError("A SEFAZ respondeu sobre outra nota. Nada foi gravado.");
+  const protocolXml = /<protNFe[\s\S]*?<\/protNFe>/.exec(body)?.[0] ?? null;
+  if (AUTHORIZED.has(code) && protocolXml && pick(protocolXml, "chNFe") === accessKey) {
+    const protocol = pick(protocolXml, "nProt");
+    if (protocol) return { status: "autorizada", code, reason, protocol, protocolXml };
+  }
+  if (["101", "151", "155"].includes(code)) return { status: "cancelada", code, reason };
+  if (DENIED.has(code)) return { status: "denegada", code, reason };
+  if (code === "217") return { status: "nao-consta", code, reason };
+  return { status: "outra", code, reason };
+}
+
+/* ---------- Inutilização de numeração (NFeInutilizacao4) ---------- */
+
+const VOID_WSDL = "http://www.portalfiscal.inf.br/nfe/wsdl/NFeInutilizacao4";
+export const VOID_ACTION = `${VOID_WSDL}/nfeInutilizacaoNF`;
+const VOID_URLS: Record<string, { homologacao: string; producao: string }> = {
+  SP: {
+    homologacao: "https://homologacao.nfe.fazenda.sp.gov.br/ws/nfeinutilizacao4.asmx",
+    producao: "https://nfe.fazenda.sp.gov.br/ws/nfeinutilizacao4.asmx",
+  },
+};
+
+export function voidUrl(uf: string, environment: "homologacao" | "producao"): string {
+  const urls = VOID_URLS[uf];
+  if (!urls) throw new SefazError(`A inutilização ainda não está configurada para empresas de ${uf || "estado não informado"}: só São Paulo.`);
+  return urls[environment];
+}
+
+export type NumberVoid = {
+  environment: "homologacao" | "producao";
+  /** IBGE code of the state of the company, two digits. */
+  stateCode: string;
+  /** The two last digits of the year. */
+  year: string;
+  cnpj: string;
+  series: number;
+  first: number;
+  last: number;
+  /** Why the numbers were skipped: 15 to 255 letters. */
+  reason: string;
+};
+
+/** The request that makes a range of numbers unusable, not signed. Throws `SefazError` with what the user has to fix. */
+export function voidXml(request: NumberVoid): { id: string; xml: string } {
+  const reason = request.reason.replace(/\s+/g, " ").trim();
+  if (reason.length < 15 || reason.length > 255) throw new SefazError("Escreva o motivo da inutilização com 15 a 255 letras.");
+  const whole = (value: number, max: number) => Number.isInteger(value) && value >= 1 && value <= max;
+  if (!whole(request.series, 999)) throw new SefazError("Série: de 1 a 999.");
+  if (!whole(request.first, 999_999_999) || !whole(request.last, 999_999_999) || request.last < request.first) throw new SefazError("Informe o primeiro e o último número da faixa, em ordem.");
+  if (!/^\d{2}$/.test(request.stateCode) || !/^\d{2}$/.test(request.year) || !/^\d{14}$/.test(request.cnpj)) throw new Error("Dados do emitente inválidos para a inutilização.");
+  const pad = (value: number, size: number) => String(value).padStart(size, "0");
+  const id = `ID${request.stateCode}${request.year}${request.cnpj}55${pad(request.series, 3)}${pad(request.first, 9)}${pad(request.last, 9)}`;
+  const text = reason.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const xml =
+    `<inutNFe xmlns="${NFE_NS}" versao="4.00"><infInut Id="${id}"><tpAmb>${request.environment === "producao" ? "1" : "2"}</tpAmb><xServ>INUTILIZAR</xServ>` +
+    `<cUF>${request.stateCode}</cUF><ano>${request.year}</ano><CNPJ>${request.cnpj}</CNPJ><mod>55</mod><serie>${request.series}</serie>` +
+    `<nNFIni>${request.first}</nNFIni><nNFFin>${request.last}</nNFFin><xJust>${text}</xJust></infInut></inutNFe>`;
+  return { id, xml };
+}
+
+export function voidEnvelope(signedRequest: string): string {
+  if (!signedRequest.startsWith(`<inutNFe xmlns="${NFE_NS}"`) || !signedRequest.includes("<Signature ")) throw new Error("Só um pedido assinado vai para a SEFAZ.");
+  return (
+    `<?xml version="1.0" encoding="UTF-8"?><soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope"><soap12:Body>` +
+    `<nfeDadosMsg xmlns="${VOID_WSDL}">${signedRequest}</nfeDadosMsg></soap12:Body></soap12:Envelope>`
+  );
+}
+
+/** 102: "Inutilização de número homologado". Anything else is a refusal, with the reason. */
+export function parseVoid(response: string): { registered: true; code: string; reason: string; protocol: string } | { registered: false; code: string; reason: string } {
+  const body = /<retInutNFe[\s\S]*<\/retInutNFe>/.exec(response)?.[0];
+  if (!body) {
+    const fault = pick(response, "Text") ?? pick(response, "faultstring");
+    throw new SefazError(fault ? `A SEFAZ recusou a chamada: ${unescape(fault)}` : "A resposta da SEFAZ não é a esperada. Tente de novo em instantes.");
+  }
+  const code = pick(body, "cStat") ?? "";
+  const reason = unescape(pick(body, "xMotivo") ?? "");
+  const protocol = pick(body, "nProt");
+  return code === "102" && protocol ? { registered: true, code, reason, protocol } : { registered: false, code, reason };
+}

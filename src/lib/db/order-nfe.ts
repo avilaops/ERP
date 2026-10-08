@@ -6,6 +6,7 @@ import { getOrder } from "@/lib/db/orders";
 import type { Order } from "@/lib/db/orders";
 import type { Queryable } from "@/lib/db/pool";
 import { loadPublishedSnapshot, loadPublishedTable } from "@/lib/db/price-table";
+import type { FreightMode } from "@/lib/fiscal/nfe";
 import { orderNfe } from "@/lib/fiscal/order-nfe";
 import { APP_NAME } from "@/lib/app-identity";
 import { isoDate } from "@/lib/format";
@@ -44,7 +45,9 @@ export async function previewOrderNfe(orderNumber: string, now: Date, conn: Quer
   const plan = paymentOf(order, sale, table, isoDate(now));
   const codes = new Map((await listPaymentCodes(conn)).map((method) => [method.label, method.code]));
 
+  const freight = await conn.query("SELECT nfe_freight_mode FROM orders WHERE id = $1", [order.id]);
   const built = orderNfe({
+    freightMode: (freight.rows[0]?.nfe_freight_mode ?? null) as FreightMode | null,
     settings,
     rules,
     order,

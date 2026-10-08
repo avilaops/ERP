@@ -3,14 +3,14 @@ import type { FiscalRules } from "@/lib/db/fiscal-rules";
 import type { Order } from "@/lib/db/orders";
 import { cityCode } from "@/lib/fiscal/cities";
 import { nfeProblems, nfeTotals } from "@/lib/fiscal/nfe";
-import type { NfeInput, NfeTotals } from "@/lib/fiscal/nfe";
+import type { FreightMode, NfeInput, NfeTotals } from "@/lib/fiscal/nfe";
 import { roundCents } from "@/lib/pricing/money";
 import type { PricingParams } from "@/lib/pricing/params";
 
 export type OrderNfeSource = {
   settings: FiscalSettings;
   rules: FiscalRules;
-  order: Pick<Order, "number" | "customer" | "discount" | "taxpayer" | "deliveryUf" | "items">;
+  order: Pick<Order, "number" | "customer" | "discount" | "taxpayer" | "deliveryUf" | "items" | "freight">;
   /** Name, code and table price of each equipment of the order, in the version of the order. */
   products: ReadonlyMap<number, { name: string; code: string | null; table: number }>;
   fiscal: ReadonlyMap<number, ProductFiscal>;
@@ -20,11 +20,16 @@ export type OrderNfeSource = {
   receipts: { method: string | null; amount: number }[];
   /** The code of the invoice (`tPag`) of each form of payment of the company, by its name. */
   paymentCodes: ReadonlyMap<string, string | null>;
+  /** What was chosen for the invoice of this order, or `null`: then the suggestion holds. */
+  freightMode: FreightMode | null;
   number: number;
   randomCode: string;
   issuedAt: string;
   software: string;
 };
+
+/** Freight paid by the company in the order is CIF; otherwise the customer hires it. A suggestion: the screen lets it be changed. */
+export const suggestedFreightMode = (freight: number): FreightMode => (freight > 0 ? "0" : "1");
 
 /**
  * The invoice of an order, as the layout takes it. What the registers do not
@@ -58,6 +63,7 @@ export function orderNfe(source: OrderNfeSource): { input: NfeInput; problems: s
 
   const input: NfeInput = {
     environment: settings.environment,
+    freightMode: source.freightMode ?? suggestedFreightMode(source.order.freight),
     series: settings.series,
     number: source.number,
     randomCode: source.randomCode,

@@ -103,8 +103,21 @@ export type NfePayment = {
   amount: number;
 };
 
+/** The ways of freight of the layout (`modFrete`), with the official wording. */
+export const FREIGHT_MODES = [
+  ["0", "Contratação do frete por conta do remetente (CIF)"],
+  ["1", "Contratação do frete por conta do destinatário (FOB)"],
+  ["2", "Contratação do frete por conta de terceiros"],
+  ["3", "Transporte próprio por conta do remetente"],
+  ["4", "Transporte próprio por conta do destinatário"],
+  ["9", "Sem ocorrência de transporte"],
+] as const;
+export type FreightMode = (typeof FREIGHT_MODES)[number][0];
+
 export type NfeInput = {
   environment: "homologacao" | "producao";
+  /** `modFrete`: who hires the freight. */
+  freightMode: FreightMode;
   series: number;
   number: number;
   /** `cNF`: eight random digits, different from the number. */
@@ -202,7 +215,8 @@ export function nfeProblems(input: NfeInput): string[] {
   need(/^\d{7}$/.test(issuer.cityCode) && /^\d{8}$/.test(issuer.cep) && Boolean(UF_CODES[issuer.uf]), "Empresa: endereço com código do município no IBGE, UF e CEP (Parâmetros → Fiscal).");
   need(issuer.street.trim() !== "" && issuer.number.trim() !== "" && issuer.district.trim() !== "" && issuer.city.trim() !== "", "Empresa: rua, número, bairro e cidade (Parâmetros → Fiscal).");
 
-  need(recipient.kind === "PJ" ? /^\d{14}$/.test(recipient.document) : /^\d{11}$/.test(recipient.document), "Cliente: CNPJ ou CPF completo.");
+  // The CNPJ may have letters since 2026 (NT 2026.004); the register already checked its digits.
+  need(recipient.kind === "PJ" ? /^[0-9A-Z]{12}\d{2}$/.test(recipient.document) : /^\d{11}$/.test(recipient.document), "Cliente: CNPJ ou CPF completo.");
   need(recipient.name.trim().length >= 2, "Cliente: nome ou razão social.");
   need(/^\d{7}$/.test(recipient.cityCode), "Cliente: código do município no IBGE (cadastro do cliente).");
   need(/^\d{8}$/.test(recipient.cep) && Boolean(UF_CODES[recipient.uf]), "Cliente: CEP e UF.");
@@ -223,6 +237,7 @@ export function nfeProblems(input: NfeInput): string[] {
   need(rules.ibsCbs !== null || issuer.taxRegime !== 3, "Regras fiscais: CST e classificação tributária do IBS/CBS (obrigatórios para o regime normal desde 03/08/2026).");
   need(rules.ibsCbs === null || (/^\d{3}$/.test(rules.ibsCbs.cst) && /^\d{6}$/.test(rules.ibsCbs.classCode)), "Regras fiscais: CST do IBS/CBS com três dígitos e classificação tributária com seis.");
 
+  need(FREIGHT_MODES.some(([code]) => code === input.freightMode), "Pedido: escolha a modalidade do frete da nota.");
   need(input.items.length > 0, "Pedido sem itens.");
   input.items.forEach((item, index) => {
     const which = `Item ${index + 1} (${item.name})`;
@@ -506,7 +521,7 @@ export function buildNfeXml(input: NfeInput): { key: string; xml: string; totals
     dest +
     input.items.map((item, index) => itemXml(item, index, input)).join("") +
     total +
-    group("transp", tag("modFrete", "1")) +
+    group("transp", tag("modFrete", input.freightMode)) +
     payment +
     group("infAdic", tag("infCpl", rules.additionalInfo ? clean(rules.additionalInfo, 5000) : null));
 

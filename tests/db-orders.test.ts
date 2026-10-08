@@ -1155,12 +1155,19 @@ test("emissão: guarda a nota assinada antes de enviar; rejeitada reemite com o 
   assert.deepEqual(invoices.map((invoice) => [invoice.number, invoice.status]), [[42, "assinada"]]);
 
   // 2. De novo: vai a mesma nota, byte a byte, e a SEFAZ rejeita.
+  let consulted = 0;
   const rejected = await issueOrderNfe(number, who, now, vault, async (url, _action, envelope) => {
-    sent.push(envelope);
     assert.match(url, /homologacao\.nfe\.fazenda\.sp\.gov\.br/);
+    // Antes de reenviar, pergunta à SEFAZ se a nota chegou: aqui, não chegou.
+    if (/nfeconsultaprotocolo4/.test(url)) {
+      consulted += 1;
+      return `<retConsSitNFe versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe"><cStat>217</cStat><xMotivo>Rejeição: NF-e não consta na base de dados da SEFAZ</xMotivo><chNFe>${/<chNFe>(\d{44})/.exec(envelope)![1]}</chNFe></retConsSitNFe>`;
+    }
+    sent.push(envelope);
     return answer(keyOf(envelope), "225", "Rejeição: Falha no Schema XML da NFe");
   }, db.pool);
   assert.equal(sent[1].replace(/<idLote>\d+<\/idLote>/, ""), sent[0].replace(/<idLote>\d+<\/idLote>/, ""));
+  assert.equal(consulted, 1);
   assert.deepEqual([rejected.invoice.status, rejected.invoice.statusCode, rejected.invoice.number], ["rejeitada", "225", 42]);
   assert.match(rejected.message, /o número é o mesmo/);
 
@@ -1237,4 +1244,32 @@ test("nota autorizada: carta de correção numera 1, 2…; cancelamento grava o 
     return `<retEnviNFe versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe"><cStat>104</cStat><xMotivo>ok</xMotivo><protNFe versao="4.00"><infProt><chNFe>${key}</chNFe><nProt>135260000000002</nProt><cStat>100</cStat><xMotivo>Autorizado</xMotivo></infProt></protNFe></retEnviNFe>`;
   }, db.pool);
   assert.deepEqual([again.invoice.number, again.invoice.status], [43, "autorizada"]);
+
+  // Nota enviada sem resposta que a SEFAZ, consultada, diz ter autorizado: grava o protocolo e NÃO reenvia.
+  const { voidInvoiceNumbers } = await import("@/lib/db/issue-nfe");
+  const { takeNextNumber, listNumberVoids } = await import("@/lib/db/invoices");
+  await registerOrderNfeEvent(number, "cancelamento", "Segundo cancelamento, para o teste da consulta.", who, now, vault, accept, db.pool);
+  const { SefazError } = await import("@/lib/fiscal/sefaz");
+  await assert.rejects(() => issueOrderNfe(number, who, now, vault, async () => { throw new SefazError("A SEFAZ não respondeu a tempo."); }, db.pool), /aguardando resposta/);
+  const calls: string[] = [];
+  const found = await issueOrderNfe(number, who, now, vault, async (url, _a, envelope) => {
+    calls.push(url);
+    const key = /<chNFe>(\d{44})/.exec(envelope)![1];
+    return `<retConsSitNFe versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe"><cStat>100</cStat><xMotivo>Autorizado o uso da NF-e</xMotivo><chNFe>${key}</chNFe><protNFe versao="4.00"><infProt><chNFe>${key}</chNFe><nProt>135260000000003</nProt><cStat>100</cStat><xMotivo>Autorizado o uso da NF-e</xMotivo></infProt></protNFe></retConsSitNFe>`;
+  }, db.pool);
+  assert.deepEqual([found.invoice.number, found.invoice.status, found.invoice.protocol], [44, "autorizada", "135260000000003"]);
+  assert.equal(calls.length, 1);
+  assert.match(calls[0], /nfeconsultaprotocolo4/);
+  assert.match(found.message, /já estava autorizada/);
+
+  // Inutilização: só número que o sistema já passou e que não virou nota com veredito.
+  const voided = async (_u: string, _a: string, envelope: string) => {
+    assert.ok(envelope.includes("<xServ>INUTILIZAR</xServ>") && envelope.includes("<Signature "));
+    return `<retInutNFe versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe"><infInut><cStat>102</cStat><xMotivo>Inutilização de número homologado</xMotivo><nProt>135260000000009</nProt></infInut></retInutNFe>`;
+  };
+  await assert.rejects(() => voidInvoiceNumbers({ series: 1, first: 42, last: 44, reason: "Numeração pulada por falha de sistema." }, who, now, vault, voided, db.pool), /veredito da SEFAZ nesta faixa \(número 42, 43, 44\)/);
+  await assert.rejects(() => voidInvoiceNumbers({ series: 1, first: 45, last: 45, reason: "Numeração pulada por falha de sistema." }, who, now, vault, voided, db.pool), /o próximo da empresa é o 45/);
+  assert.equal(await takeNextNumber(db.pool), 45);
+  assert.match((await voidInvoiceNumbers({ series: 1, first: 45, last: 45, reason: "Numeração pulada por falha de sistema." }, who, now, vault, voided, db.pool)).message, /45 a 45 inutilizada/);
+  assert.deepEqual((await listNumberVoids(db.pool)).map((item) => [item.first, item.last, item.protocol]), [[45, 45, "135260000000009"]]);
 });

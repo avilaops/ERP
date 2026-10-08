@@ -20,7 +20,7 @@ const SOURCE: OrderNfeSource = {
   },
   rules: RULES,
   order: {
-    number: "261008-W9LG", discount: 0.37, taxpayer: false, deliveryUf: "MA",
+    number: "261008-W9LG", discount: 0.37, taxpayer: false, deliveryUf: "MA", freight: 0,
     customer: {
       id: 1, kind: "PJ", document: "98765432000198", name: "Academia Teste Ltda", tradeName: null, contactName: "Ana", stateRegistration: "ISENTO", rg: null,
       phone: "98999990000", email: "ana@academia.test", cep: "65000000", street: "Av. Brasil", streetNumber: "500", complement: null, district: "Centro", city: "sao luis", uf: "MA",
@@ -32,6 +32,7 @@ const SOURCE: OrderNfeSource = {
   params,
   receipts: [{ method: "PIX", amount: 8400 }, { method: "Boleto", amount: 5530.85 }],
   paymentCodes: new Map([["PIX", "17"], ["Boleto", "15"]]),
+  freightMode: null,
   number: 7,
   randomCode: "12345678",
   issuedAt: "2026-10-08T10:00:00-03:00",
@@ -50,6 +51,10 @@ test("pedido fechado vira nota: preço com o desconto do pedido, ICMS de saída 
   assert.equal(input.rules.additionalInfo, "Texto fixo - Pedido 261008-W9LG");
   const { xml } = buildNfeXml(input);
   assert.ok(xml.includes("<CFOP>6108</CFOP>") && xml.includes("<nNF>7</nNF>") && xml.includes("<tpAmb>2</tpAmb>"));
+  // Frete: sem escolha, vale a sugestão (FOB sem frete por nossa conta, CIF com); a escolha do pedido manda.
+  assert.ok(xml.includes("<modFrete>1</modFrete>"));
+  assert.equal(orderNfe({ ...SOURCE, order: { ...SOURCE.order, freight: 350 } }).input.freightMode, "0");
+  assert.equal(orderNfe({ ...SOURCE, freightMode: "9" }).input.freightMode, "9");
 });
 
 test("o que falta nos cadastros aparece como pendência, com o lugar onde se corrige; nada é inventado", () => {

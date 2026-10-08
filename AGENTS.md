@@ -243,9 +243,18 @@ funções puras, sem banco e sem tela, conferidas com os números dos prints do 
     (migração `0023`; em 2026 a lei fixa IBS estadual 0,1%, municipal 0% e CBS 0,9%, e os valores
     **não somam** ao total da nota). Antes de mexer no leiaute, baixe o pacote e a nota técnica
     atuais do portal (`www.nfe.fazenda.gov.br`, que só abre com a raiz da ICP-Brasil): há notas
-    novas quase todo mês. Ainda por fazer do que as notas de 2026 pedem: CNPJ alfanumérico
-    (NT 2026.004; hoje o sistema só aceita CNPJ numérico), DANFE da reforma (NT 2026.010, a partir
-    de 01/12/2026) e valor líquido do produto (NT 2026.008, 2027).
+    novas quase todo mês. O **CNPJ alfanumérico** (NT 2026.004) é aceito no cliente, no
+    cadastro e na nota; no **emitente** ainda não (a chave de acesso e o código de barras passariam
+    a ter letras). Ainda por fazer do que as notas de 2026 pedem: DANFE da reforma (NT 2026.010, a
+    partir de 01/12/2026) e valor líquido do produto (NT 2026.008, 2027).
+    **Consulta de protocolo**: nota enviada sem resposta não é reenviada às cegas; o sistema
+    pergunta à SEFAZ e só reenvia se ela disser que a nota não consta (217); se já estava
+    autorizada, grava o protocolo. **Inutilização** (Parâmetros → Fiscal, `fiscal_number_voids`,
+    migração `0024`): só número que o contador da empresa já passou e que não virou nota com
+    veredito; número inutilizado não é reaproveitado por nota rejeitada. **Frete**: a modalidade
+    (`modFrete`, as seis opções do leiaute, `FREIGHT_MODES`) é escolhida no bloco "Nota fiscal" do
+    pedido e fica em `orders.nfe_freight_mode`; sem escolha vale a sugestão (CIF se o pedido tem
+    frete por nossa conta, senão FOB). Transportadora e volumes ainda não vão na nota.
 17. **O build de publicação roda no `apps-noclient`**, não no `creators` (pedido do Nicolas,
     2026-10-08): `deploy/subir.sh` confere aqui (lint, tipos, testes), manda só o que está
     commitado para `/opt/build/erp` de lá, faz o `next build` e o pacote, e o pacote vai de lá

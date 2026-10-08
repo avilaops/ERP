@@ -1,21 +1,25 @@
 import { randomInt } from "node:crypto";
 import { loadFiscalSettings, loadSealedCertificate } from "@/lib/db/fiscal";
-import { countCorrections, listOrderInvoices, loadSignedXml, recordInvoiceEvent, recordVerdict, saveSignedInvoice, takeNextNumber } from "@/lib/db/invoices";
+import { countCorrections, isNumberVoided, listOrderInvoices, recordNumberVoid, usedNumbersIn, loadSignedXml, recordInvoiceEvent, recordVerdict, saveSignedInvoice, takeNextNumber } from "@/lib/db/invoices";
 import type { Invoice } from "@/lib/db/invoices";
 import { issueInstant, previewOrderNfe } from "@/lib/db/order-nfe";
 import { getOrder } from "@/lib/db/orders";
 import type { Queryable } from "@/lib/db/pool";
+import type { Send } from "@/lib/fiscal/channel";
 import { openCertificate } from "@/lib/fiscal/certificate";
 import { NfeError, accessKey, buildNfeXml } from "@/lib/fiscal/nfe";
-import { AUTHORIZATION_ACTION, SefazError, authorizationEnvelope, authorizationUrl, nfeProcXml, parseAuthorization } from "@/lib/fiscal/sefaz";
+import {
+  AUTHORIZATION_ACTION, CONSULT_ACTION, SefazError, VOID_ACTION, authorizationEnvelope, authorizationUrl, consultEnvelope, consultUrl, nfeProcXml,
+  parseAuthorization, parseConsult, parseVoid, voidEnvelope, voidUrl, voidXml,
+} from "@/lib/fiscal/sefaz";
 import { EVENT_ACTION, eventEnvelope, eventUrl, eventXml, parseEvent } from "@/lib/fiscal/events";
-import { signEventXml, signingKeyOf, signNfeXml } from "@/lib/fiscal/sign";
+import { UF_CODES } from "@/lib/fiscal/nfe";
+import { signEventXml, signingKeyOf, signNfeXml, signVoidXml } from "@/lib/fiscal/sign";
 
 /** A refusal of the issuing the user can act on. */
 export class IssueError extends Error {}
 
-/** How an envelope reaches SEFAZ: the real channel in production, a stand-in in the tests. */
-export type Send = (url: string, action: string, envelope: string, certificate: { pfx: Buffer; passphrase: string }) => Promise<string>;
+export type { Send } from "@/lib/fiscal/channel";
 
 export type IssueResult = { invoice: Invoice; message: string };
 
@@ -45,14 +49,30 @@ export async function issueOrderNfe(orderNumber: string, who: string, now: Date,
   let invoice: Invoice;
   let signedXml: string;
   if (waiting) {
-    // Sent before without an answer: the same bytes go again, so SEFAZ recognises the same invoice.
     const stored = await loadSignedXml(waiting.id, conn);
     if (!stored) throw new Error("A nota aguardando resposta perdeu o XML.");
     invoice = waiting;
     signedXml = stored;
+    // Sent before without an answer: first ask SEFAZ what it has. Only an invoice it never received is sent again.
+    let known;
+    try {
+      known = parseConsult(await send(consultUrl(preview.issuerUf, environment), CONSULT_ACTION, consultEnvelope(waiting.accessKey, environment), { pfx: certificate.pfx, passphrase: certificate.password }), waiting.accessKey);
+    } catch (error) {
+      if (error instanceof SefazError) throw new IssueError(`${error.message} A nota ${waiting.number} continua aguardando resposta.`);
+      throw error;
+    }
+    if (known.status === "autorizada") {
+      const saved = await recordVerdict(waiting.id, { status: "autorizada", code: known.code, reason: known.reason, protocol: known.protocol, authorizedXml: nfeProcXml(stored, known.protocolXml) }, conn);
+      return { invoice: saved, message: `A nota ${saved.number} já estava autorizada na SEFAZ. Protocolo ${known.protocol}.` };
+    }
+    if (known.status !== "nao-consta") {
+      throw new IssueError(`A SEFAZ respondeu sobre a nota ${waiting.number} (${known.code}): ${known.reason}. Nada foi reenviado; confira com o contador.`);
+    }
   } else {
     const rejected = previous.find((item) => item.status === "rejeitada" && item.series === series);
-    const number = rejected ? rejected.number : await takeNextNumber(conn);
+    // A rejected invoice is issued again with its number, unless that number was made unusable meanwhile.
+    const reuse = rejected && !(await isNumberVoided(environment, series, rejected.number, conn)) ? rejected.number : null;
+    const number = reuse ?? (await takeNextNumber(conn));
     let randomCode = String(randomInt(0, 100_000_000)).padStart(8, "0");
     if (Number(randomCode) === number) randomCode = String((number + 1) % 100_000_000).padStart(8, "0");
 
@@ -153,4 +173,44 @@ export async function registerOrderNfeEvent(
 
   await recordInvoiceEvent({ invoiceId: invoice.id, kind, sequence, text: text.replace(/\s+/g, " ").trim(), signedXml: signed, protocol: result.protocol, statusCode: result.code, createdBy: who }, conn);
   return { message: kind === "cancelamento" ? `Nota ${invoice.number} cancelada. Protocolo ${result.protocol}.` : `Carta de correção ${sequence} registrada. Protocolo ${result.protocol}.` };
+}
+
+/**
+ * Makes a range of numbers unusable at SEFAZ: numbers the company skipped and
+ * will never issue. Refused here when a number of the range already is an
+ * invoice with a verdict, or was not reached by the counter yet.
+ */
+export async function voidInvoiceNumbers(
+  range: { series: number; first: number; last: number; reason: string },
+  who: string,
+  now: Date,
+  vault: Buffer,
+  send: Send,
+  conn: Queryable,
+): Promise<{ message: string }> {
+  const settings = await loadFiscalSettings(conn);
+  if (!settings.cnpj || !settings.uf || !UF_CODES[settings.uf]) throw new IssueError("Preencha o CNPJ e a UF da empresa em Parâmetros → Fiscal.");
+  if (!(range.last < settings.nextNumber)) throw new IssueError(`Só dá para inutilizar número que o sistema já passou: o próximo da empresa é o ${settings.nextNumber}.`);
+  const used = await usedNumbersIn(settings.environment, range.series, range.first, range.last, conn);
+  if (used.length > 0) throw new IssueError(`Há nota com veredito da SEFAZ nesta faixa (número ${used.join(", ")}): ela não pode ser inutilizada.`);
+
+  const sealed = await loadSealedCertificate(conn);
+  if (!sealed) throw new IssueError("Envie o certificado digital A1 em Parâmetros → Fiscal.");
+  if (sealed.validUntil.getTime() <= now.getTime()) throw new IssueError("O certificado digital venceu. Envie o certificado em vigor em Parâmetros → Fiscal.");
+  const certificate = openCertificate(sealed, vault);
+
+  let signed: string;
+  let result;
+  try {
+    const request = voidXml({ environment: settings.environment, stateCode: UF_CODES[settings.uf], year: issueInstant(now).slice(2, 4), cnpj: settings.cnpj, series: range.series, first: range.first, last: range.last, reason: range.reason });
+    signed = signVoidXml(request.xml, signingKeyOf(certificate.pfx, certificate.password));
+    result = parseVoid(await send(voidUrl(settings.uf, settings.environment), VOID_ACTION, voidEnvelope(signed), { pfx: certificate.pfx, passphrase: certificate.password }));
+  } catch (error) {
+    if (error instanceof SefazError) throw new IssueError(error.message);
+    throw error;
+  }
+  if (!result.registered) throw new IssueError(`A SEFAZ não inutilizou (${result.code}): ${result.reason}`);
+
+  await recordNumberVoid({ environment: settings.environment, series: range.series, first: range.first, last: range.last, reason: range.reason.replace(/\s+/g, " ").trim(), signedXml: signed, protocol: result.protocol, createdBy: who }, conn);
+  return { message: `Numeração ${range.first} a ${range.last} inutilizada. Protocolo ${result.protocol}.` };
 }

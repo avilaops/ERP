@@ -80,7 +80,7 @@ const MARGIN = 22;
 const WIDTH = PAGE.width - 2 * MARGIN;
 const INK = rgb(0, 0, 0);
 const GRAY = rgb(0.86, 0.86, 0.86);
-const FREIGHT: Record<string, string> = { "0": "0 - Por conta do remetente", "1": "1 - Por conta do destinatário", "2": "2 - Por conta de terceiros", "9": "9 - Sem frete" };
+const FREIGHT: Record<string, string> = { "0": "0 - Por conta do remetente (CIF)", "1": "1 - Por conta do destinatário (FOB)", "2": "2 - Por conta de terceiros", "3": "3 - Transporte próprio do remetente", "4": "4 - Transporte próprio do destinatário", "9": "9 - Sem ocorrência de transporte" };
 
 const money = (amount: number) => amount.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const dateTime = (iso: string) => (iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)} ${iso.slice(11, 19)}` : "");

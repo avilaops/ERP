@@ -91,3 +91,13 @@ export function signEventXml(xml: string, key: SigningKey): string {
   const signature = signatureOf(`<infEvento xmlns="${NFE_NS}" Id="${id}">${body}</infEvento>`, id, key);
   return `<evento xmlns="${NFE_NS}" versao="1.00"><infEvento Id="${id}">${body}</infEvento>${signature}</evento>`;
 }
+
+/** Signs the `infInut` of a request built by `voidXml` (numbers made unusable) and answers with the whole `inutNFe`. */
+export function signVoidXml(xml: string, key: SigningKey): string {
+  const match = /^<inutNFe xmlns="http:\/\/www\.portalfiscal\.inf\.br\/nfe" versao="4\.00"><infInut Id="(ID\d{41})">([\s\S]*)<\/infInut><\/inutNFe>$/.exec(xml);
+  if (!match) throw new Error("O pedido a assinar não é o que este sistema monta.");
+  const [, id, body] = match;
+  if (NOT_CANONICAL.test(body)) throw new Error("O pedido a assinar não está na forma canônica.");
+  const signature = signatureOf(`<infInut xmlns="${NFE_NS}" Id="${id}">${body}</infInut>`, id, key);
+  return `<inutNFe xmlns="${NFE_NS}" versao="4.00"><infInut Id="${id}">${body}</infInut>${signature}</inutNFe>`;
+}

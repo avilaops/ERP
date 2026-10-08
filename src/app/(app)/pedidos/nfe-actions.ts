@@ -1,25 +1,20 @@
 "use server";
 
-import { readFileSync } from "node:fs";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/auth";
 import { menuItem } from "@/lib/auth/permissions";
 import { IssueError, issueOrderNfe, registerOrderNfeEvent } from "@/lib/db/issue-nfe";
-import type { Send } from "@/lib/db/issue-nfe";
+import { saveFreightMode } from "@/lib/db/invoices";
+import { getOrder } from "@/lib/db/orders";
 import { tenantDb } from "@/lib/db/pool";
 import { vaultKey } from "@/lib/fiscal/certificate";
-import { ICP_BRASIL_ROOT_V10 } from "@/lib/fiscal/icp-brasil";
-import { transmit } from "@/lib/fiscal/sefaz";
+import { sendToSefaz } from "@/lib/fiscal/channel";
 import type { ActionState } from "@/lib/order-form";
 import { ORDER_NUMBER } from "@/lib/order-number";
 
 const FAILED = "Não foi possível emitir agora. Confira a situação da nota abaixo antes de tentar de novo.";
 
-/** The real channel: the company's certificate, trusting only the root of ICP-Brasil (or the file that replaces it). */
-const send: Send = (url, action, envelope, certificate) => {
-  const roots = process.env.NFE_CA_FILE;
-  return transmit(url, action, envelope, { ...certificate, ca: roots ? readFileSync(roots) : ICP_BRASIL_ROOT_V10 });
-};
+const send = sendToSefaz;
 
 /**
  * "Emitir nota fiscal" of a closed order. Only who edits the fiscal parameters
@@ -63,6 +58,21 @@ export async function registerNfeEventAction(_previous: ActionState, formData: F
     console.error("[nfe] falha ao registrar evento:", error instanceof Error ? error.message : error);
     return { error: FAILED };
   }
+  revalidatePath(`${menuItem("pedidos").href}/${number}`);
+  return { error: null };
+}
+
+/** The way of freight of the invoice, among the options of the layout. */
+export async function saveFreightModeAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
+  const session = await requirePermission("parametros");
+  const conn = tenantDb(session.tenant.slug);
+  const number = formData.get("number");
+  const mode = formData.get("freightMode");
+  if (typeof number !== "string" || !ORDER_NUMBER.test(number)) return { error: "Pedido não encontrado." };
+  if (typeof mode !== "string" || !["0", "1", "2", "3", "4", "9"].includes(mode)) return { error: "Escolha a modalidade do frete na lista." };
+  const order = await getOrder(number, { sellerEmail: null }, conn);
+  if (!order) return { error: "Pedido não encontrado." };
+  await saveFreightMode(order.id, mode, conn);
   revalidatePath(`${menuItem("pedidos").href}/${number}`);
   return { error: null };
 }

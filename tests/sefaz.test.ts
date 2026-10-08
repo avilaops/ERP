@@ -12,7 +12,7 @@ import { signingKeyOf, signNfeXml } from "@/lib/fiscal/sign";
 import { testPfx } from "./fiscal-helpers.ts";
 
 const INPUT: NfeInput = {
-  environment: "homologacao", series: 1, number: 9, randomCode: "48291736", issuedAt: "2026-10-08T10:30:00-03:00",
+  environment: "homologacao", freightMode: "1", series: 1, number: 9, randomCode: "48291736", issuedAt: "2026-10-08T10:30:00-03:00",
   issuer: { cnpj: "12345678000195", legalName: "Ludus Equipamentos Ltda", stateRegistration: "110042490114", taxRegime: 3, street: "Rua das Máquinas", number: "100", district: "Distrito Industrial", cityCode: "3549805", city: "São José do Rio Preto", uf: "SP", cep: "15035000" },
   recipient: { kind: "PJ", document: "98765432000198", name: "Academia", stateRegistration: null, taxpayer: false, street: "Av. Brasil", number: "500", district: "Centro", cityCode: "2111300", city: "São Luís", uf: "MA", cep: "65000000" },
   rules: { operationNature: "Venda de mercadoria", cfopInternal: "5102", cfopInterstate: "6102", cfopInterstateNonTaxpayer: "6108", icmsCode: "00", ipiCst: null, ipiFrameCode: "999", pisCst: "01", pisRate: 0.0065, cofinsCst: "01", cofinsRate: 0.03, finalConsumer: true, ipiInIcmsBase: true, additionalInfo: null, ibsCbs: { cst: "000", classCode: "000001", ibsStateRate: 0.001, ibsCityRate: 0, cbsRate: 0.009 } },
@@ -138,4 +138,51 @@ test("raiz da ICP-Brasil: é a v10 do ITI, com a impressão digital registrada, 
   assert.equal(root.subject, root.issuer);
   assert.ok(root.verify(root.publicKey));
   assert.ok(new Date(root.validTo).getTime() > Date.now(), "a raiz venceu: troque pela nova do ITI");
+});
+
+const fixtureOf = (name: string) => readFileSync(new URL(`./fixtures/nfe-xsd/${name}`, import.meta.url), "utf8");
+async function validates(xml: string, schema: string, layout: string): Promise<string[]> {
+  const result = await validateXML({
+    xml: [{ fileName: "x.xml", contents: xml }],
+    schema: [{ fileName: schema, contents: fixtureOf(schema) }],
+    preload: [layout, "tiposBasico_v4.00.xsd", "xmldsig-core-schema_v1.01.xsd"].map((fileName) => ({ fileName, contents: fixtureOf(fileName) })),
+  });
+  return result.errors.map((error) => error.message);
+}
+
+test("consulta de protocolo: pedido válido no esquema oficial; resposta diz autorizada, cancelada, denegada ou que a nota não consta", async () => {
+  const { consultEnvelope, consultUrl, parseConsult } = await import("@/lib/fiscal/sefaz");
+  const envelope = consultEnvelope(built.key, "homologacao");
+  assert.deepEqual(await validates(/<consSitNFe[\s\S]*<\/consSitNFe>/.exec(envelope)![0], "consSitNFe_v4.00.xsd", "leiauteConsSitNFe_v4.00.xsd"), []);
+  assert.match(consultUrl("SP", "producao"), /nfe\.fazenda\.sp\.gov\.br\/ws\/nfeconsultaprotocolo4\.asmx$/);
+  assert.throws(() => consultUrl("BA", "producao"), SefazError);
+
+  const reply = (code: string, reason: string, extra = "") => `<soap:Envelope xmlns:soap="x"><soap:Body><retConsSitNFe versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe"><tpAmb>2</tpAmb><verAplic>SP</verAplic><cStat>${code}</cStat><xMotivo>${reason}</xMotivo><cUF>35</cUF><chNFe>${built.key}</chNFe>${extra}</retConsSitNFe></soap:Body></soap:Envelope>`;
+  const found = parseConsult(reply("100", "Autorizado o uso da NF-e", protocol("100", "Autorizado o uso da NF-e")), built.key);
+  assert.deepEqual([found.status, found.status === "autorizada" && found.protocol], ["autorizada", "135260000012345"]);
+  assert.equal(parseConsult(reply("101", "Cancelamento de NF-e homologado"), built.key).status, "cancelada");
+  assert.equal(parseConsult(reply("217", "Rejeição: NF-e não consta na base de dados da SEFAZ"), built.key).status, "nao-consta");
+  assert.equal(parseConsult(reply("302", "Uso Denegado"), built.key).status, "denegada");
+  assert.equal(parseConsult(reply("656", "Rejeição: Consumo Indevido"), built.key).status, "outra");
+  // Autorizada sem o protocolo da própria chave não vale como autorizada.
+  assert.equal(parseConsult(reply("100", "Autorizado", protocol("100", "Autorizado", "9".repeat(44))), built.key).status, "outra");
+  assert.throws(() => parseConsult("<html/>", built.key), SefazError);
+});
+
+test("inutilização: pedido assinado válido no esquema oficial, identificador de 41 dígitos, e leitura da resposta", async () => {
+  const { parseVoid, voidEnvelope, voidUrl, voidXml } = await import("@/lib/fiscal/sefaz");
+  const { signVoidXml } = await import("@/lib/fiscal/sign");
+  const request = voidXml({ environment: "homologacao", stateCode: "35", year: "26", cnpj: "12345678000195", series: 1, first: 44, last: 46, reason: "Numeração pulada por falha de sistema & rede." });
+  assert.equal(request.id, "ID35261234567800019555001000000044000000046");
+  const signedRequest = signVoidXml(request.xml, signingKeyOf(pfx, PASSWORD));
+  assert.deepEqual(await validates(signedRequest, "inutNFe_v4.00.xsd", "leiauteInutNFe_v4.00.xsd"), []);
+  assert.ok(voidEnvelope(signedRequest).includes('<nfeDadosMsg xmlns="http://www.portalfiscal.inf.br/nfe/wsdl/NFeInutilizacao4"><inutNFe '));
+  assert.throws(() => voidEnvelope(request.xml), /assinado/);
+  assert.match(voidUrl("SP", "homologacao"), /nfeinutilizacao4\.asmx$/);
+  for (const wrong of [{ reason: "curto" }, { first: 50, last: 40 }, { series: 0 }]) {
+    assert.throws(() => voidXml({ environment: "homologacao", stateCode: "35", year: "26", cnpj: "12345678000195", series: 1, first: 44, last: 46, reason: "Numeração pulada por falha.", ...wrong }), SefazError);
+  }
+  const reply = (code: string, extra = "") => `<retInutNFe versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe"><infInut><tpAmb>2</tpAmb><cStat>${code}</cStat><xMotivo>motivo</xMotivo>${extra}</infInut></retInutNFe>`;
+  assert.deepEqual(parseVoid(reply("102", "<nProt>135260000055555</nProt>")), { registered: true, code: "102", reason: "motivo", protocol: "135260000055555" });
+  assert.deepEqual(parseVoid(reply("241")), { registered: false, code: "241", reason: "motivo" });
 });

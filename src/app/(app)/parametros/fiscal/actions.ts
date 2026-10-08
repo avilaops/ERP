@@ -4,8 +4,10 @@ import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/auth";
 import { FiscalError, removeCertificate, saveCertificate, saveFiscalSettings, saveProductFiscal } from "@/lib/db/fiscal";
 import { saveFiscalRules, savePaymentCode } from "@/lib/db/fiscal-rules";
+import { IssueError, voidInvoiceNumbers } from "@/lib/db/issue-nfe";
 import { tenantDb } from "@/lib/db/pool";
 import { listLines } from "@/lib/db/product-lines";
+import { sendToSefaz } from "@/lib/fiscal/channel";
 import { cityCode } from "@/lib/fiscal/cities";
 import { parsePercent } from "@/lib/format";
 import { exactLine } from "@/lib/lines-view";
@@ -180,6 +182,28 @@ export async function savePaymentCodeAction(_previous: ActionState, formData: Fo
     await savePaymentCode(whole(text("id")), text("code") || null, session.email, conn);
   } catch (error) {
     return problem("gravar a forma de pagamento da nota", error);
+  }
+  revalidatePath(HERE);
+  return OK;
+}
+
+/** "Inutilizar numeração": tells SEFAZ a range of numbers was skipped and will never be an invoice. There is no way back. */
+export async function voidNumbersAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
+  const session = await requirePermission("parametros");
+  const conn = tenantDb(session.tenant.slug);
+  const text = reader(formData);
+  try {
+    await voidInvoiceNumbers(
+      { series: whole(text("series")), first: whole(text("first")), last: whole(text("last")), reason: text("reason") },
+      session.email,
+      new Date(),
+      vaultKey(process.env.ERP_CERT_KEY),
+      sendToSefaz,
+      conn,
+    );
+  } catch (error) {
+    if (error instanceof IssueError) return { error: error.message };
+    return problem("inutilizar a numeração", error);
   }
   revalidatePath(HERE);
   return OK;
