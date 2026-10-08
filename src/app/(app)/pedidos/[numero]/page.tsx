@@ -10,14 +10,17 @@ import { CUSTOMER_FIELDS, customerToForm } from "@/lib/customer-form";
 import { lastDecision } from "@/lib/db/approvals";
 import { findCustomerByDocument } from "@/lib/db/customers";
 import { getOrder, listPaymentMethods, loadOrderStanding } from "@/lib/db/orders";
-import { latestVersion, loadPublishedSnapshot, loadPublishedTable } from "@/lib/db/price-table";
+import { loadApprovalPolicy } from "@/lib/db/company";
+import { latestVersion, loadDiscountLimits, loadPublishedSnapshot, loadPublishedTable } from "@/lib/db/price-table";
 import { formatMoney, formatPercent, isoDate, showDateTime, showIsoDate, showMoney, showPercent } from "@/lib/format";
 import { BAND_TEXT, REASON_TEXT, STATUS_LABELS, UF_NAMES } from "@/lib/order-form";
 import { ORDER_NUMBER } from "@/lib/order-number";
 import { closingProblems, directorOf, dueDates, paymentOf, saleOf } from "@/lib/order-quote";
 import { UFS } from "@/lib/pricing/states";
 import { compareByCode } from "@/lib/products-view";
+import { CopyButton } from "@/components/CopyButton";
 import { DiscountFields } from "@/components/DiscountFields";
+import { proposalText } from "@/lib/quote/text";
 import { CustomerForm } from "../../clientes/CustomerForm";
 import { ActionForm } from "../ActionForm";
 import {
@@ -111,6 +114,33 @@ export default async function PedidoPage({
   const catalog = [...table.items].sort((a, b) => compareByCode(a, b) || a.productId - b.productId);
   const units = order.items.reduce((total, item) => total + item.quantity, 0);
   const discountValue = sale.tableTotal - sale.netSale;
+  // The bar of the discount: for who approves, how far their own decision goes in this destination.
+  // Only the percentage leaves the server, as in Tabela de preços; a seller gets none.
+  let authority: number | null = null;
+  if (allows(session, "aprovacoes") && order.deliveryUf) {
+    const limits = await loadDiscountLimits(table.version, conn);
+    const upTo = costs || (await loadApprovalPolicy(conn)).managerLimit === "meta" ? "atTarget" : "noLoss";
+    const key = limits?.keyOf({ uf: order.deliveryUf, taxpayer: order.taxpayer });
+    authority = limits?.limits.find((limit) => limit.label === key)?.[upTo] ?? null;
+  }
+  // What "Copiar proposta" puts in the clipboard: only what the customer reads in the PDF.
+  const proposal = proposalText({
+    company: session.tenant.name,
+    number: order.number,
+    customer: order.customer ? { name: order.customer.name, document: order.customer.document } : null,
+    delivery: order.deliveryUf ? UF_NAMES[order.deliveryUf] : null,
+    items: sale.lines.map((line, index) => {
+      const product = products.get(order.items[index].productId);
+      return { quantity: order.items[index].quantity, name: product?.name ?? "", code: product?.code ?? null, unit: line.unitWithIpi };
+    }),
+    tableTotal: sale.tableTotal,
+    discount: sale.discount,
+    total: sale.invoiceTotal,
+    receipts: plan.receipts,
+    validUntil: dates.proposalValidUntil,
+    production: order.productionDays === null ? null : `${order.productionDays} dias`,
+    notes: order.notes,
+  });
 
   // The block Cliente: the linked customer, or the one searched for by document.
   const linked = order.customer;
@@ -142,6 +172,7 @@ export default async function PedidoPage({
               Salvar PDF
             </a>
           )}
+          {order.items.length > 0 && <CopyButton text={proposal} label="Copiar proposta" className={BUTTON} />}
         </div>
       </div>
       {latest && latest.version !== table.version && (
@@ -777,6 +808,9 @@ export default async function PedidoPage({
                   percent={formatPercent(order.discount)}
                   tableTotal={sale.tableTotal}
                   disabled={!editable}
+                  invoiceFactor={1 + table.ipi}
+                  free={table.freeDiscount}
+                  limit={authority}
                 />
                 {editable && (
                   <button form={TERMS} type="submit" className={`${BUTTON} self-start`}>

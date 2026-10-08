@@ -26,3 +26,13 @@ test("ida e volta: o valor em reais digitado é o desconto que o pedido mostra",
   assert.ok(percent);
   assert.equal(valueFromPercent(percent, total), "12.345,67");
 });
+
+test("cliente quer pagar: o total aceito vira o desconto que dá esse total, com e sem IPI", async () => {
+  const { percentFromTotal } = await import("@/lib/discount-entry");
+  assert.equal(percentFromTotal("258.830,20", 410841.58, 1), "36,999999");
+  assert.equal(percentFromTotal("9.000,00", 10000, 1), "10");
+  assert.equal(percentFromTotal("10.170,00", 10000, 1.13), "10");
+  assert.equal(percentFromTotal("20.000,00", 10000, 1), "0");
+  assert.equal(percentFromTotal("", 10000, 1), null);
+  assert.equal(percentFromTotal("100,00", 0, 1), null);
+});

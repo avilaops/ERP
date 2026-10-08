@@ -23,3 +23,15 @@ export function valueFromPercent(text: string, tableTotal: number): string {
   if (rate === null || rate === 0 || tableTotal <= 0) return "";
   return formatMoney(roundCents(tableTotal * rate));
 }
+
+/**
+ * "Cliente quer pagar": the total the customer accepts, as the percentage of
+ * discount that gives it. `invoiceFactor` is what the total has over the sale
+ * (1 + IPI). A total above the table is no discount.
+ */
+export function percentFromTotal(text: string, tableTotal: number, invoiceFactor: number): string | null {
+  const total = parseMoney(text);
+  if (total === null || total === 0 || tableTotal <= 0 || invoiceFactor <= 0) return null;
+  const rate = Math.max(0, Math.min(LARGEST, 1 - total / (tableTotal * invoiceFactor)));
+  return formatPercent(Math.round(rate * 1e8) / 1e8);
+}
