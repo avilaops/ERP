@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
-# Publica o ERP no servidor applications: build local → standalone.tgz → /opt/erp →
+# Publica o ERP no servidor applications: conferência local (lint, tipos, testes) →
+# build no servidor de build (apps-noclient, para não pesar no creators) → standalone.tgz → /opt/erp →
 # imagem de runtime → migração de cada empresa → docker compose up → conferência.
 # Só sai 0 se /api/health responder com a revisão enviada.
 #
-# Uso: bash deploy/subir.sh
+# Uso: bash deploy/subir.sh            (BUILD_HOST=local faz o build nesta máquina)
 # Pré-requisitos (uma vez, ver docs/operacao.md): acesso por SSH ao servidor,
 # /opt/erp/.env preenchido, banco e bloco do Caddy criados.
 set -euo pipefail
 SERVIDOR="${SERVIDOR:-applications}"
+# Onde o `next build` roda. Pedido do Nicolas (2026-10-08): no apps-noclient, não no creators.
+BUILD_HOST="${BUILD_HOST:-apps-noclient}"
+BUILD_DIR="/opt/build/erp"
 PASTA="/opt/erp"
 PORTA=3140
 cd "$(dirname "$0")/.."
@@ -19,12 +23,31 @@ COMMIT="$(git rev-parse --short HEAD)"
 AGORA="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 echo "=== ERP → $SERVIDOR ($COMMIT) ==="
 
-PACOTE="$(mktemp -d)/standalone.tgz"
-bash deploy/empacotar.sh "$PACOTE"
-
-echo "▸ enviando"
 ssh "$SERVIDOR" "mkdir -p $PASTA && [ -f $PASTA/.env ] || { echo '! falta $PASTA/.env (copie .env.example e preencha)'; exit 1; }"
-ssh "$SERVIDOR" "cat > $PASTA/standalone.tgz" < "$PACOTE"
+if [ "$BUILD_HOST" = "local" ]; then
+  PACOTE="$(mktemp -d)/standalone.tgz"
+  bash deploy/empacotar.sh "$PACOTE"
+  echo "▸ enviando"
+  ssh "$SERVIDOR" "cat > $PASTA/standalone.tgz" < "$PACOTE"
+else
+  ETAPA=conferir bash deploy/empacotar.sh
+  echo "▸ build em $BUILD_HOST"
+  # Só o que está commitado vai: nenhum .env, nada de rascunho. O node_modules de lá é reaproveitado
+  # enquanto o package-lock for o mesmo.
+  ssh "$BUILD_HOST" "mkdir -p $BUILD_DIR/work && cd $BUILD_DIR/work && find . -mindepth 1 -maxdepth 1 ! -name node_modules -exec rm -rf {} +"
+  git archive HEAD | ssh "$BUILD_HOST" "tar -x -C $BUILD_DIR/work"
+  ssh "$BUILD_HOST" "bash -s" <<REMOTO
+set -euo pipefail
+cd $BUILD_DIR/work
+if ! sha256sum -c ../lock.sha256 >/dev/null 2>&1 || [ ! -d node_modules ]; then
+  npm ci --no-audit --no-fund >/dev/null
+  sha256sum package-lock.json > ../lock.sha256
+fi
+ETAPA=montar bash deploy/empacotar.sh $BUILD_DIR/standalone.tgz
+REMOTO
+  echo "▸ enviando"
+  ssh "$BUILD_HOST" "cat $BUILD_DIR/standalone.tgz" | ssh "$SERVIDOR" "cat > $PASTA/standalone.tgz"
+fi
 scp -q Dockerfile "$SERVIDOR:$PASTA/Dockerfile"
 scp -q deploy/docker-compose.yml "$SERVIDOR:$PASTA/docker-compose.yml"
 

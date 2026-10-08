@@ -1098,7 +1098,7 @@ test("nota fiscal de conferência: pedido fechado, com os cadastros preenchidos,
     "diretoria@teste.local",
     db.pool,
   );
-  await saveFiscalRules(1, { ...EMPTY_FISCAL_RULES, operationNature: "Venda de mercadoria", cfopInternal: "5102", cfopInterstate: "6102", cfopInterstateNonTaxpayer: "6108", icmsCode: "00", ipiCst: "50", pisCst: "01", pisRate: 0.0065, cofinsCst: "01", cofinsRate: 0.03 }, "diretoria@teste.local", db.pool);
+  await saveFiscalRules(1, { ...EMPTY_FISCAL_RULES, operationNature: "Venda de mercadoria", cfopInternal: "5102", cfopInterstate: "6102", cfopInterstateNonTaxpayer: "6108", icmsCode: "00", ipiCst: "50", pisCst: "01", pisRate: 0.0065, cofinsCst: "01", cofinsRate: 0.03, ibsCbsCst: "000", ibsCbsClass: "000001" }, "diretoria@teste.local", db.pool);
   const products = await db.pool.query("SELECT id FROM products");
   for (const row of products.rows) await saveProductFiscal(Number(row.id), { ncm: "95069100", origin: 1, cest: null, unit: "UN" }, "diretoria@teste.local", db.pool);
   const city = cities[uf][0][0];

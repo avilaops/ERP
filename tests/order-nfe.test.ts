@@ -9,7 +9,7 @@ import { DEFAULT_PARAMS } from "@/lib/pricing/params";
 
 const RULES: FiscalRules = {
   ...EMPTY_FISCAL_RULES, operationNature: "Venda de mercadoria", cfopInternal: "5102", cfopInterstate: "6102", cfopInterstateNonTaxpayer: "6108",
-  icmsCode: "00", pisCst: "01", pisRate: 0.0065, cofinsCst: "01", cofinsRate: 0.03, additionalInfo: "Texto fixo",
+  icmsCode: "00", pisCst: "01", pisRate: 0.0065, cofinsCst: "01", cofinsRate: 0.03, additionalInfo: "Texto fixo", ibsCbsCst: "000", ibsCbsClass: "000001",
 };
 const params = { ...DEFAULT_PARAMS, ipi: 0, stateRates: { ...DEFAULT_PARAMS.stateRates, MA: { ...DEFAULT_PARAMS.stateRates.MA, outboundIcms: 0.07 } } };
 

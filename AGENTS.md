@@ -235,6 +235,22 @@ funções puras, sem banco e sem tela, conferidas com os números dos prints do 
     nota para `cancelada` no mesmo comando (a nota fica guardada e o pedido pode ter outra). Consulta
     de protocolo e inutilização de numeração ainda não existem.
 
+16. **NF-e segue o pacote oficial vigente e a reforma tributária.** Conferido no Portal Nacional
+    da NF-e em 2026-10-08: os esquemas de teste são os do **Pacote de Liberação 010f** (31/08/2026),
+    e a nota leva o grupo **IBS/CBS** (`IBSCBS` no item, `IBSCBSTot` no total, NT 2025.002): para o
+    regime normal é obrigatório desde 03/08/2026 (rejeição 1115) e para o Simples a partir de
+    04/01/2027. CST, classificação tributária e as três alíquotas do ano ficam em `fiscal_rules`
+    (migração `0023`; em 2026 a lei fixa IBS estadual 0,1%, municipal 0% e CBS 0,9%, e os valores
+    **não somam** ao total da nota). Antes de mexer no leiaute, baixe o pacote e a nota técnica
+    atuais do portal (`www.nfe.fazenda.gov.br`, que só abre com a raiz da ICP-Brasil): há notas
+    novas quase todo mês. Ainda por fazer do que as notas de 2026 pedem: CNPJ alfanumérico
+    (NT 2026.004; hoje o sistema só aceita CNPJ numérico), DANFE da reforma (NT 2026.010, a partir
+    de 01/12/2026) e valor líquido do produto (NT 2026.008, 2027).
+17. **O build de publicação roda no `apps-noclient`**, não no `creators` (pedido do Nicolas,
+    2026-10-08): `deploy/subir.sh` confere aqui (lint, tipos, testes), manda só o que está
+    commitado para `/opt/build/erp` de lá, faz o `next build` e o pacote, e o pacote vai de lá
+    para o `applications`. `BUILD_HOST=local` volta a fazer o build nesta máquina.
+
 10. **Provisões e taxa fixa por pedido são parâmetros** (migração `0013`): perdas, garantia e
     inadimplência somam em `channelRate`; a taxa fixa sai do lucro do pedido uma vez, junto com o
     frete (`quoteOrder`, `orderMaxDiscounts`). Entram com zero, e "Outras taxas da venda" segue

@@ -24,6 +24,13 @@ export type FiscalRules = {
   finalConsumer: boolean;
   ipiInIcmsBase: boolean;
   additionalInfo: string | null;
+  /** CST of IBS/CBS (three digits) and its tax classification (`cClassTrib`, six). Blank: the invoice has no IBSCBS group. */
+  ibsCbsCst: string | null;
+  ibsCbsClass: string | null;
+  /** The rates of the year, as fractions: IBS of the state, IBS of the city and CBS. */
+  ibsStateRate: number;
+  ibsCityRate: number;
+  cbsRate: number;
 };
 
 export const EMPTY_FISCAL_RULES: FiscalRules = {
@@ -41,6 +48,12 @@ export const EMPTY_FISCAL_RULES: FiscalRules = {
   finalConsumer: true,
   ipiInIcmsBase: true,
   additionalInfo: null,
+  ibsCbsCst: null,
+  ibsCbsClass: null,
+  // What the law sets for 2026; the same values the migration seeds.
+  ibsStateRate: 0.001,
+  ibsCityRate: 0,
+  cbsRate: 0.009,
 };
 
 const text = (value: unknown) => (value === null || value === undefined ? null : String(value));
@@ -50,7 +63,8 @@ const blank = (value: string | null) => (value?.trim() ? value.trim() : null);
 export async function loadFiscalRules(lineId: number, conn: Queryable): Promise<FiscalRules> {
   const { rows } = await conn.query(
     `SELECT operation_nature, cfop_internal, cfop_interstate, cfop_interstate_non_taxpayer, icms_code, ipi_cst, ipi_frame_code,
-            pis_cst, pis_rate, cofins_cst, cofins_rate, final_consumer, ipi_in_icms_base, additional_info
+            pis_cst, pis_rate, cofins_cst, cofins_rate, final_consumer, ipi_in_icms_base, additional_info,
+            ibscbs_cst, ibscbs_class, ibs_state_rate, ibs_city_rate, cbs_rate
        FROM fiscal_rules WHERE line_id = $1`,
     [lineId],
   );
@@ -71,6 +85,11 @@ export async function loadFiscalRules(lineId: number, conn: Queryable): Promise<
     finalConsumer: row.final_consumer === true,
     ipiInIcmsBase: row.ipi_in_icms_base === true,
     additionalInfo: text(row.additional_info),
+    ibsCbsCst: text(row.ibscbs_cst),
+    ibsCbsClass: text(row.ibscbs_class),
+    ibsStateRate: Number(row.ibs_state_rate),
+    ibsCityRate: Number(row.ibs_city_rate),
+    cbsRate: Number(row.cbs_rate),
   };
 }
 
@@ -122,19 +141,27 @@ export async function saveFiscalRules(lineId: number, input: FiscalRules, update
     input.ipiInIcmsBase === true,
     info,
     updatedBy,
+    code(input.ibsCbsCst, /^\d{3}$/, "CST do IBS/CBS: três dígitos."),
+    code(input.ibsCbsClass, /^\d{6}$/, "Classificação tributária do IBS/CBS: seis dígitos."),
+    fraction(input.ibsStateRate, "Alíquota do IBS estadual"),
+    fraction(input.ibsCityRate, "Alíquota do IBS municipal"),
+    fraction(input.cbsRate, "Alíquota da CBS"),
   ];
   const { rows } = await conn.query(
     `INSERT INTO fiscal_rules
        (line_id, operation_nature, cfop_internal, cfop_interstate, cfop_interstate_non_taxpayer, icms_code, ipi_cst, ipi_frame_code,
-        pis_cst, pis_rate, cofins_cst, cofins_rate, final_consumer, ipi_in_icms_base, additional_info, updated_by)
-     SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16
+        pis_cst, pis_rate, cofins_cst, cofins_rate, final_consumer, ipi_in_icms_base, additional_info, updated_by,
+        ibscbs_cst, ibscbs_class, ibs_state_rate, ibs_city_rate, cbs_rate)
+     SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21
       WHERE EXISTS (SELECT 1 FROM product_lines WHERE id = $1)
      ON CONFLICT (line_id) DO UPDATE SET
        operation_nature = EXCLUDED.operation_nature, cfop_internal = EXCLUDED.cfop_internal, cfop_interstate = EXCLUDED.cfop_interstate,
        cfop_interstate_non_taxpayer = EXCLUDED.cfop_interstate_non_taxpayer, icms_code = EXCLUDED.icms_code, ipi_cst = EXCLUDED.ipi_cst,
        ipi_frame_code = EXCLUDED.ipi_frame_code, pis_cst = EXCLUDED.pis_cst, pis_rate = EXCLUDED.pis_rate, cofins_cst = EXCLUDED.cofins_cst,
        cofins_rate = EXCLUDED.cofins_rate, final_consumer = EXCLUDED.final_consumer, ipi_in_icms_base = EXCLUDED.ipi_in_icms_base,
-       additional_info = EXCLUDED.additional_info, updated_at = now(), updated_by = EXCLUDED.updated_by
+       additional_info = EXCLUDED.additional_info, ibscbs_cst = EXCLUDED.ibscbs_cst, ibscbs_class = EXCLUDED.ibscbs_class,
+       ibs_state_rate = EXCLUDED.ibs_state_rate, ibs_city_rate = EXCLUDED.ibs_city_rate, cbs_rate = EXCLUDED.cbs_rate,
+       updated_at = now(), updated_by = EXCLUDED.updated_by
      RETURNING line_id`,
     values,
   );

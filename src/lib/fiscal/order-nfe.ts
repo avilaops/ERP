@@ -107,6 +107,8 @@ export function orderNfe(source: OrderNfeSource): { input: NfeInput; problems: s
       finalConsumer: rules.finalConsumer,
       ipiInIcmsBase: rules.ipiInIcmsBase,
       additionalInfo: [rules.additionalInfo, `Pedido ${order.number}`].filter(Boolean).join(" - "),
+      // Without the two codes the group is left out, and the invoice says so when the regime asks for it.
+      ibsCbs: rules.ibsCbsCst && rules.ibsCbsClass ? { cst: rules.ibsCbsCst, classCode: rules.ibsCbsClass, ibsStateRate: rules.ibsStateRate, ibsCityRate: rules.ibsCityRate, cbsRate: rules.cbsRate } : null,
     },
     items,
     // Inside the state, its internal rate; to another, the outbound rate of the destination (7%, 12% or the general one).

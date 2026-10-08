@@ -20,7 +20,7 @@ export type DanfeData = {
   protocol: string | null; authorizedAt: string | null;
   issuer: Party; recipient: Party;
   items: DanfeItem[];
-  totals: { icmsBase: number; icms: number; products: number; freight: number; discount: number; ipi: number; invoice: number; difal: number; fcp: number };
+  totals: { icmsBase: number; icms: number; products: number; freight: number; discount: number; ipi: number; invoice: number; difal: number; fcp: number; ibs: number; cbs: number };
   freightMode: string; info: string;
 };
 
@@ -69,6 +69,7 @@ export function danfeData(xml: string): DanfeData {
     totals: {
       icmsBase: number(totals, "vBC"), icms: number(totals, "vICMS"), products: number(totals, "vProd"), freight: number(totals, "vFrete"), discount: number(totals, "vDesc"),
       ipi: number(totals, "vIPI"), invoice: number(totals, "vNF"), difal: number(totals, "vICMSUFDest"), fcp: number(totals, "vFCPUFDest"),
+      ibs: number(block(block(xml, "IBSCBSTot"), "gIBS"), "vIBS"), cbs: number(block(block(xml, "IBSCBSTot"), "gCBS"), "vCBS"),
     },
     freightMode: value(block(xml, "transp"), "modFrete"), info: value(block(xml, "infAdic"), "infCpl"),
   };
@@ -267,6 +268,7 @@ export async function renderDanfe(data: DanfeData): Promise<Uint8Array> {
     const extra = [
       data.homologation ? "NF-e EMITIDA EM AMBIENTE DE HOMOLOGAÇÃO - SEM VALOR FISCAL." : "",
       data.totals.difal > 0 || data.totals.fcp > 0 ? `ICMS devido ao estado de destino (DIFAL): R$ ${money(data.totals.difal)}; Fundo de Combate à Pobreza: R$ ${money(data.totals.fcp)}.` : "",
+      data.totals.ibs > 0 || data.totals.cbs > 0 ? `Reforma tributária: IBS R$ ${money(data.totals.ibs)}; CBS R$ ${money(data.totals.cbs)} (não somam ao total da nota em 2026).` : "",
       data.info,
     ].filter(Boolean).join(" ");
     wrap(extra, regular, 7, WIDTH - 8, 6).forEach((line, at) => text(line, MARGIN + 3, foot - 15 - at * 8, 7));

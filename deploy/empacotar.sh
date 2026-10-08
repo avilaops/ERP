@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Confere, faz o build standalone e empacota em standalone.tgz.
 # Uso: bash deploy/empacotar.sh [arquivo-de-saida]
+# ETAPA=conferir só confere (lint, tipos, testes); ETAPA=montar só faz o build e o
+# pacote, para rodar no servidor de build; sem ETAPA, faz as duas coisas aqui.
 #
 # Armadilhas conhecidas:
 # 1. nunca gerar o .tgz dentro da pasta empacotada;
@@ -8,13 +10,17 @@
 # 3. nenhum .env nem .git pode ir no pacote.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+ETAPA="${ETAPA:-tudo}"
 
+if [ "$ETAPA" != "montar" ]; then
 echo "▸ conferindo (lint, tipos, testes)"
 npm run lint
 npm run typecheck
 npm test 2>&1 | tee /tmp/erp-testes.$$ | grep -E "^(ℹ|#) (tests|pass|fail|skipped)"
 grep -qE "^(ℹ|#) fail 0$" /tmp/erp-testes.$$ && grep -qE "^(ℹ|#) skipped 0$" /tmp/erp-testes.$$ || { echo "! testes falharam ou foram pulados"; rm -f /tmp/erp-testes.$$; exit 1; }
 rm -f /tmp/erp-testes.$$
+fi
+[ "$ETAPA" = "conferir" ] && exit 0
 
 echo "▸ build"
 rm -rf .next

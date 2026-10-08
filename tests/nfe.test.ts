@@ -20,8 +20,7 @@ const INPUT: NfeInput = {
   rules: {
     operationNature: "Venda de mercadoria", cfopInternal: "5102", cfopInterstate: "6102", cfopInterstateNonTaxpayer: "6108",
     icmsCode: "00", ipiCst: null, ipiFrameCode: "999", pisCst: "01", pisRate: 0.0065, cofinsCst: "01", cofinsRate: 0.03,
-    finalConsumer: true, ipiInIcmsBase: true, additionalInfo: "Pedido 261008-W9LG",
-  },
+    finalConsumer: true, ipiInIcmsBase: true, additionalInfo: "Pedido 261008-W9LG", ibsCbs: { cst: "000", classCode: "000001", ibsStateRate: 0.001, ibsCityRate: 0, cbsRate: 0.009 } },
   items: [
     { code: "LD-WH037", name: "Leg Press 45° Com Suporte Para Anilhas", ncm: "95069100", cest: null, origin: 0, unit: "UN", quantity: 2, unitPrice: 10344.12, ipiRate: 0 },
     { code: "LD-WH011", name: "Banco Regulável de 0 a 90°", ncm: "95069100", cest: null, origin: 0, unit: "UN", quantity: 1, unitPrice: 1798.98, ipiRate: 0 },
@@ -55,7 +54,7 @@ test("chave de acesso: estado, ano e mês, CNPJ, modelo 55, série, número, for
 
 test("venda para não contribuinte de outro estado: CFOP 6108, ICMS de saída e DIFAL para o destino", () => {
   const { xml, key, totals } = buildNfeXml(INPUT);
-  assert.deepEqual(totals, { products: 22487.22, ipi: 0, icmsBase: 22487.22, icms: 1574.11, pis: 146.16, cofins: 674.62, difal: 3597.96, fcp: 0, invoice: 22487.22 });
+  assert.deepEqual(totals, { products: 22487.22, ipi: 0, icmsBase: 22487.22, icms: 1574.11, pis: 146.16, cofins: 674.62, difal: 3597.96, fcp: 0, invoice: 22487.22, reformBase: 16494.37, ibsState: 16.49, ibsCity: 0, cbs: 148.45 });
   assert.ok(xml.startsWith(`<?xml version="1.0" encoding="UTF-8"?><NFe xmlns="http://www.portalfiscal.inf.br/nfe"><infNFe versao="4.00" Id="NFe${key}">`));
   for (const piece of [
     "<idDest>2</idDest>", "<tpAmb>1</tpAmb>", "<indFinal>1</indFinal>", "<indPres>9</indPres><indIntermed>0</indIntermed>",
@@ -66,6 +65,10 @@ test("venda para não contribuinte de outro estado: CFOP 6108, ICMS de saída e 
     "<qCom>2.0000</qCom><vUnCom>10344.1200000000</vUnCom><vProd>20688.24</vProd>",
     "<vNF>22487.22</vNF>", "<detPag><tPag>17</tPag><vPag>13492.33</vPag></detPag><detPag><tPag>15</tPag><vPag>8994.89</vPag></detPag>",
     "<infCpl>Pedido 261008-W9LG</infCpl>",
+    // Reforma tributária (NT 2025.002): base sem os tributos embutidos, IBS de 0,1% e CBS de 0,9% em 2026, fora do total da nota.
+    "<IBSCBS><CST>000</CST><cClassTrib>000001</cClassTrib><gIBSCBS><vBC>15174.82</vBC><gIBSUF><pIBSUF>0.1000</pIBSUF><vIBSUF>15.17</vIBSUF></gIBSUF><gIBSMun><pIBSMun>0.0000</pIBSMun><vIBSMun>0.00</vIBSMun></gIBSMun><vIBS>15.17</vIBS><gCBS><pCBS>0.9000</pCBS><vCBS>136.57</vCBS></gCBS></gIBSCBS></IBSCBS>",
+    "<IBSCBSTot><vBCIBSCBS>16494.37</vBCIBSCBS><gIBS><gIBSUF><vDif>0.00</vDif><vDevTrib>0.00</vDevTrib><vIBSUF>16.49</vIBSUF></gIBSUF>",
+    "<gCBS><vDif>0.00</vDif><vDevTrib>0.00</vDevTrib><vCBS>148.45</vCBS><vCredPres>0.00</vCredPres><vCredPresCondSus>0.00</vCredPresCondSus></gCBS></IBSCBSTot>",
   ]) {
     assert.ok(xml.includes(piece), piece);
   }
@@ -97,7 +100,10 @@ test("dentro do estado e para contribuinte: CFOP da operação, sem DIFAL; com I
 });
 
 test("Simples Nacional: CSOSN, sem base nem valor de ICMS; homologação troca o nome do cliente e do primeiro item", () => {
-  const simples = buildNfeXml({ ...INPUT, environment: "homologacao", issuer: { ...INPUT.issuer, taxRegime: 1 }, rules: { ...INPUT.rules, icmsCode: "102", pisCst: "49", cofinsCst: "49", pisRate: 0, cofinsRate: 0 } });
+  const simples = buildNfeXml({ ...INPUT, environment: "homologacao", issuer: { ...INPUT.issuer, taxRegime: 1 }, rules: { ...INPUT.rules, icmsCode: "102", pisCst: "49", cofinsCst: "49", pisRate: 0, cofinsRate: 0, ibsCbs: null } });
+  // O Simples só leva IBS/CBS a partir de 04/01/2027: sem as regras, a nota sai sem o grupo.
+  assert.doesNotMatch(simples.xml, /IBSCBS/);
+  assert.ok(nfeProblems({ ...INPUT, rules: { ...INPUT.rules, ibsCbs: null } }).some((problem) => problem.includes("IBS/CBS")));
   assert.ok(simples.xml.includes("<ICMSSN102><orig>0</orig><CSOSN>102</CSOSN></ICMSSN102>"));
   assert.ok(simples.xml.includes("<CRT>1</CRT>") && simples.xml.includes("<tpAmb>2</tpAmb>"));
   assert.ok(simples.xml.includes("<PISOutr><CST>49</CST><vBC>20688.24</vBC><pPIS>0.0000</pPIS><vPIS>0.00</vPIS></PISOutr>"));
@@ -126,7 +132,7 @@ test("esquema oficial da NF-e 4.00 (XSD): o XML passa inteiro; só falta a assin
   const { readFileSync } = await import("node:fs");
   const { validateXML } = await import("xmllint-wasm");
   const read = (name: string) => readFileSync(new URL(`./fixtures/nfe-xsd/${name}`, import.meta.url), "utf8");
-  const preload = ["leiauteNFe_v4.00.xsd", "tiposBasico_v4.00.xsd", "xmldsig-core-schema_v1.01.xsd"].map((fileName) => ({ fileName, contents: read(fileName) }));
+  const preload = ["leiauteNFe_v4.00.xsd", "tiposBasico_v4.00.xsd", "DFeTiposBasicos_v1.00.xsd", "xmldsig-core-schema_v1.01.xsd"].map((fileName) => ({ fileName, contents: read(fileName) }));
   const cases: NfeInput[] = [
     INPUT,
     { ...INPUT, destination: { internalIcms: 0.2, fcp: 0.02 }, recipient: { ...INPUT.recipient, uf: "RJ", cityCode: "3304557", city: "Rio de Janeiro", phone: "(21) 3333-4444" }, icmsRate: 0.12 },

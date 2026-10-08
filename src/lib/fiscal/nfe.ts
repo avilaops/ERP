@@ -72,6 +72,12 @@ export type NfeRules = {
   /** Whether the IPI is part of the ICMS base in a sale to a final consumer. */
   ipiInIcmsBase: boolean;
   additionalInfo: string | null;
+  /**
+   * IBS and CBS of the tax reform (NT 2025.002): the classification the
+   * accountant gives and the rates of the year. `null`: the invoice has no
+   * IBSCBS group, which the regime normal may not do since 2026-08-03.
+   */
+  ibsCbs: { cst: string; classCode: string; ibsStateRate: number; ibsCityRate: number; cbsRate: number } | null;
 };
 
 export type NfeItem = {
@@ -214,6 +220,9 @@ export function nfeProblems(input: NfeInput): string[] {
   need(rules.ipiCst === null || /^\d{2}$/.test(rules.ipiCst), "Regras fiscais: CST do IPI com dois dígitos, ou em branco para nota sem IPI.");
   need(rules.ipiCst !== null || input.items.every((item) => item.ipiRate === 0), "Regras fiscais: a linha tem IPI na tabela, falta o CST do IPI.");
 
+  need(rules.ibsCbs !== null || issuer.taxRegime !== 3, "Regras fiscais: CST e classificação tributária do IBS/CBS (obrigatórios para o regime normal desde 03/08/2026).");
+  need(rules.ibsCbs === null || (/^\d{3}$/.test(rules.ibsCbs.cst) && /^\d{6}$/.test(rules.ibsCbs.classCode)), "Regras fiscais: CST do IBS/CBS com três dígitos e classificação tributária com seis.");
+
   need(input.items.length > 0, "Pedido sem itens.");
   input.items.forEach((item, index) => {
     const which = `Item ${index + 1} (${item.name})`;
@@ -230,7 +239,7 @@ export function nfeProblems(input: NfeInput): string[] {
   return problems;
 }
 
-type ItemFigures = { product: number; ipi: number; icmsBase: number; icms: number; pis: number; cofins: number; difalBase: number; difal: number; fcp: number };
+type ItemFigures = { product: number; ipi: number; icmsBase: number; icms: number; pis: number; cofins: number; difalBase: number; difal: number; fcp: number; reformBase: number; ibsState: number; ibsCity: number; cbs: number };
 
 /** The account of one item. The ICMS base takes the IPI only in a sale to a final consumer, when the rules say so. */
 function figuresOf(item: NfeItem, input: NfeInput): ItemFigures {
@@ -241,20 +250,31 @@ function figuresOf(item: NfeItem, input: NfeInput): ItemFigures {
   const icmsBase = taxed ? roundCents(product + (rules.finalConsumer && rules.ipiInIcmsBase ? ipi : 0)) : 0;
   const interstate = issuer.uf !== recipient.uf;
   const owesDifal = taxed && interstate && !recipient.taxpayer && rules.finalConsumer;
+  const icms = roundCents(icmsBase * input.icmsRate);
+  const pis = roundCents(product * rules.pisRate);
+  const cofins = roundCents(product * rules.cofinsRate);
+  const difal = owesDifal ? roundCents(icmsBase * Math.max(0, input.destination.internalIcms - input.icmsRate)) : 0;
+  const fcp = owesDifal ? roundCents(icmsBase * input.destination.fcp) : 0;
+  // Base of IBS and CBS (rule UB16-10): the product less the taxes it carries inside.
+  const reformBase = rules.ibsCbs ? roundCents(product - pis - cofins - icms - difal - fcp) : 0;
   return {
     product,
     ipi,
     icmsBase,
-    icms: roundCents(icmsBase * input.icmsRate),
-    pis: roundCents(product * rules.pisRate),
-    cofins: roundCents(product * rules.cofinsRate),
+    icms,
+    pis,
+    cofins,
     difalBase: owesDifal ? icmsBase : 0,
-    difal: owesDifal ? roundCents(icmsBase * Math.max(0, input.destination.internalIcms - input.icmsRate)) : 0,
-    fcp: owesDifal ? roundCents(icmsBase * input.destination.fcp) : 0,
+    difal,
+    fcp,
+    reformBase,
+    ibsState: rules.ibsCbs ? roundCents(reformBase * rules.ibsCbs.ibsStateRate) : 0,
+    ibsCity: rules.ibsCbs ? roundCents(reformBase * rules.ibsCbs.ibsCityRate) : 0,
+    cbs: rules.ibsCbs ? roundCents(reformBase * rules.ibsCbs.cbsRate) : 0,
   };
 }
 
-export type NfeTotals = { products: number; ipi: number; icmsBase: number; icms: number; pis: number; cofins: number; difal: number; fcp: number; invoice: number };
+export type NfeTotals = { products: number; ipi: number; icmsBase: number; icms: number; pis: number; cofins: number; difal: number; fcp: number; invoice: number; reformBase: number; ibsState: number; ibsCity: number; cbs: number };
 
 /** The totals of the invoice: the sum of the items, each already in cents. The invoice total is products plus IPI. */
 export function nfeTotals(input: NfeInput): NfeTotals {
@@ -270,7 +290,12 @@ export function nfeTotals(input: NfeInput): NfeTotals {
     cofins: sum((figures) => figures.cofins),
     difal: sum((figures) => figures.difal),
     fcp: sum((figures) => figures.fcp),
+    // In 2026 IBS and CBS are informed and do not add to the total of the invoice.
     invoice: roundCents(products + ipi),
+    reformBase: sum((figures) => figures.reformBase),
+    ibsState: sum((figures) => figures.ibsState),
+    ibsCity: sum((figures) => figures.ibsCity),
+    cbs: sum((figures) => figures.cbs),
   };
 }
 
@@ -352,7 +377,22 @@ function itemXml(item: NfeItem, index: number, input: NfeInput): string {
       ipi +
       contribution("PIS", rules.pisCst, figures.product, rules.pisRate, figures.pis) +
       contribution("COFINS", rules.cofinsCst, figures.product, rules.cofinsRate, figures.cofins) +
-      difal,
+      difal +
+      (rules.ibsCbs
+        ? group(
+            "IBSCBS",
+            tag("CST", rules.ibsCbs.cst) +
+              tag("cClassTrib", rules.ibsCbs.classCode) +
+              group(
+                "gIBSCBS",
+                tag("vBC", money(figures.reformBase)) +
+                  group("gIBSUF", tag("pIBSUF", rate(rules.ibsCbs.ibsStateRate)) + tag("vIBSUF", money(figures.ibsState))) +
+                  group("gIBSMun", tag("pIBSMun", rate(rules.ibsCbs.ibsCityRate)) + tag("vIBSMun", money(figures.ibsCity))) +
+                  tag("vIBS", money(figures.ibsState + figures.ibsCity)) +
+                  group("gCBS", tag("pCBS", rate(rules.ibsCbs.cbsRate)) + tag("vCBS", money(figures.cbs))),
+              ),
+          )
+        : ""),
   );
   return group("det", product + taxes, ` nItem="${index + 1}"`);
 }
@@ -435,7 +475,22 @@ export function buildNfeXml(input: NfeInput): { key: string; xml: string; totals
         tag("vCOFINS", money(totals.cofins)) +
         tag("vOutro", "0.00") +
         tag("vNF", money(totals.invoice)),
-    ),
+    ) +
+      (rules.ibsCbs
+        ? group(
+            "IBSCBSTot",
+            tag("vBCIBSCBS", money(totals.reformBase)) +
+              group(
+                "gIBS",
+                group("gIBSUF", tag("vDif", "0.00") + tag("vDevTrib", "0.00") + tag("vIBSUF", money(totals.ibsState))) +
+                  group("gIBSMun", tag("vDif", "0.00") + tag("vDevTrib", "0.00") + tag("vIBSMun", money(totals.ibsCity))) +
+                  tag("vIBS", money(totals.ibsState + totals.ibsCity)) +
+                  tag("vCredPres", "0.00") +
+                  tag("vCredPresCondSus", "0.00"),
+              ) +
+              group("gCBS", tag("vDif", "0.00") + tag("vDevTrib", "0.00") + tag("vCBS", money(totals.cbs)) + tag("vCredPres", "0.00") + tag("vCredPresCondSus", "0.00")),
+          )
+        : ""),
   );
 
   const payment = group(

@@ -49,6 +49,11 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
     ["pisRate", "Alíquota do PIS (%)", formatPercent(rules.pisRate), "Ex.: 0,65", ""],
     ["cofinsCst", "CST da COFINS", rules.cofinsCst, "Ex.: 01", ""],
     ["cofinsRate", "Alíquota da COFINS (%)", formatPercent(rules.cofinsRate), "Ex.: 3", ""],
+    ["ibsCbsCst", "CST do IBS/CBS (reforma tributária)", rules.ibsCbsCst, "Ex.: 000", ""],
+    ["ibsCbsClass", "Classificação tributária do IBS/CBS (cClassTrib)", rules.ibsCbsClass, "Ex.: 000001", ""],
+    ["ibsStateRate", "Alíquota do IBS estadual (%)", formatPercent(rules.ibsStateRate), "0,1 em 2026", ""],
+    ["ibsCityRate", "Alíquota do IBS municipal (%)", formatPercent(rules.ibsCityRate), "0 em 2026", ""],
+    ["cbsRate", "Alíquota da CBS (%)", formatPercent(rules.cbsRate), "0,9 em 2026", ""],
   ] as const;
   const today = isoDate(new Date());
   const daysLeft = certificate ? Math.round((parseDate(isoDate(certificate.validUntil)) - parseDate(today)) / DAY_MS) : null;

@@ -21,7 +21,7 @@ after(async () => {
 const NATIONAL: FiscalRules = {
   operationNature: "Venda de mercadoria", cfopInternal: "5102", cfopInterstate: "6102", cfopInterstateNonTaxpayer: "6108", icmsCode: "00",
   ipiCst: null, ipiFrameCode: "999", pisCst: "01", pisRate: 0.0065, cofinsCst: "01", cofinsRate: 0.03, finalConsumer: true, ipiInIcmsBase: false,
-  additionalInfo: "Texto fixo",
+  additionalInfo: "Texto fixo", ibsCbsCst: "000", ibsCbsClass: "000001", ibsStateRate: 0.001, ibsCityRate: 0, cbsRate: 0.009,
 };
 
 test("regras fiscais: nascem em branco, sem código vindo do programa; cada linha guarda as suas", { skip }, async () => {
