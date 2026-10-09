@@ -69,6 +69,7 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "0035_parcelas_combinadas.sql",
     "0036_contrato_do_pedido.sql",
     "0037_convite_por_email.sql",
+    "0038_contrato_enviado_em_arquivo.sql",
   ]);
 
   const second = await withClient((client) => migrate(client, MIGRATIONS_DIR));

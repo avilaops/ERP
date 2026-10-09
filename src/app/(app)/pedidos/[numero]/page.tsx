@@ -36,7 +36,7 @@ import { DownPaymentFields } from "@/components/DownPaymentFields";
 import { proposalText } from "@/lib/quote/text";
 import { decideApprovalAction } from "../../aprovacoes/actions";
 import { FREIGHT_MODES } from "@/lib/fiscal/nfe";
-import { cancelContractAction, resendContractAction, sendContractAction, signContractAction } from "../contract-actions";
+import { cancelContractAction, resendContractAction, sendContractAction, sendUploadedContractAction, signContractAction } from "../contract-actions";
 import { issueNfeAction, registerNfeEventAction, saveDeliveryAction, saveTransportAction, sendNfeMailAction } from "../nfe-actions";
 import { CustomerForm } from "../../clientes/CustomerForm";
 import { ActionForm } from "../ActionForm";
@@ -307,7 +307,7 @@ export default async function PedidoPage({
                       Contrato nº {contractNumber(order.number, contract.sequence)} · {standingText(contract, now)}
                     </strong>
                     <span className="block">
-                      Enviado para {contract.recipientName} ({contract.recipientEmail}) em {showDateTime(contract.createdAt)}
+                      {contract.fileName ? `Arquivo próprio (${contract.fileName}) enviado` : "Enviado"} para {contract.recipientName} ({contract.recipientEmail}) em {showDateTime(contract.createdAt)}
                       {contract.status === "enviado" && ` · link válido até ${showDateTime(contract.expiresAt)}`}
                     </span>
                     {contract.status === "assinado" && (
@@ -353,6 +353,39 @@ export default async function PedidoPage({
             </ul>
           )}
           {typeof contractDraft === "string" && <p className="mt-3 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-amber-900">{contractDraft}</p>}
+          {order.status === "fechado" && !waiting && (
+            <details className="mt-3 border-t border-slate-200 pt-2">
+              <summary className="inline-block cursor-pointer py-1 font-medium text-brand underline">Enviar um PDF próprio em vez do modelo</summary>
+              <p className="mt-1 text-slate-600">
+                Para contrato fora do padrão. O cliente lê e assina exatamente o arquivo enviado (até 6 MB, sem senha); o sistema só junta a folha de registro das
+                assinaturas.
+              </p>
+              <ActionForm action={sendUploadedContractAction} className="mt-2 flex flex-wrap items-end gap-3">
+                <input type="hidden" name="number" value={order.number} />
+                <div className="min-w-56 flex-1 basis-full">
+                  <label htmlFor="contractFile" className="block text-xs font-medium text-slate-600">
+                    Contrato em PDF
+                  </label>
+                  <input id="contractFile" name="file" type="file" accept="application/pdf,.pdf" className={`${INPUT} w-full`} />
+                </div>
+                <div className="min-w-56 flex-1">
+                  <label htmlFor="fileRecipientName" className="block text-xs font-medium text-slate-600">
+                    Quem assina pelo cliente
+                  </label>
+                  <input id="fileRecipientName" name="recipientName" type="text" defaultValue={order.customer?.contactName ?? order.customer?.name ?? ""} autoComplete="off" className={`${INPUT} w-full`} />
+                </div>
+                <div className="min-w-56 flex-1">
+                  <label htmlFor="fileRecipientEmail" className="block text-xs font-medium text-slate-600">
+                    E-mail de quem assina
+                  </label>
+                  <input id="fileRecipientEmail" name="recipientEmail" type="email" defaultValue={order.customer?.email ?? ""} autoComplete="off" className={`${INPUT} w-full`} />
+                </div>
+                <button type="submit" className="rounded border border-slate-300 bg-white px-4 py-2 font-semibold hover:bg-slate-50">
+                  Enviar este PDF para assinatura
+                </button>
+              </ActionForm>
+            </details>
+          )}
           {contractDraft !== null && typeof contractDraft !== "string" && (
             <ActionForm action={sendContractAction} className="mt-3 flex flex-wrap items-end gap-3">
               <input type="hidden" name="number" value={order.number} />

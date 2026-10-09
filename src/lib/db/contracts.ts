@@ -67,6 +67,8 @@ export type Contract = {
   status: ContractStatus;
   title: string;
   body: string;
+  /** The file was sent ready by the company instead of being drawn from the model; then this is its name. */
+  fileName: string | null;
   sha256: string;
   expiresAt: Date;
   recipientName: string;
@@ -88,7 +90,7 @@ export type Contract = {
   companySignatures: CompanySignature[];
 };
 
-const COLUMNS = `c.id, c.order_id, c.sequence, c.status, c.title, c.body, c.pdf_sha256, c.expires_at, c.recipient_name, c.recipient_email, c.viewed_at,
+const COLUMNS = `c.id, c.order_id, c.sequence, c.status, c.title, c.body, c.file_name, c.pdf_sha256, c.expires_at, c.recipient_name, c.recipient_email, c.viewed_at,
   c.signed_at, c.signer_name, c.signer_document, c.signer_ip, c.refused_at, c.refusal_reason, c.cancelled_at, c.cancelled_by, c.created_at, c.created_by,
   (c.code_hash IS NOT NULL AND c.code_expires_at > now() AND c.code_attempts < ${CODE_MAX_ATTEMPTS}) AS code_pending, c.pending_name,
   COALESCE((SELECT json_agg(json_build_object('email', s.email, 'name', s.name, 'role', s.role, 'ip', s.ip, 'signedAt', s.signed_at) ORDER BY s.id)
@@ -96,7 +98,7 @@ const COLUMNS = `c.id, c.order_id, c.sequence, c.status, c.title, c.body, c.pdf_
 
 function toContract(row: Record<string, unknown>): Contract {
   return {
-    id: Number(row.id), orderId: Number(row.order_id), sequence: Number(row.sequence), status: row.status as ContractStatus, title: String(row.title), body: String(row.body),
+    id: Number(row.id), orderId: Number(row.order_id), sequence: Number(row.sequence), status: row.status as ContractStatus, title: String(row.title), body: String(row.body), fileName: text(row.file_name),
     sha256: String(row.pdf_sha256), expiresAt: row.expires_at as Date, recipientName: String(row.recipient_name), recipientEmail: String(row.recipient_email),
     viewedAt: moment(row.viewed_at), signedAt: moment(row.signed_at), signerName: text(row.signer_name), signerDocument: text(row.signer_document), signerIp: text(row.signer_ip),
     refusedAt: moment(row.refused_at), refusalReason: text(row.refusal_reason), cancelledAt: moment(row.cancelled_at), cancelledBy: text(row.cancelled_by),
@@ -151,7 +153,7 @@ export async function addContractEvent(contractId: number, kind: ContractEventKi
   await conn.query("INSERT INTO order_contract_events (contract_id, kind, detail, ip, actor) VALUES ($1, $2, $3, $4, $5)", [contractId, kind, event.detail?.slice(0, 400) ?? null, event.ip ?? null, event.actor]);
 }
 
-export type NewContract = { orderId: number; sequence: number; title: string; body: string; pdf: Uint8Array; sha256: string; tokenHash: string; expiresAt: Date; recipientName: string; recipientEmail: string; createdBy: string };
+export type NewContract = { orderId: number; sequence: number; title: string; body: string; pdf: Uint8Array; sha256: string; tokenHash: string; expiresAt: Date; recipientName: string; recipientEmail: string; createdBy: string; /** Name of the PDF the company sent ready, when the contract is not the model's. */ fileName?: string | null };
 
 export const PENDING_EXISTS = "Este pedido já tem um contrato aguardando assinatura. Cancele-o antes de enviar outro.";
 
@@ -159,9 +161,9 @@ export const PENDING_EXISTS = "Este pedido já tem um contrato aguardando assina
 export async function createContract(input: NewContract, conn: Queryable): Promise<Contract> {
   try {
     const { rows } = await conn.query(
-      `INSERT INTO order_contracts (order_id, sequence, title, body, pdf, pdf_sha256, token_hash, expires_at, recipient_name, recipient_email, created_by)
-       VALUES ($1, $11, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
-      [input.orderId, input.title, input.body, Buffer.from(input.pdf), input.sha256, input.tokenHash, input.expiresAt, input.recipientName, input.recipientEmail, input.createdBy, input.sequence],
+      `INSERT INTO order_contracts (order_id, sequence, title, body, pdf, pdf_sha256, token_hash, expires_at, recipient_name, recipient_email, created_by, uploaded, file_name)
+       VALUES ($1, $11, $2, $3, $4, $5, $6, $7, $8, $9, $10, $12::text IS NOT NULL, $12) RETURNING id`,
+      [input.orderId, input.title, input.body, Buffer.from(input.pdf), input.sha256, input.tokenHash, input.expiresAt, input.recipientName, input.recipientEmail, input.createdBy, input.sequence, input.fileName ?? null],
     );
     return (await getOrderContract(input.orderId, Number(rows[0].id), conn))!;
   } catch (error) {

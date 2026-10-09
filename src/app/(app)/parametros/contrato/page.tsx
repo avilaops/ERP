@@ -6,7 +6,8 @@ import { DEFAULT_CONTRACT_MAIL_BODY, DEFAULT_CONTRACT_MAIL_SUBJECT, loadContract
 import { defaultMailbox, loadMailInfo } from "@/lib/db/mail";
 import { tenantDb } from "@/lib/db/pool";
 import { ActionForm } from "../../pedidos/ActionForm";
-import { saveContractSettingsAction } from "./actions";
+import { ConfirmButton } from "../../pedidos/ConfirmButton";
+import { importContractModelAction, saveContractSettingsAction } from "./actions";
 
 export const metadata = { title: "Contrato · ERP" };
 export const dynamic = "force-dynamic";
@@ -44,6 +45,31 @@ export default async function ContractSettingsPage() {
           .
         </p>
       )}
+
+      <section className={`${CARD} mt-6 p-5`} aria-labelledby="arquivo">
+        <h2 id="arquivo" className="text-sm font-semibold uppercase tracking-wide">
+          Já tem o contrato em Word?
+        </h2>
+        <p className="mt-1 max-w-3xl text-sm text-slate-600">
+          Envie o arquivo (.docx ou .txt) e o texto dele vira o modelo abaixo. Negrito, fontes e imagens não vêm: o contrato sai no padrão do sistema, com a sua
+          logo. Depois é só marcar onde entram os dados do pedido, com os campos entre chaves.
+        </p>
+        <ActionForm action={importContractModelAction} className="mt-3 flex flex-wrap items-end gap-3">
+          <div className="min-w-0 flex-1">
+            <label htmlFor="file" className={LABEL}>
+              Arquivo do contrato
+            </label>
+            <input id="file" name="file" type="file" accept=".docx,.txt,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain" className={INPUT} />
+          </div>
+          {settings.body ? (
+            <ConfirmButton label="Usar este arquivo como modelo" confirmLabel="Confirmar: trocar o texto atual" className="rounded border border-slate-300 bg-white px-4 py-2 text-sm font-semibold hover:bg-slate-50" />
+          ) : (
+            <button type="submit" className="rounded border border-slate-300 bg-white px-4 py-2 text-sm font-semibold hover:bg-slate-50">
+              Usar este arquivo como modelo
+            </button>
+          )}
+        </ActionForm>
+      </section>
 
       <ActionForm action={saveContractSettingsAction} className="mt-6 flex flex-col gap-6">
         <section className={`${CARD} p-5`} aria-labelledby="modelo">

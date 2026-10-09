@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/auth";
-import { ContractError, saveContractSettings } from "@/lib/db/contracts";
+import { ContractFileError, modelText } from "@/lib/contract/docx";
+import { ContractError, loadContractSettings, saveContractSettings } from "@/lib/db/contracts";
 import { tenantDb } from "@/lib/db/pool";
 import type { ActionState } from "@/lib/order-form";
 
@@ -31,4 +32,31 @@ export async function saveContractSettingsAction(_previous: ActionState, formDat
   console.info(`[contrato] ${session.email} alterou o modelo do contrato de ${session.tenant.slug}`);
   revalidatePath(HERE);
   return { error: null, notice: "Modelo gravado. Vale para os próximos contratos; os já enviados não mudam." };
+}
+
+/**
+ * "Usar este arquivo como modelo": the contract the company already has, in
+ * Word or plain text. Its text takes the place of the model's; the fields in
+ * braces are then marked by hand on the screen. Title, validity of the link
+ * and the message of the e-mail stay as they are.
+ */
+export async function importContractModelAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
+  const session = await requirePermission("parametros");
+  const conn = tenantDb(session.tenant.slug);
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) return { error: "Escolha o arquivo do contrato (.docx ou .txt)." };
+  if (file.size > 2 * 1024 * 1024) return { error: "Arquivo grande demais para um modelo de contrato: o limite é 2 MB." };
+  let length = 0;
+  try {
+    const body = modelText(new Uint8Array(await file.arrayBuffer()), file.name);
+    length = body.length;
+    await saveContractSettings({ ...(await loadContractSettings(conn)), body }, session.email, conn);
+  } catch (error) {
+    if (error instanceof ContractFileError || error instanceof ContractError) return { error: error.message };
+    console.error("[contrato] falha ao importar o modelo:", error instanceof Error ? error.message : error);
+    return { error: "Não foi possível ler o arquivo agora. Nada foi alterado; tente de novo." };
+  }
+  console.info(`[contrato] ${session.email} importou o modelo do contrato de ${session.tenant.slug} de um arquivo (${length} letras)`);
+  revalidatePath(HERE);
+  return { error: null, notice: "Texto importado para o modelo. Confira abaixo e ponha os campos entre chaves onde entram os dados do pedido." };
 }

@@ -125,12 +125,24 @@ export default async function SigningPage({ params }: Props) {
         <h2 id="texto" className="sr-only">
           Texto do contrato
         </h2>
-        <Body text={contract.body} />
-        <p className="mt-4 border-t border-slate-200 pt-3 text-sm">
-          <a href={pdf} target="_blank" rel="noopener" className="font-medium text-brand underline">
-            Abrir o contrato em PDF
-          </a>
-        </p>
+        {contract.fileName ? (
+          // The company sent the contract ready: the text is in the file, and the way to it is the first thing on the page.
+          <>
+            <p className="text-sm text-slate-800">O contrato está em arquivo PDF. Abra e leia o arquivo antes de assinar.</p>
+            <a href={pdf} target="_blank" rel="noopener" className={`${PRIMARY} mt-3 block text-center`}>
+              Abrir o contrato (PDF)
+            </a>
+          </>
+        ) : (
+          <>
+            <Body text={contract.body} />
+            <p className="mt-4 border-t border-slate-200 pt-3 text-sm">
+              <a href={pdf} target="_blank" rel="noopener" className="font-medium text-brand underline">
+                Abrir o contrato em PDF
+              </a>
+            </p>
+          </>
+        )}
       </section>
 
       <section className="rounded-lg border border-slate-200 bg-white p-4" aria-labelledby="assinar">
@@ -157,7 +169,7 @@ export default async function SigningPage({ params }: Props) {
           </div>
           <label className="flex items-start gap-3 text-sm text-slate-800">
             <input type="checkbox" name="accepted" value="sim" className="mt-1 h-5 w-5" />
-            <span>Li o contrato acima e concordo com ele. Aceito assiná-lo por meio eletrônico, com o código enviado ao meu e-mail.</span>
+            <span>{contract.fileName ? "Abri e li o contrato em PDF e concordo com ele." : "Li o contrato acima e concordo com ele."} Aceito assiná-lo por meio eletrônico, com o código enviado ao meu e-mail.</span>
           </label>
           <button type="submit" className={PRIMARY}>
             {contract.codePending ? "Enviar outro código" : "Receber o código por e-mail"}

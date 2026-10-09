@@ -9,7 +9,7 @@ import { clientIp, publicAppUrl } from "@/lib/contract/public";
 import { cancelContract, ContractError, signForCompany } from "@/lib/db/contracts";
 import { getOrder } from "@/lib/db/orders";
 import { tenantDb } from "@/lib/db/pool";
-import { resendOrderContract, sendOrderContract } from "@/lib/db/send-contract";
+import { resendOrderContract, sendOrderContract, sendUploadedContract } from "@/lib/db/send-contract";
 import type { SentContract } from "@/lib/db/send-contract";
 import { vaultKey } from "@/lib/fiscal/certificate";
 import { MailError } from "@/lib/mail/message";
@@ -58,6 +58,38 @@ export async function sendContractAction(_previous: ActionState, formData: FormD
     return refusal(error);
   }
   console.info(`[contrato] pedido ${number}: contrato ${sent.contract.sequence} gerado por ${session.email}`);
+  revalidatePath(`${menuItem("pedidos").href}/${number}`);
+  return told(sent);
+}
+
+/**
+ * "Enviar este PDF para assinatura": the company's own file instead of the
+ * model. Same reach as the other: who reaches the order sends; a seller, only their own.
+ */
+export async function sendUploadedContractAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
+  const session = await requirePermission("pedidos");
+  const conn = tenantDb(session.tenant.slug);
+  const number = field(formData, "number");
+  if (number === null || !ORDER_NUMBER.test(number)) return { error: NOT_FOUND };
+  const order = await getOrder(number, { sellerEmail: seesAllOrders(session) ? null : session.email }, conn);
+  if (!order) return { error: NOT_FOUND };
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) return { error: "Escolha o arquivo do contrato em PDF." };
+  // Refused by its size before a byte of it is read into memory.
+  if (file.size > 6 * 1024 * 1024) return { error: "PDF grande demais: o limite é 6 MB. Se for digitalizado, reduza a resolução e envie de novo." };
+  let sent: SentContract;
+  try {
+    sent = await sendUploadedContract(
+      order,
+      { bytes: new Uint8Array(await file.arrayBuffer()), name: file.name },
+      { name: field(formData, "recipientName"), email: field(formData, "recipientEmail") },
+      { company: session.tenant.name, tenant: session.tenant.slug, appUrl: publicAppUrl(), sentBy: session.email, now: new Date(), way },
+      conn,
+    );
+  } catch (error) {
+    return refusal(error);
+  }
+  console.info(`[contrato] pedido ${number}: contrato ${sent.contract.sequence} enviado em arquivo por ${session.email}`);
   revalidatePath(`${menuItem("pedidos").href}/${number}`);
   return told(sent);
 }

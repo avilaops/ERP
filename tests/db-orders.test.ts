@@ -1637,3 +1637,57 @@ test("contrato do pedido: prazo vencido, recusa do cliente e exclusão do pedido
     assert.equal(Number((await db.pool.query(`SELECT count(*) FROM ${tableName} WHERE contract_id = $1`, [opened.id])).rows[0].count), 0, tableName);
   }
 });
+
+test("contrato em arquivo: o PDF da empresa é guardado byte a byte, assinado pelo mesmo caminho e recusado quando não é um PDF legível", { skip }, async () => {
+  const { PDFDocument } = await import("pdf-lib");
+  const { fingerprint, hashToken } = await import("@/lib/contract/token");
+  const { findContractByToken, listOrderContracts, loadContractPdf } = await import("@/lib/db/contracts");
+  const { contractFile, requestSigningCode, sendUploadedContract, signOrderContract } = await import("@/lib/db/send-contract");
+  const number = await createOrder({ seller: SELLER, version: 1, productId: ID["LD-B001"], quantity: 1 }, numbers("261009-ARQV"), db.pool);
+  await linkOrderCustomer(number, customerSp, SELLER.email, MINE, db.pool);
+  await saveOrderTerms(number, { ...TERMS, deliveryUf: "SP" }, SELLER.email, MINE, db.pool);
+  await savePayment(number, { ...PAYMENT, downPayment: 20000 }, SELLER.email, MINE, db.pool);
+  const outbox: string[] = [];
+  const way = {
+    env: { ERP_SMTP_HOST: "mail.avilaops.com", ERP_SMTP_USER: "noreply@avilaops.com", ERP_SMTP_PASSWORD: "x", ERP_MAIL_FROM: "noreply@avilaops.com" },
+    key: () => { throw new Error("sem caixa própria"); },
+    send: async (_config: unknown, _envelope: unknown, message: string) => void outbox.push(Buffer.from(message.split("Content-Transfer-Encoding: base64\r\n\r\n")[1].split("\r\n--")[0], "base64").toString("utf8")),
+  };
+  const now = new Date();
+  const context = { company: "Acme", tenant: "acme", appUrl: "https://erp.teste", sentBy: SELLER.email, now, way };
+  const own = await PDFDocument.create();
+  own.addPage([300, 400]).drawText("Contrato feito fora do sistema");
+  own.addPage([300, 400]);
+  const bytes = await own.save();
+  const to = { name: "Maria Compradora", email: "maria@cliente.test" };
+
+  // Só de pedido fechado.
+  const negotiating = (await getOrder(number, MINE, db.pool))!;
+  await assert.rejects(() => sendUploadedContract(negotiating, { bytes, name: "c.pdf" }, to, context, db.pool), /depois que o pedido é fechado/);
+  assert.equal((await closeOrder(number, SELLER.email, MINE, db.pool)).status, "fechado");
+  const closed = (await getOrder(number, MINE, db.pool))!;
+  // O que não é PDF, está vazio, é grande demais ou não abre: recusado, e nada é criado nem enviado.
+  await assert.rejects(() => sendUploadedContract(closed, { bytes: new Uint8Array(0), name: "c.pdf" }, to, context, db.pool), /Escolha o arquivo/);
+  await assert.rejects(() => sendUploadedContract(closed, { bytes: new TextEncoder().encode("PK\u0003\u0004 isto é um docx"), name: "c.pdf" }, to, context, db.pool), /não é um PDF/);
+  await assert.rejects(() => sendUploadedContract(closed, { bytes: new TextEncoder().encode("%PDF-1.7 e mais nada"), name: "c.pdf" }, to, context, db.pool), /protegido por senha ou danificado/);
+  await assert.rejects(() => sendUploadedContract(closed, { bytes: new Uint8Array(6 * 1024 * 1024 + 1), name: "c.pdf" }, to, context, db.pool), /limite é 6 MB/);
+  await assert.rejects(() => sendUploadedContract(closed, { bytes, name: "c.pdf" }, { name: null, email: "sem-arroba" }, context, db.pool), /E-mail de quem assina inválido/);
+  assert.deepEqual([await listOrderContracts(closed.id, db.pool), outbox], [[], []]);
+
+  const sent = await sendUploadedContract(closed, { bytes, name: "pasta/Contrato Especial\u0007.pdf" }, to, context, db.pool);
+  assert.deepEqual([sent.delivery.status, sent.contract.status, sent.contract.fileName], ["enviado", "enviado", "pasta Contrato Especial .pdf"]);
+  assert.match(sent.contract.body, /enviado em arquivo PDF \(pasta Contrato Especial \.pdf\)/);
+  // Guardado exatamente como veio: é dele a impressão digital que as assinaturas citam.
+  const stored = (await loadContractPdf(sent.contract.id, db.pool))!;
+  assert.deepEqual([stored.length, fingerprint(stored), sent.contract.sha256], [bytes.length, fingerprint(bytes), fingerprint(bytes)]);
+
+  const token = outbox[0].match(/contrato\/acme\/(\S+)/)![1];
+  const opened = (await findContractByToken(hashToken(token), db.pool))!;
+  await requestSigningCode(opened, token, { name: "Maria Compradora", document: "529.982.247-25", accepted: true }, { company: "Acme", now, ip: null, way }, db.pool);
+  await signOrderContract(opened, token, outbox[1].match(/\n(\d{6})\r?\n/)![1], { company: "Acme", now, ip: "203.0.113.7", agent: null, way }, db.pool);
+  const [signed] = await listOrderContracts(closed.id, db.pool);
+  assert.equal(signed.status, "assinado");
+  // O arquivo assinado são as duas folhas da empresa mais a folha de registro.
+  assert.equal((await PDFDocument.load(await contractFile(signed, { company: "Acme", orderNumber: number, now }, db.pool))).getPageCount(), 3);
+  assert.equal(fingerprint((await loadContractPdf(signed.id, db.pool))!), fingerprint(bytes));
+});

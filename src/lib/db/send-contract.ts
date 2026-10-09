@@ -1,3 +1,4 @@
+import { PDFDocument } from "pdf-lib";
 import { renderContractPdf, withEvidence } from "@/lib/contract/pdf";
 import { blankWords, contractNumber, contractValues, DEFAULT_CONTRACT_BODY, DEFAULT_CONTRACT_TITLE, fillContract } from "@/lib/contract/text";
 import { CODE_MINUTES, fingerprint, hashCode, hashToken, newCode, newToken } from "@/lib/contract/token";
@@ -122,6 +123,32 @@ export type SendContext = {
 
 export type SentContract = { contract: Contract; delivery: Delivery };
 
+/** Who signs for the customer, from what was typed or, blank, from the customer's register. */
+function recipientOf(order: Order, typed: { name: string | null; email: string | null }): { name: string; email: string } {
+  const email = (typed.email ?? order.customer?.email ?? "").trim().toLowerCase();
+  const name = (typed.name ?? "").trim() || order.customer?.contactName?.trim() || order.customer?.name || "";
+  if (email === "") throw new ContractError("O cliente não tem e-mail no cadastro: informe o e-mail de quem assina.");
+  if (!isMailAddress(email)) throw new ContractError("E-mail de quem assina inválido.");
+  if (name === "") throw new ContractError("Informe o nome de quem assina pelo cliente.");
+  if (name.length > 120) throw new ContractError("Nome de quem assina: até 120 letras.");
+  return { name, email };
+}
+
+/** Keeps the file as it leaves, with its fingerprint and a new secret link, and writes to the customer. */
+async function keepAndSend(order: Order, file: { title: string; body: string; pdf: Uint8Array; sequence: number; fileName: string | null }, recipient: { name: string; email: string }, context: SendContext, conn: Queryable): Promise<SentContract> {
+  const settings = await loadContractSettings(conn);
+  const token = newToken();
+  const contract = await createContract(
+    {
+      orderId: order.id, sequence: file.sequence, title: file.title, body: file.body, pdf: file.pdf, sha256: fingerprint(file.pdf), tokenHash: hashToken(token), fileName: file.fileName,
+      expiresAt: new Date(context.now.getTime() + settings.linkDays * 86_400_000), recipientName: recipient.name, recipientEmail: recipient.email, createdBy: context.sentBy,
+    },
+    conn,
+  );
+  await addContractEvent(contract.id, "enviado", { detail: `para ${recipient.name} <${recipient.email}>${file.fileName ? `, arquivo ${file.fileName}` : ""}`, actor: context.sentBy }, conn);
+  return { contract, delivery: await mailLink(contract, order, signingUrl(context.appUrl, context.tenant, token), context, conn) };
+}
+
 /**
  * "Enviar contrato para assinatura". Draws the contract, keeps the file and
  * its fingerprint, and writes to the customer with the link. What is refused
@@ -131,26 +158,46 @@ export type SentContract = { contract: Contract; delivery: Delivery };
  */
 export async function sendOrderContract(order: Order, recipient: { name: string | null; email: string | null }, context: SendContext, conn: Queryable): Promise<SentContract> {
   const draft = await draftOrderContract(order, context.company, context.now, conn);
-  const email = (recipient.email ?? order.customer?.email ?? "").trim().toLowerCase();
-  const name = (recipient.name ?? "").trim() || order.customer?.contactName?.trim() || order.customer!.name;
-  if (email === "") throw new ContractError("O cliente não tem e-mail no cadastro: informe o e-mail de quem assina.");
-  if (!isMailAddress(email)) throw new ContractError("E-mail de quem assina inválido.");
-  if (name.length > 120) throw new ContractError("Nome de quem assina: até 120 letras.");
+  const signer = recipientOf(order, recipient);
   if (!(await mailChannel(conn, context.way.env, context.way.key))) throw new MailError(MAIL_NOT_SET);
-
-  const settings = await loadContractSettings(conn);
   const sequence = await nextContractSequence(order.id, conn);
   const pdf = await renderContractPdf({ company: context.company, title: draft.title, number: contractNumber(order.number, sequence), body: draft.body }, await logoOf(conn));
-  const token = newToken();
-  const contract = await createContract(
-    {
-      orderId: order.id, sequence, title: draft.title, body: draft.body, pdf, sha256: fingerprint(pdf), tokenHash: hashToken(token),
-      expiresAt: new Date(context.now.getTime() + settings.linkDays * 86_400_000), recipientName: name, recipientEmail: email, createdBy: context.sentBy,
-    },
+  return keepAndSend(order, { title: draft.title, body: draft.body, pdf, sequence, fileName: null }, signer, context, conn);
+}
+
+/** A PDF of a contract is a few pages; a scanned one may be heavier. */
+export const MAX_CONTRACT_PDF_BYTES = 6 * 1024 * 1024;
+
+/**
+ * "Enviar um PDF próprio para assinatura": the company sends the contract
+ * ready, and that is the file the customer reads and signs. It is kept byte by
+ * byte; the ERP only adds the record of signatures after it. A file that is
+ * not a PDF, is locked with a password or cannot take that record is refused
+ * before anything is stored or sent.
+ */
+export async function sendUploadedContract(order: Order, file: { bytes: Uint8Array; name: string }, recipient: { name: string | null; email: string | null }, context: SendContext, conn: Queryable): Promise<SentContract> {
+  if (order.status !== "fechado") throw new ContractError("O contrato é enviado depois que o pedido é fechado.");
+  if (file.bytes.byteLength === 0) throw new ContractError("Escolha o arquivo do contrato em PDF.");
+  if (file.bytes.byteLength > MAX_CONTRACT_PDF_BYTES) throw new ContractError("PDF grande demais: o limite é 6 MB. Se for digitalizado, reduza a resolução e envie de novo.");
+  if (Buffer.from(file.bytes.subarray(0, 5)).toString("latin1") !== "%PDF-") throw new ContractError("O arquivo não é um PDF. Salve o contrato como PDF e envie de novo.");
+  try {
+    // The same reading the record of signatures does later: what cannot be opened now could not be signed.
+    const opened = await PDFDocument.load(file.bytes);
+    if (opened.getPageCount() === 0) throw new Error("sem páginas");
+  } catch {
+    throw new ContractError("Não foi possível abrir este PDF: ele está protegido por senha ou danificado. Gere o PDF de novo, sem senha, e envie.");
+  }
+  const signer = recipientOf(order, recipient);
+  if (!(await mailChannel(conn, context.way.env, context.way.key))) throw new MailError(MAIL_NOT_SET);
+  const settings = await loadContractSettings(conn);
+  const fileName = file.name.replace(/[\u0000-\u001f\\/]+/g, " ").trim().slice(0, 200) || "contrato.pdf";
+  return keepAndSend(
+    order,
+    { title: settings.title ?? DEFAULT_CONTRACT_TITLE, body: `Este contrato foi enviado em arquivo PDF (${fileName}). O texto completo está no arquivo: abra-o para ler antes de assinar.`, pdf: file.bytes, sequence: await nextContractSequence(order.id, conn), fileName },
+    signer,
+    context,
     conn,
   );
-  await addContractEvent(contract.id, "enviado", { detail: `para ${name} <${email}>`, actor: context.sentBy }, conn);
-  return { contract, delivery: await mailLink(contract, order, signingUrl(context.appUrl, context.tenant, token), context, conn) };
 }
 
 /** "Enviar o link de novo": a new link for the same contract; the one sent before stops working. */

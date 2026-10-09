@@ -4,6 +4,8 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { PDFDocument } from "pdf-lib";
 import { renderContractPdf, withEvidence } from "@/lib/contract/pdf";
+import { deflateRawSync } from "node:zlib";
+import { ContractFileError, docxText, modelText } from "@/lib/contract/docx";
 import { clientIp, openSigning, publicAppUrl } from "@/lib/contract/public";
 import { addressLine, blankWords, CONTRACT_WORDS, contractNumber, DEFAULT_CONTRACT_BODY, fillContract, maskedEmail, wordsUsed } from "@/lib/contract/text";
 import type { ContractValues } from "@/lib/contract/text";
@@ -145,8 +147,10 @@ test("fora da sessão, só o login e o link de assinatura escolhem a empresa", (
 
 test("contrato no pedido: as ações conferem a permissão, o alcance do vendedor e tiram quem assina da sessão", () => {
   const actions = read("app/(app)/pedidos/contract-actions.ts");
-  assert.equal(actions.split('await requirePermission("pedidos")').length - 1, 4);
-  assert.equal(actions.split("seesAllOrders(session) ? null : session.email").length - 1, 2);
+  assert.equal(actions.split('await requirePermission("pedidos")').length - 1, 5);
+  assert.equal(actions.split("seesAllOrders(session) ? null : session.email").length - 1, 3);
+  // O arquivo é recusado pelo tamanho antes de ser lido.
+  assert.ok(actions.indexOf("file.size > 6 * 1024 * 1024") < actions.indexOf("await file.arrayBuffer()"));
   assert.ok(actions.includes("{ email: session.email, name: session.name, role: session.profile ?? ROLE_LABELS[session.role], ip: clientIp(await headers()) }"));
   assert.doesNotMatch(actions, /formData\.get\("(email|name|role|tenant|empresa)"\)|field\(formData, "(email|name|role|tenant|empresa)"\)/);
   for (const file of ["api/pedidos/[numero]/contrato/[id]/route.ts", "api/pedidos/[numero]/contrato-previa/route.ts"]) {
@@ -158,4 +162,84 @@ test("contrato no pedido: as ações conferem a permissão, o alcance do vendedo
   assert.ok(read("app/api/pedidos/[numero]/contrato/[id]/route.ts").includes("getOrderContract(order.id, Number(id), conn)"));
   // O modelo é de quem tem Parâmetros.
   assert.ok(read("app/(app)/parametros/contrato/actions.ts").includes('await requirePermission("parametros")'));
+});
+
+/** A ZIP with the files given, each one deflated or stored: enough of the format for a .docx. */
+function zip(files: [name: string, content: string, deflate?: boolean][]): Uint8Array {
+  const locals: Buffer[] = [];
+  const central: Buffer[] = [];
+  let offset = 0;
+  for (const [name, content, deflate = true] of files) {
+    const raw = Buffer.from(content, "utf8");
+    const packed = deflate ? deflateRawSync(raw) : raw;
+    const head = Buffer.alloc(30);
+    head.writeUInt32LE(0x04034b50, 0);
+    head.writeUInt16LE(deflate ? 8 : 0, 8);
+    head.writeUInt32LE(packed.length, 18);
+    head.writeUInt32LE(raw.length, 22);
+    head.writeUInt16LE(Buffer.byteLength(name), 26);
+    const entry = Buffer.alloc(46);
+    entry.writeUInt32LE(0x02014b50, 0);
+    entry.writeUInt16LE(deflate ? 8 : 0, 10);
+    entry.writeUInt32LE(packed.length, 20);
+    entry.writeUInt32LE(raw.length, 24);
+    entry.writeUInt16LE(Buffer.byteLength(name), 28);
+    entry.writeUInt32LE(offset, 42);
+    locals.push(head, Buffer.from(name), packed);
+    central.push(entry, Buffer.from(name));
+    offset += 30 + Buffer.byteLength(name) + packed.length;
+  }
+  const directory = Buffer.concat(central);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(files.length, 8);
+  end.writeUInt16LE(files.length, 10);
+  end.writeUInt32LE(directory.length, 12);
+  end.writeUInt32LE(offset, 16);
+  return new Uint8Array(Buffer.concat([...locals, directory, end]));
+}
+
+const DOCUMENT = `<?xml version="1.0"?><w:document xmlns:w="x"><w:body>
+<w:p><w:pPr><w:pStyle w:val="Ttulo1"/></w:pPr><w:r><w:t>Cláusula 1 - Objeto</w:t></w:r></w:p>
+<w:p><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">A VENDEDORA vende </w:t></w:r><w:r><w:t>ao COMPRADOR &amp; sucessores os equipamentos &lt;abaixo&gt;.</w:t></w:r></w:p>
+<w:p></w:p>
+<w:p><w:pPr><w:numPr><w:ilvl w:val="0"/></w:numPr></w:pPr><w:r><w:t>Garantia de 12 meses</w:t></w:r></w:p>
+<w:p><w:pPr><w:numPr><w:ilvl w:val="0"/></w:numPr></w:pPr><w:r><w:t>Foro:</w:t><w:tab/><w:t>Votuporanga&#47;SP</w:t></w:r></w:p>
+<w:p><w:r><w:t>Linha um</w:t><w:br/><w:t>Linha dois</w:t></w:r><w:r><w:instrText>PAGE</w:instrText></w:r></w:p>
+</w:body></w:document>`;
+
+test("modelo em Word: o texto do .docx vira o modelo, com título, lista e acentos; a formatação fica para trás", () => {
+  const expected = "# Cláusula 1 - Objeto\n\nA VENDEDORA vende ao COMPRADOR & sucessores os equipamentos <abaixo>.\n\n- Garantia de 12 meses\n- Foro: Votuporanga/SP\n\nLinha um\n\nLinha dois";
+  for (const deflate of [true, false]) {
+    assert.equal(docxText(zip([["[Content_Types].xml", "<Types/>", deflate], ["word/document.xml", DOCUMENT, deflate], ["word/styles.xml", "<w:styles/>", deflate]])), expected);
+  }
+  assert.equal(modelText(zip([["word/document.xml", DOCUMENT]]), "Contrato Ludus.DOCX"), expected);
+  // Texto simples entra como está.
+  assert.equal(modelText(new TextEncoder().encode("\ufeffCláusula 1\r\n\r\n{cliente} compra.\r\n"), "contrato.txt"), "Cláusula 1\n\n{cliente} compra.");
+});
+
+test("modelo em Word: o que não é um documento legível é recusado com o motivo, sem estourar a memória", () => {
+  const refused = (bytes: Uint8Array, name: string, message: RegExp) => assert.throws(() => modelText(bytes, name), (error: unknown) => error instanceof ContractFileError && message.test(error.message));
+  refused(new Uint8Array(0), "contrato.docx", /está vazio/);
+  refused(new TextEncoder().encode("isto não é um zip"), "contrato.docx", /documento do Word/);
+  refused(zip([["outra/coisa.xml", "<a/>"]]), "contrato.docx", /documento do Word/);
+  refused(zip([["word/document.xml", "<w:document><w:body><w:p></w:p></w:body></w:document>"]]), "contrato.docx", /não tem texto/);
+  refused(new Uint8Array(2 * 1024 * 1024 + 1), "contrato.docx", /limite é 2 MB/);
+  refused(new TextEncoder().encode("x"), "contrato.doc", /Word antigo/);
+  refused(new TextEncoder().encode("%PDF-1.7"), "contrato.pdf", /PDF não serve de modelo/);
+  // Um arquivo pequeno feito para virar centenas de megabytes ao abrir não é aberto.
+  const bomb = zip([["word/document.xml", `<w:p><w:r><w:t>${"A".repeat(9 * 1024 * 1024)}</w:t></w:r></w:p>`]]);
+  assert.ok(bomb.byteLength < 2 * 1024 * 1024);
+  refused(bomb, "contrato.docx", /documento do Word/);
+});
+
+test("modelo em Word e PDF próprio: as telas enviam o arquivo só para quem pode e dizem o que acontece", () => {
+  const model = read("app/(app)/parametros/contrato/actions.ts");
+  assert.equal(model.split('await requirePermission("parametros")').length - 1, 2);
+  assert.ok(model.indexOf("file.size > 2 * 1024 * 1024") < model.indexOf("await file.arrayBuffer()"));
+  // Importar troca só o texto: título, validade e mensagem do e-mail ficam.
+  assert.ok(model.includes("saveContractSettings({ ...(await loadContractSettings(conn)), body }, session.email, conn)"));
+  // Na página de assinatura, o contrato em arquivo leva direto ao PDF.
+  const signing = read("app/contrato/[empresa]/[token]/page.tsx");
+  assert.ok(signing.includes("{contract.fileName ? (") && signing.includes("Abrir o contrato (PDF)"));
 });
