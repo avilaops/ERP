@@ -116,7 +116,8 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
             <label htmlFor="certificate" className={LABEL}>
               Arquivo (.pfx ou .p12)
             </label>
-            <input id="certificate" name="certificate" type="file" accept=".pfx,.p12,application/x-pkcs12" className="mt-1 w-full text-sm" />
+            {/* No `accept`: on an iPhone a file whose kind the phone does not recognise (a .pfx saved from WhatsApp or e-mail) shows greyed out and cannot be chosen. What is sent is checked on the server. */}
+            <input id="certificate" name="certificate" type="file" className="mt-1 w-full text-sm" />
           </div>
           <div>
             <label htmlFor="password" className={LABEL}>

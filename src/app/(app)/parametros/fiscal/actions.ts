@@ -96,10 +96,13 @@ export async function saveCertificateAction(_previous: ActionState, formData: Fo
     }
     console.info(`[fiscal] ${session.email} enviou o certificado de ${session.tenant.slug}`);
   } catch (error) {
-    return problem("guardar o certificado", error);
+    const refused = problem("guardar o certificado", error);
+    // Which refusal it was, for who gives support: the reason shown on the screen, never what was typed or sent.
+    console.info(`[fiscal] certificado de ${session.tenant.slug} recusado para ${session.email}: ${refused.error}`);
+    return refused;
   }
   revalidatePath(HERE);
-  return OK;
+  return { error: null, notice: "Certificado guardado. Confira acima de quem é e até quando vale." };
 }
 
 export async function removeCertificateAction(previous: ActionState): Promise<ActionState> {
