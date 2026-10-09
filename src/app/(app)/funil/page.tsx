@@ -72,6 +72,9 @@ export default async function FunilPage({ searchParams }: { searchParams: Promis
         hint={`${openCount} em andamento · ${showMoney(openTotal)}${everyone ? " · equipe toda" : ""}`}
         actions={
           <>
+            <Link href={`${ITEM.href}/painel`} className={SECONDARY}>
+              Painel
+            </Link>
             <Link href={`${ITEM.href}/tarefas`} className={SECONDARY}>
               Tarefas{pending > 0 ? ` (${pending})` : ""}
             </Link>

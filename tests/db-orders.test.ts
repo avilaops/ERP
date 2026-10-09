@@ -1894,9 +1894,28 @@ test("funil: oportunidade anda por etapas, tem atividades, segue o pedido e cada
   // Desfazer o vínculo à mão também é possível.
   await linkOpportunityOrder(id, null, SELLER.email, mine, db.pool);
 
+  // O painel: quantas chegaram a cada etapa (quem ganhou passou por todas), aproveitamento, motivos e quem está parado.
+  const { funnelReport, listIdleOpportunities } = await import("@/lib/db/funnel");
+  const extra = await createOpportunity({ ...blank, title: "Estúdio", company: "Studio Corpo", email: null, estimatedValue: 10000 }, SELLER, db.pool);
+  await moveOpportunity(extra, lost.id, "Achou caro", SELLER.email, mine, db.pool);
+  const since = new Date(Date.now() - 86_400_000);
+  const report = await funnelReport(since, all, db.pool);
+  assert.deepEqual([report.created, report.open, report.won, report.lost, report.winRate, report.wonValue, report.openValue], [3, 1, 1, 1, 0.5, 80000, 0]);
+  // "Academia nova" foi ganha (passou por todas); "Condomínio" ficou em Novo; "Estúdio" foi de Novo direto para perdido.
+  assert.deepEqual(report.reached.map((stage) => [stage.name, stage.count]), [["Novo", 3], ["Contato feito", 1], ["Proposta enviada", 1], ["Visita", 1], ["Negociação", 1]]);
+  assert.deepEqual(report.lostReasons, [{ reason: "Achou caro", count: 1 }]);
+  assert.deepEqual(report.owners.map((owner) => [owner.name, owner.created, owner.won, owner.wonValue]), [[SELLER.name, 2, 1, 80000], [OTHER_SELLER.name, 1, 0, 0]]);
+  assert.ok(report.daysToWin !== null && report.daysToWin < 1);
+  // Parada é a que está em andamento sem tarefa por fazer; o vendedor só vê as dele.
+  assert.deepEqual((await listIdleOpportunities(all, db.pool)).map((item) => item.title), ["Condomínio"]);
+  assert.deepEqual([report.idle, (await funnelReport(since, mine, db.pool)).idle, (await funnelReport(since, mine, db.pool)).created], [1, 0, 2]);
+  assert.equal((await funnelReport(new Date(Date.now() + 86_400_000), all, db.pool)).created, 0);
+  await deleteOpportunity(extra, mine, db.pool);
+
   // Excluir a oportunidade leva as atividades; a etapa vazia pode sair.
   await deleteOpportunity(id, mine, db.pool);
   assert.equal(Number((await db.pool.query("SELECT count(*) FROM opportunity_activities WHERE opportunity_id = $1", [id])).rows[0].count), 0);
+  assert.equal(Number((await db.pool.query("SELECT count(*) FROM opportunity_moves WHERE opportunity_id = $1", [id])).rows[0].count), 0);
   await deleteOpportunity(other, all, db.pool);
   await deleteStage(visit.id, db.pool);
   assert.equal((await listStages(db.pool)).length, 6);

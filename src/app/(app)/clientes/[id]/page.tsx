@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requirePermission } from "@/lib/auth";
 import { tenantDb } from "@/lib/db/pool";
-import { menuItem } from "@/lib/auth/permissions";
+import { allows, menuItem } from "@/lib/auth/permissions";
 import { ufFromCep } from "@/lib/cep";
 import { completenessText, isComplete, isRequired } from "@/lib/customer";
 import type { CustomerKind } from "@/lib/customer";
@@ -74,6 +74,12 @@ export default async function ClientePage({
         >
           {completenessText(customer)}
         </span>
+        {/* The sales in progress with this customer live in the funnel; each seller finds their own there. */}
+        {allows(session, "funil") && (
+          <Link href={`${menuItem("funil").href}?q=${encodeURIComponent(customer.name)}`} className="text-sm font-medium text-brand underline">
+            Ver no funil
+          </Link>
+        )}
       </div>
       {first(query.cadastrado) && (
         <p role="status" className="mt-4 max-w-4xl rounded border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-900">

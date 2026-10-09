@@ -67,7 +67,10 @@ export async function moveStage(id: number, direction: "antes" | "depois", who: 
 export async function deleteStage(id: number, conn: Queryable): Promise<void> {
   try {
     const { rows } = await conn.query(
-      "DELETE FROM pipeline_stages WHERE id = $1 AND kind = 'aberta' AND (SELECT count(*) FROM pipeline_stages WHERE kind = 'aberta') > 1 RETURNING id",
+      `WITH target AS (SELECT id FROM pipeline_stages WHERE id = $1 AND kind = 'aberta' AND (SELECT count(*) FROM pipeline_stages WHERE kind = 'aberta') > 1),
+            -- The history keeps the name of the stage; only the reference to it goes.
+            freed AS (UPDATE opportunity_moves m SET stage_id = NULL FROM target WHERE m.stage_id = target.id)
+       DELETE FROM pipeline_stages s USING target WHERE s.id = target.id RETURNING s.id`,
       [id],
     );
     if (rows.length === 0) throw new FunnelError("Esta etapa não pode ser removida: é a de ganho, a de perda ou a única em aberto.");
@@ -154,11 +157,22 @@ export async function createOpportunity(input: OpportunityInput, owner: { email:
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, (SELECT id FROM pipeline_stages WHERE kind = 'aberta' ORDER BY position, id LIMIT 1), $10, $11, $10, $10) RETURNING id`,
       [data.title, data.customerId, data.company, data.contactName, data.phone, data.email, data.source, data.estimatedValue, data.notes, owner.email, owner.name],
     );
-    return Number(rows[0].id);
+    const id = Number(rows[0].id);
+    await noteMove(id, owner.email, conn);
+    return id;
   } catch (error) {
     if (pgErrorCode(error) === FOREIGN_KEY) throw new FunnelError("Cliente não encontrado. Recarregue a página.");
     throw error;
   }
+}
+
+/** Writes down the stage an opportunity is in now, as one more step of its way. */
+async function noteMove(id: number, who: string, conn: Queryable): Promise<void> {
+  await conn.query(
+    `INSERT INTO opportunity_moves (opportunity_id, stage_id, stage_name, stage_kind, moved_by)
+     SELECT o.id, s.id, s.name, s.kind, $2 FROM opportunities o JOIN pipeline_stages s ON s.id = o.stage_id WHERE o.id = $1`,
+    [id, who],
+  );
 }
 
 export async function getOpportunity(id: number, scope: FunnelScope, conn: Queryable): Promise<Opportunity | null> {
@@ -204,13 +218,15 @@ export async function moveOpportunity(id: number, stageId: number, lostReason: s
     [id, scope.ownerEmail, stageId, stage.kind === "perdida" ? reason : null, stage.kind === "aberta", who],
   );
   if (rows.length === 0) throw new FunnelError(NOT_FOUND);
+  await noteMove(id, who, conn);
 }
 
 /** Removes an opportunity with what was noted on it. A linked order is not touched. */
 export async function deleteOpportunity(id: number, scope: FunnelScope, conn: Queryable): Promise<void> {
   const { rows } = await conn.query(
     `WITH target AS (SELECT id FROM opportunities WHERE id = $1 AND ($2::text IS NULL OR owner_email = $2)),
-          noted AS (DELETE FROM opportunity_activities a USING target WHERE a.opportunity_id = target.id)
+          noted AS (DELETE FROM opportunity_activities a USING target WHERE a.opportunity_id = target.id),
+          walked AS (DELETE FROM opportunity_moves m USING target WHERE m.opportunity_id = target.id)
      DELETE FROM opportunities o USING target WHERE o.id = target.id RETURNING o.id`,
     [id, scope.ownerEmail],
   );
@@ -240,12 +256,15 @@ export async function linkOpportunityOrder(id: number, orderNumber: string | nul
  */
 export async function syncOpportunitiesWithOrders(conn: Queryable): Promise<void> {
   await conn.query(
-    `UPDATE opportunities o
+    `WITH closed AS (
+     UPDATE opportunities o
         SET stage_id = t.id, closed_at = now(), updated_at = now(), updated_by = 'sistema',
             lost_reason = CASE WHEN t.kind = 'perdida' THEN 'Pedido ' || d.number || CASE WHEN d.status = 'cancelado' THEN ' cancelado' ELSE ' marcado como perdido' END ELSE NULL END
        FROM orders d, pipeline_stages s, pipeline_stages t
       WHERE d.id = o.order_id AND s.id = o.stage_id AND s.kind = 'aberta'
-        AND t.kind = CASE WHEN d.status = 'fechado' THEN 'ganha' WHEN d.status IN ('perdido', 'cancelado') THEN 'perdida' END`,
+        AND t.kind = CASE WHEN d.status = 'fechado' THEN 'ganha' WHEN d.status IN ('perdido', 'cancelado') THEN 'perdida' END
+     RETURNING o.id, t.id AS stage_id, t.name, t.kind)
+     INSERT INTO opportunity_moves (opportunity_id, stage_id, stage_name, stage_kind, moved_by) SELECT id, stage_id, name, kind, 'sistema' FROM closed`,
   );
 }
 
@@ -312,4 +331,92 @@ export async function listPendingActivities(scope: FunnelScope, conn: Queryable)
     [scope.ownerEmail],
   );
   return rows.map((row) => ({ ...toActivity(row), opportunityTitle: String(row.opportunity_title), party: String(row.party ?? ""), ownerName: String(row.owner_name) }));
+}
+
+export type FunnelReport = {
+  created: number;
+  open: number;
+  won: number;
+  lost: number;
+  /** Won over won plus lost; `null` while nothing was decided. */
+  winRate: number | null;
+  wonValue: number;
+  openValue: number;
+  /** Days from creation to closing, on average, of the ones won. */
+  daysToWin: number | null;
+  /** How many of the opportunities of the period got to each open stage, in the order of the funnel. */
+  reached: { name: string; count: number }[];
+  lostReasons: { reason: string; count: number }[];
+  owners: { name: string; created: number; won: number; wonValue: number }[];
+  /** Open ones, of any period, with nothing left to do noted on them. */
+  idle: number;
+};
+
+/**
+ * The numbers of the funnel for the opportunities created from `since` on,
+ * within the scope. "Reached a stage" counts who was ever moved into it, or
+ * into one further down the funnel: a sale that skipped a stage still passed it.
+ */
+export async function funnelReport(since: Date, scope: FunnelScope, conn: Queryable): Promise<FunnelReport> {
+  const base = await conn.query(
+    `SELECT o.id, s.kind, o.estimated_value, o.owner_name, o.lost_reason, o.created_at, o.closed_at
+       FROM opportunities o JOIN pipeline_stages s ON s.id = o.stage_id
+      WHERE o.created_at >= $1 AND ($2::text IS NULL OR o.owner_email = $2)`,
+    [since, scope.ownerEmail],
+  );
+  const rows = base.rows.map((row) => ({ id: Number(row.id), kind: row.kind as StageKind, value: row.estimated_value === null ? 0 : Number(row.estimated_value), owner: String(row.owner_name), reason: text(row.lost_reason), createdAt: row.created_at as Date, closedAt: (row.closed_at as Date | null) ?? null }));
+  const won = rows.filter((row) => row.kind === "ganha");
+  const lost = rows.filter((row) => row.kind === "perdida");
+  const open = rows.filter((row) => row.kind === "aberta");
+
+  const stages = (await listStages(conn)).filter((stage) => stage.kind === "aberta");
+  const moves = await conn.query(
+    `SELECT m.opportunity_id, m.stage_name, m.stage_kind FROM opportunity_moves m JOIN opportunities o ON o.id = m.opportunity_id
+      WHERE o.created_at >= $1 AND ($2::text IS NULL OR o.owner_email = $2)`,
+    [since, scope.ownerEmail],
+  );
+  // The furthest open stage each one was ever in, by the place of the stage in the funnel of today. A sale won passed all of them.
+  const order = new Map(stages.map((stage, index) => [stage.name, index]));
+  const furthest = new Map<number, number>();
+  for (const move of moves.rows) {
+    const id = Number(move.opportunity_id);
+    const at = move.stage_kind === "ganha" ? stages.length - 1 : (order.get(String(move.stage_name)) ?? -1);
+    if (at > (furthest.get(id) ?? -1)) furthest.set(id, at);
+  }
+  const reached = stages.map((stage, index) => ({ name: stage.name, count: [...furthest.values()].filter((at) => at >= index).length }));
+
+  const reasons = new Map<string, number>();
+  for (const row of lost) reasons.set(row.reason ?? "Sem motivo informado", (reasons.get(row.reason ?? "Sem motivo informado") ?? 0) + 1);
+  const owners = new Map<string, { name: string; created: number; won: number; wonValue: number }>();
+  for (const row of rows) {
+    const owner = owners.get(row.owner) ?? { name: row.owner, created: 0, won: 0, wonValue: 0 };
+    owner.created += 1;
+    if (row.kind === "ganha") {
+      owner.won += 1;
+      owner.wonValue += row.value;
+    }
+    owners.set(row.owner, owner);
+  }
+  const idle = await conn.query(
+    `SELECT count(*)::int AS n FROM opportunities o JOIN pipeline_stages s ON s.id = o.stage_id
+      WHERE s.kind = 'aberta' AND ($1::text IS NULL OR o.owner_email = $1)
+        AND NOT EXISTS (SELECT 1 FROM opportunity_activities a WHERE a.opportunity_id = o.id AND a.done_at IS NULL AND a.kind <> 'nota')`,
+    [scope.ownerEmail],
+  );
+  const days = won.filter((row) => row.closedAt).map((row) => (row.closedAt!.getTime() - row.createdAt.getTime()) / 86_400_000);
+  return {
+    created: rows.length, open: open.length, won: won.length, lost: lost.length,
+    winRate: won.length + lost.length === 0 ? null : won.length / (won.length + lost.length),
+    wonValue: won.reduce((sum, row) => sum + row.value, 0), openValue: open.reduce((sum, row) => sum + row.value, 0),
+    daysToWin: days.length === 0 ? null : days.reduce((sum, value) => sum + value, 0) / days.length,
+    reached,
+    lostReasons: [...reasons].map(([reason, count]) => ({ reason, count })).sort((a, b) => b.count - a.count || a.reason.localeCompare(b.reason)),
+    owners: [...owners.values()].sort((a, b) => b.wonValue - a.wonValue || b.won - a.won || a.name.localeCompare(b.name)),
+    idle: Number(idle.rows[0].n),
+  };
+}
+
+/** The open opportunities with nothing left to do: the ones a sale is lost by forgetting. */
+export async function listIdleOpportunities(scope: FunnelScope, conn: Queryable): Promise<Opportunity[]> {
+  return (await listOpportunities(scope, conn)).filter((item) => item.stageKind === "aberta" && item.nextTitle === null);
 }
