@@ -20,7 +20,12 @@ export async function saveContractSettingsAction(_previous: ActionState, formDat
   const days = text("linkDays").trim();
   try {
     await saveContractSettings(
-      { title: text("title"), body: text("body"), linkDays: /^\d{1,2}$/.test(days) ? Number(days) : Number.NaN, mailSubject: text("mailSubject"), mailBody: text("mailBody") },
+      {
+        title: text("title"), body: text("body"), linkDays: /^\d{1,2}$/.test(days) ? Number(days) : Number.NaN, mailSubject: text("mailSubject"), mailBody: text("mailBody"),
+        downloadDays: /^\d{1,3}$/.test(text("downloadDays").trim()) ? Number(text("downloadDays").trim()) : Number.NaN,
+        seal: text("seal") === "sim",
+        secondFactor: text("secondFactor") === "sim",
+      },
       session.email,
       conn,
     );

@@ -1,5 +1,6 @@
 import { CODE_INTERVAL_SECONDS, CODE_MAX_ATTEMPTS, CODE_MAX_SENT, CODE_MINUTES } from "@/lib/contract/token";
 import type { ContractEvidence } from "@/lib/contract/pdf";
+import { maskedPhone } from "@/lib/contract/sms";
 import { contractNumber } from "@/lib/contract/text";
 import { formatDocument } from "@/lib/customer";
 import { pgErrorCode } from "@/lib/db/pool";
@@ -16,7 +17,19 @@ const blank = (value: string | null | undefined) => (value?.trim() ? value.trim(
 const moment = (value: unknown) => (value === null || value === undefined ? null : (value as Date));
 
 /** The model of the contract and the message that carries the link. `null` is the standard text. */
-export type ContractSettings = { title: string | null; body: string | null; linkDays: number; mailSubject: string | null; mailBody: string | null };
+export type ContractSettings = {
+  title: string | null;
+  body: string | null;
+  linkDays: number;
+  mailSubject: string | null;
+  mailBody: string | null;
+  /** For how many days after the signature the customer's link still hands the PDF. */
+  downloadDays: number;
+  /** Seal the signed PDF with the company's digital certificate. */
+  seal: boolean;
+  /** Ask for a second code, sent to the mobile phone of who signs. */
+  secondFactor: boolean;
+};
 
 export const DEFAULT_CONTRACT_MAIL_SUBJECT = "Contrato do pedido nº {pedido} para assinatura - {empresa}";
 export const DEFAULT_CONTRACT_MAIL_BODY =
@@ -27,10 +40,13 @@ export const fillContractMail = (template: string, values: Record<(typeof CONTRA
   template.replace(/\{(empresa|cliente|pedido|link|validade)\}/g, (_match, word: (typeof CONTRACT_MAIL_WORDS)[number]) => values[word]);
 
 export async function loadContractSettings(conn: Queryable): Promise<ContractSettings> {
-  const { rows } = await conn.query("SELECT title, body, link_days, mail_subject, mail_body FROM contract_settings");
+  const { rows } = await conn.query("SELECT title, body, link_days, mail_subject, mail_body, download_days, seal, second_factor FROM contract_settings");
   const row = rows[0];
-  if (!row) return { title: null, body: null, linkDays: 7, mailSubject: null, mailBody: null };
-  return { title: text(row.title), body: text(row.body), linkDays: Number(row.link_days), mailSubject: text(row.mail_subject), mailBody: text(row.mail_body) };
+  if (!row) return { title: null, body: null, linkDays: 7, mailSubject: null, mailBody: null, downloadDays: 30, seal: false, secondFactor: false };
+  return {
+    title: text(row.title), body: text(row.body), linkDays: Number(row.link_days), mailSubject: text(row.mail_subject), mailBody: text(row.mail_body),
+    downloadDays: Number(row.download_days), seal: row.seal === true, secondFactor: row.second_factor === true,
+  };
 }
 
 /** Blank takes a text back to the standard one. */
@@ -46,12 +62,14 @@ export async function saveContractSettings(input: ContractSettings, updatedBy: s
   if (mailSubject !== null && (mailSubject.length < 3 || mailSubject.length > 150 || /[\r\n]/.test(mailSubject))) problems.push("Assunto do e-mail: de 3 a 150 letras, em uma linha.");
   if (mailBody !== null && (mailBody.length < 10 || mailBody.length > 4000)) problems.push("Texto do e-mail: de 10 a 4.000 letras.");
   if (mailBody !== null && !mailBody.includes("{link}")) problems.push("Texto do e-mail: precisa ter {link}, que é o endereço onde o cliente assina.");
+  if (!Number.isInteger(input.downloadDays) || input.downloadDays < 1 || input.downloadDays > 365) problems.push("Prazo para o cliente baixar o contrato assinado: de 1 a 365 dias.");
   if (problems.length > 0) throw new ContractError(problems.join(" "));
   await conn.query(
-    `INSERT INTO contract_settings (title, body, link_days, mail_subject, mail_body, updated_by) VALUES ($1, $2, $3, $4, $5, $6)
+    `INSERT INTO contract_settings (title, body, link_days, mail_subject, mail_body, download_days, seal, second_factor, updated_by) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
      ON CONFLICT (id) DO UPDATE SET title = EXCLUDED.title, body = EXCLUDED.body, link_days = EXCLUDED.link_days,
-       mail_subject = EXCLUDED.mail_subject, mail_body = EXCLUDED.mail_body, updated_at = now(), updated_by = EXCLUDED.updated_by`,
-    [title, body, input.linkDays, mailSubject, mailBody, updatedBy],
+       mail_subject = EXCLUDED.mail_subject, mail_body = EXCLUDED.mail_body, download_days = EXCLUDED.download_days, seal = EXCLUDED.seal,
+       second_factor = EXCLUDED.second_factor, updated_at = now(), updated_by = EXCLUDED.updated_by`,
+    [title, body, input.linkDays, mailSubject, mailBody, input.downloadDays, input.seal, input.secondFactor, updatedBy],
   );
 }
 
@@ -73,6 +91,8 @@ export type Contract = {
   expiresAt: Date;
   recipientName: string;
   recipientEmail: string;
+  /** The mobile phone the second code goes to, digits with the country code; `null` when the contract asks only for the code of the e-mail. */
+  recipientPhone: string | null;
   viewedAt: Date | null;
   signedAt: Date | null;
   signerName: string | null;
@@ -90,7 +110,7 @@ export type Contract = {
   companySignatures: CompanySignature[];
 };
 
-const COLUMNS = `c.id, c.order_id, c.sequence, c.status, c.title, c.body, c.file_name, c.pdf_sha256, c.expires_at, c.recipient_name, c.recipient_email, c.viewed_at,
+const COLUMNS = `c.id, c.order_id, c.sequence, c.status, c.title, c.body, c.file_name, c.pdf_sha256, c.expires_at, c.recipient_name, c.recipient_email, c.recipient_phone, c.viewed_at,
   c.signed_at, c.signer_name, c.signer_document, c.signer_ip, c.refused_at, c.refusal_reason, c.cancelled_at, c.cancelled_by, c.created_at, c.created_by,
   (c.code_hash IS NOT NULL AND c.code_expires_at > now() AND c.code_attempts < ${CODE_MAX_ATTEMPTS}) AS code_pending, c.pending_name,
   COALESCE((SELECT json_agg(json_build_object('email', s.email, 'name', s.name, 'role', s.role, 'ip', s.ip, 'signedAt', s.signed_at) ORDER BY s.id)
@@ -99,7 +119,7 @@ const COLUMNS = `c.id, c.order_id, c.sequence, c.status, c.title, c.body, c.file
 function toContract(row: Record<string, unknown>): Contract {
   return {
     id: Number(row.id), orderId: Number(row.order_id), sequence: Number(row.sequence), status: row.status as ContractStatus, title: String(row.title), body: String(row.body), fileName: text(row.file_name),
-    sha256: String(row.pdf_sha256), expiresAt: row.expires_at as Date, recipientName: String(row.recipient_name), recipientEmail: String(row.recipient_email),
+    sha256: String(row.pdf_sha256), expiresAt: row.expires_at as Date, recipientName: String(row.recipient_name), recipientEmail: String(row.recipient_email), recipientPhone: text(row.recipient_phone),
     viewedAt: moment(row.viewed_at), signedAt: moment(row.signed_at), signerName: text(row.signer_name), signerDocument: text(row.signer_document), signerIp: text(row.signer_ip),
     refusedAt: moment(row.refused_at), refusalReason: text(row.refusal_reason), cancelledAt: moment(row.cancelled_at), cancelledBy: text(row.cancelled_by),
     createdAt: row.created_at as Date, createdBy: String(row.created_by), codePending: Boolean(row.code_pending), pendingName: text(row.pending_name),
@@ -111,6 +131,18 @@ function toContract(row: Record<string, unknown>): Contract {
 
 /** Waiting for the customer and still within the time of the link. */
 export const isOpen = (contract: Pick<Contract, "status" | "expiresAt">, now: Date) => contract.status === "enviado" && contract.expiresAt.getTime() > now.getTime();
+
+/**
+ * Whether the customer's link still hands the file: while the contract waits
+ * within its time and, once signed, for the days the company set. A link that
+ * ran out, a refusal or a withdrawal hand nothing: an e-mail forwarded months
+ * later does not open a contract with the CPF of who signed.
+ */
+export function linkDelivers(contract: Pick<Contract, "status" | "expiresAt" | "signedAt">, now: Date, downloadDays: number): boolean {
+  if (contract.status === "enviado") return contract.expiresAt.getTime() > now.getTime();
+  if (contract.status === "assinado" && contract.signedAt) return now.getTime() < contract.signedAt.getTime() + downloadDays * 86_400_000;
+  return false;
+}
 
 /** How the contract stands, in the words of the screen. */
 export function standingText(contract: Contract, now: Date): string {
@@ -153,7 +185,7 @@ export async function addContractEvent(contractId: number, kind: ContractEventKi
   await conn.query("INSERT INTO order_contract_events (contract_id, kind, detail, ip, actor) VALUES ($1, $2, $3, $4, $5)", [contractId, kind, event.detail?.slice(0, 400) ?? null, event.ip ?? null, event.actor]);
 }
 
-export type NewContract = { orderId: number; sequence: number; title: string; body: string; pdf: Uint8Array; sha256: string; tokenHash: string; expiresAt: Date; recipientName: string; recipientEmail: string; createdBy: string; /** Name of the PDF the company sent ready, when the contract is not the model's. */ fileName?: string | null };
+export type NewContract = { orderId: number; sequence: number; title: string; body: string; pdf: Uint8Array; sha256: string; tokenHash: string; expiresAt: Date; recipientName: string; recipientEmail: string; createdBy: string; /** Name of the PDF the company sent ready, when the contract is not the model's. */ fileName?: string | null; /** The mobile phone of who signs, when the second code is asked for. */ recipientPhone?: string | null };
 
 export const PENDING_EXISTS = "Este pedido já tem um contrato aguardando assinatura. Cancele-o antes de enviar outro.";
 
@@ -161,9 +193,9 @@ export const PENDING_EXISTS = "Este pedido já tem um contrato aguardando assina
 export async function createContract(input: NewContract, conn: Queryable): Promise<Contract> {
   try {
     const { rows } = await conn.query(
-      `INSERT INTO order_contracts (order_id, sequence, title, body, pdf, pdf_sha256, token_hash, expires_at, recipient_name, recipient_email, created_by, uploaded, file_name)
-       VALUES ($1, $11, $2, $3, $4, $5, $6, $7, $8, $9, $10, $12::text IS NOT NULL, $12) RETURNING id`,
-      [input.orderId, input.title, input.body, Buffer.from(input.pdf), input.sha256, input.tokenHash, input.expiresAt, input.recipientName, input.recipientEmail, input.createdBy, input.sequence, input.fileName ?? null],
+      `INSERT INTO order_contracts (order_id, sequence, title, body, pdf, pdf_sha256, token_hash, expires_at, recipient_name, recipient_email, created_by, uploaded, file_name, recipient_phone)
+       VALUES ($1, $11, $2, $3, $4, $5, $6, $7, $8, $9, $10, $12::text IS NOT NULL, $12, $13) RETURNING id`,
+      [input.orderId, input.title, input.body, Buffer.from(input.pdf), input.sha256, input.tokenHash, input.expiresAt, input.recipientName, input.recipientEmail, input.createdBy, input.sequence, input.fileName ?? null, input.recipientPhone ?? null],
     );
     return (await getOrderContract(input.orderId, Number(rows[0].id), conn))!;
   } catch (error) {
@@ -181,7 +213,7 @@ export async function nextContractSequence(orderId: number, conn: Queryable): Pr
 /** A new link for a contract still waiting: the old one stops working, and the time starts again. */
 export async function renewContractLink(orderId: number, contractId: number, tokenHash: string, expiresAt: Date, conn: Queryable): Promise<Contract> {
   const { rows } = await conn.query(
-    `UPDATE order_contracts SET token_hash = $3, expires_at = $4, code_hash = NULL, code_expires_at = NULL, code_attempts = 0, codes_sent = 0, code_sent_at = NULL
+    `UPDATE order_contracts SET token_hash = $3, expires_at = $4, code_hash = NULL, phone_code_hash = NULL, code_expires_at = NULL, code_attempts = 0, codes_sent = 0, code_sent_at = NULL
       WHERE order_id = $1 AND id = $2 AND status = 'enviado' RETURNING id`,
     [orderId, contractId, tokenHash, expiresAt],
   );
@@ -226,15 +258,16 @@ export async function markViewed(contractId: number, ip: string | null, conn: Qu
  * e-mail. One code a minute, ten in all, and never on a contract that is not
  * waiting anymore: each refusal says which rule stopped it.
  */
-export async function startCode(contractId: number, signer: { name: string; document: string; codeHash: string; ip: string | null }, conn: Queryable): Promise<void> {
+export async function startCode(contractId: number, signer: { name: string; document: string; codeHash: string; /** Hash of the code sent to the phone, when the contract asks for it. */ phoneCodeHash?: string | null; ip: string | null }, conn: Queryable): Promise<void> {
   const { rows } = await conn.query(
     `UPDATE order_contracts
         SET code_hash = $2, code_expires_at = now() + make_interval(mins => $5::int), code_sent_at = now(), code_attempts = 0, codes_sent = codes_sent + 1,
-            pending_name = $3, pending_document = $4
+            pending_name = $3, pending_document = $4, phone_code_hash = $8
       WHERE id = $1 AND status = 'enviado' AND expires_at > now() AND codes_sent < $6::int
+        AND (recipient_phone IS NULL) = ($8::text IS NULL)
         AND (code_sent_at IS NULL OR code_sent_at < now() - make_interval(secs => $7::int))
       RETURNING id`,
-    [contractId, signer.codeHash, signer.name, signer.document, CODE_MINUTES, CODE_MAX_SENT, CODE_INTERVAL_SECONDS],
+    [contractId, signer.codeHash, signer.name, signer.document, CODE_MINUTES, CODE_MAX_SENT, CODE_INTERVAL_SECONDS, signer.phoneCodeHash ?? null],
   );
   if (rows.length > 0) {
     await addContractEvent(contractId, "codigo_enviado", { ip: signer.ip, actor: "cliente" }, conn);
@@ -255,18 +288,20 @@ export async function startCode(contractId: number, signer: { name: string; docu
  * checked in the same statement that writes the signature: a contract is never
  * signed twice, after its time or with a code that ran out of tries.
  */
-export async function signWithCode(contractId: number, proof: { codeHash: string; ip: string | null; agent: string | null }, conn: Queryable): Promise<void> {
+export async function signWithCode(contractId: number, proof: { codeHash: string; /** Hash of what was typed as the code of the phone; `null` when none was typed. */ phoneCodeHash?: string | null; ip: string | null; agent: string | null }, conn: Queryable): Promise<void> {
   const { rows } = await conn.query(
     `UPDATE order_contracts
         SET status = 'assinado', signed_at = now(), signer_name = pending_name, signer_document = pending_document, signer_ip = $3, signer_agent = $4,
-            code_hash = NULL, code_expires_at = NULL
+            code_hash = NULL, phone_code_hash = NULL, code_expires_at = NULL
       WHERE id = $1 AND status = 'enviado' AND expires_at > now() AND code_hash = $2 AND code_expires_at > now() AND code_attempts < $5::int
         AND pending_name IS NOT NULL AND pending_document IS NOT NULL
-      RETURNING signer_name, signer_document`,
-    [contractId, proof.codeHash, proof.ip, proof.agent?.slice(0, 300) ?? null, CODE_MAX_ATTEMPTS],
+        -- A contract that asks for the code of the phone is signed only with both.
+        AND (recipient_phone IS NULL OR phone_code_hash = $6)
+      RETURNING signer_name, signer_document, recipient_phone`,
+    [contractId, proof.codeHash, proof.ip, proof.agent?.slice(0, 300) ?? null, CODE_MAX_ATTEMPTS, proof.phoneCodeHash ?? null],
   );
   if (rows.length > 0) {
-    await addContractEvent(contractId, "assinado", { detail: `${rows[0].signer_name}, CPF ${formatDocument(String(rows[0].signer_document))}, com código enviado ao e-mail`, ip: proof.ip, actor: "cliente" }, conn);
+    await addContractEvent(contractId, "assinado", { detail: `${rows[0].signer_name}, CPF ${formatDocument(String(rows[0].signer_document))}, com código enviado ao e-mail${rows[0].recipient_phone ? " e código enviado ao celular" : ""}`, ip: proof.ip, actor: "cliente" }, conn);
     return;
   }
   const tried = await conn.query(
@@ -317,7 +352,7 @@ export async function listContractEvents(contractId: number, conn: Queryable): P
 }
 
 /** What the record of signatures prints for a contract, from what was stored at each step. */
-export async function loadEvidence(contract: Contract, context: { company: string; orderNumber: string; now: Date }, conn: Queryable): Promise<ContractEvidence> {
+export async function loadEvidence(contract: Contract, context: { company: string; orderNumber: string; now: Date; /** Name on the certificate that seals the file, when it is sealed. */ sealedBy?: string | null }, conn: Queryable): Promise<ContractEvidence> {
   const events = await listContractEvents(contract.id, conn);
   return {
     company: context.company,
@@ -325,11 +360,14 @@ export async function loadEvidence(contract: Contract, context: { company: strin
     number: contractNumber(context.orderNumber, contract.sequence),
     sha256: contract.sha256,
     standing: standingText(contract, context.now),
+    seal: context.sealedBy ?? null,
     signers: [
       ...(contract.status === "assinado"
         ? [{
             party: "Comprador(a)", name: contract.signerName!, document: formatDocument(contract.signerDocument!), email: contract.recipientEmail, at: showDateTime(contract.signedAt!), ip: contract.signerIp,
-            method: "código de confirmação enviado ao e-mail acima, digitado no link de assinatura",
+            method: contract.recipientPhone
+              ? `dois códigos de confirmação, um enviado ao e-mail acima e outro por SMS ao celular ${maskedPhone(contract.recipientPhone)}, digitados no link de assinatura`
+              : "código de confirmação enviado ao e-mail acima, digitado no link de assinatura",
           }]
         : []),
       ...contract.companySignatures.map((signature) => ({

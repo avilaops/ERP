@@ -3,7 +3,10 @@ import { requirePermission } from "@/lib/auth";
 import { menuItem } from "@/lib/auth/permissions";
 import { CONTRACT_WORDS, DEFAULT_CONTRACT_BODY, DEFAULT_CONTRACT_TITLE } from "@/lib/contract/text";
 import { DEFAULT_CONTRACT_MAIL_BODY, DEFAULT_CONTRACT_MAIL_SUBJECT, loadContractSettings } from "@/lib/db/contracts";
+import { smsAvailable } from "@/lib/contract/sms";
+import { loadCertificateInfo } from "@/lib/db/fiscal";
 import { defaultMailbox, loadMailInfo } from "@/lib/db/mail";
+import { showDate } from "@/lib/format";
 import { tenantDb } from "@/lib/db/pool";
 import { ActionForm } from "../../pedidos/ActionForm";
 import { ConfirmButton } from "../../pedidos/ConfirmButton";
@@ -21,6 +24,11 @@ export default async function ContractSettingsPage() {
   const session = await requirePermission("parametros");
   const conn = tenantDb(session.tenant.slug);
   const settings = await loadContractSettings(conn);
+  // What each protection depends on, said next to its switch: a switch that cannot work is not a surprise later.
+  const certificate = await loadCertificateInfo(conn);
+  const now = new Date();
+  const certificateValid = certificate !== null && certificate.validUntil.getTime() > now.getTime();
+  const hasSms = smsAvailable(process.env);
   const hasMailbox = (await loadMailInfo(conn)).own !== null || defaultMailbox(process.env) !== null;
 
   return (
@@ -132,6 +140,51 @@ export default async function ContractSettingsPage() {
               </label>
               <textarea key={settings.mailBody ?? ""} id="mailBody" name="mailBody" rows={9} defaultValue={settings.mailBody ?? ""} placeholder={DEFAULT_CONTRACT_MAIL_BODY} className={INPUT} />
             </div>
+          </div>
+        </section>
+
+        <section className={`${CARD} p-5`} aria-labelledby="seguranca">
+          <h2 id="seguranca" className="text-sm font-semibold uppercase tracking-wide">
+            Segurança
+          </h2>
+          <div className="mt-4 flex flex-col gap-4">
+            <div className="sm:max-w-xs">
+              <label htmlFor="downloadDays" className={LABEL}>
+                Depois de assinado, o link do cliente entrega o PDF por (dias)
+              </label>
+              <input key={settings.downloadDays} id="downloadDays" name="downloadDays" type="text" inputMode="numeric" defaultValue={settings.downloadDays} autoComplete="off" className={INPUT} />
+              <p className="mt-1 text-xs text-slate-600">Passado o prazo, ou se o link venceu sem assinatura, o endereço não entrega mais nada. A empresa continua baixando pelo pedido.</p>
+            </div>
+            <label className="flex items-start gap-3">
+              <input key={String(settings.seal)} type="checkbox" name="seal" value="sim" defaultChecked={settings.seal} className="mt-1 h-5 w-5" />
+              <span className="text-sm">
+                <span className="block font-semibold">Selar o contrato assinado com o certificado digital da empresa</span>
+                <span className="block text-slate-600">
+                  O PDF assinado sai com a assinatura digital do certificado A1 (ICP-Brasil), o mesmo das notas fiscais. Qualquer alteração no arquivo aparece no
+                  leitor de PDF como assinatura inválida. Vale como assinatura da empresa em todo contrato assinado pelo cliente.
+                </span>
+                <span className={`mt-1 block ${certificateValid ? "text-emerald-800" : "text-amber-900"}`}>
+                  {certificateValid
+                    ? `Certificado em vigor: ${certificate.subject}, válido até ${showDate(certificate.validUntil)}.`
+                    : certificate
+                      ? "O certificado enviado está vencido: enquanto não houver um em vigor, o contrato sai sem o selo."
+                      : "Ainda não há certificado: envie o A1 em Parâmetros → Fiscal. Até lá, o contrato sai sem o selo."}
+                </span>
+              </span>
+            </label>
+            <label className="flex items-start gap-3">
+              <input key={String(settings.secondFactor)} type="checkbox" name="secondFactor" value="sim" defaultChecked={settings.secondFactor} className="mt-1 h-5 w-5" />
+              <span className="text-sm">
+                <span className="block font-semibold">Pedir um segundo código, enviado por SMS ao celular de quem assina</span>
+                <span className="block text-slate-600">
+                  Além do código do e-mail, o cliente digita outro, que chega no celular informado ao enviar o contrato. Quem tiver só o acesso ao e-mail não
+                  consegue assinar. Cada SMS tem custo no serviço de envio.
+                </span>
+                <span className={`mt-1 block ${hasSms ? "text-emerald-800" : "text-amber-900"}`}>
+                  {hasSms ? "Serviço de SMS configurado neste servidor." : "O serviço de SMS ainda não está configurado neste servidor: com a opção ligada, o contrato não é enviado. Peça à Ávila Ops para ligar."}
+                </span>
+              </span>
+            </label>
           </div>
         </section>
 

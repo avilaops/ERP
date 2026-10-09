@@ -4,7 +4,8 @@ import { clientIp, openSigning } from "@/lib/contract/public";
 import { contractNumber, maskedEmail } from "@/lib/contract/text";
 import { CODE_MINUTES } from "@/lib/contract/token";
 import { formatDocument } from "@/lib/customer";
-import { isOpen, markViewed } from "@/lib/db/contracts";
+import { maskedPhone } from "@/lib/contract/sms";
+import { isOpen, linkDelivers, loadContractSettings, markViewed } from "@/lib/db/contracts";
 import { showDateTime } from "@/lib/format";
 import { refuseAction, requestCodeAction, signAction } from "./actions";
 import { PublicForm } from "./PublicForm";
@@ -90,12 +91,16 @@ export default async function SigningPage({ params }: Props) {
           <p className="font-semibold">Contrato assinado.</p>
           <p className="mt-1 text-sm">
             Assinado por {contract.signerName}, CPF {formatDocument(contract.signerDocument ?? "")}, em {showDateTime(contract.signedAt!)} (horário de Brasília). Uma cópia
-            vai para {maskedEmail(contract.recipientEmail)}; se não chegar, baixe o contrato aqui.
+            vai para {maskedEmail(contract.recipientEmail)}.
           </p>
         </div>
-        <a href={pdf} target="_blank" rel="noopener" className={`${PRIMARY} text-center`}>
-          Baixar o contrato assinado (PDF)
-        </a>
+        {linkDelivers(contract, now, (await loadContractSettings(signing.conn)).downloadDays) ? (
+          <a href={pdf} target="_blank" rel="noopener" className={`${PRIMARY} text-center`}>
+            Baixar o contrato assinado (PDF)
+          </a>
+        ) : (
+          <p className="rounded-lg border border-slate-300 bg-white p-4 text-sm text-slate-700">O prazo para baixar o contrato por este endereço terminou. Peça uma cópia à empresa.</p>
+        )}
       </Shell>
     );
   }
@@ -150,8 +155,9 @@ export default async function SigningPage({ params }: Props) {
           Assinar
         </h2>
         <p className="mt-1 text-sm text-slate-600">
-          1. Informe o seu nome e CPF. 2. Enviamos um código para {maskedEmail(contract.recipientEmail)}. 3. Digite o código para assinar. O prazo para assinar
-          vai até {showDateTime(contract.expiresAt)}.
+          1. Informe o seu nome e CPF. 2. Enviamos um código para {maskedEmail(contract.recipientEmail)}
+          {contract.recipientPhone ? ` e outro por SMS para o celular ${maskedPhone(contract.recipientPhone)}` : ""}. 3. Digite{" "}
+          {contract.recipientPhone ? "os dois códigos" : "o código"} para assinar. O prazo para assinar vai até {showDateTime(contract.expiresAt)}.
         </p>
         <PublicForm action={requestCodeAction} className="mt-4 flex flex-col gap-4">
           {hidden}
@@ -172,7 +178,7 @@ export default async function SigningPage({ params }: Props) {
             <span>{contract.fileName ? "Abri e li o contrato em PDF e concordo com ele." : "Li o contrato acima e concordo com ele."} Aceito assiná-lo por meio eletrônico, com o código enviado ao meu e-mail.</span>
           </label>
           <button type="submit" className={PRIMARY}>
-            {contract.codePending ? "Enviar outro código" : "Receber o código por e-mail"}
+            {contract.codePending ? (contract.recipientPhone ? "Enviar outros códigos" : "Enviar outro código") : contract.recipientPhone ? "Receber os códigos" : "Receber o código por e-mail"}
           </button>
         </PublicForm>
 
@@ -185,6 +191,14 @@ export default async function SigningPage({ params }: Props) {
               </label>
               <input id="code" name="code" type="text" inputMode="numeric" maxLength={6} autoComplete="one-time-code" className={`${INPUT} text-center text-2xl tracking-[0.4em]`} />
             </div>
+            {contract.recipientPhone && (
+              <div>
+                <label htmlFor="phoneCode" className={LABEL}>
+                  Código de 6 números que chegou por SMS no celular {maskedPhone(contract.recipientPhone)}
+                </label>
+                <input id="phoneCode" name="phoneCode" type="text" inputMode="numeric" maxLength={6} autoComplete="off" className={`${INPUT} text-center text-2xl tracking-[0.4em]`} />
+              </div>
+            )}
             <button type="submit" className={PRIMARY}>
               Assinar contrato
             </button>

@@ -7,6 +7,7 @@ import type { Signing } from "@/lib/contract/public";
 import { ContractError, refuseContract } from "@/lib/db/contracts";
 import { requestSigningCode, signOrderContract } from "@/lib/db/send-contract";
 import { vaultKey } from "@/lib/fiscal/certificate";
+import { sendSms } from "@/lib/contract/sms";
 import { sendMail } from "@/lib/mail/smtp";
 import type { ActionState } from "@/lib/order-form";
 
@@ -19,7 +20,7 @@ import type { ActionState } from "@/lib/order-form";
 const GONE = "Este endereço não vale mais. Peça à empresa um novo link.";
 const FAILED = "Não foi possível concluir agora. Tente de novo em instantes.";
 
-const way = { env: process.env, key: () => vaultKey(process.env.ERP_CERT_KEY), send: sendMail };
+const way = { env: process.env, key: () => vaultKey(process.env.ERP_CERT_KEY), send: sendMail, sms: sendSms };
 
 const field = (formData: FormData, key: string) => {
   const value = formData.get(key);
@@ -53,7 +54,7 @@ export async function requestCodeAction(_previous: ActionState, formData: FormDa
     return refusal(error);
   }
   revalidatePath(pageOf(signing));
-  return { error: null, notice: "Código enviado. Confira a sua caixa de entrada (e o spam)." };
+  return { error: null, notice: signing.contract.recipientPhone ? "Códigos enviados: um para o seu e-mail (confira também o spam) e outro por SMS para o seu celular." : "Código enviado. Confira a sua caixa de entrada (e o spam)." };
 }
 
 /** "Assinar contrato": the code that went to the e-mail. */
@@ -64,7 +65,7 @@ export async function signAction(_previous: ActionState, formData: FormData): Pr
   try {
     await signOrderContract(
       signing.contract, signing.token, field(formData, "code").replace(/\D/g, ""),
-      { company: signing.tenant.name, now: new Date(), ip: clientIp(requestHeaders), agent: requestHeaders.get("user-agent"), way },
+      { company: signing.tenant.name, now: new Date(), ip: clientIp(requestHeaders), agent: requestHeaders.get("user-agent"), way, phoneCode: field(formData, "phoneCode").replace(/\D/g, "") },
       signing.conn,
     );
   } catch (error) {

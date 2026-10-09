@@ -4,6 +4,7 @@ import { getOrderContract } from "@/lib/db/contracts";
 import { getOrder } from "@/lib/db/orders";
 import { tenantDb } from "@/lib/db/pool";
 import { contractFile, contractFileName } from "@/lib/db/send-contract";
+import { vaultKey } from "@/lib/fiscal/certificate";
 import { ORDER_NUMBER } from "@/lib/order-number";
 
 /**
@@ -30,7 +31,7 @@ export async function GET(_request: Request, context: Context): Promise<Response
   const contract = order ? await getOrderContract(order.id, Number(id), conn) : null;
   if (!order || !contract) return text("Contrato não encontrado.", 404);
 
-  const pdf = await contractFile(contract, { company: session.tenant.name, orderNumber: order.number, now: new Date() }, conn);
+  const pdf = await contractFile(contract, { company: session.tenant.name, orderNumber: order.number, now: new Date(), vault: () => vaultKey(process.env.ERP_CERT_KEY) }, conn);
   return new Response(Buffer.from(pdf), {
     headers: { "Content-Type": "application/pdf", "Content-Disposition": `inline; filename="${contractFileName(order.number, contract)}"`, "Cache-Control": "private, no-store" },
   });

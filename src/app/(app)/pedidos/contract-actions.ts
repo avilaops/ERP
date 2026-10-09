@@ -6,6 +6,7 @@ import { requirePermission } from "@/lib/auth";
 import { menuItem, seesAllOrders } from "@/lib/auth/permissions";
 import { ROLE_LABELS } from "@/lib/auth/roles";
 import { clientIp, publicAppUrl } from "@/lib/contract/public";
+import { sendSms } from "@/lib/contract/sms";
 import { cancelContract, ContractError, signForCompany } from "@/lib/db/contracts";
 import { getOrder } from "@/lib/db/orders";
 import { tenantDb } from "@/lib/db/pool";
@@ -20,7 +21,7 @@ import { ORDER_NUMBER } from "@/lib/order-number";
 const FAILED = "Não foi possível concluir agora. Tente de novo.";
 const NOT_FOUND = "Pedido não encontrado.";
 
-const way = { env: process.env, key: () => vaultKey(process.env.ERP_CERT_KEY), send: sendMail };
+const way = { env: process.env, key: () => vaultKey(process.env.ERP_CERT_KEY), send: sendMail, sms: sendSms };
 
 function refusal(error: unknown): ActionState {
   if (error instanceof ContractError || error instanceof MailError) return { error: error.message };
@@ -50,7 +51,7 @@ export async function sendContractAction(_previous: ActionState, formData: FormD
   try {
     sent = await sendOrderContract(
       order,
-      { name: field(formData, "recipientName"), email: field(formData, "recipientEmail") },
+      { name: field(formData, "recipientName"), email: field(formData, "recipientEmail"), phone: field(formData, "recipientPhone") },
       { company: session.tenant.name, tenant: session.tenant.slug, appUrl: publicAppUrl(), sentBy: session.email, now: new Date(), way },
       conn,
     );
@@ -82,7 +83,7 @@ export async function sendUploadedContractAction(_previous: ActionState, formDat
     sent = await sendUploadedContract(
       order,
       { bytes: new Uint8Array(await file.arrayBuffer()), name: file.name },
-      { name: field(formData, "recipientName"), email: field(formData, "recipientEmail") },
+      { name: field(formData, "recipientName"), email: field(formData, "recipientEmail"), phone: field(formData, "recipientPhone") },
       { company: session.tenant.name, tenant: session.tenant.slug, appUrl: publicAppUrl(), sentBy: session.email, now: new Date(), way },
       conn,
     );

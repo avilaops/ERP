@@ -6,7 +6,15 @@ import { PDFDocument } from "pdf-lib";
 import { renderContractPdf, withEvidence } from "@/lib/contract/pdf";
 import { deflateRawSync } from "node:zlib";
 import { ContractFileError, docxText, modelText } from "@/lib/contract/docx";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { clientIp, openSigning, publicAppUrl } from "@/lib/contract/public";
+import { certificateHolder, sealOf, sealPdf } from "@/lib/contract/seal";
+import { maskedPhone, mobileNumber, sendSms, smsAvailable, smsConfig, SmsError } from "@/lib/contract/sms";
+import { linkDelivers } from "@/lib/db/contracts";
+import { signingKeyOf } from "@/lib/fiscal/sign";
+import { testPfx } from "./fiscal-helpers.ts";
 import { addressLine, blankWords, CONTRACT_WORDS, contractNumber, DEFAULT_CONTRACT_BODY, fillContract, maskedEmail, wordsUsed } from "@/lib/contract/text";
 import type { ContractValues } from "@/lib/contract/text";
 import { fingerprint, hashCode, hashToken, newCode, newToken, TOKEN } from "@/lib/contract/token";
@@ -242,4 +250,102 @@ test("modelo em Word e PDF próprio: as telas enviam o arquivo só para quem pod
   // Na página de assinatura, o contrato em arquivo leva direto ao PDF.
   const signing = read("app/contrato/[empresa]/[token]/page.tsx");
   assert.ok(signing.includes("{contract.fileName ? (") && signing.includes("Abrir o contrato (PDF)"));
+});
+
+test("link do cliente: entrega o arquivo enquanto aguarda no prazo e, assinado, só pelos dias que a empresa definiu", () => {
+  const now = new Date("2026-10-09T12:00:00Z");
+  const at = (days: number) => new Date(now.getTime() + days * 86_400_000);
+  assert.equal(linkDelivers({ status: "enviado", expiresAt: at(1), signedAt: null }, now, 30), true);
+  // Venceu sem assinatura: o endereço não entrega mais nada.
+  assert.equal(linkDelivers({ status: "enviado", expiresAt: at(-1), signedAt: null }, now, 30), false);
+  assert.equal(linkDelivers({ status: "assinado", expiresAt: at(-20), signedAt: at(-29) }, now, 30), true);
+  assert.equal(linkDelivers({ status: "assinado", expiresAt: at(-20), signedAt: at(-31) }, now, 30), false);
+  assert.equal(linkDelivers({ status: "assinado", expiresAt: at(5), signedAt: at(-2) }, now, 1), false);
+  for (const status of ["recusado", "cancelado"] as const) assert.equal(linkDelivers({ status, expiresAt: at(5), signedAt: null }, now, 30), false);
+});
+
+test("selo digital: o PDF sai assinado com o certificado da empresa, cobre o arquivo inteiro e acusa qualquer alteração", async () => {
+  const document = await PDFDocument.create();
+  document.addPage().drawText("Contrato de teste");
+  document.addPage();
+  const pdf = await document.save();
+  const key = signingKeyOf(testPfx({ bits: 2048 }), "senha-de-teste");
+  assert.equal(certificateHolder(key), "ACADEMIA TESTE LTDA:48240052000161");
+  assert.equal(sealOf(pdf), null);
+  const sealed = await sealPdf(pdf, key, { name: certificateHolder(key), reason: "Contrato assinado", at: new Date("2026-10-09T15:00:00Z") });
+  const seal = sealOf(sealed)!;
+  // As folhas são as mesmas, e a assinatura cobre do primeiro ao último byte, menos o lugar dela.
+  assert.equal((await PDFDocument.load(sealed)).getPageCount(), 2);
+  assert.equal(seal.range[0], 0);
+  assert.equal(seal.range[2] + seal.range[3], sealed.length);
+  assert.equal(seal.signed.length, sealed.length - (seal.range[2] - seal.range[1]));
+  const text = Buffer.from(sealed).toString("latin1");
+  for (const expected of ["/SubFilter /adbe.pkcs7.detached", "/Type /Sig", "/FT /Sig", "/SigFlags 3"]) assert.ok(text.includes(expected), expected);
+  // A chave privada não vai para o arquivo.
+  assert.ok(!text.includes("PRIVATE KEY"));
+
+  // Conferido por uma implementação independente (OpenSSL): íntegro passa, um byte trocado não.
+  let openssl = true;
+  try {
+    execFileSync("openssl", ["version"], { stdio: "ignore" });
+  } catch {
+    openssl = false;
+  }
+  if (!openssl) return;
+  const dir = mkdtempSync(`${tmpdir()}/erp-selo-`);
+  try {
+    const verify = (content: Uint8Array) => {
+      writeFileSync(`${dir}/assinatura.der`, seal.signature);
+      writeFileSync(`${dir}/conteudo.bin`, content);
+      try {
+        execFileSync("openssl", ["cms", "-verify", "-binary", "-inform", "DER", "-in", `${dir}/assinatura.der`, "-content", `${dir}/conteudo.bin`, "-noverify", "-out", "/dev/null"], { stdio: "ignore" });
+        return true;
+      } catch {
+        return false;
+      }
+    };
+    assert.equal(verify(seal.signed), true);
+    const changed = Buffer.from(seal.signed);
+    changed[Math.floor(changed.length / 2)] ^= 1;
+    assert.equal(verify(changed), false);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("segundo código: só celular brasileiro recebe, o número aparece mascarado e a credencial do SMS vem do servidor", async () => {
+  assert.equal(mobileNumber("(17) 99781-1471"), "5517997811471");
+  assert.equal(mobileNumber("+55 17 99781 1471"), "5517997811471");
+  // Fixo, número curto ou sem DDD não recebem código.
+  for (const typed of ["(17) 3421-1234", "99781-1471", "", "1799781147", "00997811471"]) assert.equal(mobileNumber(typed), null, typed);
+  assert.equal(maskedPhone("5517997811471"), "(17) 9****-1471");
+
+  assert.equal(smsConfig({}), null);
+  assert.equal(smsAvailable({ ERP_TWILIO_ACCOUNT_SID: "errado", ERP_TWILIO_AUTH_TOKEN: "t", ERP_TWILIO_FROM: "+15005550006" }), false);
+  const env = { ERP_TWILIO_ACCOUNT_SID: `AC${"a".repeat(32)}`, ERP_TWILIO_AUTH_TOKEN: "segredo", ERP_TWILIO_FROM: "+15005550006" };
+  const config = smsConfig(env)!;
+  assert.equal(smsAvailable(env), true);
+  const calls: { url: string; init: { headers: Record<string, string>; body: string } }[] = [];
+  await sendSms(config, "5517997811471", "123456 é o seu código", async (url, init) => {
+    calls.push({ url, init });
+    return { status: 201, json: async () => ({}) };
+  });
+  assert.equal(calls[0].url, `https://api.twilio.com/2010-04-01/Accounts/AC${"a".repeat(32)}/Messages.json`);
+  assert.equal(Buffer.from(calls[0].init.headers.Authorization.slice(6), "base64").toString(), `AC${"a".repeat(32)}:segredo`);
+  assert.deepEqual(Object.fromEntries(new URLSearchParams(calls[0].init.body)), { To: "+5517997811471", From: "+15005550006", Body: "123456 é o seu código" });
+  await assert.rejects(() => sendSms(config, "5517997811471", "x", async () => ({ status: 400, json: async () => ({ message: "The 'To' number is not a valid phone number." }) })), (error: unknown) => error instanceof SmsError && /recusou o envio \(400\): The 'To' number/.test(error.message));
+  await assert.rejects(() => sendSms(config, "5517997811471", "x", async () => { throw new Error("ECONNRESET"); }), /não respondeu/);
+});
+
+test("proteções do contrato: o link só entrega pela regra do prazo, e nenhum código vai para log", () => {
+  const route = read("app/contrato/[empresa]/[token]/pdf/route.ts");
+  assert.ok(route.indexOf("linkDelivers(contract, now,") < route.indexOf("contractFile("));
+  assert.ok(read("app/contrato/[empresa]/[token]/page.tsx").includes("linkDelivers(contract, now,"));
+  for (const file of ["lib/db/send-contract.ts", "lib/contract/sms.ts", "lib/contract/seal.ts", "lib/db/contract-seal.ts", "lib/db/contracts.ts"]) {
+    for (const line of read(file).split("\n").filter((text) => /console\.(info|error|log|warn)/.test(text))) assert.doesNotMatch(line, /\bcode\b|phoneCode|token|authToken|privateKey|password|\btext\b/i, line.trim());
+  }
+  // O selo usa o certificado só para assinar: nada dele volta para tela nenhuma.
+  const sealing = read("lib/db/contract-seal.ts");
+  assert.doesNotMatch(sealing, /console\./);
+  for (const page of ["app/(app)/parametros/contrato/page.tsx", "app/(app)/pedidos/[numero]/page.tsx", "app/contrato/[empresa]/[token]/page.tsx"]) assert.doesNotMatch(read(page), /openCertificate|loadContractSeal|privateKey|ERP_TWILIO/, page);
 });

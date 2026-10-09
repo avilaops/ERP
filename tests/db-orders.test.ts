@@ -1480,8 +1480,8 @@ test("contrato do pedido: enviado com link secreto, assinado com código do e-ma
   const closed = (await getOrder(number, MINE, db.pool))!;
 
   // O modelo da empresa, com um campo desconhecido que fica como digitado.
-  await assert.rejects(() => saveContractSettings({ title: null, body: null, linkDays: 7, mailSubject: null, mailBody: "Sem o endereço de assinatura" }, DIRECTOR, db.pool), /precisa ter \{link\}/);
-  await saveContractSettings({ title: "Contrato de venda", body: "# Partes\n\n{empresa} vende a {cliente} ({cliente_documento}).\n\n{equipamentos}\n\nTotal: {total}. {inexistente}\n\nPrazo: {prazo_fabricacao}. Gerente: {gerente}.", linkDays: 3, mailSubject: null, mailBody: null }, DIRECTOR, db.pool);
+  await assert.rejects(() => saveContractSettings({ title: null, body: null, linkDays: 7, downloadDays: 30, seal: false, secondFactor: false, mailSubject: null, mailBody: "Sem o endereço de assinatura" }, DIRECTOR, db.pool), /precisa ter \{link\}/);
+  await saveContractSettings({ title: "Contrato de venda", body: "# Partes\n\n{empresa} vende a {cliente} ({cliente_documento}).\n\n{equipamentos}\n\nTotal: {total}. {inexistente}\n\nPrazo: {prazo_fabricacao}. Gerente: {gerente}.", linkDays: 3, downloadDays: 30, seal: false, secondFactor: false, mailSubject: null, mailBody: null }, DIRECTOR, db.pool);
   const draft = await draftOrderContract(closed, "Acme", now, db.pool);
   assert.equal(draft.title, "Contrato de venda");
   assert.match(draft.body, /Acme vende a .* \(CNPJ 11\.222\.333\/0001-81\)/);
@@ -1582,7 +1582,7 @@ test("contrato do pedido: enviado com link secreto, assinado com código do e-ma
   const after = await listOrderContracts(closed.id, db.pool);
   assert.deepEqual(after.map((contract) => [contract.sequence, contract.status, contract.cancelledBy]), [[2, "cancelado", DIRECTOR], [1, "assinado", null]]);
   await assert.rejects(() => deleteOrder(number, ALL, db.pool, { withHistory: true }), /contrato assinado/);
-  await saveContractSettings({ title: null, body: null, linkDays: 7, mailSubject: null, mailBody: null }, DIRECTOR, db.pool);
+  await saveContractSettings({ title: null, body: null, linkDays: 7, downloadDays: 30, seal: false, secondFactor: false, mailSubject: null, mailBody: null }, DIRECTOR, db.pool);
 });
 
 test("contrato do pedido: prazo vencido, recusa do cliente e exclusão do pedido sem contrato assinado", { skip }, async () => {
@@ -1690,4 +1690,95 @@ test("contrato em arquivo: o PDF da empresa é guardado byte a byte, assinado pe
   // O arquivo assinado são as duas folhas da empresa mais a folha de registro.
   assert.equal((await PDFDocument.load(await contractFile(signed, { company: "Acme", orderNumber: number, now }, db.pool))).getPageCount(), 3);
   assert.equal(fingerprint((await loadContractPdf(signed.id, db.pool))!), fingerprint(bytes));
+});
+
+test("contrato com selo e segundo código: o assinado sai selado com o certificado, e sem o código do celular ninguém assina", { skip }, async () => {
+  const { randomBytes } = await import("node:crypto");
+  const { sealOf } = await import("@/lib/contract/seal");
+  const { hashToken } = await import("@/lib/contract/token");
+  const { ContractError, findContractByToken, listContractEvents, listOrderContracts, loadContractSettings, saveContractSettings } = await import("@/lib/db/contracts");
+  const { sealStanding } = await import("@/lib/db/contract-seal");
+  const { saveCertificate } = await import("@/lib/db/fiscal");
+  const { contractFile, requestSigningCode, sendOrderContract, signOrderContract, SMS_NOT_SET } = await import("@/lib/db/send-contract");
+  const { testPfx } = await import("./fiscal-helpers.ts");
+  const number = await createOrder({ seller: SELLER, version: 1, productId: ID["LD-B001"], quantity: 1 }, numbers("261009-SELO"), db.pool);
+  await linkOrderCustomer(number, customerSp, SELLER.email, MINE, db.pool);
+  await saveOrderTerms(number, { ...TERMS, deliveryUf: "SP" }, SELLER.email, MINE, db.pool);
+  await savePayment(number, { ...PAYMENT, downPayment: 20000 }, SELLER.email, MINE, db.pool);
+  assert.equal((await closeOrder(number, SELLER.email, MINE, db.pool)).status, "fechado");
+  const closed = (await getOrder(number, MINE, db.pool))!;
+  const now = new Date("2026-10-09T15:00:00Z");
+  const vault = randomBytes(32);
+  await db.pool.query("DELETE FROM fiscal_certificates");
+  const base = await loadContractSettings(db.pool);
+  await assert.rejects(() => saveContractSettings({ ...base, downloadDays: 0 }, DIRECTOR, db.pool), /de 1 a 365 dias/);
+  await saveContractSettings({ ...base, seal: true, secondFactor: true, downloadDays: 10 }, DIRECTOR, db.pool);
+  // Selo ligado sem certificado: a tela sabe dizer por que não sela.
+  assert.equal(await sealStanding(db.pool, now), "sem-certificado");
+
+  const mails: string[] = [];
+  const texts: { to: string; text: string }[] = [];
+  const twilio = { ERP_TWILIO_ACCOUNT_SID: `AC${"b".repeat(32)}`, ERP_TWILIO_AUTH_TOKEN: "t", ERP_TWILIO_FROM: "+15005550006" };
+  const way = {
+    env: { ERP_SMTP_HOST: "mail.avilaops.com", ERP_SMTP_USER: "noreply@avilaops.com", ERP_SMTP_PASSWORD: "x", ERP_MAIL_FROM: "noreply@avilaops.com", ...twilio },
+    key: () => vault,
+    send: async (_config: unknown, _envelope: unknown, message: string) => void mails.push(Buffer.from(message.split("Content-Transfer-Encoding: base64\r\n\r\n")[1].split("\r\n--")[0], "base64").toString("utf8")),
+    sms: async (_config: unknown, to: string, text: string) => void texts.push({ to, text }),
+  };
+  const context = { company: "Acme", tenant: "acme", appUrl: "https://erp.teste", sentBy: SELLER.email, now, way };
+  // Com o segundo código ligado: sem serviço de SMS nada é enviado, e o celular de quem assina é obrigatório.
+  await assert.rejects(() => sendOrderContract(closed, { name: "Maria Compradora", email: "maria@cliente.test", phone: "(17) 99781-1471" }, { ...context, way: { ...way, env: { ...way.env, ERP_TWILIO_AUTH_TOKEN: "" } } }, db.pool), (error: unknown) => error instanceof ContractError && error.message === SMS_NOT_SET);
+  await assert.rejects(() => sendOrderContract(closed, { name: "Maria Compradora", email: "maria@cliente.test", phone: "(17) 3421-1234" }, context, db.pool), /celular de quem assina, com DDD/);
+  assert.deepEqual(await listOrderContracts(closed.id, db.pool), []);
+
+  const sent = await sendOrderContract(closed, { name: "Maria Compradora", email: "maria@cliente.test", phone: "(17) 99781-1471" }, context, db.pool);
+  assert.equal(sent.contract.recipientPhone, "5517997811471");
+  const token = mails[0].match(/contrato\/acme\/(\S+)/)![1];
+  const opened = (await findContractByToken(hashToken(token), db.pool))!;
+  const asking = { company: "Acme", now, ip: "203.0.113.7", way };
+  // Sem o serviço de SMS na hora de pedir o código, nenhum código sai.
+  await assert.rejects(() => requestSigningCode(opened, token, { name: "Maria Compradora", document: "529.982.247-25", accepted: true }, { ...asking, way: { ...way, sms: undefined } }, db.pool), /código por SMS desta empresa está fora do ar/);
+  assert.equal(mails.length, 1);
+  await requestSigningCode(opened, token, { name: "Maria Compradora", document: "529.982.247-25", accepted: true }, asking, db.pool);
+  // Dois códigos diferentes, por dois caminhos; nenhum dos dois fica no banco.
+  const mailCode = mails[1].match(/\n(\d{6})\r?\n/)![1];
+  assert.equal(texts[0].to, "5517997811471");
+  const phoneCode = texts[0].text.match(/(\d{6}) é o seu código/)![1];
+  const kept = await db.pool.query("SELECT row_to_json(c)::text AS dump FROM order_contracts c WHERE id = $1", [opened.id]);
+  assert.ok(!String(kept.rows[0].dump).includes(`"${mailCode}"`) && !String(kept.rows[0].dump).includes(`"${phoneCode}"`));
+
+  const signing = { company: "Acme", now, ip: "203.0.113.7", agent: null, way };
+  // Só o código do e-mail não assina: quem tem a caixa de e-mail e não tem o celular fica de fora.
+  await assert.rejects(() => signOrderContract(opened, token, mailCode, signing, db.pool), /código de 6 números que chegou por SMS/);
+  const wrongPhone = phoneCode === "000000" ? "111111" : "000000";
+  await assert.rejects(() => signOrderContract(opened, token, mailCode, { ...signing, phoneCode: wrongPhone }, db.pool), /Código incorreto\. Restam 4 tentativas/);
+  // Os códigos não se trocam de lugar.
+  await assert.rejects(() => signOrderContract(opened, token, phoneCode, { ...signing, phoneCode: mailCode }, db.pool), /Código incorreto/);
+  assert.equal((await listOrderContracts(closed.id, db.pool))[0].status, "enviado");
+
+  // Com o certificado da empresa guardado, o contrato assinado sai selado.
+  await saveCertificate(testPfx({ name: "EMPRESA DE TESTE LTDA:11222333000181", bits: 2048, until: new Date("2027-06-01T00:00:00Z") }), "senha-de-teste", vault, DIRECTOR, now, db.pool);
+  assert.equal(await sealStanding(db.pool, now), null);
+  await signOrderContract(opened, token, mailCode, { ...signing, phoneCode }, db.pool);
+  const [signed] = await listOrderContracts(closed.id, db.pool);
+  assert.equal(signed.status, "assinado");
+  assert.ok((await listContractEvents(signed.id, db.pool)).some((event) => event.text.includes("código enviado ao e-mail e código enviado ao celular")));
+  const file = await contractFile(signed, { company: "Acme", orderNumber: number, now, vault: () => vault }, db.pool);
+  const seal = sealOf(file)!;
+  assert.equal(seal.range[2] + seal.range[3], file.length);
+  assert.ok(Buffer.from(file).includes("EMPRESA DE TESTE LTDA:11222333000181"));
+  // A cópia que foi por e-mail também saiu selada.
+  assert.ok(mails.length >= 3);
+  // Sem a chave do cofre, com a chave errada ou com o selo desligado, o arquivo sai sem selo, mas sai.
+  for (const context of [{ vault: undefined }, { vault: () => randomBytes(32) }]) {
+    assert.equal(sealOf(await contractFile(signed, { company: "Acme", orderNumber: number, now, ...context }, db.pool)), null);
+  }
+  await saveContractSettings({ ...(await loadContractSettings(db.pool)), seal: false, secondFactor: false, downloadDays: 30 }, DIRECTOR, db.pool);
+  assert.equal(await sealStanding(db.pool, now), "desligado");
+  assert.equal(sealOf(await contractFile(signed, { company: "Acme", orderNumber: number, now, vault: () => vault }, db.pool)), null);
+  // Certificado vencido não sela.
+  await saveContractSettings({ ...(await loadContractSettings(db.pool)), seal: true }, DIRECTOR, db.pool);
+  assert.equal(await sealStanding(db.pool, new Date("2027-07-01T00:00:00Z")), "vencido");
+  await saveContractSettings({ ...(await loadContractSettings(db.pool)), seal: false }, DIRECTOR, db.pool);
+  await db.pool.query("DELETE FROM fiscal_certificates");
 });

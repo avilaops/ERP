@@ -1,5 +1,8 @@
 import { PDFDocument } from "pdf-lib";
 import { renderContractPdf, withEvidence } from "@/lib/contract/pdf";
+import { sealPdf } from "@/lib/contract/seal";
+import { maskedPhone, mobileNumber, smsAvailable, smsConfig, SmsError } from "@/lib/contract/sms";
+import type { SmsSender } from "@/lib/contract/sms";
 import { blankWords, contractNumber, contractValues, DEFAULT_CONTRACT_BODY, DEFAULT_CONTRACT_TITLE, fillContract } from "@/lib/contract/text";
 import { CODE_MINUTES, fingerprint, hashCode, hashToken, newCode, newToken } from "@/lib/contract/token";
 import { isValidCpf, normalizeDocument } from "@/lib/customer";
@@ -9,6 +12,7 @@ import {
   loadEvidence, nextContractSequence, renewContractLink, signWithCode, startCode,
 } from "@/lib/db/contracts";
 import type { Contract, SigningContract } from "@/lib/db/contracts";
+import { loadContractSeal } from "@/lib/db/contract-seal";
 import { loadFiscalSettings } from "@/lib/db/fiscal";
 import { loadMailInfo, mailChannel } from "@/lib/db/mail";
 import type { Order } from "@/lib/db/orders";
@@ -27,7 +31,7 @@ import { quoteDocument } from "@/lib/quote/document";
 const LOGO_SIDE = { width: 510, height: 144 };
 
 /** How the messages leave: the server's environment, the key of the vault and the function that talks to the mail server. */
-export type MailWay = { env: Record<string, string | undefined>; key: () => Buffer; send: MailSender };
+export type MailWay = { env: Record<string, string | undefined>; key: () => Buffer; send: MailSender; /** How a text message is handed to the provider, for the second code. */ sms?: SmsSender };
 
 export type OrderContractDraft = {
   title: string;
@@ -123,25 +127,35 @@ export type SendContext = {
 
 export type SentContract = { contract: Contract; delivery: Delivery };
 
-/** Who signs for the customer, from what was typed or, blank, from the customer's register. */
-function recipientOf(order: Order, typed: { name: string | null; email: string | null }): { name: string; email: string } {
+export const SMS_NOT_SET = "O segundo código pelo celular está ligado em Parâmetros → Contrato, mas o serviço de SMS não está configurado neste servidor. Desligue a opção ou avise a Ávila Ops.";
+
+/**
+ * Who signs for the customer, from what was typed or, blank, from the
+ * customer's register. When the company asks for the second code, the mobile
+ * phone of who signs is part of it, and the service that sends it has to exist.
+ */
+async function recipientOf(order: Order, typed: { name: string | null; email: string | null; phone?: string | null }, way: MailWay, conn: Queryable): Promise<{ name: string; email: string; phone: string | null }> {
   const email = (typed.email ?? order.customer?.email ?? "").trim().toLowerCase();
   const name = (typed.name ?? "").trim() || order.customer?.contactName?.trim() || order.customer?.name || "";
   if (email === "") throw new ContractError("O cliente não tem e-mail no cadastro: informe o e-mail de quem assina.");
   if (!isMailAddress(email)) throw new ContractError("E-mail de quem assina inválido.");
   if (name === "") throw new ContractError("Informe o nome de quem assina pelo cliente.");
   if (name.length > 120) throw new ContractError("Nome de quem assina: até 120 letras.");
-  return { name, email };
+  if (!(await loadContractSettings(conn)).secondFactor) return { name, email, phone: null };
+  if (!way.sms || !smsAvailable(way.env)) throw new ContractError(SMS_NOT_SET);
+  const phone = mobileNumber(typed.phone ?? order.customer?.phone ?? "");
+  if (!phone) throw new ContractError("Informe o celular de quem assina, com DDD: o segundo código de confirmação vai por SMS para ele.");
+  return { name, email, phone };
 }
 
 /** Keeps the file as it leaves, with its fingerprint and a new secret link, and writes to the customer. */
-async function keepAndSend(order: Order, file: { title: string; body: string; pdf: Uint8Array; sequence: number; fileName: string | null }, recipient: { name: string; email: string }, context: SendContext, conn: Queryable): Promise<SentContract> {
+async function keepAndSend(order: Order, file: { title: string; body: string; pdf: Uint8Array; sequence: number; fileName: string | null }, recipient: { name: string; email: string; phone: string | null }, context: SendContext, conn: Queryable): Promise<SentContract> {
   const settings = await loadContractSettings(conn);
   const token = newToken();
   const contract = await createContract(
     {
       orderId: order.id, sequence: file.sequence, title: file.title, body: file.body, pdf: file.pdf, sha256: fingerprint(file.pdf), tokenHash: hashToken(token), fileName: file.fileName,
-      expiresAt: new Date(context.now.getTime() + settings.linkDays * 86_400_000), recipientName: recipient.name, recipientEmail: recipient.email, createdBy: context.sentBy,
+      expiresAt: new Date(context.now.getTime() + settings.linkDays * 86_400_000), recipientName: recipient.name, recipientEmail: recipient.email, recipientPhone: recipient.phone, createdBy: context.sentBy,
     },
     conn,
   );
@@ -156,9 +170,9 @@ async function keepAndSend(order: Order, file: { title: string; body: string; pd
  * a mail server that refuses the message leaves the contract waiting, and the
  * link can be sent again.
  */
-export async function sendOrderContract(order: Order, recipient: { name: string | null; email: string | null }, context: SendContext, conn: Queryable): Promise<SentContract> {
+export async function sendOrderContract(order: Order, recipient: { name: string | null; email: string | null; phone?: string | null }, context: SendContext, conn: Queryable): Promise<SentContract> {
   const draft = await draftOrderContract(order, context.company, context.now, conn);
-  const signer = recipientOf(order, recipient);
+  const signer = await recipientOf(order, recipient, context.way, conn);
   if (!(await mailChannel(conn, context.way.env, context.way.key))) throw new MailError(MAIL_NOT_SET);
   const sequence = await nextContractSequence(order.id, conn);
   const pdf = await renderContractPdf({ company: context.company, title: draft.title, number: contractNumber(order.number, sequence), body: draft.body }, await logoOf(conn));
@@ -175,7 +189,7 @@ export const MAX_CONTRACT_PDF_BYTES = 6 * 1024 * 1024;
  * not a PDF, is locked with a password or cannot take that record is refused
  * before anything is stored or sent.
  */
-export async function sendUploadedContract(order: Order, file: { bytes: Uint8Array; name: string }, recipient: { name: string | null; email: string | null }, context: SendContext, conn: Queryable): Promise<SentContract> {
+export async function sendUploadedContract(order: Order, file: { bytes: Uint8Array; name: string }, recipient: { name: string | null; email: string | null; phone?: string | null }, context: SendContext, conn: Queryable): Promise<SentContract> {
   if (order.status !== "fechado") throw new ContractError("O contrato é enviado depois que o pedido é fechado.");
   if (file.bytes.byteLength === 0) throw new ContractError("Escolha o arquivo do contrato em PDF.");
   if (file.bytes.byteLength > MAX_CONTRACT_PDF_BYTES) throw new ContractError("PDF grande demais: o limite é 6 MB. Se for digitalizado, reduza a resolução e envie de novo.");
@@ -187,7 +201,7 @@ export async function sendUploadedContract(order: Order, file: { bytes: Uint8Arr
   } catch {
     throw new ContractError("Não foi possível abrir este PDF: ele está protegido por senha ou danificado. Gere o PDF de novo, sem senha, e envie.");
   }
-  const signer = recipientOf(order, recipient);
+  const signer = await recipientOf(order, recipient, context.way, conn);
   if (!(await mailChannel(conn, context.way.env, context.way.key))) throw new MailError(MAIL_NOT_SET);
   const settings = await loadContractSettings(conn);
   const fileName = file.name.replace(/[\u0000-\u001f\\/]+/g, " ").trim().slice(0, 200) || "contrato.pdf";
@@ -209,11 +223,27 @@ export async function resendOrderContract(order: Pick<Order, "id" | "number">, c
   return { contract, delivery: await mailLink(contract, order, signingUrl(context.appUrl, context.tenant, token), context, conn) };
 }
 
-/** The contract with its record of signatures, as it stands now. */
-export async function contractFile(contract: Contract, context: { company: string; orderNumber: string; now: Date }, conn: Queryable): Promise<Uint8Array> {
+/**
+ * The contract with its record of signatures, as it stands now. A signed
+ * contract of a company that turned the seal on leaves signed with the
+ * company's digital certificate (`vault` opens it). A seal that cannot be made
+ * (no key on the server, certificate that does not open) never keeps the
+ * contract from the person: the file leaves without it, and the log says why.
+ */
+export async function contractFile(contract: Contract, context: { company: string; orderNumber: string; now: Date; vault?: () => Buffer }, conn: Queryable): Promise<Uint8Array> {
   const pdf = await loadContractPdf(contract.id, conn);
   if (!pdf) throw new Error(`Contrato ${contract.id} sem arquivo.`);
-  return withEvidence(pdf, await loadEvidence(contract, context, conn));
+  const plain = async () => withEvidence(pdf, await loadEvidence(contract, context, conn));
+  if (contract.status !== "assinado" || !context.vault) return plain();
+  try {
+    const seal = await loadContractSeal(conn, context.vault, context.now);
+    if (!seal) return await plain();
+    const file = await withEvidence(pdf, await loadEvidence(contract, { ...context, sealedBy: seal.holder }, conn));
+    return await sealPdf(file, seal.key, { name: seal.holder, reason: `Contrato nº ${contractNumber(context.orderNumber, contract.sequence)} assinado eletronicamente`, at: context.now });
+  } catch (error) {
+    console.error("[contrato] o selo digital não pôde ser aplicado; o arquivo sai sem ele:", error instanceof Error ? error.message : error);
+    return plain();
+  }
 }
 
 export const contractFileName = (orderNumber: string, contract: Pick<Contract, "sequence" | "status">) =>
@@ -237,8 +267,22 @@ export async function requestSigningCode(contract: SigningContract, token: strin
   if (problems.length > 0) throw new ContractError(problems.join(" "));
   if (!(await mailChannel(conn, context.way.env, context.way.key))) throw new ContractError("O envio de e-mail desta empresa está fora do ar. Avise quem lhe enviou o contrato.");
 
+  // The second code, when this contract asks for it: another six digits, to the mobile phone, by another way.
+  const sms = contract.recipientPhone && smsAvailable(context.way.env) ? smsConfig(context.way.env) : null;
+  if (contract.recipientPhone && (!sms || !context.way.sms)) throw new ContractError("O envio do código por SMS desta empresa está fora do ar. Avise quem lhe enviou o contrato.");
   const code = newCode();
-  await startCode(contract.id, { name, document, codeHash: hashCode(token, code), ip: context.ip }, conn);
+  const phoneCode = contract.recipientPhone ? newCode() : null;
+  await startCode(contract.id, { name, document, codeHash: hashCode(token, code), phoneCodeHash: phoneCode === null ? null : hashCode(token, `sms:${phoneCode}`), ip: context.ip }, conn);
+  if (phoneCode !== null && sms && context.way.sms) {
+    try {
+      await context.way.sms(sms, contract.recipientPhone!, `${context.company}: ${phoneCode} é o seu código para assinar o contrato do pedido ${contract.orderNumber}. Vale ${CODE_MINUTES} min. Não informe a ninguém.`);
+      await addContractEvent(contract.id, "email", { detail: `código por SMS enviado ao celular ${maskedPhone(contract.recipientPhone!)}`, ip: context.ip, actor: "cliente" }, conn);
+    } catch (error) {
+      if (!(error instanceof SmsError)) console.error("[contrato] falha inesperada no SMS:", error instanceof Error ? error.message : error);
+      await addContractEvent(contract.id, "email", { detail: `o código por SMS para ${maskedPhone(contract.recipientPhone!)} não saiu${error instanceof SmsError ? `: ${error.message}` : ""}`, ip: context.ip, actor: "cliente" }, conn);
+      throw new ContractError("Não conseguimos enviar o código por SMS agora. Tente de novo em um minuto.");
+    }
+  }
   const delivery = await deliver(
     context.way, conn,
     {
@@ -260,14 +304,16 @@ export async function requestSigningCode(contract: SigningContract, token: strin
  */
 export async function signOrderContract(
   contract: SigningContract, token: string, code: string,
-  context: { company: string; now: Date; ip: string | null; agent: string | null; way: MailWay },
+  context: { company: string; now: Date; ip: string | null; agent: string | null; way: MailWay; /** What was typed as the code of the phone. */ phoneCode?: string | null },
   conn: Queryable,
 ): Promise<void> {
-  if (!/^\d{6}$/.test(code)) throw new ContractError("O código tem 6 números.");
-  await signWithCode(contract.id, { codeHash: hashCode(token, code), ip: context.ip, agent: context.agent }, conn);
+  if (!/^\d{6}$/.test(code)) throw new ContractError("O código do e-mail tem 6 números.");
+  const phoneCode = context.phoneCode ?? "";
+  if (contract.recipientPhone && !/^\d{6}$/.test(phoneCode)) throw new ContractError("Informe também o código de 6 números que chegou por SMS no celular.");
+  await signWithCode(contract.id, { codeHash: hashCode(token, code), phoneCodeHash: contract.recipientPhone ? hashCode(token, `sms:${phoneCode}`) : null, ip: context.ip, agent: context.agent }, conn);
   try {
     const signed = (await getOrderContract(contract.orderId, contract.id, conn))!;
-    const file = await contractFile(signed, { company: context.company, orderNumber: contract.orderNumber, now: context.now }, conn);
+    const file = await contractFile(signed, { company: context.company, orderNumber: contract.orderNumber, now: context.now, vault: context.way.key }, conn);
     const attachments: MailAttachment[] = [{ filename: contractFileName(contract.orderNumber, signed), contentType: "application/pdf", content: file }];
     const number = contractNumber(contract.orderNumber, signed.sequence);
     for (const to of [...new Set([signed.recipientEmail, contract.sellerEmail].filter((address) => isMailAddress(address)))]) {

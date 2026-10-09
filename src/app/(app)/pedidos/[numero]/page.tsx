@@ -18,7 +18,7 @@ import { listOrderInvoiceEvents, listOrderInvoices } from "@/lib/db/invoices";
 import { previewOrderNfe } from "@/lib/db/order-nfe";
 import { findCustomerByDocument } from "@/lib/db/customers";
 import { getOrder, listPaymentMethods, loadOrderStanding } from "@/lib/db/orders";
-import { ContractError, isOpen, listOrderContracts, standingText } from "@/lib/db/contracts";
+import { ContractError, isOpen, listOrderContracts, loadContractSettings, standingText } from "@/lib/db/contracts";
 import { draftOrderContract } from "@/lib/db/send-contract";
 import { contractNumber } from "@/lib/contract/text";
 import { formatDocument } from "@/lib/customer";
@@ -173,6 +173,8 @@ export default async function PedidoPage({
   const now = new Date();
   const contracts = await listOrderContracts(order.id, conn);
   const waiting = contracts.find((contract) => contract.status === "enviado") ?? null;
+  // When the company asks for the second code, sending a contract also asks for the mobile phone of who signs.
+  const asksPhone = order.status === "fechado" ? (await loadContractSettings(conn)).secondFactor : false;
   const contractDraft =
     order.status === "fechado" && !waiting
       ? await draftOrderContract(order, session.tenant.name, now, conn).catch((error: unknown) => {
@@ -380,6 +382,14 @@ export default async function PedidoPage({
                   </label>
                   <input id="fileRecipientEmail" name="recipientEmail" type="email" defaultValue={order.customer?.email ?? ""} autoComplete="off" className={`${INPUT} w-full`} />
                 </div>
+                {asksPhone && (
+                  <div className="min-w-56 flex-1">
+                    <label htmlFor="fileRecipientPhone" className="block text-xs font-medium text-slate-600">
+                      Celular de quem assina (recebe o segundo código por SMS)
+                    </label>
+                    <input id="fileRecipientPhone" name="recipientPhone" type="tel" inputMode="tel" defaultValue={order.customer?.phone ?? ""} placeholder="(17) 99999-8888" autoComplete="off" className={`${INPUT} w-full`} />
+                  </div>
+                )}
                 <button type="submit" className="rounded border border-slate-300 bg-white px-4 py-2 font-semibold hover:bg-slate-50">
                   Enviar este PDF para assinatura
                 </button>
@@ -406,6 +416,14 @@ export default async function PedidoPage({
                 </label>
                 <input id="recipientEmail" name="recipientEmail" type="email" defaultValue={order.customer?.email ?? ""} autoComplete="off" className={`${INPUT} w-full`} />
               </div>
+              {asksPhone && (
+                <div className="min-w-56 flex-1">
+                  <label htmlFor="recipientPhone" className="block text-xs font-medium text-slate-600">
+                    Celular de quem assina (recebe o segundo código por SMS)
+                  </label>
+                  <input id="recipientPhone" name="recipientPhone" type="tel" inputMode="tel" defaultValue={order.customer?.phone ?? ""} placeholder="(17) 99999-8888" autoComplete="off" className={`${INPUT} w-full`} />
+                </div>
+              )}
               <a href={`/api/pedidos/${order.number}/contrato-previa`} target="_blank" rel="noopener" className="py-2 font-medium text-brand underline">
                 Conferir o contrato (PDF)
               </a>

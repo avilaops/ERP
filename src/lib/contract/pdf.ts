@@ -163,6 +163,8 @@ export type ContractEvidence = {
   /** `Assinado pelo cliente em 08/10/2026 15:21`, `Aguardando a assinatura do cliente`... */
   standing: string;
   signers: EvidenceSigner[];
+  /** Name on the digital certificate that seals this file, or `null` when it is not sealed. */
+  seal?: string | null;
   /** Everything that happened, the oldest first. */
   events: { at: string; text: string; ip: string | null }[];
 };
@@ -191,6 +193,9 @@ export async function withEvidence(contract: Uint8Array, evidence: ContractEvide
   sheet.paragraph(`Situação: ${evidence.standing}`, small);
   sheet.paragraph("Impressão digital (SHA-256) do contrato assinado, sem esta folha de registro:", small);
   sheet.paragraph(evidence.sha256, { ...small, bold: true });
+  if (evidence.seal) {
+    sheet.paragraph(`Este arquivo é selado com o certificado digital ICP-Brasil de ${evidence.seal}: qualquer alteração feita depois aparece no leitor de PDF como assinatura inválida.`, small);
+  }
   sheet.y -= 12;
 
   sheet.paragraph("Assinaturas", { size: 9.5, bold: true });
