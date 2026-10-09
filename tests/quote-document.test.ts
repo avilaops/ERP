@@ -5,9 +5,9 @@ import type { Customer } from "@/lib/db/customers";
 import type { Order } from "@/lib/db/orders";
 import type { PublishedTable } from "@/lib/db/price-table";
 import { showMoney } from "@/lib/format";
-import { dueDates, saleOf } from "@/lib/order-quote";
+import { dueDates, paymentOf, saleOf } from "@/lib/order-quote";
 import { quoteSale } from "@/lib/pricing/order";
-import { QuoteError, quoteDocument } from "@/lib/quote/document";
+import { measuresText, QuoteError, quoteDocument } from "@/lib/quote/document";
 
 const TABLE = {
   version: 3,
@@ -217,4 +217,33 @@ test("empresa sem IPI: o orçamento não traz linha de IPI nem de valor sem IPI"
   assert.equal(document.hasIpi, false);
   assert.ok(document.totals.every((total) => !total.label.includes("IPI")));
   assert.equal(document.totals.at(-1)?.label, "Total da nota");
+});
+
+test("medidas do equipamento: dimensões em metros e peso; o que não está cadastrado fica de fora, e sem nada não há linha", () => {
+  assert.equal(measuresText({ lengthMm: 1650, widthMm: 1200, heightMm: 1400, weightKg: 182.5 }), "Dimensões (C x L x A): 1,65 x 1,20 x 1,40 m · Peso: 182,5 kg");
+  assert.equal(measuresText({ lengthMm: 1650, widthMm: null, heightMm: 1400, weightKg: null }), "Comprimento: 1,65 m · Altura: 1,40 m");
+  assert.equal(measuresText({ lengthMm: null, widthMm: null, heightMm: null, weightKg: 95 }), "Peso: 95 kg");
+  assert.equal(measuresText({ lengthMm: null, widthMm: null, heightMm: null, weightKg: null }), null);
+});
+
+test("condições de pagamento e assinatura: entrada com percentual, saldo em parcelas ou na entrega, local e data por extenso", () => {
+  // The plan needs the policy and the commission of the version, which the fixture of the document does not carry.
+  const POLICY = { ...TABLE, minDownPayment: 0.7, commission: 0.02 } as PublishedTable;
+  const input = { company: "Ludus Equipamentos", table: TABLE, dates: dueDates(ORDER, TABLE, TODAY), products: PRODUCTS, today: TODAY };
+  const paying = { ...ORDER, downPayment: 5000, downPaymentMethod: "PIX", downPaymentDate: "2026-10-06", balanceMethod: "Boleto", installmentCount: 2, firstInstallmentDays: 30, installmentIntervalDays: 30, productionDays: 90 } as Order;
+  const sale = saleOf(paying, TABLE);
+  const parcelled = quoteDocument({ ...input, order: paying, sale, place: " Votuporanga/SP ", manager: "DANILO RODRIGUES", payment: { plan: paymentOf(paying, sale, POLICY, TODAY), onDelivery: false } });
+  assert.equal(parcelled.signedAt, "Votuporanga/SP, 6 de outubro de 2026");
+  assert.equal(parcelled.payment.length, 4);
+  assert.match(parcelled.payment[0], /^Entrada de R\$ 5\.000(,00)? \(\d{1,2},\d%\) via PIX em 06\/10\/2026$/);
+  assert.match(parcelled.payment[1], /^Saldo de R\$ [\d.]+,\d{2} em 2 parcelas via Boleto:$/);
+  assert.match(parcelled.payment[2], /^1\/2: R\$ [\d.]+,\d{2} em 05\/11\/2026$/);
+
+  const delivered = { ...paying, balanceMethod: "Na entrega", balanceOnDelivery: true } as Order;
+  const onDelivery = quoteDocument({ ...input, order: delivered, sale, payment: { plan: paymentOf(delivered, sale, POLICY, TODAY), onDelivery: true } });
+  assert.match(onDelivery.payment[1], /^Saldo de R\$ [\d.]+,\d{2} na entrega \(previsão: 04\/01\/2027\)$/);
+  assert.equal(onDelivery.payment.length, 2);
+  // Sem local cadastrado, só a data; sem pagamento informado, nenhuma condição.
+  const plain = build();
+  assert.deepEqual([plain.signedAt, plain.payment], ["6 de outubro de 2026", []]);
 });

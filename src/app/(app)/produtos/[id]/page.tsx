@@ -6,11 +6,11 @@ import { menuItem } from "@/lib/auth/permissions";
 import { loadProductFiscal, PRODUCT_ORIGINS } from "@/lib/db/fiscal";
 import { listSupplierItemsOf } from "@/lib/db/supplier-items";
 import { tenantDb } from "@/lib/db/pool";
-import { listProducts } from "@/lib/db/products";
+import { listProducts, loadProductMeasures } from "@/lib/db/products";
 import { productToForm } from "@/lib/product-form";
 import { saveProductFiscalAction } from "../../parametros/fiscal/actions";
 import { ActionForm } from "../../pedidos/ActionForm";
-import { deleteProductAction, saveProductScreenAction, setProductActiveAction } from "../actions";
+import { deleteProductAction, saveProductMeasuresAction, saveProductScreenAction, setProductActiveAction } from "../actions";
 import { ProductScreen } from "../ProductScreen";
 
 export const metadata = { title: "Equipamento · ERP" };
@@ -24,6 +24,7 @@ export default async function EquipamentoPage({ params }: { params: Promise<{ id
   if (!product) notFound();
   const lines = await listLines(conn);
   const fiscal = await loadProductFiscal(product.id, conn);
+  const measures = await loadProductMeasures(product.id, conn);
   const fromSupplier = await listSupplierItemsOf(product.code, conn);
 
   return (
@@ -86,6 +87,45 @@ export default async function EquipamentoPage({ params }: { params: Promise<{ id
             ))}
           </ul>
         </section>
+      )}
+
+      {measures && (
+        <details className="mx-auto mt-6 max-w-xl rounded-lg border border-slate-200 bg-white" open={Object.values(measures).every((value) => value === null)}>
+          <summary className="cursor-pointer px-4 py-3 font-medium">Dimensões e peso (saem na proposta)</summary>
+          <ActionForm action={saveProductMeasuresAction} className="grid grid-cols-2 gap-4 border-t border-slate-200 p-4 sm:grid-cols-4">
+            <input type="hidden" name="id" value={product.id} />
+            {(
+              [
+                ["lengthMm", "Comprimento (mm)", measures.lengthMm],
+                ["widthMm", "Largura (mm)", measures.widthMm],
+                ["heightMm", "Altura (mm)", measures.heightMm],
+                ["weightKg", "Peso (kg)", measures.weightKg],
+              ] as const
+            ).map(([name, label, value]) => (
+              <div key={name}>
+                <label htmlFor={name} className="block text-sm font-medium">
+                  {label}
+                </label>
+                <input
+                  key={value ?? ""}
+                  id={name}
+                  name={name}
+                  type="text"
+                  inputMode={name === "weightKg" ? "decimal" : "numeric"}
+                  defaultValue={value === null ? "" : String(value).replace(".", ",")}
+                  autoComplete="off"
+                  className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-right outline-none focus:ring-2 focus:ring-brand"
+                />
+              </div>
+            ))}
+            <div className="col-span-2 sm:col-span-4">
+              <button type="submit" className="rounded-lg bg-brand px-4 py-2.5 font-semibold text-white hover:bg-brand-dark">
+                Salvar medidas
+              </button>
+              <p className="mt-2 text-xs text-slate-600">Em branco, a proposta não mostra a linha. O que o catálogo do fornecedor trazia já veio preenchido.</p>
+            </div>
+          </ActionForm>
+        </details>
       )}
 
       {fiscal && (

@@ -36,3 +36,17 @@ test("cliente quer pagar: o total aceito vira o desconto que dá esse total, com
   assert.equal(percentFromTotal("", 10000, 1), null);
   assert.equal(percentFromTotal("100,00", 0, 1), null);
 });
+
+test("entrada em % e em R$: uma calcula a outra sobre o total do pedido; 100% é aceito e texto inválido não inventa valor", async () => {
+  const { sharePercentFromValue, valueFromSharePercent } = await import("@/lib/discount-entry");
+  // O caso do vídeo do cliente: R$ 50.000 de R$ 111.259,41 são 44,9%.
+  assert.equal(sharePercentFromValue("50.000,00", 111259.41), "44,9");
+  assert.equal(sharePercentFromValue("111.259,41", 111259.41), "100");
+  assert.equal(valueFromSharePercent("70", 14196.45), "9.937,52");
+  assert.equal(valueFromSharePercent("30 %", 100000), "30.000,00");
+  assert.equal(valueFromSharePercent("12,5", 1000), "125,00");
+  assert.equal(valueFromSharePercent("100", 1000), "1.000,00");
+  for (const wrong of ["abc", "101", "-5", ""]) assert.equal(valueFromSharePercent(wrong, 1000), "", wrong);
+  assert.equal(sharePercentFromValue("abc", 1000), null);
+  assert.equal(sharePercentFromValue("10,00", 0), null);
+});

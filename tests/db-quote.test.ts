@@ -32,11 +32,20 @@ test("orçamento: descrição e foto de cada equipamento pedido, e só deles", {
   assert.deepEqual([...products.keys()].sort((a, b) => a - b), [full.id, described.id, bare.id]);
   assert.ok(!products.has(other.id) && !products.has(999_999));
 
-  assert.equal(products.get(full.id)?.description, "Carga de 400 kg.");
-  assert.ok(Buffer.from(products.get(full.id)?.photo ?? []).equals(stored.bytes));
-  assert.deepEqual(products.get(described.id), { description: "Estofado preto.", photo: null });
+  // A descrição comercial não vai mais para a proposta: no lugar dela, as medidas do equipamento, quando cadastradas.
+  assert.equal(products.get(full.id)?.description, null);
+  const { saveProductMeasures, loadProductMeasures } = await import("@/lib/db/products");
+  assert.deepEqual(await loadProductMeasures(full.id, db.pool), { lengthMm: null, widthMm: null, heightMm: null, weightKg: null });
+  await assert.rejects(() => saveProductMeasures(full.id, { lengthMm: 0, widthMm: null, heightMm: null, weightKg: null }, WHO, db.pool), /Comprimento: informe em milímetros/);
+  await assert.rejects(() => saveProductMeasures(full.id, { lengthMm: null, widthMm: null, heightMm: null, weightKg: Number.NaN }, WHO, db.pool), /Peso: informe em quilos/);
+  await saveProductMeasures(full.id, { lengthMm: 1650, widthMm: 1200, heightMm: 1400, weightKg: 182.5 }, WHO, db.pool);
+  await saveProductMeasures(described.id, { lengthMm: null, widthMm: null, heightMm: null, weightKg: 95 }, WHO, db.pool);
+  const measured = await loadQuoteProducts([full.id, described.id, bare.id], db.pool);
+  assert.equal(measured.get(full.id)?.description, "Dimensões (C x L x A): 1,65 x 1,20 x 1,40 m · Peso: 182,5 kg");
+  assert.ok(Buffer.from(measured.get(full.id)?.photo ?? []).equals(stored.bytes));
+  assert.deepEqual(measured.get(described.id), { description: "Peso: 95 kg", photo: null });
   assert.deepEqual(products.get(bare.id), { description: null, photo: null });
-  // Só descrição e foto: nenhum campo de custo sai daqui.
+  // Só a linha de medidas e a foto: nenhum campo de custo sai daqui.
   for (const product of products.values()) assert.deepEqual(Object.keys(product), ["description", "photo"]);
 });
 

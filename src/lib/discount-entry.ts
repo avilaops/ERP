@@ -35,3 +35,18 @@ export function percentFromTotal(text: string, tableTotal: number, invoiceFactor
   const rate = Math.max(0, Math.min(LARGEST, 1 - total / (tableTotal * invoiceFactor)));
   return formatPercent(Math.round(rate * 1e8) / 1e8);
 }
+
+/** The down payment typed in reais, as the percentage of the total of the order it is (one decimal: `44,9`). `null` while the text is not an amount. */
+export function sharePercentFromValue(text: string, total: number): string | null {
+  const value = parseMoney(text);
+  if (value === null || total <= 0) return null;
+  return (Math.round((value / total) * 1000) / 10).toLocaleString("pt-BR", { maximumFractionDigits: 1 });
+}
+
+/** The down payment typed in %, in reais over the total of the order. Blank while the text is not a percentage from 0 to 100. */
+export function valueFromSharePercent(text: string, total: number): string {
+  const typed = text.trim().replace(/\s*%$/, "").replace(",", ".");
+  if (!/^\d{1,3}(\.\d{1,4})?$/.test(typed) || total <= 0) return "";
+  const percent = Number(typed);
+  return percent > 100 ? "" : formatMoney(roundCents((total * percent) / 100));
+}

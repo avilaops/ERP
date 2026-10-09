@@ -7,7 +7,7 @@ import { loadPublishedTable } from "@/lib/db/price-table";
 import { loadQuoteProducts } from "@/lib/db/quote";
 import { isoDate } from "@/lib/format";
 import { ORDER_NUMBER } from "@/lib/order-number";
-import { dueDates, saleOf } from "@/lib/order-quote";
+import { dueDates, paymentOf, saleOf } from "@/lib/order-quote";
 import { logoPng, thumbnail } from "@/lib/photos/normalize";
 import { NO_ITEMS_MESSAGE, QuoteError, quoteDocument } from "@/lib/quote/document";
 import { renderQuotePdf } from "@/lib/quote/pdf";
@@ -53,15 +53,18 @@ export async function GET(_request: Request, context: Context): Promise<Response
     conn,
   );
   const proposal = await loadProposalSettings(conn);
+  const sale = saleOf(order, table);
   let document;
   try {
     document = quoteDocument({
       manager: proposal.managerName,
       place: proposal.place,
+      // The conditions as agreed so far; an order with nothing agreed prints none.
+      payment: { plan: paymentOf(order, sale, table, today), onDelivery: order.balanceOnDelivery },
       company: session.tenant.name,
       order,
       table,
-      sale: saleOf(order, table),
+      sale,
       dates: dueDates(order, table, today),
       products,
       today,

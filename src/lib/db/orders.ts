@@ -44,6 +44,8 @@ export type Order = {
   installmentCount: number | null;
   firstInstallmentDays: number | null;
   installmentIntervalDays: number | null;
+  /** The balance is one installment, due on the day the order is ready: the form chosen for it says so. */
+  balanceOnDelivery: boolean;
   paymentNotes: string | null;
   updatedAt: Date;
   /** `updated_at` exactly as the database holds it: what "nobody changed it since I read it" is checked against. */
@@ -67,7 +69,7 @@ const FOREIGN_KEY_VIOLATION = "23503";
 const COLUMNS = `id, number, status, seller_email, seller_name, customer_id, price_table_version, discount, delivery_uf,
   taxpayer, production_days, freight, notes, down_payment, down_payment_method,
   to_char(down_payment_date, 'YYYY-MM-DD') AS down_payment_date, balance_method, installment_count,
-  first_installment_days, installment_interval_days, payment_notes, updated_at, updated_at::text AS revision, closed_at`;
+  first_installment_days, installment_interval_days, balance_on_delivery, payment_notes, updated_at, updated_at::text AS revision, closed_at`;
 
 const textOrNull = (value: unknown) => (value === null ? null : String(value));
 const numberOrNull = (value: unknown) => (value === null ? null : Number(value));
@@ -158,6 +160,7 @@ export async function getOrder(number: string, scope: OrderScope, conn: Queryabl
     installmentCount: numberOrNull(row.installment_count),
     firstInstallmentDays: numberOrNull(row.first_installment_days),
     installmentIntervalDays: numberOrNull(row.installment_interval_days),
+    balanceOnDelivery: row.balance_on_delivery === true,
     paymentNotes: textOrNull(row.payment_notes),
     updatedAt: row.updated_at as Date,
     revision: String(row.revision),
@@ -424,7 +427,12 @@ export async function savePayment(
   const { rows } = await conn.query(
     `UPDATE orders
         SET down_payment = $2, down_payment_method = $3, down_payment_date = $4, balance_method = $5,
-            installment_count = $6, first_installment_days = $7, installment_interval_days = $8, payment_notes = $9,
+            -- A form "na entrega" is one installment on the day the order is ready: count and days typed are not kept.
+            balance_on_delivery = EXISTS (SELECT 1 FROM payment_methods m WHERE m.label = $5 AND m.on_delivery),
+            installment_count = CASE WHEN EXISTS (SELECT 1 FROM payment_methods m WHERE m.label = $5 AND m.on_delivery) THEN 1 ELSE $6::integer END,
+            first_installment_days = CASE WHEN EXISTS (SELECT 1 FROM payment_methods m WHERE m.label = $5 AND m.on_delivery) THEN NULL ELSE $7::integer END,
+            installment_interval_days = CASE WHEN EXISTS (SELECT 1 FROM payment_methods m WHERE m.label = $5 AND m.on_delivery) THEN NULL ELSE $8::integer END,
+            payment_notes = $9,
             updated_at = now(), updated_by = $10
       WHERE number = $1 AND status = 'em_negociacao' AND ($11::text IS NULL OR seller_email = $11)
       RETURNING id`,
@@ -603,32 +611,56 @@ export async function reopenOrder(number: string, who: string, scope: OrderScope
 }
 
 /**
- * Removes an order in negotiation, items and order in the same statement. An
- * order that was once closed, approved or refused has history and is refused by the database.
+ * Removes an order in negotiation, items and order in the same statement.
  * Answers with who the seller was, for the log.
+ *
+ * An order that was once closed or went through approval has history. Only
+ * with `withHistory` (the directors) it leaves too, taking that history along,
+ * and only while nothing of it reached the money or the tax authority: no
+ * amount received, no refund, no bill tied to it and no invoice. Otherwise it
+ * stays, and the way out of the list is to mark it as lost.
  */
-export async function deleteOrder(number: string, scope: OrderScope, conn: Queryable): Promise<{ sellerEmail: string }> {
-  try {
-    const { rows } = await conn.query(
-      `WITH target AS (
-         SELECT id, seller_email FROM orders
-          WHERE number = $1 AND status = 'em_negociacao' AND ($2::text IS NULL OR seller_email = $2)
-       ), items AS (
-         DELETE FROM order_items USING target WHERE order_id = target.id RETURNING order_id
-       ), removed AS (
-         DELETE FROM orders USING target WHERE orders.id = target.id RETURNING target.seller_email
-       )
-       SELECT seller_email FROM removed`,
-      [number, scope.sellerEmail],
+export async function deleteOrder(number: string, scope: OrderScope, conn: Queryable, { withHistory = false }: { withHistory?: boolean } = {}): Promise<{ sellerEmail: string }> {
+  const { rows } = await conn.query(
+    `WITH target AS (
+       SELECT o.id, o.seller_email,
+              EXISTS (SELECT 1 FROM order_closings c WHERE c.order_id = o.id)
+                OR EXISTS (SELECT 1 FROM order_approvals a WHERE a.order_id = o.id)
+                OR EXISTS (SELECT 1 FROM receivables r WHERE r.order_id = o.id) AS has_history,
+              EXISTS (SELECT 1 FROM receipts p JOIN receivables r ON r.id = p.receivable_id WHERE r.order_id = o.id)
+                OR EXISTS (SELECT 1 FROM refund_requests q WHERE q.order_id = o.id)
+                OR EXISTS (SELECT 1 FROM refunds f WHERE f.order_id = o.id)
+                OR EXISTS (SELECT 1 FROM payables b WHERE b.order_id = o.id)
+                OR EXISTS (SELECT 1 FROM fiscal_invoices i WHERE i.order_id = o.id) AS is_bound
+         FROM orders o
+        WHERE o.number = $1 AND o.status = 'em_negociacao' AND ($2::text IS NULL OR o.seller_email = $2)
+     ), free AS (
+       SELECT id, seller_email FROM target WHERE NOT is_bound AND (NOT has_history OR $3::boolean)
+     ), approvals AS (
+       DELETE FROM order_approvals USING free WHERE order_id = free.id RETURNING order_id
+     ), closings AS (
+       DELETE FROM order_closings USING free WHERE order_id = free.id RETURNING order_id
+     ), expected AS (
+       DELETE FROM receivables USING free WHERE order_id = free.id RETURNING order_id
+     ), items AS (
+       DELETE FROM order_items USING free WHERE order_id = free.id RETURNING order_id
+     ), removed AS (
+       DELETE FROM orders USING free WHERE orders.id = free.id RETURNING free.seller_email
+     )
+     SELECT (SELECT count(*)::int FROM target) AS found, (SELECT has_history FROM target) AS has_history,
+            (SELECT is_bound FROM target) AS is_bound, (SELECT seller_email FROM removed) AS seller_email`,
+    [number, scope.sellerEmail, withHistory],
+  );
+  const row = rows[0];
+  if (Number(row.found) === 0) throw new OrderError("Pedido não encontrado ou fora de negociação: só pedido em negociação pode ser excluído.");
+  if (row.seller_email === null) {
+    throw new OrderError(
+      row.is_bound
+        ? "Este pedido tem recebimento, conta ou nota fiscal ligados a ele e não pode ser excluído. Se a venda não saiu, marque o pedido como perdido."
+        : "Este pedido já foi fechado ou passou por aprovação: só a diretoria pode excluí-lo. Se a venda não saiu, marque o pedido como perdido.",
     );
-    if (rows.length === 0) throw new OrderError("Pedido não encontrado ou fora de negociação: só pedido em negociação pode ser excluído.");
-    return { sellerEmail: String(rows[0].seller_email) };
-  } catch (error) {
-    if (pgErrorCode(error) === FOREIGN_KEY_VIOLATION) {
-      throw new OrderError("Este pedido tem histórico (fechamento ou aprovação) e não pode ser excluído.");
-    }
-    throw error;
   }
+  return { sellerEmail: String(row.seller_email) };
 }
 
 /** One order of the list: what identifies it and what the sale is made of. No sum here. */

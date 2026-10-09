@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requirePermission } from "@/lib/auth";
+import { listOnDeliveryMethods } from "@/lib/db/payment-methods";
 import { tenantDb } from "@/lib/db/pool";
 import { allows, menuItem, seesAllOrders, seesCosts } from "@/lib/auth/permissions";
 import { ufFromCep } from "@/lib/cep";
@@ -23,10 +24,11 @@ import { formatMoney, formatPercent, isoDate, showDateTime, showIsoDate, showMon
 import { BAND_TEXT, REASON_TEXT, STATUS_LABELS, UF_NAMES } from "@/lib/order-form";
 import { ORDER_NUMBER } from "@/lib/order-number";
 import { closingProblems, directorOf, dueDates, paymentOf, saleOf } from "@/lib/order-quote";
-import { UFS } from "@/lib/pricing/states";
+import { ORIGIN_UF, UFS } from "@/lib/pricing/states";
 import { compareByCode } from "@/lib/products-view";
 import { CopyButton } from "@/components/CopyButton";
 import { DiscountFields } from "@/components/DiscountFields";
+import { DownPaymentFields } from "@/components/DownPaymentFields";
 import { proposalText } from "@/lib/quote/text";
 import { decideApprovalAction } from "../../aprovacoes/actions";
 import { FREIGHT_MODES } from "@/lib/fiscal/nfe";
@@ -110,7 +112,10 @@ export default async function PedidoPage({
   // The profile comes from the session. Costs are read only for who may see them.
   const costs = seesCosts(session);
   const snapshot = costs ? await loadPublishedSnapshot(order.priceTableVersion, conn) : null;
-  const board = snapshot ? directorOf(order, snapshot) : null;
+  // The board is there from the first item: while the order has no state of delivery saved, it is
+  // calculated for the customer's state or, without one, for the state the goods leave from, and says so.
+  const assumedUf = order.deliveryUf === null ? (order.customer?.uf ?? ORIGIN_UF) : null;
+  const board = snapshot ? directorOf(assumedUf ? { ...order, deliveryUf: assumedUf } : order, snapshot) : null;
 
   // The newest table of the line of this order: another line publishing does not make this one old.
   const latest = await latestVersion(conn, table.lineId);
@@ -124,6 +129,8 @@ export default async function PedidoPage({
   const missing = editable ? closingProblems(order, sale) : [];
   // The forms of payment are the company's own list; one already used and since turned off still shows.
   const methods = await listPaymentMethods(conn);
+  // The forms that mean "the balance is paid at delivery".
+  const onDelivery = await listOnDeliveryMethods(conn);
   const methodsWith = (used: string | null) => (used && !methods.includes(used) ? [...methods, used] : methods);
   const reasons = standing.policy?.reasons ?? [];
   const shortOfRequired = board ? Math.max(0, board.quote.requiredDownPayment - plan.downPayment) : 0;
@@ -930,19 +937,8 @@ export default async function PedidoPage({
               </div>
               <ActionForm action={savePaymentAction} className="grid gap-5 p-5 sm:grid-cols-3">
                 <input type="hidden" name="number" value={order.number} />
-                <div>
-                  <label htmlFor="downPayment" className="block text-sm font-medium">
-                    Entrada (R$)
-                  </label>
-                  <input
-                    id="downPayment"
-                    name="downPayment"
-                    type="text"
-                    inputMode="decimal"
-                    defaultValue={order.downPayment === 0 ? "" : formatMoney(order.downPayment)}
-                    placeholder="0,00"
-                    className={`${INPUT} mt-1 w-full text-right`}
-                  />
+                <div className="sm:col-span-3 lg:col-span-1">
+                  <DownPaymentFields key={`${order.downPayment}-${sale.invoiceTotal}`} name="downPayment" amount={order.downPayment === 0 ? "" : formatMoney(order.downPayment)} invoiceTotal={sale.invoiceTotal} />
                   <p className={HELP}>
                     {showPercent(plan.downPaymentRate)} da nota ·{" "}
                     {plan.meetsPolicy ? "dentro da política" : "abaixo da política: precisa de aprovação"}
@@ -1012,6 +1008,13 @@ export default async function PedidoPage({
                       </option>
                     ))}
                   </select>
+                  {onDelivery.length > 0 && (
+                    <p className={HELP}>
+                      {order.balanceOnDelivery
+                        ? `Saldo na entrega: uma parcela de ${showMoney(plan.balance)} no dia em que o pedido fica pronto${dates.completion ? ` (${showIsoDate(dates.completion)})` : ""}.`
+                        : `Com "${onDelivery[0]}", o saldo vira uma parcela só, no dia em que o pedido fica pronto; parcelas e prazos não são usados.`}
+                    </p>
+                  )}
                 </div>
                 <div className="flex gap-3">
                   <div>
@@ -1189,7 +1192,13 @@ export default async function PedidoPage({
               </dl>
             </section>
 
-            {board && <DirectorBoard board={board} imported={lineImported} />}
+            {board && (
+              <DirectorBoard
+                board={board}
+                imported={lineImported}
+                note={assumedUf ? `Calculado para entrega em ${UF_NAMES[assumedUf]}: o pedido ainda não tem o estado de entrega gravado.` : null}
+              />
+            )}
             {board && shortOfRequired > 0 && (
               <p className="rounded-lg border border-dashed border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                 Faltam <strong>{showMoney(shortOfRequired)}</strong> de entrada para cobrir {lineWords(lineImported).payShort}, o lucro da meta e a comissão.

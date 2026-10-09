@@ -491,7 +491,9 @@ const PAYMENT: OrderPayment = {
 test("formas de pagamento vêm do banco da empresa", { skip }, async () => {
   const methods = await listPaymentMethods(db.pool);
   assert.deepEqual(methods.slice(0, 3), ["PIX", "Boleto", "Transferência"]);
-  assert.equal(methods.length, 8);
+  // As oito do início e a "Na entrega", que é um prazo para o saldo, não um meio de pagamento.
+  assert.equal(methods.length, 9);
+  assert.ok(methods.includes("Na entrega"));
   await db.pool.query("UPDATE payment_methods SET active = false WHERE label = 'Cheque'");
   await db.pool.query("INSERT INTO payment_methods (label, position, updated_by) VALUES ('Consórcio', 0, 'x')");
   const changed = await listPaymentMethods(db.pool);
@@ -578,8 +580,8 @@ test("com entrada de 30.000 o pedido do print fecha, com data e registro do fech
   assert.deepEqual([reopened.status, reopened.closedAt, reopened.priceTableVersion], ["em_negociacao", null, 1]);
   const history = await db.pool.query("SELECT reopened_by, reopened_at IS NOT NULL AS reopened FROM order_closings WHERE order_id = $1", [closed.id]);
   assert.deepEqual(history.rows, [{ reopened_by: DIRECTOR, reopened: true }]);
-  // Pedido que já foi fechado tem histórico: não se exclui mais, nem em negociação.
-  await assert.rejects(() => deleteOrder(N, MINE, db.pool), /tem histórico \(fechamento ou aprovação\)/);
+  // Pedido que já foi fechado tem histórico: o vendedor não exclui mais, nem em negociação; só a diretoria.
+  await assert.rejects(() => deleteOrder(N, MINE, db.pool), /só a diretoria pode excluí-lo.*marque o pedido como perdido/);
   assert.equal((await order(N)).items.length, 2);
   // Fecha de novo: são dois fechamentos na história.
   assert.equal((await closeOrder(N, SELLER.email, MINE, db.pool)).status, "fechado");
@@ -723,8 +725,8 @@ test("aprovação: recusar exige motivo, devolve o pedido à negociação e o ve
   assert.deepEqual([mine.approved, mine.decidedBy, mine.comment], [false, MANAGER.email, "Entrada muito baixa: peça 65%."]);
   assert.equal(await lastDecision("261004-RECU", THEIRS, db.pool), null);
   assert.equal(await lastDecision("261002-NADA", ALL, db.pool), null);
-  // Pedido recusado tem histórico: não se exclui. Pode ser corrigido e enviado de novo.
-  await assert.rejects(() => deleteOrder("261004-RECU", MINE, db.pool), /tem histórico/);
+  // Pedido recusado tem histórico: o vendedor não exclui. Pode ser corrigido e enviado de novo.
+  await assert.rejects(() => deleteOrder("261004-RECU", MINE, db.pool), /só a diretoria pode excluí-lo/);
   await savePayment("261004-RECU", { ...PAYMENT, downPayment: 5500 }, SELLER.email, MINE, db.pool);
   assert.equal((await closeOrder("261004-RECU", SELLER.email, MINE, db.pool)).status, "aguardando_aprovacao");
   const past = await listPastDecisions(10, db.pool);
@@ -1366,4 +1368,52 @@ test("nota autorizada: carta de correção numera 1, 2…; cancelamento grava o 
   assert.equal(await takeNextNumber(db.pool), 45);
   assert.match((await voidInvoiceNumbers({ series: 1, first: 45, last: 45, reason: "Numeração pulada por falha de sistema." }, who, now, vault, voided, db.pool)).message, /45 a 45 inutilizada/);
   assert.deepEqual((await listNumberVoids(db.pool)).map((item) => [item.first, item.last, item.protocol]), [[45, 45, "135260000000009"]]);
+});
+
+test("saldo na entrega: a forma marcada vira uma parcela só, no dia em que o pedido fica pronto; parcelas e prazos digitados não ficam", { skip }, async () => {
+  const number = await createOrder({ seller: SELLER, version: 1, productId: ID["LD-B001"], quantity: 1 }, numbers("261009-ENTR"), db.pool);
+  await linkOrderCustomer(number, customerSp, SELLER.email, MINE, db.pool);
+  await saveOrderTerms(number, { ...TERMS, deliveryUf: "SP", productionDays: 90 }, SELLER.email, MINE, db.pool);
+  await savePayment(number, { ...PAYMENT, downPayment: 10000, downPaymentDate: "2026-10-09", balanceMethod: "Na entrega", installmentCount: 3, firstInstallmentDays: 30, installmentIntervalDays: 30 }, SELLER.email, MINE, db.pool);
+  const saved = await order(number);
+  assert.deepEqual([saved.balanceOnDelivery, saved.balanceMethod, saved.installmentCount, saved.firstInstallmentDays, saved.installmentIntervalDays], [true, "Na entrega", 1, null, null]);
+  const table = (await loadPublishedTable(1, db.pool))!;
+  const sale = saleOf(saved, table);
+  const plan = paymentOf(saved, sale, table, "2026-10-09");
+  // Entrada em 09/10 e o saldo inteiro 90 dias depois: 07/01/2027.
+  assert.deepEqual(plan.receipts.map((receipt) => [receipt.label, receipt.dueDate, receipt.method, receipt.amount]), [
+    ["Entrada", "2026-10-09", "PIX", 10000],
+    ["1/1", "2027-01-07", "Na entrega", plan.balance],
+  ]);
+  assert.equal(plan.installmentsTotal, plan.balance);
+  // Trocar para uma forma comum volta às parcelas digitadas.
+  await savePayment(number, { ...PAYMENT, downPayment: 10000, balanceMethod: "Boleto", installmentCount: 2 }, SELLER.email, MINE, db.pool);
+  const back = await order(number);
+  assert.deepEqual([back.balanceOnDelivery, back.installmentCount], [false, 2]);
+  assert.equal(paymentOf(back, sale, table, "2026-10-09").receipts.length, 3);
+  await deleteOrder(number, MINE, db.pool);
+});
+
+test("excluir pedido com histórico: só a diretoria, e só enquanto nada chegou ao dinheiro nem à nota", { skip }, async () => {
+  const number = await createOrder({ seller: SELLER, version: 1, productId: ID["LD-B001"], quantity: 1 }, numbers("261009-HIST"), db.pool);
+  await linkOrderCustomer(number, customerSp, SELLER.email, MINE, db.pool);
+  await saveOrderTerms(number, { ...TERMS, deliveryUf: "SP" }, SELLER.email, MINE, db.pool);
+  await savePayment(number, { ...PAYMENT, downPayment: 20000 }, SELLER.email, MINE, db.pool);
+  assert.equal((await closeOrder(number, SELLER.email, MINE, db.pool)).status, "fechado");
+  const { rows } = await db.pool.query("SELECT id FROM orders WHERE number = $1", [number]);
+  const id = Number(rows[0].id);
+  // Fechado não se exclui; reaberto, tem histórico: o vendedor não exclui, a diretoria sim.
+  await assert.rejects(() => deleteOrder(number, ALL, db.pool, { withHistory: true }), /fora de negociação/);
+  await reopenOrder(number, DIRECTOR, ALL, db.pool);
+  await assert.rejects(() => deleteOrder(number, MINE, db.pool), /só a diretoria pode excluí-lo/);
+  // Com recebimento baixado, nem a diretoria: o dinheiro entrou.
+  const expected = await db.pool.query("SELECT id FROM receivables WHERE order_id = $1 ORDER BY number LIMIT 1", [id]);
+  await db.pool.query("INSERT INTO receipts (receivable_id, amount, amount_without_ipi, received_at, method, recorded_by) VALUES ($1, 100, 88.5, now(), 'PIX', 'x')", [expected.rows[0].id]);
+  await assert.rejects(() => deleteOrder(number, ALL, db.pool, { withHistory: true }), /tem recebimento, conta ou nota fiscal/);
+  await db.pool.query("DELETE FROM receipts WHERE receivable_id = $1", [expected.rows[0].id]);
+  assert.deepEqual(await deleteOrder(number, ALL, db.pool, { withHistory: true }), { sellerEmail: SELLER.email });
+  for (const tableName of ["orders", "order_items", "order_closings", "order_approvals", "receivables"]) {
+    const column = tableName === "orders" ? "id" : "order_id";
+    assert.equal(Number((await db.pool.query(`SELECT count(*) FROM ${tableName} WHERE ${column} = $1`, [id])).rows[0].count), 0, tableName);
+  }
 });

@@ -29,6 +29,8 @@ const DOCUMENT: QuoteDocument = {
   seller: { name: "Vera Vendedora", email: "vera@teste.local" },
   manager: null,
   place: null,
+  signedAt: "6 de outubro de 2026",
+  payment: [],
   customer: {
     name: "Academia Força Total Ltda",
     tradeName: "Força Total",
@@ -264,15 +266,22 @@ test("o desenho não conhece banco, sessão, ambiente nem relógio", () => {
   assert.doesNotMatch(code, /@\/lib\/(db|auth)|next\/|process\.env|new Date\(\)|Date\.now|node:fs|readFile/);
 });
 
-test("gerente comercial e local de emissão: aparecem quando a empresa cadastrou; sem eles, a proposta é a de sempre", async () => {
+test("rodapé da proposta: condições de pagamento, local e data por extenso e as assinaturas; o gerente comercial só assina, não vai no cabeçalho", async () => {
   const bare = pdfText(await renderQuotePdf(DOCUMENT, NOTHING));
-  assert.ok(bare.includes("Emissão: 06/10/2026") && !bare.includes("GERENTE COMERCIAL"));
+  // Sem gerente cadastrado e sem pagamento combinado: duas assinaturas, nenhuma condição.
+  assert.ok(bare.includes("Emissão: 06/10/2026") && bare.includes("6 de outubro de 2026"));
+  assert.ok(bare.includes("CLIENTE") && bare.includes("VENDEDOR") && !bare.includes("GERENTE COMERCIAL") && !bare.includes("CONDIÇÕES DE PAGAMENTO"));
 
-  const text = pdfText(await renderQuotePdf({ ...DOCUMENT, manager: "DANILO RODRIGUES", place: "Votuporanga/SP" }, NOTHING));
-  for (const expected of ["Votuporanga/SP, 06/10/2026", "GERENTE COMERCIAL", "DANILO RODRIGUES", "VENDEDOR", "Vera Vendedora"]) {
+  const full = { ...DOCUMENT, manager: "DANILO RODRIGUES", place: "Votuporanga/SP", signedAt: "Votuporanga/SP, 6 de outubro de 2026", payment: ["Entrada de R$ 50.000,00 (44,9%) via PIX em 28/09/2026", "Saldo de R$ 61.259,41 na entrega (previsão: 27/12/2026)"] };
+  const text = pdfText(await renderQuotePdf(full, NOTHING));
+  for (const expected of ["CONDIÇÕES DE PAGAMENTO", "Entrada de R$ 50.000,00 (44,9%) via PIX em 28/09/2026", "Saldo de R$ 61.259,41 na entrega (previsão: 27/12/2026)", "Votuporanga/SP, 6 de outubro de 2026", "GERENTE COMERCIAL", "DANILO RODRIGUES"]) {
     assert.ok(text.includes(expected), expected);
   }
-  assert.ok(!text.includes("Emissão: 06/10/2026"));
-  // O gerente fica abaixo do vendedor, na mesma coluna.
-  assert.ok(text.indexOf("GERENTE COMERCIAL") > text.indexOf("Vera Vendedora"));
+  // O gerente aparece uma vez só, na linha de assinatura, depois das condições; o cabeçalho segue com a data de emissão.
+  assert.equal(text.split("GERENTE COMERCIAL").length - 1, 1);
+  assert.ok(text.indexOf("GERENTE COMERCIAL") > text.indexOf("CONDIÇÕES DE PAGAMENTO"));
+  assert.ok(text.includes("Emissão: 06/10/2026"));
+  // Muitos itens: o rodapé inteiro passa junto para a página seguinte, nunca cortado.
+  const long = await PDFDocument.load(await renderQuotePdf({ ...full, items: Array.from({ length: 60 }, (_, index) => item(index + 1)), units: 60 }, NOTHING));
+  assert.ok(long.getPageCount() >= 2);
 });

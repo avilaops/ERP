@@ -128,7 +128,7 @@ export default async function ParametrosPage({ searchParams }: { searchParams: P
             <h2 id="dados-proposta" className="text-sm font-semibold uppercase tracking-wide">
               Proposta
             </h2>
-            <p className="mt-1 text-sm text-slate-600">O que aparece no orçamento em PDF e no texto de &quot;Copiar proposta&quot;, além do vendedor. Em branco, não aparece.</p>
+            <p className="mt-1 text-sm text-slate-600">No orçamento em PDF, o gerente comercial assina no rodapé, ao lado do cliente e do vendedor, e o local vai junto da data por extenso. Em branco, não aparecem.</p>
             <ActionForm action={saveProposalSettingsAction} className="mt-3 grid gap-3 sm:grid-cols-2">
               <div>
                 <label htmlFor="managerName" className="block text-sm font-medium">

@@ -4,7 +4,14 @@ import type { Queryable } from "@/lib/db/pool";
 /** A refusal the user can act on. The message goes to the screen as it is. */
 export class PaymentMethodError extends Error {}
 
-export type PaymentMethod = { id: number; label: string; position: number; active: boolean };
+export type PaymentMethod = {
+  id: number;
+  label: string;
+  position: number;
+  active: boolean;
+  /** Chosen for the balance, it makes it one installment due on the day the order is ready. */
+  onDelivery: boolean;
+};
 
 const UNIQUE_VIOLATION = "23505";
 const DUPLICATE = "Já existe uma forma de pagamento com este nome.";
@@ -14,6 +21,7 @@ const method = (row: Record<string, unknown>): PaymentMethod => ({
   label: String(row.label),
   position: Number(row.position),
   active: row.active === true,
+  onDelivery: row.on_delivery === true,
 });
 
 function check(label: string, position: number, who: string): void {
@@ -27,7 +35,7 @@ function check(label: string, position: number, who: string): void {
 
 /** Every form of payment of the company, the ones turned off too, in the order of the lists. */
 export async function listAllPaymentMethods(conn: Queryable): Promise<PaymentMethod[]> {
-  const { rows } = await conn.query("SELECT id, label, position, active FROM payment_methods ORDER BY position, label");
+  const { rows } = await conn.query("SELECT id, label, position, active, on_delivery FROM payment_methods ORDER BY position, label");
   return rows.map(method);
 }
 
@@ -38,7 +46,7 @@ export async function createPaymentMethod(label: string, who: string, conn: Quer
     const { rows } = await conn.query(
       `INSERT INTO payment_methods (label, position, updated_by)
        SELECT $1, COALESCE(max(position), 0) + 1, $2 FROM payment_methods
-       RETURNING id, label, position, active`,
+       RETURNING id, label, position, active, on_delivery`,
       [label.trim(), who],
     );
     return method(rows[0]);
@@ -54,16 +62,16 @@ export async function createPaymentMethod(label: string, who: string, conn: Quer
  */
 export async function updatePaymentMethod(
   id: number,
-  change: { label: string; position: number; active: boolean },
+  change: { label: string; position: number; active: boolean; onDelivery?: boolean },
   who: string,
   conn: Queryable,
 ): Promise<PaymentMethod> {
   check(change.label, change.position, who);
   try {
     const { rows } = await conn.query(
-      `UPDATE payment_methods SET label = $2, position = $3, active = $4, updated_at = now(), updated_by = $5
-        WHERE id = $1 RETURNING id, label, position, active`,
-      [id, change.label.trim(), change.position, change.active, who],
+      `UPDATE payment_methods SET label = $2, position = $3, active = $4, on_delivery = COALESCE($6, on_delivery), updated_at = now(), updated_by = $5
+        WHERE id = $1 RETURNING id, label, position, active, on_delivery`,
+      [id, change.label.trim(), change.position, change.active, who, change.onDelivery ?? null],
     );
     if (rows.length === 0) throw new PaymentMethodError("Forma de pagamento não encontrada.");
     return method(rows[0]);
@@ -77,4 +85,10 @@ export async function updatePaymentMethod(
 export async function deletePaymentMethod(id: number, conn: Queryable): Promise<void> {
   const { rows } = await conn.query("DELETE FROM payment_methods WHERE id = $1 RETURNING id", [id]);
   if (rows.length === 0) throw new PaymentMethodError("Forma de pagamento não encontrada.");
+}
+
+/** The names of the forms that mean "the balance is paid at delivery", turned off or not: an order already written with one keeps its meaning. */
+export async function listOnDeliveryMethods(conn: Queryable): Promise<string[]> {
+  const { rows } = await conn.query("SELECT label FROM payment_methods WHERE on_delivery ORDER BY position, label");
+  return rows.map((row) => String(row.label));
 }

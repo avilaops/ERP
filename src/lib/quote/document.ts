@@ -3,7 +3,7 @@ import type { Order } from "@/lib/db/orders";
 import type { PublishedTable } from "@/lib/db/price-table";
 import { formatPercent, showIsoDate, showMoney, showPercent } from "@/lib/format";
 import { UF_NAMES } from "@/lib/order-form";
-import type { DueDates } from "@/lib/order-quote";
+import type { DueDates, PaymentPlan } from "@/lib/order-quote";
 import type { SaleQuote } from "@/lib/pricing/order";
 import { compareByCode } from "@/lib/products-view";
 
@@ -55,6 +55,10 @@ export type QuoteDocument = {
   /** The commercial manager of the company and where the proposal is issued, when the company registered them. */
   manager: string | null;
   place: string | null;
+  /** `Votuporanga/SP, 8 de outubro de 2026`: what goes above the signatures. Without a place, only the date. */
+  signedAt: string;
+  /** The payment as agreed, one line each: down payment, then the balance. Empty while nothing was agreed. */
+  payment: string[];
   customer: QuoteCustomer | null;
   /** The name of the state of delivery. */
   delivery: string | null;
@@ -85,16 +89,56 @@ type QuoteInput = {
   /** From the company's parameters; absent or `null`, the proposal goes without them. */
   manager?: string | null;
   place?: string | null;
+  /** The payment plan of the order (`paymentOf`), to print the conditions. Absent, nothing about payment is printed. */
+  payment?: { plan: PaymentPlan; onDelivery: boolean } | null;
 };
 
 const blankToNull = (value: string | null | undefined) => (value?.trim() ? value.trim() : null);
+
+const MONTHS = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+/** `2026-10-08` → `8 de outubro de 2026`. */
+const longDate = (day: string) => `${Number(day.slice(8, 10))} de ${MONTHS[Number(day.slice(5, 7)) - 1]} de ${day.slice(0, 4)}`;
+
+/**
+ * Dimensions and weight of an equipment, as the proposal prints them under its
+ * name. What was not registered is left out; nothing registered, no line.
+ */
+export function measuresText({ lengthMm, widthMm, heightMm, weightKg }: { lengthMm: number | null; widthMm: number | null; heightMm: number | null; weightKg: number | null }): string | null {
+  const metres = (mm: number) => (mm / 1000).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const sides = [lengthMm, widthMm, heightMm];
+  const size = sides.every((side) => side !== null)
+    ? `Dimensões (C x L x A): ${sides.map((side) => metres(side as number)).join(" x ")} m`
+    : [lengthMm !== null && `Comprimento: ${metres(lengthMm)} m`, widthMm !== null && `Largura: ${metres(widthMm)} m`, heightMm !== null && `Altura: ${metres(heightMm)} m`].filter(Boolean).join(" · ");
+  const weight = weightKg === null ? "" : `Peso: ${weightKg.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} kg`;
+  return [size, weight].filter((part) => part !== "").join(" · ") || null;
+}
+
+/** The payment as the customer reads it: the down payment and then the balance, by how it was agreed. */
+function paymentLines(plan: PaymentPlan, onDelivery: boolean): string[] {
+  const [first, ...rest] = plan.receipts;
+  if (!first) return [];
+  const down = first.label === "Entrada" ? first : null;
+  const parts = down ? rest : plan.receipts;
+  const lines: string[] = [];
+  if (down) lines.push(`Entrada de ${showMoney(down.amount)} (${showPercent(plan.downPaymentRate)})${down.method ? ` via ${down.method}` : ""} em ${showIsoDate(down.dueDate)}`);
+  if (parts.length === 0) {
+    if (plan.balance > 0) lines.push(`Saldo de ${showMoney(plan.balance)}: a combinar`);
+  } else if (onDelivery) {
+    lines.push(`Saldo de ${showMoney(plan.balance)} na entrega (previsão: ${showIsoDate(parts[0].dueDate)})`);
+  } else {
+    const method = parts[0].method ? ` via ${parts[0].method}` : "";
+    lines.push(`Saldo de ${showMoney(plan.balance)} em ${parts.length} ${parts.length === 1 ? "parcela" : "parcelas"}${method}:`);
+    for (const part of parts) lines.push(`${part.label}: ${showMoney(part.amount)} em ${showIsoDate(part.dueDate)}`);
+  }
+  return lines;
+}
 
 /**
  * What goes on the quotation, from the team's account of the order. Name, code
  * and price are the ones of the version of the order; the description is the
  * one registered today. The seller is the one of the order, whoever asks.
  */
-export function quoteDocument({ company, order, table, sale, dates, products, today, manager = null, place = null }: QuoteInput): QuoteDocument {
+export function quoteDocument({ company, order, table, sale, dates, products, today, manager = null, place = null, payment = null }: QuoteInput): QuoteDocument {
   if (order.items.length === 0) throw new QuoteError(NO_ITEMS_MESSAGE);
   if (sale.lines.length !== order.items.length) throw new Error("A conta do pedido não tem uma linha por equipamento.");
 
@@ -138,6 +182,8 @@ export function quoteDocument({ company, order, table, sale, dates, products, to
     seller: { name: order.sellerName, email: order.sellerEmail },
     manager: blankToNull(manager),
     place: blankToNull(place),
+    signedAt: [blankToNull(place), longDate(today)].filter(Boolean).join(", "),
+    payment: payment ? paymentLines(payment.plan, payment.onDelivery) : [],
     customer: customer && {
       name: customer.name,
       tradeName: customer.tradeName,

@@ -217,7 +217,8 @@ export async function deleteOrderAction(_previous: ActionState, formData: FormDa
 
   const number = reader(formData)("number") ?? "";
   try {
-    const { sellerEmail } = await deleteOrder(number, scopeOf(session), conn);
+    // An order with history (once closed or sent to approval) only leaves by the hand of the directors.
+    const { sellerEmail } = await deleteOrder(number, scopeOf(session), conn, { withHistory: approvesAtLoss(session) });
     console.info(`[pedidos] ${session.email} excluiu o pedido ${number} (de ${sellerEmail}) em ${session.tenant.slug}`);
   } catch (error) {
     return { error: problem("excluir o pedido", error) };

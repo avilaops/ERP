@@ -40,7 +40,7 @@ export async function updatePaymentMethodAction(_previous: ActionState, formData
     await updatePaymentMethod(
       Number(text(formData, "id")),
       // Anything that is not a whole number is refused by the database layer, with the message of the field.
-      { label: text(formData, "label"), position: /^\d{1,4}$/.test(position) ? Number(position) : -1, active: text(formData, "active") !== "" },
+      { label: text(formData, "label"), position: /^\d{1,4}$/.test(position) ? Number(position) : -1, active: text(formData, "active") !== "", onDelivery: text(formData, "onDelivery") !== "" },
       session.email,
       conn,
     );

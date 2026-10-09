@@ -410,6 +410,25 @@ metas de venda (`sales_goals`, uma da equipe e uma por vendedor em cada mês) s�
 Diretoria (`setsGoals`), sempre para o mês corrente. Os gráficos são `src/components/Charts.tsx`,
 componentes de servidor em CSS, sem biblioteca.
 
+## Pedidos do cliente de 08/10/2026 (vídeos do Rogério)
+
+Decisões que vieram do cliente e não se desfazem sem falar com ele:
+
+1. **O quadro "Só o diretor vê" aparece desde o primeiro item do pedido.** Sem estado de entrega
+   gravado, é calculado para o estado do cliente ou, na falta, para o de origem, e diz qual usou.
+2. **Entrada em % e em R$**, uma calculando a outra (`DownPaymentFields`); só o valor em reais é
+   enviado.
+3. **Saldo "na entrega"** (migração `0032`): forma de pagamento marcada `on_delivery` faz o saldo
+   virar uma parcela só, com vencimento na data de conclusão (`paymentOf`). Fica gravado no
+   pedido (`orders.balance_on_delivery`); a marca é da empresa, em Parâmetros → Formas de pagamento.
+4. **Orçamento em PDF**: sem a descrição comercial do equipamento; no lugar, dimensões e peso
+   (`products.length_mm…weight_kg`, migração `0033`, editáveis na tela do equipamento). O
+   gerente comercial não vai no cabeçalho: assina no rodapé, com o cliente e o vendedor, abaixo
+   das condições de pagamento e do local e data por extenso.
+5. **Excluir pedido com histórico** (já fechado ou enviado a aprovação): só a diretoria
+   (`deleteOrder(..., { withHistory })`), e só sem recebimento, estorno, conta ou nota fiscal
+   ligados a ele. Fora disso o pedido fica e a saída é marcar como perdido.
+
 ## Perfis de acesso da empresa: só tiram, nunca dão
 
 Além dos quatro tipos do sistema (`ROLES`), a empresa cria perfis próprios em Equipe → Perfis da

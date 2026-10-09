@@ -89,6 +89,9 @@ export default async function FormasDePagamentoPage() {
                 <label className="flex items-center gap-2 pb-2 text-sm">
                   <input key={String(method.active)} type="checkbox" name="active" value="sim" defaultChecked={method.active} /> Em uso
                 </label>
+                <label className="flex items-center gap-2 pb-2 text-sm" title="Escolhida para o saldo, vira uma parcela só, no dia em que o pedido fica pronto.">
+                  <input key={String(method.onDelivery)} type="checkbox" name="onDelivery" value="sim" defaultChecked={method.onDelivery} /> Saldo na entrega
+                </label>
                 <button type="submit" className="rounded border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50">
                   Salvar
                 </button>

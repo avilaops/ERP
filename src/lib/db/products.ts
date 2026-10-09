@@ -334,3 +334,29 @@ export async function listProductCosts(conn: Queryable, lineId: number = MAIN_LI
     advisoryCost === null ? [] : [{ advisoryCost, taxCredit, packaging }],
   );
 }
+
+/** Dimensions and weight of an equipment, for the proposal. `null` is "not registered": the proposal leaves it out. */
+export type ProductMeasures = { lengthMm: number | null; widthMm: number | null; heightMm: number | null; weightKg: number | null };
+
+export async function loadProductMeasures(productId: number, conn: Queryable): Promise<ProductMeasures | null> {
+  const { rows } = await conn.query("SELECT length_mm, width_mm, height_mm, weight_kg FROM products WHERE id = $1", [productId]);
+  const row = rows[0];
+  if (!row) return null;
+  const number = (value: unknown) => (value === null ? null : Number(value));
+  return { lengthMm: number(row.length_mm), widthMm: number(row.width_mm), heightMm: number(row.height_mm), weightKg: number(row.weight_kg) };
+}
+
+export async function saveProductMeasures(productId: number, measures: ProductMeasures, updatedBy: string, conn: Queryable): Promise<void> {
+  if (updatedBy.trim() === "") throw new Error("Falta dizer quem está alterando as medidas do equipamento.");
+  for (const [label, value] of [["Comprimento", measures.lengthMm], ["Largura", measures.widthMm], ["Altura", measures.heightMm]] as const) {
+    if (value !== null && (!Number.isInteger(value) || value < 1 || value > 99_999)) throw new ProductError(`${label}: informe em milímetros, número inteiro de 1 a 99.999, ou deixe em branco.`);
+  }
+  if (measures.weightKg !== null && (!Number.isFinite(measures.weightKg) || measures.weightKg <= 0 || measures.weightKg > 999_999)) {
+    throw new ProductError("Peso: informe em quilos, maior que zero, ou deixe em branco.");
+  }
+  const { rows } = await conn.query(
+    "UPDATE products SET length_mm = $2, width_mm = $3, height_mm = $4, weight_kg = $5, updated_at = now(), updated_by = $6 WHERE id = $1 RETURNING id",
+    [productId, measures.lengthMm, measures.widthMm, measures.heightMm, measures.weightKg, updatedBy],
+  );
+  if (!rows[0]) throw new ProductError("Produto não encontrado.");
+}

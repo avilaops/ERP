@@ -19,11 +19,13 @@ after(async () => {
 test("formas de pagamento: a diretoria acrescenta, renomeia, reordena e desliga; nada se apaga", { skip }, async () => {
   const initial = await listAllPaymentMethods(db.pool);
   assert.deepEqual(initial.map((item) => item.label).slice(0, 2), ["PIX", "Boleto"]);
-  assert.equal(initial.length, 8);
+  assert.equal(initial.length, 9);
+  // "Na entrega" nasce marcada como saldo na entrega; as outras, não. A marca é da empresa: muda na tela.
+  assert.deepEqual(initial.filter((item) => item.onDelivery).map((item) => item.label), ["Na entrega"]);
 
   // Nova forma entra no fim da lista do pedido.
   const added = await createPaymentMethod("  Consórcio ", WHO, db.pool);
-  assert.deepEqual([added.label, added.position, added.active], ["Consórcio", 9, true]);
+  assert.deepEqual([added.label, added.position, added.active], ["Consórcio", 10, true]);
   assert.equal((await listPaymentMethods(db.pool)).at(-1), "Consórcio");
   await assert.rejects(() => createPaymentMethod("PIX", WHO, db.pool), /Já existe uma forma de pagamento com este nome/);
   await assert.rejects(() => createPaymentMethod("  ", WHO, db.pool), /Informe o nome/);
@@ -43,7 +45,7 @@ test("formas de pagamento: a diretoria acrescenta, renomeia, reordena e desliga;
   await updatePaymentMethod(cheque.id, { ...cheque, active: false }, WHO, db.pool);
   assert.ok(!(await listPaymentMethods(db.pool)).includes("Cheque"));
   assert.deepEqual((await listAllPaymentMethods(db.pool)).find((item) => item.label === "Cheque")?.active, false);
-  assert.equal((await listAllPaymentMethods(db.pool)).length, 9);
+  assert.equal((await listAllPaymentMethods(db.pool)).length, 10);
 });
 
 test("formas de pagamento: remover tira da lista, e só existe uma vez", { skip }, async () => {

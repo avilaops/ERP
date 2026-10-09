@@ -26,7 +26,7 @@ function Rows({ rows }: { rows: Row[] }) {
  * board, and the page only has one for who `seesCosts`.
  */
 /** `imported`: whether the line of the order is bought abroad; it names what the down payment pays first. */
-export function DirectorBoard({ board, imported = true }: { board: Board; imported?: boolean }) {
+export function DirectorBoard({ board, imported = true, note = null }: { board: Board; imported?: boolean; /** What the figures assume, when the order does not say yet. */ note?: string | null }) {
   const { quote, max, targetNetProfit } = board;
   const target = showPercent(targetNetProfit, 0);
 
@@ -57,6 +57,7 @@ export function DirectorBoard({ board, imported = true }: { board: Board; import
       <h2 id="so-o-diretor" className="text-xs font-semibold uppercase tracking-wide text-indigo-900">
         Só o diretor vê
       </h2>
+      {note && <p className="mt-1 text-xs text-slate-600">{note}</p>}
       <div className="mt-3 flex flex-col gap-3">
         <Rows rows={result} />
         <hr className="border-slate-200" />

@@ -69,6 +69,13 @@ function wrap(text: string, font: PDFFont, size: number, width: number): string[
 }
 
 /** At most `max` lines; when something is left out, the last one ends in "…". */
+/** The text cut to fit one line of the given width. */
+function fitted(text: string, font: PDFFont, size: number, width: number): string {
+  let shown = text;
+  while (shown !== "" && font.widthOfTextAtSize(shown, size) > width) shown = shown.slice(0, -1);
+  return shown;
+}
+
 function clamp(lines: string[], max: number, font: PDFFont, size: number, width: number): string[] {
   if (lines.length <= max) return lines;
   let last = lines[max - 1];
@@ -173,7 +180,7 @@ export async function renderQuotePdf(document: QuoteDocument, { logo, photos }: 
     write(document.company, MARGIN, y - 18, { size: 16, bold: true });
   }
   write(document.title, right, y - 15, { size: 15, bold: true, align: "right" });
-  write(document.place ? `${document.place}, ${document.issuedOn}` : `Emissão: ${document.issuedOn}`, right, y - 30, { color: MUTED, align: "right" });
+  write(`Emissão: ${document.issuedOn}`, right, y - 30, { color: MUTED, align: "right" });
   write(`Validade: ${document.validUntil}`, right, y - 42, { color: MUTED, align: "right" });
   y -= LOGO_BOX.height + 10;
   rule(y);
@@ -197,8 +204,7 @@ export async function renderQuotePdf(document: QuoteDocument, { logo, photos }: 
     return at;
   };
   const { customer, seller } = document;
-  const afterName = block("Vendedor", [seller.name, seller.email], MARGIN);
-  const afterSeller = document.manager ? block("Gerente comercial", [document.manager], MARGIN, afterName - 6) : afterName;
+  const afterSeller = block("Vendedor", [seller.name, seller.email], MARGIN);
   const afterCustomer = customer
     ? block(
         "Cliente",
@@ -319,6 +325,44 @@ export async function renderQuotePdf(document: QuoteDocument, { logo, photos }: 
     paragraph(`${label}: ${value}`);
     y -= 3;
   }
+
+  // The payment as agreed, in a box of its own.
+  if (document.payment.length > 0) {
+    const lines = document.payment.flatMap((line) => wrap(clean(line), fonts.regular, 9, CONTENT_WIDTH - 20));
+    const boxHeight = 24 + lines.length * 12;
+    if (y - boxHeight - 8 < BODY_BOTTOM) newPage();
+    y -= 8;
+    page.drawRectangle({ x: MARGIN, y: y - boxHeight, width: CONTENT_WIDTH, height: boxHeight, color: SHADE });
+    write("CONDIÇÕES DE PAGAMENTO", MARGIN + 10, y - 14, { size: 8, bold: true, color: MUTED });
+    lines.forEach((line, index) => write(line, MARGIN + 10, y - 27 - index * 12));
+    y -= boxHeight + 8;
+  }
+
+  // Where and when, and who signs: the customer, the seller and, when the company has one, the commercial manager.
+  const signers: [string, (string | null)[]][] = [
+    ["Cliente", document.customer ? [document.customer.name, document.customer.document] : []],
+    ["Vendedor", [seller.name]],
+    ...(document.manager ? ([["Gerente comercial", [document.manager]]] as [string, string[]][]) : []),
+  ];
+  const signaturesHeight = 96;
+  if (y - signaturesHeight < BODY_BOTTOM) newPage();
+  y -= 18;
+  write(document.signedAt, MARGIN, y - 9);
+  y -= 52;
+  const slot = CONTENT_WIDTH / signers.length;
+  signers.forEach(([title, details], index) => {
+    const left = MARGIN + index * slot + 8;
+    const width = slot - 16;
+    page.drawLine({ start: { x: left, y }, end: { x: left + width, y }, thickness: 0.6, color: INK });
+    const centered = (text: string, baseline: number, options: { size: number; bold?: boolean; color?: typeof INK }) => {
+      const font = options.bold ? fonts.bold : fonts.regular;
+      const shown = fitted(clean(text), font, options.size, width);
+      write(shown, left + (width - font.widthOfTextAtSize(shown, options.size)) / 2, baseline, options);
+    };
+    centered(title.toUpperCase(), y - 11, { size: 7, bold: true, color: MUTED });
+    details.filter((detail): detail is string => Boolean(detail)).forEach((detail, at) => centered(detail, y - 21 - at * 10, { size: 8 }));
+  });
+  y -= 44;
 
   // Footer, once the number of pages is known.
   const pages = pdf.getPages();

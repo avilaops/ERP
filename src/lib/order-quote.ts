@@ -146,7 +146,9 @@ type PaymentData = Pick<
   | "firstInstallmentDays"
   | "installmentIntervalDays"
   | "closedAt"
->;
+> &
+  // Absent in what is only being tried out: then the balance follows the installments typed.
+  Partial<Pick<Order, "balanceOnDelivery" | "productionDays">>;
 
 /**
  * The payment as agreed: down payment, balance, installments and the commission
@@ -165,8 +167,11 @@ export function paymentOf(order: PaymentData, sale: SaleQuote, table: PublishedT
   if (downPayment > 0) {
     receipts.push({ label: DOWN_PAYMENT, dueDate: base, method: order.downPaymentMethod, amount: downPayment, commission: commission(downPayment) });
   }
-  const parts =
-    balance > 0 && order.installmentCount
+  // "Na entrega": the whole balance on the day the order is ready (the production time counted from the same day as the rest).
+  const onDelivery = order.balanceOnDelivery === true && balance > 0;
+  const parts = onDelivery
+    ? [{ number: 1, dueDate: addDays(base, order.productionDays ?? 0), amount: balance }]
+    : balance > 0 && order.installmentCount
       ? installments({
           balance,
           count: order.installmentCount,

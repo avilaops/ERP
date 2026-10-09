@@ -62,6 +62,8 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "0029_gerente_e_local_da_proposta.sql",
     "0030_linha_importada_ou_nao.sql",
     "0031_perfis_de_acesso.sql",
+    "0032_saldo_na_entrega.sql",
+    "0033_medidas_do_equipamento.sql",
   ]);
 
   const second = await withClient((client) => migrate(client, MIGRATIONS_DIR));

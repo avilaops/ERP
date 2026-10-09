@@ -14,9 +14,11 @@ import {
   deleteProduct,
   listProducts,
   ProductError,
+  saveProductMeasures,
   updateProduct,
 } from "@/lib/db/products";
 import { loadParams } from "@/lib/db/params";
+import type { ActionState } from "@/lib/order-form";
 import { latestVersion, loadPublishedSnapshot, nextVersionNumber, PriceTableError, publishPriceTable } from "@/lib/db/price-table";
 import { draftPriceTable, NOTHING_TO_PUBLISH, pendingChanges } from "@/lib/price-table";
 import type { PublishState } from "@/lib/price-table";
@@ -262,4 +264,27 @@ export async function saveProductScreenAction(formData: FormData): Promise<Produ
   } catch (error) {
     return { ok: false, errors: [problem(id ? "alterar" : "cadastrar", error)], invalid: [] };
   }
+}
+
+/** "Salvar medidas": dimensions and weight of the equipment, as the proposal prints them. Blank takes one away. */
+export async function saveProductMeasuresAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
+  const session = await requirePermission("produtos");
+  const conn = tenantDb(session.tenant.slug);
+  const text = (key: string) => {
+    const value = formData.get(key);
+    return typeof value === "string" ? value.trim() : "";
+  };
+  // Anything that is not a number is refused below, with the name of the field.
+  const whole = (key: string) => (text(key) === "" ? null : /^\d{1,5}$/.test(text(key)) ? Number(text(key)) : Number.NaN);
+  const weight = text("weightKg") === "" ? null : /^\d{1,6}([.,]\d{1,2})?$/.test(text("weightKg")) ? Number(text("weightKg").replace(",", ".")) : Number.NaN;
+  const id = text("id");
+  try {
+    await saveProductMeasures(Number(id), { lengthMm: whole("lengthMm"), widthMm: whole("widthMm"), heightMm: whole("heightMm"), weightKg: weight }, session.email, conn);
+  } catch (error) {
+    if (error instanceof ProductError) return { error: error.message };
+    console.error("[produtos] falha ao gravar as medidas:", error instanceof Error ? error.message : error);
+    return { error: "Não foi possível gravar agora. Nada foi alterado; tente de novo." };
+  }
+  revalidatePath(`/produtos/${id}`);
+  return { error: null, notice: "Medidas gravadas: já saem na próxima proposta." };
 }

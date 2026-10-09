@@ -178,7 +178,9 @@ test("vendedor dono, gerente e diretoria recebem o PDF do pedido", { skip }, asy
       `Orçamento #${ORDER}`,
       "Empresa A",
       "Supino reto",
-      "Estofado preto.",
+      // A descrição comercial saiu da proposta; no rodapé, onde e quando, e as linhas de assinatura.
+      "CLIENTE",
+      "VENDEDOR",
       "Leg press",
       "Desconto (5,0%)",
       invoiceTotal,
@@ -231,7 +233,7 @@ test("foto gravada que não abre: o PDF sai assim mesmo, com o quadro dela vazio
     // Uma imagem a menos (a foto); o resto do orçamento está inteiro.
     assert.equal(pdfImages(bytes), before - 1);
     const text = pdfText(bytes);
-    for (const expected of ["Supino reto", "Estofado preto.", "Leg press", invoiceTotal]) assert.ok(text.includes(expected), `falta "${expected}"`);
+    for (const expected of ["Supino reto", "Leg press", invoiceTotal]) assert.ok(text.includes(expected), `falta "${expected}"`);
   } finally {
     await conn.query("UPDATE product_photos SET bytes = $1 WHERE product_id = $2", [rows[0].bytes, rows[0].product_id]);
   }
