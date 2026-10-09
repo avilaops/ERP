@@ -72,7 +72,7 @@ test("certificado: guardado selado, mostrado sem o arquivo, e só o da própria 
   const opened = openCertificate({ ciphertext: rows[0].ciphertext, iv: rows[0].iv, authTag: rows[0].auth_tag }, KEY);
   assert.deepEqual([opened.password, Buffer.compare(opened.pfx, Buffer.from(pfx))], ["senha-de-teste", 0]);
 
-  await assert.rejects(() => saveCertificate(pfx, "errada", KEY, BOSS, NOW, db.pool), /Não foi possível abrir/);
+  await assert.rejects(() => saveCertificate(pfx, "errada", KEY, BOSS, NOW, db.pool), /A senha não confere com este certificado/);
   await assert.rejects(() => saveCertificate(testPfx({ until: new Date("2026-06-01T00:00:00Z") }), "senha-de-teste", KEY, BOSS, NOW, db.pool), /já venceu/);
   await assert.rejects(() => saveCertificate(testPfx({ from: new Date("2026-12-01T00:00:00Z") }), "senha-de-teste", KEY, BOSS, NOW, db.pool), /ainda não começou/);
   await assert.rejects(() => saveCertificate(testPfx({ name: "OUTRA EMPRESA:11222333000181" }), "senha-de-teste", KEY, BOSS, NOW, db.pool), /não é o da empresa/);

@@ -11,7 +11,7 @@ import { sendToSefaz } from "@/lib/fiscal/channel";
 import { cityCode } from "@/lib/fiscal/cities";
 import { parsePercent } from "@/lib/format";
 import { exactLine } from "@/lib/lines-view";
-import { CertificateError, vaultKey } from "@/lib/fiscal/certificate";
+import { CertificateError, vaultKey, WrongPasswordError } from "@/lib/fiscal/certificate";
 import type { ActionState } from "@/lib/order-form";
 
 const HERE = "/parametros/fiscal";
@@ -86,7 +86,14 @@ export async function saveCertificateAction(_previous: ActionState, formData: Fo
   if (file.size > 32 * 1024) return { error: "Arquivo grande demais para ser um certificado A1." };
   if (typeof password !== "string" || password === "") return { error: "Informe a senha do certificado." };
   try {
-    await saveCertificate(new Uint8Array(await file.arrayBuffer()), password, key, session.email, new Date(), conn);
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    try {
+      await saveCertificate(bytes, password, key, session.email, new Date(), conn);
+    } catch (error) {
+      // A space the keyboard of a phone left before or after the password is not part of it.
+      if (!(error instanceof WrongPasswordError) || password.trim() === password) throw error;
+      await saveCertificate(bytes, password.trim(), key, session.email, new Date(), conn);
+    }
     console.info(`[fiscal] ${session.email} enviou o certificado de ${session.tenant.slug}`);
   } catch (error) {
     return problem("guardar o certificado", error);

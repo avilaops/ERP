@@ -1,4 +1,5 @@
 import { LineTabs } from "@/components/LineTabs";
+import { PasswordField } from "@/components/PasswordField";
 import { loadFiscalRules, listPaymentCodes, missingFiscalRules, PAYMENT_CODES } from "@/lib/db/fiscal-rules";
 import { listNumberVoids } from "@/lib/db/invoices";
 import { listLines } from "@/lib/db/product-lines";
@@ -121,7 +122,7 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
             <label htmlFor="password" className={LABEL}>
               Senha do certificado
             </label>
-            <input id="password" name="password" type="password" autoComplete="off" className={INPUT} />
+            <PasswordField id="password" name="password" className={INPUT} />
           </div>
           <button type="submit" className="rounded bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark">
             {certificate ? "Trocar certificado" : "Enviar certificado"}

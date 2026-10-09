@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
 import { test } from "node:test";
-import { CertificateError, openCertificate, readCertificate, sealCertificate, vaultKey } from "@/lib/fiscal/certificate";
+import { CertificateError, openCertificate, readCertificate, sealCertificate, vaultKey, WrongPasswordError } from "@/lib/fiscal/certificate";
 import { testPfx } from "./fiscal-helpers.ts";
 
 const PFX = testPfx();
@@ -15,9 +15,12 @@ test("certificado: lê de quem é, o CNPJ e a validade, só com a senha certa", 
   // O mesmo arquivo dá sempre o mesmo resumo.
   assert.equal(readCertificate(PFX, "senha-de-teste").fingerprint, info.fingerprint);
 
-  assert.throws(() => readCertificate(PFX, "senha errada"), CertificateError);
+  // Senha errada é dita como senha errada, e não como arquivo ruim: é o erro mais comum ao enviar pelo celular.
+  assert.throws(() => readCertificate(PFX, "senha errada"), (error: unknown) => error instanceof WrongPasswordError && error instanceof CertificateError && /A senha não confere/.test(error.message));
+  assert.throws(() => readCertificate(PFX, "senha-de-test"), WrongPasswordError);
+  assert.throws(() => readCertificate(PFX, "senha-de-teste "), WrongPasswordError);
   assert.throws(() => readCertificate(new Uint8Array(), "x"), /Escolha o arquivo/);
-  assert.throws(() => readCertificate(new TextEncoder().encode("isto não é um certificado"), "x"), /Não foi possível abrir/);
+  assert.throws(() => readCertificate(new TextEncoder().encode("isto não é um certificado"), "x"), (error: unknown) => error instanceof CertificateError && !(error instanceof WrongPasswordError) && /Não foi possível ler o arquivo como certificado/.test(error.message));
   assert.throws(() => readCertificate(new Uint8Array(40_000), "x"), /grande demais/);
   // Sem a chave privada não assina nada.
   assert.throws(() => readCertificate(testPfx({ withKey: false }), "senha-de-teste"), /não traz a chave privada/);

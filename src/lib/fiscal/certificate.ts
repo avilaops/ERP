@@ -4,6 +4,9 @@ import forge from "node-forge";
 /** A refusal the user can act on. The message goes to the screen as it is. */
 export class CertificateError extends Error {}
 
+/** The file is a certificate, but the password typed does not open it. */
+export class WrongPasswordError extends CertificateError {}
+
 /** What identifies a certificate, read from the file itself. Nothing secret here. */
 export type CertificateInfo = {
   /** The name it was issued to, as written in it. */
@@ -33,8 +36,12 @@ export function readCertificate(pfx: Uint8Array, password: string): CertificateI
   try {
     const asn1 = forge.asn1.fromDer(forge.util.createBuffer(Buffer.from(pfx).toString("binary")));
     p12 = forge.pkcs12.pkcs12FromAsn1(asn1, password);
-  } catch {
-    throw new CertificateError("Não foi possível abrir o certificado. Confira se o arquivo é .pfx ou .p12 e se a senha está certa.");
+  } catch (error) {
+    // The library tells a wrong password from a file that is not a certificate; the person is told which one it was.
+    if (error instanceof Error && /Invalid password|MAC could not be verified/i.test(error.message)) {
+      throw new WrongPasswordError("A senha não confere com este certificado. Confira maiúsculas, minúsculas e símbolos (um * no fim, por exemplo): toque em Mostrar para ver o que foi digitado.");
+    }
+    throw new CertificateError("Não foi possível ler o arquivo como certificado. Envie o arquivo .pfx ou .p12 do certificado A1.");
   }
 
   const keys = [

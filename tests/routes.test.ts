@@ -268,6 +268,11 @@ test("certificado digital: só a diretoria envia; arquivo e senha não voltam pa
   assert.ok(page.includes('await requirePermission("parametros")'));
   // A chave do cofre vem do ambiente do servidor, nunca do formulário nem do banco.
   assert.ok(actions.includes("vaultKey(process.env.ERP_CERT_KEY)"));
+  // A senha pode ser mostrada enquanto é digitada, mas nunca vem preenchida do servidor.
+  assert.ok(page.includes('<PasswordField id="password" name="password"'));
+  assert.doesNotMatch(readFileSync(new URL("../src/components/PasswordField.tsx", import.meta.url), "utf8"), /defaultValue|value=/);
+  // Um espaço que o teclado do celular deixou não faz parte da senha: só nesse caso há segunda tentativa.
+  assert.ok(actions.includes("if (!(error instanceof WrongPasswordError) || password.trim() === password) throw error;"));
   // A tela só conhece a ficha do certificado: nada que abra o cofre.
   assert.doesNotMatch(page, /openCertificate|ciphertext|ERP_CERT_KEY|sealCertificate/);
   // Nenhum log leva a senha ou o conteúdo do arquivo.
