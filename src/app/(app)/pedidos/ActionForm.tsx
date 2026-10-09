@@ -45,13 +45,17 @@ export function ActionForm({
       action={formAction}
       onSubmit={(event) => {
         event.preventDefault();
+        // One send at a time: a second tap while the first is on its way would repeat the action
+        // (an invitation sent three times, a payment recorded twice).
+        if (sent.current) return;
         // The button pressed goes along: some forms decide by it (aprovar, recusar).
         const data = new FormData(event.currentTarget, (event.nativeEvent as SubmitEvent).submitter);
         sent.current = true;
         startTransition(() => formAction(data));
       }}
       noValidate
-      className={className}
+      aria-busy={pending}
+      className={`${className ?? ""} aria-busy:pointer-events-none aria-busy:opacity-60`.trim()}
     >
       {children}
       {state.error && !pending && (
