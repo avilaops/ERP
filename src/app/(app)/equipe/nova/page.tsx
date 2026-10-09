@@ -20,6 +20,7 @@ export default async function NovaPessoaPage() {
         </Link>
         <h1 className="min-w-0 truncate text-2xl font-semibold">Convidar pessoa</h1>
       </div>
+      <p className="mt-1 text-sm text-slate-600">A pessoa recebe um e-mail com o endereço do sistema. Quem ainda não tem conta recebe junto o endereço para criar a senha.</p>
       <ActionForm action={inviteUserAction} className="mt-3 flex flex-col gap-3">
         <input type="hidden" name="active" value="sim" />
         <PersonFields saved={null} profiles={profiles} />

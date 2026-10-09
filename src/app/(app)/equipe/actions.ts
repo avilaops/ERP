@@ -5,7 +5,11 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/auth";
 import { menuItem } from "@/lib/auth/permissions";
+import { publicAppUrl } from "@/lib/contract/public";
+import { inviteByMail } from "@/lib/db/invite";
 import { tenantDb } from "@/lib/db/pool";
+import { vaultKey } from "@/lib/fiscal/certificate";
+import { sendMail } from "@/lib/mail/smtp";
 import { createUser, deleteUser, updateUser, UserError } from "@/lib/db/users";
 import type { ActionState } from "@/lib/order-form";
 import { parseUserForm } from "@/lib/user-form";
@@ -43,10 +47,31 @@ export async function inviteUserAction(_previous: ActionState, formData: FormDat
   try {
     const created = await createUser({ ...parsed.user, items: screensOf(formData) }, session.email, conn);
     await noteUserChange(process.env, session.tenant.slug, created.email, created.active);
+    // The person is in; the e-mail tells them. What happens to it shows on the list, and it can be sent again.
+    const invite = await inviteByMail({ userId: created.id, company: session.tenant.name, appUrl: publicAppUrl(), invitedBy: session.name, now: new Date(), env: process.env, key: () => vaultKey(process.env.ERP_CERT_KEY), send: sendMail }, conn);
+    console.info(`[equipe] ${session.email} convidou ${created.email} em ${session.tenant.slug}: convite ${invite.status}`);
   } catch (error) {
     return problem(error);
   }
   done();
+}
+
+/** "Enviar convite por e-mail" of a person already registered: the same message of the invitation, again. */
+export async function sendInviteAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
+  const session = await requirePermission("equipe");
+  const conn = tenantDb(session.tenant.slug);
+  const id = Number(reader(formData)("id"));
+  if (!Number.isSafeInteger(id) || id <= 0) return { error: "Pessoa não encontrada." };
+  let invite;
+  try {
+    invite = await inviteByMail({ userId: id, company: session.tenant.name, appUrl: publicAppUrl(), invitedBy: session.name, now: new Date(), env: process.env, key: () => vaultKey(process.env.ERP_CERT_KEY), send: sendMail }, conn);
+  } catch (error) {
+    return problem(error);
+  }
+  revalidatePath(HERE);
+  revalidatePath(`${HERE}/${id}`);
+  if (invite.status === "enviado") return { error: null, notice: `Convite enviado: ${invite.detail}.` };
+  return { error: invite.detail ?? "O convite não saiu." };
 }
 
 /** "Salvar": name, type of access and whether the person still gets in. */

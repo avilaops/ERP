@@ -7,11 +7,14 @@ import { listProfiles } from "@/lib/db/access-profiles";
 import { listUsers } from "@/lib/db/users";
 import { ActionForm } from "../../pedidos/ActionForm";
 import { ConfirmButton } from "../../pedidos/ConfirmButton";
-import { deleteUserAction, saveUserAction } from "../actions";
+import { showDateTime } from "@/lib/format";
+import { deleteUserAction, saveUserAction, sendInviteAction } from "../actions";
 import { BOTTOM_BAR, PersonFields, PRIMARY_BUTTON } from "../PersonFields";
 
 export const metadata = { title: "Pessoa · ERP" };
 export const dynamic = "force-dynamic";
+
+const INVITE_LABELS = { enviado: "Convite enviado", falhou: "O convite não saiu", pendente: "Convite não enviado" } as const;
 
 export default async function PessoaPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -47,6 +50,27 @@ export default async function PessoaPage({ params }: { params: Promise<{ id: str
           </button>
         </div>
       </ActionForm>
+      {!self && user.active && (
+        <section className="mt-4 rounded-lg border border-slate-300 bg-white p-4" aria-labelledby="convite">
+          <h2 id="convite" className="font-semibold">
+            Convite por e-mail
+          </h2>
+          <p className="mt-1 text-sm text-slate-600">
+            {user.invite
+              ? `${INVITE_LABELS[user.invite.status]} em ${showDateTime(user.invite.at)}${user.invite.detail ? `: ${user.invite.detail}` : ""}`
+              : "Nenhum convite foi enviado para esta pessoa."}
+          </p>
+          <p className="mt-1 text-sm text-slate-600">
+            A mensagem vai para {user.email}. Quem ainda não tem conta recebe o endereço para criar a senha; quem já tem entra com a senha que já usa.
+          </p>
+          <ActionForm action={sendInviteAction} className="mt-3">
+            <input type="hidden" name="id" value={user.id} />
+            <button type="submit" className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 font-semibold hover:bg-slate-50">
+              {user.invite ? "Enviar convite de novo" : "Enviar convite por e-mail"}
+            </button>
+          </ActionForm>
+        </section>
+      )}
       {!self && (
         <ActionForm action={deleteUserAction} className="mt-4">
           <input type="hidden" name="id" value={user.id} />

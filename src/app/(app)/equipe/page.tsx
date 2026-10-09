@@ -72,6 +72,11 @@ export default async function EquipePage() {
                       {user.email === session.email ? " (você)" : ""}
                     </span>
                     <span className="block truncate text-xs text-slate-500">{user.email}</span>
+                    {user.active && user.invite && user.email !== session.email && (
+                      <span className={`block truncate text-xs ${user.invite.status === "enviado" ? "text-emerald-800" : "text-amber-900"}`}>
+                        {user.invite.status === "enviado" ? "Convite enviado por e-mail" : user.invite.status === "falhou" ? "O convite por e-mail não saiu" : "Convite por e-mail não enviado"}
+                      </span>
+                    )}
                   </span>
                   <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium ${user.active ? "bg-brand-soft text-brand" : "bg-slate-200 text-slate-600"}`}>
                     {user.active ? `${user.profileName ?? ROLE_LABELS[user.role]}${user.items ? ` · ${user.items.length} telas` : ""}` : "Sem acesso"}

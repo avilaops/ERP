@@ -22,13 +22,15 @@ export type AppUser = {
   /** The powers of the type the profile gave up; empty without a profile. */
   denied: string[];
   updatedAt: Date;
+  /** What happened to the last invitation by e-mail, or `null` when none was tried. */
+  invite: { status: "enviado" | "falhou" | "pendente"; detail: string | null; at: Date } | null;
 };
 
 export type UserInput = { email: string; name: string; role: Role; items?: string[] | null; /** A profile of the company: then the type and the screens are the profile's. */ profileId?: number | null };
 
 const UNIQUE_VIOLATION = "23505";
 /** With a profile of the company, the screens and what was given up come from it; the type is its type of origin. */
-const COLUMNS = `users.id, users.email, users.name, users.role, users.active, users.updated_at, users.profile_id,
+const COLUMNS = `users.id, users.email, users.name, users.role, users.active, users.updated_at, users.profile_id, users.invite_status, users.invite_detail, users.invite_at,
   COALESCE((SELECT p.items FROM access_profiles p WHERE p.id = users.profile_id), users.allowed_items) AS allowed_items,
   (SELECT p.name FROM access_profiles p WHERE p.id = users.profile_id) AS profile_name,
   COALESCE((SELECT p.denied FROM access_profiles p WHERE p.id = users.profile_id), '{}') AS denied`;
@@ -47,6 +49,7 @@ const user = (row: Record<string, unknown>): AppUser => {
     profileName: row.profile_name == null ? null : String(row.profile_name),
     denied: (row.denied as string[] | null) ?? [],
     updatedAt: row.updated_at as Date,
+    invite: row.invite_status == null ? null : { status: row.invite_status as "enviado" | "falhou" | "pendente", detail: row.invite_detail == null ? null : String(row.invite_detail), at: row.invite_at as Date },
   };
 };
 
