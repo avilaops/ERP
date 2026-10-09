@@ -5,10 +5,11 @@ import type { Identity, Session } from "@/lib/auth/access";
 import { assertAuthConfig, isProduction } from "@/lib/auth/config";
 import type { AuthEnv } from "@/lib/auth/config";
 import { createCombinedDirectory, createEnvDirectory } from "@/lib/auth/directory";
-import type { UserDirectory } from "@/lib/auth/directory";
+import type { DirectoryUser, UserDirectory } from "@/lib/auth/directory";
 import { LOCAL_COOKIE, LOCAL_LOGIN_PATH, localProvider } from "@/lib/auth/local-provider";
 import { menuItem } from "@/lib/auth/permissions";
 import type { MenuItemKey } from "@/lib/auth/permissions";
+import { signedUpMemberships } from "@/lib/auth/signed-up";
 import { loginUrl, SSO_COOKIE, verifySsoToken } from "@/lib/auth/sso";
 import { chooseMembership, parseTenants } from "@/lib/auth/tenants";
 import type { Tenant } from "@/lib/auth/tenants";
@@ -70,6 +71,17 @@ function runtime(env: AuthEnv): Runtime {
 type CookieStore = Awaited<ReturnType<typeof cookies>>;
 
 /**
+ * Every company an e-mail belongs to: first the ones of the configuration, then
+ * the ones that signed up on the site (when the sign-up is on; otherwise the
+ * second list is empty and no query is made).
+ */
+async function membershipsOf(env: AuthEnv, config: Runtime, email: string): Promise<DirectoryUser[]> {
+  const configured = await config.directory.findMemberships(email);
+  const signedUp = await signedUpMemberships(env, email, config.tenants.map((tenant) => tenant.slug));
+  return [...configured, ...signedUp];
+}
+
+/**
  * Who the visitor is and which company the request is for. The company comes
  * from what the directory says about the e-mail; never from a field, a parameter
  * of the address or anything else the browser could choose freely. The cookie
@@ -85,7 +97,7 @@ async function resolveIdentity(env: AuthEnv, config: Runtime, store: CookieStore
   const ssoUser = verifySsoToken(store.get(SSO_COOKIE)?.value, config.ssoSecret);
   if (!ssoUser) return { authenticated: false, user: null };
 
-  const memberships = await config.directory.findMemberships(ssoUser.email);
+  const memberships = await membershipsOf(env, config, ssoUser.email);
   return {
     authenticated: true,
     user: chooseMembership(memberships, store.get(TENANT_COOKIE)?.value),
@@ -115,7 +127,7 @@ export async function listCompanies(): Promise<{ slug: string; name: string }[]>
   }
   const ssoUser = verifySsoToken(store.get(SSO_COOKIE)?.value, config.ssoSecret);
   if (!ssoUser) return [];
-  return (await config.directory.findMemberships(ssoUser.email)).map(({ tenant }) => ({ slug: tenant.slug, name: tenant.name }));
+  return (await membershipsOf(process.env, config, ssoUser.email)).map(({ tenant }) => ({ slug: tenant.slug, name: tenant.name }));
 }
 
 /** The signed-in ERP user, or `null`. The profile never comes from the browser. */

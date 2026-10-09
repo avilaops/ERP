@@ -38,3 +38,16 @@ export function tenantSchema(slug: string): string {
   if (!SLUG.test(slug)) throw new Error(`Identificador de empresa inválido: "${slug}".`);
   return `tenant_${slug}`;
 }
+
+/** A PostgreSQL identifier safe to write unquoted: lower-case letters, digits and underscore. */
+const IDENTIFIER = /^[a-z_][a-z0-9_]{0,62}$/;
+
+/**
+ * The two statements that name a schema, which cannot take a `$1` parameter.
+ * The only place where a schema name becomes SQL text: the name is checked
+ * here, whatever its origin.
+ */
+export function schemaStatements(schema: string): { create: string; use: string } {
+  if (!IDENTIFIER.test(schema)) throw new Error(`Nome de esquema inválido: "${schema}".`);
+  return { create: `CREATE SCHEMA IF NOT EXISTS ${schema}`, use: `SET search_path TO ${schema}` };
+}

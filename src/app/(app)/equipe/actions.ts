@@ -1,5 +1,6 @@
 "use server";
 
+import { noteUserChange } from "@/lib/auth/signed-up";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/auth";
@@ -40,7 +41,8 @@ export async function inviteUserAction(_previous: ActionState, formData: FormDat
   const parsed = parseUserForm(reader(formData), { withEmail: true });
   if (!parsed.ok) return { error: parsed.errors.join(" ") };
   try {
-    await createUser({ ...parsed.user, items: screensOf(formData) }, session.email, conn);
+    const created = await createUser({ ...parsed.user, items: screensOf(formData) }, session.email, conn);
+    await noteUserChange(process.env, session.tenant.slug, created.email, created.active);
   } catch (error) {
     return problem(error);
   }
@@ -55,7 +57,8 @@ export async function saveUserAction(_previous: ActionState, formData: FormData)
   const parsed = parseUserForm(read, { withEmail: false });
   if (!parsed.ok) return { error: parsed.errors.join(" ") };
   try {
-    await updateUser(Number(read("id")), { ...parsed.user, items: screensOf(formData) }, session.email, conn);
+    const saved = await updateUser(Number(read("id")), { ...parsed.user, items: screensOf(formData) }, session.email, conn);
+    await noteUserChange(process.env, session.tenant.slug, saved.email, saved.active);
   } catch (error) {
     return problem(error);
   }
@@ -69,6 +72,7 @@ export async function deleteUserAction(_previous: ActionState, formData: FormDat
   try {
     const { email } = await deleteUser(Number(reader(formData)("id")), session.email, conn);
     console.info(`[equipe] ${session.email} removeu ${email} de ${session.tenant.slug}`);
+    await noteUserChange(process.env, session.tenant.slug, email, false);
   } catch (error) {
     return problem(error);
   }
