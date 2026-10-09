@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { after, before, test } from "node:test";
 import type pg from "pg";
 import { migrate } from "@/lib/db/migrate";
@@ -185,4 +186,25 @@ test("migração: nome de arquivo fora do padrão é recusado antes de tocar o b
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test("o pacote publicado leva tudo o que o db-migrate.ts importa", async () => {
+  // A migração roda dentro do container, só com o que o empacotar.sh copia. Arquivo
+  // importado e não copiado derruba o deploy na hora de migrar.
+  const { readFileSync } = await import("node:fs");
+  const { dirname, join, relative } = await import("node:path");
+  const root = fileURLToPath(new URL("../", import.meta.url));
+  const packer = readFileSync(join(root, "deploy/empacotar.sh"), "utf8");
+  const seen = new Set<string>();
+  const walk = (file: string) => {
+    if (seen.has(file)) return;
+    seen.add(file);
+    for (const match of readFileSync(join(root, file), "utf8").matchAll(/from "(\.{1,2}\/[^"]+)"/g)) {
+      walk(relative(root, join(root, dirname(file), match[1])));
+    }
+  };
+  walk("scripts/db-migrate.ts");
+  assert.ok(seen.size > 3);
+  for (const file of seen) assert.ok(packer.includes(file), `${file} não é copiado pelo deploy/empacotar.sh`);
+  for (const folder of ["db/migrations", "db/control"]) assert.ok(packer.includes(`cp -r ${folder} `), folder);
 });
