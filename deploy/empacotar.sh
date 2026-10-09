@@ -55,7 +55,7 @@ conta() { printf '%s\n' "$LISTA" | grep -cE "$1" || true; }
 # Tudo o que o db-migrate.ts importa por caminho relativo tem de ir junto: faltando um
 # arquivo, a migração cai ao carregar e o deploy para com a versão antiga no ar.
 for MODULO in $(grep -oE 'from "\.\./[^"]+"' scripts/db-migrate.ts | sed -E 's#from "\.\./([^"]+)"#\1#'); do
-  printf '%s\n' "$LISTA" | grep -qxF "./$MODULO" || { echo "! $MODULO não está no pacote (o db-migrate.ts importa)"; exit 1; }
+  [ "$(printf '%s\n' "$LISTA" | grep -cxF "./$MODULO" || true)" = "1" ] || { echo "! $MODULO não está no pacote (o db-migrate.ts importa)"; exit 1; }
 done
 [ "$(conta '^\./node_modules/pg/package\.json$')" = "1" ] || { echo "! sem o pacote pg (a migração não rodaria)"; exit 1; }
 # O sharp só funciona com o binário nativo e a libvips ao lado: sem eles o PUT da foto dá 500.
