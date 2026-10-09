@@ -29,7 +29,7 @@ export type InviteRequest = {
 export function inviteText({ name, company, invitedBy, appUrl, invite }: { name: string; company: string; invitedBy: string; appUrl: string; invite: string | null }): string {
   const opening = `Olá, ${name}.\n\n${invitedBy} liberou o seu acesso ao sistema de ${company}.`;
   return invite
-    ? `${opening}\n\n1. Crie a sua senha neste endereço (vale por 7 dias e funciona uma vez):\n\n${invite}\n\n2. Depois, entre no sistema com o seu e-mail e a senha criada:\n\n${appUrl}\n\nSe você não esperava este convite, ignore esta mensagem.`
+    ? `${opening}\n\n1. Crie a sua senha neste endereço (vale por 7 dias e funciona uma vez):\n\n${invite}\n\nAo salvar a senha você já entra no sistema.\n\n2. Nas próximas vezes, entre por este endereço com o seu e-mail e a senha criada:\n\n${appUrl}\n\nSe você não esperava este convite, ignore esta mensagem.`
     : `${opening}\n\nVocê já tem conta no login da Ávila Ops com este e-mail: entre com a senha que já usa.\n\n${appUrl}\n\nSe não lembra a senha, peça a quem lhe convidou para falar com a Ávila Ops.`;
 }
 
