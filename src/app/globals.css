@@ -13,6 +13,21 @@
   color-scheme: light;
   --page-bg: #edefeb;
   --page-ink: #172120;
+  /*
+   * The frame of every screen (docs/ux.md). On a phone there is a bar with the
+   * brand at the top and the destinations at the bottom; whatever sticks to an
+   * edge of the screen starts after them, never under them.
+   */
+  --topbar: 3.25rem;
+  --tabbar: calc(3.5rem + env(safe-area-inset-bottom));
+  /* The height of anything a finger has to hit. */
+  --control: 2.75rem;
+}
+@media (min-width: 48rem) {
+  :root {
+    --topbar: 0px;
+    --tabbar: 0px;
+  }
 }
 
 /*
@@ -109,12 +124,15 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* Page titles as in the prototype: condensed, upper case. */
+/*
+ * Page titles keep the face of the prototype (condensed, upper case) at the
+ * size of a tool: the title says where the person is, the screen is for the task.
+ */
 h1 {
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 2.125rem;
-  line-height: 1;
+  font-size: 1.5rem;
+  line-height: 1.1;
   letter-spacing: 0.01em;
   text-transform: uppercase;
   text-wrap: balance;
@@ -135,5 +153,25 @@ input[type="date"]::-webkit-date-and-time-value {
 
 /* A section reached by its link stops below the bars fixed at the top of a phone. */
 h2[id] {
-  scroll-margin-top: 7.5rem;
+  scroll-margin-top: calc(var(--topbar) + 4rem);
+}
+
+@media (min-width: 48rem) {
+  h1 {
+    font-size: 1.75rem;
+  }
+}
+
+/* The marker of a <details> is drawn by the summary itself, the same in every browser. */
+summary {
+  list-style: none;
+}
+summary::-webkit-details-marker {
+  display: none;
+}
+
+/* Keyboard focus is always visible, whatever the control. */
+:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
 }

@@ -131,7 +131,7 @@ export function CustomerForm({
       </fieldset>
 
       {/* On the customer's own screen the button stays in reach at the bottom of a phone. Inside an order, the order has its own bar. */}
-      <div className={`flex items-center gap-4 ${hidden === undefined ? "sticky bottom-0 z-10 -mx-4 border-t border-slate-200 bg-white px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:static md:mx-0 md:border-0 md:bg-transparent md:p-0" : ""}`}>
+      <div className={`flex items-center gap-4 ${hidden === undefined ? "sticky bottom-[var(--tabbar)] z-10 -mx-4 border-t border-slate-200 bg-white px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:static md:mx-0 md:border-0 md:bg-transparent md:p-0" : ""}`}>
         <button
           type="submit"
           disabled={pending}

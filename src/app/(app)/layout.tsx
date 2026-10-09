@@ -10,7 +10,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
       <Sidebar session={session} />
-      <main className="min-w-0 flex-1 p-4 md:p-8">{children}</main>
+      {/* On a phone the last line of the page ends above the bar of destinations, never under it. */}
+      <main className="min-w-0 flex-1 px-4 pt-3 pb-[calc(var(--tabbar)+1rem)] md:px-8 md:py-6">{children}</main>
     </div>
   );
 }

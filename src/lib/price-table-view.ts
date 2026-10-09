@@ -7,7 +7,9 @@ import { compareByCode, matchesText } from "@/lib/products-view";
 export type PriceTableView = {
   /** The titles after "Equipamento". */
   columns: string[];
-  rows: { id: number; name: string; code: string | null; cells: string[] }[];
+  rows: { id: number; name: string; code: string | null; cells: string[]; /** The price the list shows first: the one the customer pays per unit. */ main: string }[];
+  /** What the main price is: with IPI, or the only price of a line without IPI. */
+  mainLabel: string;
   counter: string;
 };
 
@@ -52,12 +54,13 @@ export function priceTableView(
           prices ? showPercent(prices.maxTaxpayer) : NONE,
         );
       }
-      return { id: item.productId, name: item.name, code: item.code, cells };
+      return { id: item.productId, name: item.name, code: item.code, cells, main: showMoney(hasIpi ? item.tableWithIpi : item.table) };
     });
 
   return {
     columns: [...(hasIpi ? TEAM_COLUMNS : TEAM_COLUMNS_WITHOUT_IPI), ...authorityColumns, ...(snapshot ? DIRECTOR_COLUMNS : [])],
     rows,
+    mainLabel: hasIpi ? "com IPI" : "preço de tabela",
     counter: rows.length === 1 ? "1 equipamento" : `${rows.length} equipamentos`,
   };
 }

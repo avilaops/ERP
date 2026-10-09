@@ -661,7 +661,7 @@ export default async function PedidoPage({
       )}
 
       {/* On a phone the page is long: the parts stay one touch away, each saying whether it is filled in. */}
-      <nav aria-label="Partes do pedido" className="sticky top-[3.75rem] z-10 -mx-4 mt-4 flex gap-2 overflow-x-auto border-b border-slate-200 bg-[#edefeb] px-4 py-2 text-sm md:hidden">
+      <nav aria-label="Partes do pedido" className="sticky top-[var(--topbar)] z-10 -mx-4 mt-4 flex gap-2 overflow-x-auto border-b border-slate-200 bg-[#edefeb] px-4 py-2 text-sm md:hidden">
         {(
           [
             ["equipamentos", "Itens", order.items.length > 0],
@@ -1384,7 +1384,7 @@ export default async function PedidoPage({
       </fieldset>
 
       {/* On a phone the total stays in sight, with the way to the closing. */}
-      <div className="sticky bottom-0 z-10 -mx-4 mt-6 flex items-center justify-between gap-3 border-t border-slate-200 bg-white px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:hidden">
+      <div className="sticky bottom-[var(--tabbar)] z-10 -mx-4 mt-6 flex items-center justify-between gap-3 border-t border-slate-200 bg-white px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:hidden">
         <span>
           <span className="block text-xs text-slate-600">Total da nota</span>
           <span className="block text-lg font-bold leading-tight">{showMoney(sale.invoiceTotal)}</span>

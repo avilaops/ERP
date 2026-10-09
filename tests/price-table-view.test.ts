@@ -58,7 +58,10 @@ test("equipe: só preço e desconto livre; nada de custo nem de desconto máximo
     name: "MESA FLEXORA - BATERIA DE PESOS",
     code: "LD-B001",
     cells: ["R$ 19.204,61", "R$ 21.701,21", "20%"],
+    // O preço em destaque da lista: o que o cliente paga por unidade, com IPI.
+    main: "R$ 21.701,21",
   });
+  assert.equal(view.mainLabel, "com IPI");
   assert.equal(view.rows.length, 4);
   assert.ok(view.rows.every((row) => row.cells.length === 3));
 

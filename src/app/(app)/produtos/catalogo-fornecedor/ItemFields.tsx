@@ -5,7 +5,7 @@ const LABEL = "block font-medium";
 
 /** The buttons kept in reach at the bottom of a phone while the fields scroll. */
 export const BOTTOM_BAR =
-  "sticky bottom-0 -mx-4 mt-2 flex flex-col gap-2 border-t border-slate-200 bg-white px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:static md:mx-0 md:border-0 md:bg-transparent md:px-0";
+  "sticky bottom-[var(--tabbar)] -mx-4 mt-2 flex flex-col gap-2 border-t border-slate-200 bg-white px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:static md:mx-0 md:border-0 md:bg-transparent md:px-0";
 
 /**
  * One item of the supplier's catalogue on one screen: photo, the supplier's

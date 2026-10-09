@@ -172,3 +172,13 @@ Mandatory first step: Analyze the user's request and project state. Select a wor
 3. Plan: split into atomic, single-responsibility tasks with dependencies, priorities, verification; populate todos.
 4. Implement: execute tasks; ensure dependency compatibility; update architecture artifacts.
 5. Verify: validate against design; run Self Reflection. If scores < thresholds → return to Design. Update status.
+
+## ERP: diretrizes de UX (regra da casa)
+
+Toda tela nova ou alterada segue `docs/ux.md`: **uma tela, uma tarefa, uma decisão**. Cada
+página ou etapa cabe na área útil de uma tela (360×640, 390×844, 430×932, 1366×768, 1440×900);
+o que não cabe vira etapa, paginação, detalhe ou "Ver …", nunca fonte menor, controle apertado,
+nome cortado ou `overflow: hidden`. Use as peças de `src/components/ui.tsx` (`PageHeader`,
+`Pill`, `Pager`, `INPUT`, `PRIMARY`…), `FitRows` e `EquipmentPicker` em vez de estilo repetido
+na página, e as variáveis `--topbar`/`--tabbar` para qualquer coisa que grude numa borda.
+Antes de entregar, responda às sete perguntas do `docs/ux.md` e meça a tela nos cinco tamanhos.

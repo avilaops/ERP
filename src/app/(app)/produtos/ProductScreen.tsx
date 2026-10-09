@@ -233,7 +233,7 @@ export function ProductScreen({
       )}
 
       {/* Always in reach: the buttons stay at the bottom of the screen while the fields scroll. */}
-      <div className="sticky bottom-0 -mx-4 mt-2 flex flex-col gap-2 border-t border-slate-200 bg-white px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:static md:mx-0 md:flex-row md:border-0 md:bg-transparent md:px-0">
+      <div className="sticky bottom-[var(--tabbar)] -mx-4 mt-2 flex flex-col gap-2 border-t border-slate-200 bg-white px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:static md:mx-0 md:flex-row md:border-0 md:bg-transparent md:px-0">
         <button type="submit" disabled={pending} className="rounded-lg bg-brand px-4 py-3.5 text-base font-semibold text-white hover:bg-brand-dark disabled:opacity-60">
           {pending ? "Salvando…" : "Salvar equipamento"}
         </button>

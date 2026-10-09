@@ -9,13 +9,13 @@ import { lineHref } from "@/lib/lines-view";
 export function LineTabs({ lines, current, path }: { lines: ProductLine[]; current: number; path: string }) {
   if (lines.length < 2) return null;
   return (
-    <nav aria-label="Linha de produto" className="mt-4 flex flex-wrap gap-2">
+    <nav aria-label="Linha de produto" className="mt-2 flex flex-wrap gap-2">
       {lines.map((line) => (
         <Link
           key={line.id}
           href={lineHref(path, line.id)}
           aria-current={line.id === current ? "page" : undefined}
-          className={`rounded-full border px-4 py-1.5 text-sm font-medium ${
+          className={`inline-flex min-h-9 items-center rounded-full border px-4 text-sm font-medium ${
             line.id === current ? "border-brand bg-brand text-white" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
           }`}
         >

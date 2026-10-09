@@ -65,5 +65,5 @@ export function PersonFields({ saved, profiles }: { saved: AppUser | null; profi
 
 /** The buttons kept in reach at the bottom of the screen while the fields scroll. */
 export const BOTTOM_BAR =
-  "sticky bottom-0 -mx-4 mt-2 flex flex-col gap-2 border-t border-slate-200 bg-white px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:static md:mx-0 md:border-0 md:bg-transparent md:px-0";
+  "sticky bottom-[var(--tabbar)] -mx-4 mt-2 flex flex-col gap-2 border-t border-slate-200 bg-white px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:static md:mx-0 md:border-0 md:bg-transparent md:px-0";
 export const PRIMARY_BUTTON = "rounded-lg bg-brand px-4 py-3.5 text-base font-semibold text-white hover:bg-brand-dark";
