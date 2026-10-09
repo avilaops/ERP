@@ -55,13 +55,14 @@ export async function draftOrderContract(order: Order, company: string, now: Dat
   const today = isoDate(now);
   const sale = saleOf(order, table);
   const proposal = await loadProposalSettings(conn);
+  const plan = paymentOf(order, sale, table, today);
   const quote = quoteDocument({
     company, order, table, sale, today, dates: dueDates(order, table, today), products: new Map(), manager: proposal.managerName, place: proposal.place,
-    payment: { plan: paymentOf(order, sale, table, today), onDelivery: order.balanceOnDelivery },
+    payment: { plan, onDelivery: order.balanceOnDelivery },
   });
   const settings = await loadContractSettings(conn);
   const template = settings.body ?? DEFAULT_CONTRACT_BODY;
-  const values = contractValues({ company, issuer: await loadFiscalSettings(conn), customer: order.customer, orderNumber: order.number, quote });
+  const values = contractValues({ company, issuer: await loadFiscalSettings(conn), customer: order.customer, orderNumber: order.number, quote, amounts: { total: sale.invoiceTotal, downPayment: plan.downPayment, balance: plan.balance } });
   return { title: settings.title ?? DEFAULT_CONTRACT_TITLE, body: fillContract(template, values), blanks: blankWords(template, values) };
 }
 

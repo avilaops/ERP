@@ -1,5 +1,7 @@
 import { formatCep, formatDocument, formatPhone } from "@/lib/customer";
 import type { CustomerInput } from "@/lib/customer";
+import { moneyInWords } from "@/lib/contract/words";
+import { showMoney } from "@/lib/format";
 import type { QuoteDocument } from "@/lib/quote/document";
 
 /**
@@ -56,6 +58,11 @@ export const CONTRACT_WORDS = [
   ["pedido", "Número do pedido"],
   ["equipamentos", "Lista dos equipamentos, com quantidade e valor"],
   ["total", "Valor total do pedido"],
+  ["total_extenso", "Valor total por extenso"],
+  ["entrada", "Valor da entrada combinada"],
+  ["entrada_extenso", "Valor da entrada por extenso"],
+  ["saldo", "Valor que resta depois da entrada"],
+  ["saldo_extenso", "Valor que resta, por extenso"],
   ["pagamento", "Entrada e parcelas, como combinado no pedido"],
   ["prazo_fabricacao", "Prazo de fabricação do pedido"],
   ["entrega", "Estado de entrega"],
@@ -105,10 +112,12 @@ export type ContractInput = {
   orderNumber: string;
   /** The quotation of the same order: items, totals, payment and dates already as the customer reads them. */
   quote: QuoteDocument;
+  /** The figures of the order, for the amounts the contract writes out: the total of the invoice, the down payment and what is left. */
+  amounts: { total: number; downPayment: number; balance: number };
 };
 
 /** The value of every field for one order. */
-export function contractValues({ company, issuer, customer, orderNumber, quote }: ContractInput): ContractValues {
+export function contractValues({ company, issuer, customer, orderNumber, quote, amounts }: ContractInput): ContractValues {
   const total = quote.totals.find((row) => row.strong)?.value ?? "";
   return {
     empresa: company,
@@ -127,6 +136,12 @@ export function contractValues({ company, issuer, customer, orderNumber, quote }
       .map((item) => `- ${item.quantity} x ${joined([item.code, item.name], " - ")}: ${item.unitWithIpi} cada, total ${item.totalWithIpi}`)
       .join("\n"),
     total,
+    total_extenso: moneyInWords(amounts.total),
+    // An order with no down payment agreed says nothing here, instead of "R$ 0".
+    entrada: amounts.downPayment > 0 ? showMoney(amounts.downPayment) : "",
+    entrada_extenso: amounts.downPayment > 0 ? moneyInWords(amounts.downPayment) : "",
+    saldo: amounts.downPayment > 0 ? showMoney(amounts.balance) : "",
+    saldo_extenso: amounts.downPayment > 0 ? moneyInWords(amounts.balance) : "",
     pagamento: quote.payment.join("\n"),
     prazo_fabricacao: quote.production ?? "",
     entrega: quote.delivery ?? "",

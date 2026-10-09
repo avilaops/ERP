@@ -17,6 +17,7 @@ import { signingKeyOf } from "@/lib/fiscal/sign";
 import { testPfx } from "./fiscal-helpers.ts";
 import { addressLine, blankWords, CONTRACT_WORDS, contractNumber, DEFAULT_CONTRACT_BODY, fillContract, maskedEmail, wordsUsed } from "@/lib/contract/text";
 import type { ContractValues } from "@/lib/contract/text";
+import { moneyInWords, numberInWords } from "@/lib/contract/words";
 import { fingerprint, hashCode, hashToken, newCode, newToken, TOKEN } from "@/lib/contract/token";
 import { pdfPieces } from "./pdf-helpers.ts";
 
@@ -348,4 +349,25 @@ test("proteções do contrato: o link só entrega pela regra do prazo, e nenhum 
   const sealing = read("lib/db/contract-seal.ts");
   assert.doesNotMatch(sealing, /console\./);
   for (const page of ["app/(app)/parametros/contrato/page.tsx", "app/(app)/pedidos/[numero]/page.tsx", "app/contrato/[empresa]/[token]/page.tsx"]) assert.doesNotMatch(read(page), /openCertificate|loadContractSeal|privateKey|ERP_TWILIO/, page);
+});
+
+test("valor por extenso: como o contrato escreve depois do número", () => {
+  const cases: [number, string][] = [
+    [0, "zero"], [1, "um"], [16, "dezesseis"], [21, "vinte e um"], [100, "cem"], [101, "cento e um"], [110, "cento e dez"], [999, "novecentos e noventa e nove"],
+    [1000, "mil"], [1001, "mil e um"], [1100, "mil e cem"], [1234, "mil duzentos e trinta e quatro"], [2500, "dois mil e quinhentos"], [21334, "vinte e um mil trezentos e trinta e quatro"],
+    [100000, "cem mil"], [1000000, "um milhão"], [2000010, "dois milhões e dez"], [1250300, "um milhão duzentos e cinquenta mil e trezentos"],
+  ];
+  for (const [value, words] of cases) assert.equal(numberInWords(value), words, String(value));
+  assert.equal(moneyInWords(21334.57), "vinte e um mil trezentos e trinta e quatro reais e cinquenta e sete centavos");
+  assert.equal(moneyInWords(10000), "dez mil reais");
+  assert.equal(moneyInWords(1), "um real");
+  assert.equal(moneyInWords(0.01), "um centavo");
+  assert.equal(moneyInWords(0.5), "cinquenta centavos");
+  assert.equal(moneyInWords(1000000), "um milhão de reais");
+  assert.equal(moneyInWords(1000000.1), "um milhão de reais e dez centavos");
+  assert.equal(moneyInWords(1500000), "um milhão e quinhentos mil reais");
+  // Centavo quebrado da conta em ponto flutuante não vira "noventa e nove".
+  assert.equal(moneyInWords(11334.57 + 10000), "vinte e um mil trezentos e trinta e quatro reais e cinquenta e sete centavos");
+  assert.throws(() => moneyInWords(-1));
+  assert.throws(() => numberInWords(1.5));
 });
