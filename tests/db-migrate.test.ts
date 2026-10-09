@@ -71,6 +71,7 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "0037_convite_por_email.sql",
     "0038_contrato_enviado_em_arquivo.sql",
     "0039_seguranca_do_contrato.sql",
+    "0040_funil_comercial.sql",
   ]);
 
   const second = await withClient((client) => migrate(client, MIGRATIONS_DIR));
@@ -101,6 +102,8 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "idempotency_keys",
     "lost_reasons",
     "mail_settings",
+    "opportunities",
+    "opportunity_activities",
     "order_approvals",
     "order_closings",
     "order_contract_events",
@@ -112,6 +115,7 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "payable_categories",
     "payables",
     "payment_methods",
+    "pipeline_stages",
     "price_table_items",
     "price_table_state_rates",
     "price_table_versions",

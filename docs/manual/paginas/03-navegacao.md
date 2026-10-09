@@ -22,6 +22,7 @@ O menu fica à esquerda em todas as telas. Ele mostra apenas os itens liberados 
 | Dashboard | Visão geral de vendas, funil, lucro e ranking. |
 | Preços e metas | Metas de venda e acompanhamento da tabela. |
 | Aprovações | Pedidos que pediram aprovação por desconto ou entrada. |
+| Funil | As vendas em andamento, antes do pedido: oportunidades por etapa e as tarefas de cada uma. |
 | Pedidos | Todos os pedidos e orçamentos. |
 | Clientes | Cadastro de clientes. |
 | Recebimentos | Parcelas a receber e recebidas. |

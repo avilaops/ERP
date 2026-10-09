@@ -1782,3 +1782,122 @@ test("contrato com selo e segundo código: o assinado sai selado com o certifica
   await saveContractSettings({ ...(await loadContractSettings(db.pool)), seal: false }, DIRECTOR, db.pool);
   await db.pool.query("DELETE FROM fiscal_certificates");
 });
+
+test("funil: oportunidade anda por etapas, tem atividades, segue o pedido e cada vendedor vê só as suas", { skip }, async () => {
+  const {
+    addActivity, createOpportunity, createStage, deleteActivity, deleteOpportunity, deleteStage, FunnelError, getOpportunity, linkOpportunityOrder, listActivities, listOpportunities,
+    listPendingActivities, listStages, moveOpportunity, moveStage, renameStage, setActivityDone, syncOpportunitiesWithOrders, updateOpportunity,
+  } = await import("@/lib/db/funnel");
+  const { byStage, dueLabel, matchesOpportunity } = await import("@/lib/funnel-view");
+  const mine = { ownerEmail: SELLER.email };
+  const theirs = { ownerEmail: OTHER_SELLER.email };
+  const all = { ownerEmail: null };
+
+  // As etapas que vêm prontas, com uma de ganho e uma de perda no fim.
+  const stages = await listStages(db.pool);
+  assert.deepEqual(stages.map((stage) => [stage.name, stage.kind]), [["Novo", "aberta"], ["Contato feito", "aberta"], ["Proposta enviada", "aberta"], ["Negociação", "aberta"], ["Ganho", "ganha"], ["Perdido", "perdida"]]);
+  const [first, second] = stages;
+  const won = stages.find((stage) => stage.kind === "ganha")!;
+  const lost = stages.find((stage) => stage.kind === "perdida")!;
+  // A empresa cria, renomeia, reordena e remove etapa; ganho e perdido não saem nem mudam de lugar.
+  await createStage("  Visita   técnica ", DIRECTOR, db.pool);
+  await assert.rejects(() => createStage("visita técnica".replace("v", "V"), DIRECTOR, db.pool), /Já existe uma etapa/);
+  await assert.rejects(() => createStage("x", DIRECTOR, db.pool), /de 2 a 40 letras/);
+  const visit = (await listStages(db.pool)).find((stage) => stage.name === "Visita técnica")!;
+  assert.equal(visit.position, 5);
+  await moveStage(visit.id, "antes", DIRECTOR, db.pool);
+  assert.deepEqual((await listStages(db.pool)).filter((stage) => stage.kind === "aberta").map((stage) => stage.name), ["Novo", "Contato feito", "Proposta enviada", "Visita técnica", "Negociação"]);
+  await assert.rejects(() => moveStage(first.id, "antes", DIRECTOR, db.pool), /já está na ponta/);
+  await assert.rejects(() => moveStage(won.id, "antes", DIRECTOR, db.pool), /não pode ser movida/);
+  await renameStage(visit.id, "Visita", DIRECTOR, db.pool);
+  await assert.rejects(() => deleteStage(won.id, db.pool), /não pode ser removida/);
+
+  // Precisa de um cliente do cadastro ou do nome da empresa; nasce na primeira etapa, no nome de quem cria.
+  const blank = { title: "", customerId: null, company: null, contactName: null, phone: null, email: "sem-arroba", source: null, estimatedValue: -1, notes: null };
+  await assert.rejects(() => createOpportunity(blank, SELLER, db.pool), (error: unknown) => error instanceof FunnelError && /o que está sendo vendido.*cliente do cadastro ou informe o nome da empresa.*E-mail inválido.*Valor estimado inválido/.test(error.message));
+  await assert.rejects(() => createOpportunity({ ...blank, title: "Academia", customerId: 999_999, email: null, estimatedValue: null }, SELLER, db.pool), /Cliente não encontrado/);
+  const id = await createOpportunity({ ...blank, title: " Academia  nova ", company: "Fit Club", contactName: "Paula", email: " Paula@FitClub.test ", estimatedValue: 80000, notes: "Quer inaugurar em março." }, SELLER, db.pool);
+  const other = await createOpportunity({ ...blank, title: "Condomínio", customerId: customerSp, company: "ignorado com cliente", email: null, estimatedValue: null }, OTHER_SELLER, db.pool);
+  const created = (await getOpportunity(id, mine, db.pool))!;
+  assert.deepEqual([created.title, created.company, created.email, created.stageName, created.ownerEmail, created.estimatedValue, created.closedAt], ["Academia nova", "Fit Club", "paula@fitclub.test", "Novo", SELLER.email, 80000, null]);
+  // Com cliente do cadastro, a empresa digitada não é guardada.
+  assert.deepEqual([(await getOpportunity(other, theirs, db.pool))!.company, (await getOpportunity(other, theirs, db.pool))!.customerName !== null], [null, true]);
+
+  // Cada vendedor só vê, altera, move e exclui as suas; quem vê a equipe vê todas.
+  assert.equal(await getOpportunity(other, mine, db.pool), null);
+  assert.deepEqual((await listOpportunities(mine, db.pool)).map((item) => item.id), [id]);
+  assert.equal((await listOpportunities(all, db.pool)).length, 2);
+  await assert.rejects(() => updateOpportunity(other, { ...blank, title: "Minha agora", company: "X Ltda", email: null, estimatedValue: null }, SELLER.email, mine, db.pool), /não encontrada/);
+  await assert.rejects(() => moveOpportunity(other, second.id, null, SELLER.email, mine, db.pool), /não encontrada/);
+  await assert.rejects(() => deleteOpportunity(other, mine, db.pool), /não encontrada/);
+  await assert.rejects(() => addActivity(other, { kind: "tarefa", title: "Ligar", dueOn: null }, SELLER.email, mine, db.pool), /não encontrada/);
+
+  // Atividades: a tarefa com data aparece como próximo passo; anotação não tem data nem fica pendente.
+  await assert.rejects(() => addActivity(id, { kind: "outra", title: "Ligar", dueOn: null }, SELLER.email, mine, db.pool), /tipo da atividade/);
+  await assert.rejects(() => addActivity(id, { kind: "tarefa", title: "Ligar", dueOn: "31/12/2026" }, SELLER.email, mine, db.pool), /Data inválida/);
+  await addActivity(id, { kind: "ligacao", title: "Ligar para a Paula", dueOn: "2026-10-12" }, SELLER.email, mine, db.pool);
+  await addActivity(id, { kind: "tarefa", title: "Mandar a planta", dueOn: "2026-10-10" }, SELLER.email, mine, db.pool);
+  await addActivity(id, { kind: "nota", title: "Prefere contato de manhã.", dueOn: "2026-10-01" }, SELLER.email, mine, db.pool);
+  const next = (await getOpportunity(id, mine, db.pool))!;
+  assert.deepEqual([next.nextDue, next.nextTitle], ["2026-10-10", "Mandar a planta"]);
+  const activities = await listActivities(id, db.pool);
+  assert.deepEqual(activities.map((activity) => [activity.kind, activity.dueOn]), [["tarefa", "2026-10-10"], ["ligacao", "2026-10-12"], ["nota", null]]);
+  assert.deepEqual((await listPendingActivities(mine, db.pool)).map((activity) => [activity.title, activity.party]), [["Mandar a planta", "Fit Club"], ["Ligar para a Paula", "Fit Club"]]);
+  assert.deepEqual(await listPendingActivities(theirs, db.pool), []);
+  const plant = activities[0];
+  await assert.rejects(() => setActivityDone(plant.id, true, OTHER_SELLER.email, theirs, db.pool), /não encontrada/);
+  await setActivityDone(plant.id, true, SELLER.email, mine, db.pool);
+  assert.equal((await getOpportunity(id, mine, db.pool))!.nextTitle, "Ligar para a Paula");
+  await setActivityDone(plant.id, false, SELLER.email, mine, db.pool);
+  await assert.rejects(() => setActivityDone(activities[2].id, true, SELLER.email, mine, db.pool), /não encontrada/);
+  await assert.rejects(() => deleteActivity(plant.id, theirs, db.pool), /não encontrada/);
+  await deleteActivity(plant.id, mine, db.pool);
+  // Os rótulos de prazo da tela.
+  assert.deepEqual([dueLabel("2026-10-08", "2026-10-09"), dueLabel("2026-10-09", "2026-10-09"), dueLabel("2026-10-12", "2026-10-09"), dueLabel(null, "2026-10-09")], [{ tone: "bad", text: "Atrasada · 08/10/2026" }, { tone: "warn", text: "Hoje" }, { tone: "neutral", text: "12/10/2026" }, null]);
+
+  // Mover de etapa; perder pede o motivo; voltar a uma etapa em aberto reabre.
+  await moveOpportunity(id, second.id, null, SELLER.email, mine, db.pool);
+  await assert.rejects(() => moveOpportunity(id, lost.id, "  ", SELLER.email, mine, db.pool), /por que a venda foi perdida/);
+  await moveOpportunity(id, lost.id, "Fechou com o concorrente", SELLER.email, mine, db.pool);
+  const closed = (await getOpportunity(id, mine, db.pool))!;
+  assert.deepEqual([closed.stageKind, closed.lostReason, closed.closedAt !== null], ["perdida", "Fechou com o concorrente", true]);
+  // Tarefa de oportunidade fechada não fica na lista do dia.
+  assert.deepEqual(await listPendingActivities(mine, db.pool), []);
+  await moveOpportunity(id, second.id, null, SELLER.email, mine, db.pool);
+  const reopened = (await getOpportunity(id, mine, db.pool))!;
+  assert.deepEqual([reopened.stageName, reopened.lostReason, reopened.closedAt], ["Contato feito", null, null]);
+  await assert.rejects(() => deleteStage(second.id, db.pool), /Há oportunidades nesta etapa/);
+
+  // O quadro soma por etapa, e a busca acha por venda, empresa, contato ou vendedor.
+  const board = byStage(await listStages(db.pool), await listOpportunities(all, db.pool));
+  assert.deepEqual(board.filter((column) => column.items.length > 0).map((column) => [column.stage.name, column.items.length, column.total]), [["Novo", 1, 0], ["Contato feito", 1, 80000]]);
+  assert.deepEqual([matchesOpportunity(reopened, "fit paula"), matchesOpportunity(reopened, "academia vendedor"), matchesOpportunity(reopened, "condominio")], [true, true, false]);
+
+  // Vira pedido: só pedido ao alcance de quem vincula; fechado o pedido, a oportunidade é ganha sozinha.
+  const number = await createOrder({ seller: SELLER, version: 1, productId: ID["LD-B001"], quantity: 1 }, numbers("261009-FUNI"), db.pool);
+  await assert.rejects(() => linkOpportunityOrder(other, number, OTHER_SELLER.email, theirs, db.pool), /não encontrado/);
+  await linkOpportunityOrder(id, number, SELLER.email, mine, db.pool);
+  assert.deepEqual([(await getOpportunity(id, mine, db.pool))!.orderNumber, (await getOpportunity(id, mine, db.pool))!.orderStatus], [number, "em_negociacao"]);
+  await syncOpportunitiesWithOrders(db.pool);
+  assert.equal((await getOpportunity(id, mine, db.pool))!.stageKind, "aberta");
+  await linkOrderCustomer(number, customerSp, SELLER.email, MINE, db.pool);
+  await saveOrderTerms(number, { ...TERMS, deliveryUf: "SP" }, SELLER.email, MINE, db.pool);
+  await savePayment(number, { ...PAYMENT, downPayment: 20000 }, SELLER.email, MINE, db.pool);
+  assert.equal((await closeOrder(number, SELLER.email, MINE, db.pool)).status, "fechado");
+  await syncOpportunitiesWithOrders(db.pool);
+  const gained = (await getOpportunity(id, mine, db.pool))!;
+  assert.deepEqual([gained.stageKind, gained.stageName, gained.closedAt !== null], ["ganha", "Ganho", true]);
+  // Excluir o pedido (reaberto, pela diretoria) só desfaz a ligação: a oportunidade fica.
+  await reopenOrder(number, DIRECTOR, ALL, db.pool);
+  await deleteOrder(number, ALL, db.pool, { withHistory: true });
+  assert.equal((await getOpportunity(id, mine, db.pool))!.orderNumber, null);
+  // Desfazer o vínculo à mão também é possível.
+  await linkOpportunityOrder(id, null, SELLER.email, mine, db.pool);
+
+  // Excluir a oportunidade leva as atividades; a etapa vazia pode sair.
+  await deleteOpportunity(id, mine, db.pool);
+  assert.equal(Number((await db.pool.query("SELECT count(*) FROM opportunity_activities WHERE opportunity_id = $1", [id])).rows[0].count), 0);
+  await deleteOpportunity(other, all, db.pool);
+  await deleteStage(visit.id, db.pool);
+  assert.equal((await listStages(db.pool)).length, 6);
+});

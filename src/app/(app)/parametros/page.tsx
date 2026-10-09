@@ -82,6 +82,10 @@ export default async function ParametrosPage({ searchParams }: { searchParams: P
           E-mail das notas
         </Link>
         {" · "}
+        <Link href="/parametros/funil" className="font-medium text-brand underline">
+          Etapas do funil
+        </Link>
+        {" · "}
         <Link href="/parametros/contrato" className="font-medium text-brand underline">
           Contrato
         </Link>

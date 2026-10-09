@@ -11,6 +11,7 @@ const MATRIX: [MenuItemKey, string, string, [boolean, boolean, boolean, boolean]
   ["dashboard", "Dashboard", "/dashboard", [true, true, true, false]],
   ["precos-metas", "Preços e metas", "/precos-metas", [true, true, false, false]],
   ["aprovacoes", "Aprovações", "/aprovacoes", [true, true, false, false]],
+  ["funil", "Funil", "/funil", [true, true, true, false]],
   ["pedidos", "Pedidos", "/pedidos", [true, true, true, false]],
   ["clientes", "Clientes", "/clientes", [true, true, true, false]],
   ["recebimentos", "Recebimentos", "/recebimentos", [true, false, false, true]],
@@ -36,8 +37,8 @@ test("os perfis são exatamente os quatro, com os rótulos de tela", () => {
   });
 });
 
-test("o menu tem os 14 itens do manual, na ordem do manual", () => {
-  assert.equal(MENU_ITEMS.length, 14);
+test("o menu tem os 15 itens, os do manual mais o funil, na ordem do manual", () => {
+  assert.equal(MENU_ITEMS.length, 15);
   assert.deepEqual(
     MENU_ITEMS.map((item) => [item.key, item.label, item.href]),
     MATRIX.map(([key, label, href]) => [key, label, href]),
@@ -52,7 +53,7 @@ test("o menu tem os 14 itens do manual, na ordem do manual", () => {
   assert.deepEqual(MENU_ITEMS.map((item) => item.label), labels);
 });
 
-test("matriz de permissão: 14 itens × 4 perfis", () => {
+test("matriz de permissão: 15 itens × 4 perfis", () => {
   let checked = 0;
   for (const [key, , , row] of MATRIX) {
     COLUMNS.forEach((role, column) => {
@@ -60,7 +61,7 @@ test("matriz de permissão: 14 itens × 4 perfis", () => {
       checked += 1;
     });
   }
-  assert.equal(checked, 56);
+  assert.equal(checked, 60);
 });
 
 test("menuFor devolve só os itens do perfil, na ordem do manual", () => {
@@ -78,6 +79,7 @@ test("menuFor devolve só os itens do perfil, na ordem do manual", () => {
   ]);
   assert.deepEqual(menuFor("VENDEDOR").map((item) => item.href), [
     "/dashboard",
+    "/funil",
     "/pedidos",
     "/clientes",
     "/comissoes",
@@ -120,11 +122,11 @@ test("telas por pessoa: a lista só tira telas do perfil, nunca dá uma que ele 
   assert.equal(allows(seller, "produtos"), false);
   assert.equal(allows(seller, "parametros"), false);
   // Sem lista, valem todas as telas do perfil.
-  for (const items of [null, undefined]) assert.equal(menuOf({ role: "VENDEDOR", items }).length, 6);
+  for (const items of [null, undefined]) assert.equal(menuOf({ role: "VENDEDOR", items }).length, 7);
 });
 
 test("telas por pessoa: o que se guarda é só o que foi tirado do perfil", () => {
-  const all = ["dashboard", "pedidos", "clientes", "comissoes", "tabela-precos", "simulador"];
+  const all = ["dashboard", "funil", "pedidos", "clientes", "comissoes", "tabela-precos", "simulador"];
   assert.equal(narrowedItems("VENDEDOR", all), null);
   assert.equal(narrowedItems("VENDEDOR", [...all, "parametros"]), null);
   // Na ordem do menu, sem o que o perfil não tem.

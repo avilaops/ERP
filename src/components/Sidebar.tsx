@@ -17,6 +17,7 @@ import { tenantDb } from "@/lib/db/pool";
  */
 const TAB_ORDER: [key: string, label: string, icon: string][] = [
   ["pedidos", "Pedidos", "M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h7"],
+  ["funil", "Funil", "M3 5h18l-7 8v6l-4 2v-8z"],
   ["clientes", "Clientes", "M16 20v-1.5a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4V20M9.5 10.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7M21 20v-1.5a4 4 0 0 0-3-3.9M15.5 3.6a3.5 3.5 0 0 1 0 6.8"],
   ["tabela-precos", "Preços", "M3 12V4h8l10 10-8 8zM7.5 7.5h.01"],
   ["simulador", "Simular", "M6 3h12v18H6zM9 7h6M9 12h.01M12 12h.01M15 12h.01M9 16h.01M12 16h.01M15 16h.01"],
