@@ -1409,7 +1409,7 @@ test("excluir pedido com histórico: só a diretoria, e só enquanto nada chegou
   // Com recebimento baixado, nem a diretoria: o dinheiro entrou.
   const expected = await db.pool.query("SELECT id FROM receivables WHERE order_id = $1 ORDER BY number LIMIT 1", [id]);
   await db.pool.query("INSERT INTO receipts (receivable_id, amount, amount_without_ipi, received_at, method, recorded_by) VALUES ($1, 100, 88.5, now(), 'PIX', 'x')", [expected.rows[0].id]);
-  await assert.rejects(() => deleteOrder(number, ALL, db.pool, { withHistory: true }), /tem recebimento, conta ou nota fiscal/);
+  await assert.rejects(() => deleteOrder(number, ALL, db.pool, { withHistory: true }), /tem recebimento, conta, nota fiscal ou contrato assinado/);
   await db.pool.query("DELETE FROM receipts WHERE receivable_id = $1", [expected.rows[0].id]);
   assert.deepEqual(await deleteOrder(number, ALL, db.pool, { withHistory: true }), { sellerEmail: SELLER.email });
   for (const tableName of ["orders", "order_items", "order_closings", "order_approvals", "receivables"]) {
@@ -1458,4 +1458,182 @@ test("parcelas combinadas uma a uma: data, valor e forma de cada; têm de somar 
   assert.deepEqual((await order(number)).customInstallments, []);
   await assert.rejects(() => saveOrderInstallments(number, [{ dueDate: "2026-11-10", amount: 1, method: null }], SELLER.email, MINE, db.pool), /pago na entrega/);
   await deleteOrder(number, MINE, db.pool);
+});
+
+test("contrato do pedido: enviado com link secreto, assinado com código do e-mail, com trilha; reabrir cancela o pendente e o assinado segura o pedido", { skip }, async () => {
+  const { hashToken, TOKEN } = await import("@/lib/contract/token");
+  const { ContractError, cancelContract, findContractByToken, listContractEvents, listOrderContracts, loadContractPdf, saveContractSettings, signForCompany } = await import("@/lib/db/contracts");
+  const { contractFile, draftOrderContract, requestSigningCode, resendOrderContract, sendOrderContract, signOrderContract } = await import("@/lib/db/send-contract");
+  const { removeOwnMailbox } = await import("@/lib/db/mail");
+  const { fingerprint } = await import("@/lib/contract/token");
+  await removeOwnMailbox(DIRECTOR, db.pool);
+
+  const number = await createOrder({ seller: SELLER, version: 1, productId: ID["LD-B001"], quantity: 1 }, numbers("261009-CONT"), db.pool);
+  await linkOrderCustomer(number, customerSp, SELLER.email, MINE, db.pool);
+  await saveOrderTerms(number, { ...TERMS, deliveryUf: "SP", productionDays: 60 }, SELLER.email, MINE, db.pool);
+  await savePayment(number, { ...PAYMENT, downPayment: 20000 }, SELLER.email, MINE, db.pool);
+  const now = new Date();
+  // Só pedido fechado tem contrato.
+  const negotiating = (await getOrder(number, MINE, db.pool))!;
+  await assert.rejects(() => draftOrderContract(negotiating, "Acme", now, db.pool), /depois que o pedido é fechado/);
+  assert.equal((await closeOrder(number, SELLER.email, MINE, db.pool)).status, "fechado");
+  const closed = (await getOrder(number, MINE, db.pool))!;
+
+  // O modelo da empresa, com um campo desconhecido que fica como digitado.
+  await assert.rejects(() => saveContractSettings({ title: null, body: null, linkDays: 7, mailSubject: null, mailBody: "Sem o endereço de assinatura" }, DIRECTOR, db.pool), /precisa ter \{link\}/);
+  await saveContractSettings({ title: "Contrato de venda", body: "# Partes\n\n{empresa} vende a {cliente} ({cliente_documento}).\n\n{equipamentos}\n\nTotal: {total}. {inexistente}\n\nPrazo: {prazo_fabricacao}. Gerente: {gerente}.", linkDays: 3, mailSubject: null, mailBody: null }, DIRECTOR, db.pool);
+  const draft = await draftOrderContract(closed, "Acme", now, db.pool);
+  assert.equal(draft.title, "Contrato de venda");
+  assert.match(draft.body, /Acme vende a .* \(CNPJ 11\.222\.333\/0001-81\)/);
+  assert.match(draft.body, /- 1 x LD-B001/);
+  assert.ok(draft.body.includes("{inexistente}") && draft.body.includes("60 dias"));
+  // O que o modelo usa e a empresa não cadastrou sai em branco, e a tela avisa.
+  assert.deepEqual(draft.blanks, ["Gerente comercial (Parâmetros)"]);
+
+  const outbox: { to: string; message: string }[] = [];
+  const way = {
+    env: { ERP_SMTP_HOST: "mail.avilaops.com", ERP_SMTP_USER: "noreply@avilaops.com", ERP_SMTP_PASSWORD: "segredo-padrao", ERP_MAIL_FROM: "noreply@avilaops.com" },
+    key: () => { throw new Error("o cofre não é aberto sem caixa própria"); },
+    send: async (_config: unknown, envelope: { from: string; to: string }, message: string) => void outbox.push({ to: envelope.to, message }),
+  };
+  const textOf = (message: string) => Buffer.from(message.split("Content-Transfer-Encoding: base64\r\n\r\n")[1].split("\r\n--")[0], "base64").toString("utf8");
+  const context = { company: "Acme", tenant: "acme", appUrl: "https://erp.teste/", sentBy: SELLER.email, now, way };
+
+  // Sem caixa de saída e sem e-mail, nada é criado.
+  await assert.rejects(() => sendOrderContract(closed, { name: null, email: "quem@assina.test" }, { ...context, way: { ...way, env: {} } }, db.pool), /Envio de e-mail não configurado/);
+  await assert.rejects(() => sendOrderContract(closed, { name: null, email: "sem-arroba" }, context, db.pool), /E-mail de quem assina inválido/);
+  assert.deepEqual(await listOrderContracts(closed.id, db.pool), []);
+
+  const sent = await sendOrderContract(closed, { name: "Maria Compradora", email: " Maria@Cliente.test " }, context, db.pool);
+  assert.deepEqual([sent.delivery.status, sent.contract.status, sent.contract.sequence, sent.contract.recipientEmail], ["enviado", "enviado", 1, "maria@cliente.test"]);
+  assert.equal(Math.round((sent.contract.expiresAt.getTime() - now.getTime()) / 86_400_000), 3);
+  const link = textOf(outbox[0].message).match(/https:\/\/erp\.teste\/contrato\/acme\/(\S+)/)!;
+  const token = link[1];
+  assert.match(token, TOKEN);
+  // O banco não guarda o segredo do link: só o resumo dele. E o arquivo guardado confere com a impressão digital.
+  const stored = await db.pool.query("SELECT token_hash, pdf_sha256 FROM order_contracts WHERE id = $1", [sent.contract.id]);
+  assert.equal(stored.rows[0].token_hash, hashToken(token));
+  assert.notEqual(stored.rows[0].token_hash, token);
+  const original = (await loadContractPdf(sent.contract.id, db.pool))!;
+  assert.equal(fingerprint(original), stored.rows[0].pdf_sha256);
+  assert.equal(Buffer.from(original.subarray(0, 5)).toString("latin1"), "%PDF-");
+  // Um pendente por pedido.
+  await assert.rejects(() => sendOrderContract(closed, { name: null, email: "outra@cliente.test" }, context, db.pool), /já tem um contrato aguardando assinatura/);
+
+  // Link novo: o anterior deixa de abrir.
+  const again = await resendOrderContract(closed, sent.contract.id, context, db.pool);
+  const fresh = textOf(outbox[1].message).match(/contrato\/acme\/(\S+)/)![1];
+  assert.equal(again.contract.id, sent.contract.id);
+  assert.equal(await findContractByToken(hashToken(token), db.pool), null);
+  const opened = (await findContractByToken(hashToken(fresh), db.pool))!;
+  assert.deepEqual([opened.orderNumber, opened.sellerEmail, opened.codePending], [number, SELLER.email, false]);
+
+  // Código: nome completo, CPF válido e o aceite; o código vai para o e-mail do contrato e não fica no banco.
+  const asking = { company: "Acme", now, ip: "203.0.113.7", way };
+  await assert.rejects(() => requestSigningCode(opened, fresh, { name: "Maria", document: "111.111.111-11", accepted: false }, asking, db.pool), /nome completo.*CPF válido.*leu e concorda/);
+  await requestSigningCode(opened, fresh, { name: "  Maria   Compradora ", document: "529.982.247-25", accepted: true }, asking, db.pool);
+  assert.equal(outbox[2].to, "maria@cliente.test");
+  const code = textOf(outbox[2].message).match(/\n(\d{6})\r?\n/)![1];
+  const kept = await db.pool.query("SELECT code_hash, pending_name, pending_document FROM order_contracts WHERE id = $1", [opened.id]);
+  assert.deepEqual([kept.rows[0].pending_name, kept.rows[0].pending_document], ["Maria Compradora", "52998224725"]);
+  assert.ok(!String(kept.rows[0].code_hash).includes(code));
+  // Outro código em menos de um minuto é recusado.
+  await assert.rejects(() => requestSigningCode(opened, fresh, { name: "Maria Compradora", document: "529.982.247-25", accepted: true }, asking, db.pool), /Aguarde um minuto/);
+
+  // Código errado conta tentativa; no quinto erro o código morre, mesmo que o certo venha depois.
+  const signing = { company: "Acme", now, ip: "203.0.113.7", agent: "navegador de teste", way };
+  const wrong = code === "000000" ? "111111" : "000000";
+  await assert.rejects(() => signOrderContract(opened, fresh, "12", signing, db.pool), /6 números/);
+  for (const left of ["Restam 4 tentativas", "Restam 3 tentativas", "Restam 2 tentativas", "Resta 1 tentativa", "As tentativas acabaram"]) {
+    await assert.rejects(() => signOrderContract(opened, fresh, wrong, signing, db.pool), (error: unknown) => error instanceof ContractError && error.message.includes(left));
+  }
+  await assert.rejects(() => signOrderContract(opened, fresh, code, signing, db.pool), /venceu ou não foi pedido/);
+  assert.equal((await listOrderContracts(closed.id, db.pool))[0].status, "enviado");
+
+  // Código novo (o minuto passou) e a assinatura.
+  await db.pool.query("UPDATE order_contracts SET code_sent_at = now() - interval '2 minutes' WHERE id = $1", [opened.id]);
+  await requestSigningCode(opened, fresh, { name: "Maria Compradora", document: "529.982.247-25", accepted: true }, asking, db.pool);
+  const second = textOf(outbox[3].message).match(/\n(\d{6})\r?\n/)![1];
+  // O código de um link não serve em outro: o resumo leva o segredo do link.
+  await assert.rejects(() => signOrderContract(opened, token, second, signing, db.pool), /Código incorreto/);
+  await signForCompany(closed.id, opened.id, { email: SELLER.email, name: SELLER.name, role: "Vendedor", ip: "198.51.100.2" }, db.pool);
+  await assert.rejects(() => signForCompany(closed.id, opened.id, { email: SELLER.email, name: SELLER.name, role: "Vendedor", ip: null }, db.pool), /já assinou/);
+  await signOrderContract(opened, fresh, second, signing, db.pool);
+  const [signed] = await listOrderContracts(closed.id, db.pool);
+  assert.deepEqual([signed.status, signed.signerName, signed.signerDocument, signed.signerIp, signed.codePending], ["assinado", "Maria Compradora", "52998224725", "203.0.113.7", false]);
+  assert.deepEqual(signed.companySignatures.map((signature) => [signature.email, signature.role]), [[SELLER.email, "Vendedor"]]);
+  // Assinado uma vez só.
+  await assert.rejects(() => signOrderContract(opened, fresh, second, signing, db.pool), /venceu ou não foi pedido/);
+  // A cópia assinada vai para o cliente e para o vendedor, com o PDF.
+  assert.deepEqual(outbox.slice(4).map((mail) => mail.to), ["maria@cliente.test", SELLER.email]);
+  assert.ok(outbox[4].message.includes('filename="contrato-261009-CONT-1-assinado.pdf"'));
+  // O arquivo assinado é o original mais a folha de registro; o original guardado não muda.
+  const file = await contractFile(signed, { company: "Acme", orderNumber: number, now }, db.pool);
+  assert.ok(file.length > original.length);
+  assert.equal(fingerprint((await loadContractPdf(signed.id, db.pool))!), signed.sha256);
+  const trail = (await listContractEvents(signed.id, db.pool)).map((event) => event.kind);
+  assert.deepEqual(trail.filter((kind) => kind !== "email"), ["enviado", "codigo_enviado", ...Array(5).fill("codigo_errado"), "codigo_enviado", "codigo_errado", "assinado_empresa", "assinado"]);
+
+  // Contrato assinado não se cancela, e segura o pedido: nem a diretoria o exclui depois de reaberto.
+  await assert.rejects(() => cancelContract(closed.id, signed.id, DIRECTOR, db.pool), /Só contrato aguardando assinatura/);
+  const next = await sendOrderContract(closed, { name: null, email: "maria@cliente.test" }, context, db.pool);
+  assert.equal(next.contract.sequence, 2);
+  await reopenOrder(number, DIRECTOR, ALL, db.pool);
+  const after = await listOrderContracts(closed.id, db.pool);
+  assert.deepEqual(after.map((contract) => [contract.sequence, contract.status, contract.cancelledBy]), [[2, "cancelado", DIRECTOR], [1, "assinado", null]]);
+  await assert.rejects(() => deleteOrder(number, ALL, db.pool, { withHistory: true }), /contrato assinado/);
+  await saveContractSettings({ title: null, body: null, linkDays: 7, mailSubject: null, mailBody: null }, DIRECTOR, db.pool);
+});
+
+test("contrato do pedido: prazo vencido, recusa do cliente e exclusão do pedido sem contrato assinado", { skip }, async () => {
+  const { hashToken } = await import("@/lib/contract/token");
+  const { findContractByToken, isOpen, listOrderContracts, refuseContract, standingText } = await import("@/lib/db/contracts");
+  const { requestSigningCode, sendOrderContract } = await import("@/lib/db/send-contract");
+  const { MailError } = await import("@/lib/mail/message");
+  const number = await createOrder({ seller: SELLER, version: 1, productId: ID["LD-B001"], quantity: 1 }, numbers("261009-RECU"), db.pool);
+  await linkOrderCustomer(number, customerSp, SELLER.email, MINE, db.pool);
+  await saveOrderTerms(number, { ...TERMS, deliveryUf: "SP" }, SELLER.email, MINE, db.pool);
+  await savePayment(number, { ...PAYMENT, downPayment: 20000 }, SELLER.email, MINE, db.pool);
+  assert.equal((await closeOrder(number, SELLER.email, MINE, db.pool)).status, "fechado");
+  const closed = (await getOrder(number, MINE, db.pool))!;
+  const outbox: string[] = [];
+  const way = {
+    env: { ERP_SMTP_HOST: "mail.avilaops.com", ERP_SMTP_USER: "noreply@avilaops.com", ERP_SMTP_PASSWORD: "segredo-padrao", ERP_MAIL_FROM: "noreply@avilaops.com" },
+    key: () => { throw new Error("sem caixa própria"); },
+    send: async (_config: unknown, _envelope: unknown, message: string) => void outbox.push(message),
+  };
+  const now = new Date();
+  const context = { company: "Acme", tenant: "acme", appUrl: "https://erp.teste", sentBy: SELLER.email, now, way };
+  const tokenOf = (message: string) => Buffer.from(message.split("Content-Transfer-Encoding: base64\r\n\r\n")[1].split("\r\n--")[0], "base64").toString("utf8").match(/contrato\/acme\/(\S+)/)![1];
+
+  // O servidor de e-mail recusou: o contrato fica aguardando, e a tela diz que o link não saiu.
+  const failed = await sendOrderContract(closed, { name: null, email: "joao@cliente.test" }, { ...context, way: { ...way, send: async () => { throw new MailError("O servidor de e-mail recusou (destinatário): 550 caixa inexistente"); } } }, db.pool);
+  assert.deepEqual([failed.contract.status, failed.delivery.status], ["enviado", "falhou"]);
+  const { resendOrderContract } = await import("@/lib/db/send-contract");
+  await resendOrderContract(closed, failed.contract.id, context, db.pool);
+  const token = tokenOf(outbox[0]);
+  const opened = (await findContractByToken(hashToken(token), db.pool))!;
+
+  // Depois do prazo o link não aceita código nem recusa.
+  await db.pool.query("UPDATE order_contracts SET expires_at = now() - interval '1 minute' WHERE id = $1", [opened.id]);
+  const late = (await findContractByToken(hashToken(token), db.pool))!;
+  assert.equal(isOpen(late, new Date()), false);
+  assert.match(standingText(late, new Date()), /^Link vencido em /);
+  await assert.rejects(() => requestSigningCode(late, token, { name: "João Comprador", document: "529.982.247-25", accepted: true }, { company: "Acme", now: new Date(), ip: null, way }, db.pool), /não está mais aguardando/);
+  await assert.rejects(() => refuseContract(late.id, "Tarde demais", null, db.pool), /não está mais aguardando/);
+
+  // No prazo, o cliente recusa e diz o motivo; depois disso nada mais é assinado.
+  await db.pool.query("UPDATE order_contracts SET expires_at = now() + interval '1 day' WHERE id = $1", [opened.id]);
+  await refuseContract(opened.id, "  O prazo de entrega está errado.  ", "203.0.113.9", db.pool);
+  const [refused] = await listOrderContracts(closed.id, db.pool);
+  assert.deepEqual([refused.status, refused.refusalReason], ["recusado", "O prazo de entrega está errado."]);
+  await assert.rejects(() => requestSigningCode(refused as typeof opened, token, { name: "João Comprador", document: "529.982.247-25", accepted: true }, { company: "Acme", now: new Date(), ip: null, way }, db.pool), /não está mais aguardando/);
+
+  // Sem contrato assinado, a diretoria exclui o pedido reaberto, e os contratos vão junto com a trilha.
+  await reopenOrder(number, DIRECTOR, ALL, db.pool);
+  await deleteOrder(number, ALL, db.pool, { withHistory: true });
+  assert.equal(Number((await db.pool.query("SELECT count(*) FROM order_contracts WHERE order_id = $1", [closed.id])).rows[0].count), 0);
+  for (const tableName of ["order_contract_events", "order_contract_signatures"]) {
+    assert.equal(Number((await db.pool.query(`SELECT count(*) FROM ${tableName} WHERE contract_id = $1`, [opened.id])).rows[0].count), 0, tableName);
+  }
 });

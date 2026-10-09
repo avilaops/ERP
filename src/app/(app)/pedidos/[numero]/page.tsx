@@ -18,6 +18,10 @@ import { listOrderInvoiceEvents, listOrderInvoices } from "@/lib/db/invoices";
 import { previewOrderNfe } from "@/lib/db/order-nfe";
 import { findCustomerByDocument } from "@/lib/db/customers";
 import { getOrder, listPaymentMethods, loadOrderStanding } from "@/lib/db/orders";
+import { ContractError, isOpen, listOrderContracts, standingText } from "@/lib/db/contracts";
+import { draftOrderContract } from "@/lib/db/send-contract";
+import { contractNumber } from "@/lib/contract/text";
+import { formatDocument } from "@/lib/customer";
 import { loadProposalSettings, loadApprovalPolicy } from "@/lib/db/company";
 import { latestVersion, loadDiscountLimits, loadPublishedSnapshot, loadPublishedTable } from "@/lib/db/price-table";
 import { formatMoney, formatPercent, isoDate, showDateTime, showIsoDate, showMoney, showPercent } from "@/lib/format";
@@ -32,6 +36,7 @@ import { DownPaymentFields } from "@/components/DownPaymentFields";
 import { proposalText } from "@/lib/quote/text";
 import { decideApprovalAction } from "../../aprovacoes/actions";
 import { FREIGHT_MODES } from "@/lib/fiscal/nfe";
+import { cancelContractAction, resendContractAction, sendContractAction, signContractAction } from "../contract-actions";
 import { issueNfeAction, registerNfeEventAction, saveDeliveryAction, saveTransportAction, sendNfeMailAction } from "../nfe-actions";
 import { CustomerForm } from "../../clientes/CustomerForm";
 import { ActionForm } from "../ActionForm";
@@ -79,6 +84,15 @@ const requiredOf = (kind: CustomerKind) =>
   [...CUSTOMER_FIELDS[kind].main, ...CUSTOMER_FIELDS[kind].address].map(({ key }) => key).filter((key) => isRequired(kind, key));
 
 const INVOICE_LABELS = { assinada: "aguardando resposta da SEFAZ", autorizada: "autorizada", rejeitada: "rejeitada", denegada: "denegada", cancelada: "cancelada" } as const;
+/** The colours of a contract by how it stands; `vencido` is one sent whose link ran out. */
+const CONTRACT_COLORS: Record<"enviado" | "assinado" | "recusado" | "cancelado" | "vencido", string> = {
+  enviado: "border-sky-300 bg-sky-50 text-sky-900",
+  assinado: "border-emerald-300 bg-emerald-50 text-emerald-900",
+  recusado: "border-red-300 bg-red-50 text-red-900",
+  cancelado: "border-slate-300 bg-slate-50 text-slate-700",
+  vencido: "border-amber-300 bg-amber-50 text-amber-900",
+};
+
 const INVOICE_COLORS = {
   assinada: "border-amber-300 bg-amber-50 text-amber-900",
   autorizada: "border-emerald-300 bg-emerald-50 text-emerald-900",
@@ -155,6 +169,17 @@ export default async function PedidoPage({
     const key = limits?.keyOf({ uf: order.deliveryUf, taxpayer: order.taxpayer });
     authority = limits?.limits.find((limit) => limit.label === key)?.[upTo] ?? null;
   }
+  // The contracts of the order, and, while it is closed, the one that would leave now (or why none can).
+  const now = new Date();
+  const contracts = await listOrderContracts(order.id, conn);
+  const waiting = contracts.find((contract) => contract.status === "enviado") ?? null;
+  const contractDraft =
+    order.status === "fechado" && !waiting
+      ? await draftOrderContract(order, session.tenant.name, now, conn).catch((error: unknown) => {
+          if (error instanceof ContractError) return error.message;
+          throw error;
+        })
+      : null;
   // The conference of the invoice: only for a closed order and for who edits the fiscal parameters.
   const invoice = order.status === "fechado" && allows(session, "parametros") ? await previewOrderNfe(order.number, new Date(), conn) : null;
   const invoices = invoice ? await listOrderInvoices(order.id, conn) : [];
@@ -259,6 +284,103 @@ export default async function PedidoPage({
               Recusar
             </button>
           </ActionForm>
+        </section>
+      )}
+      {(contracts.length > 0 || contractDraft !== null) && (
+        <section className="mt-3 rounded-lg border border-slate-200 bg-white p-4 text-sm" aria-labelledby="contrato">
+          <h2 id="contrato" className="text-sm font-semibold uppercase tracking-wide">
+            Contrato
+          </h2>
+          <p className="mt-1 text-slate-600">
+            O cliente recebe um link por e-mail, lê o contrato e assina com nome, CPF e um código enviado ao e-mail dele. O PDF assinado sai com o registro das
+            assinaturas na última folha.
+          </p>
+          {contracts.length > 0 && (
+            <ul className="mt-3 flex flex-col gap-2">
+              {contracts.map((contract) => {
+                const open = isOpen(contract, now);
+                const live = contract.status === "enviado" || contract.status === "assinado";
+                const mine = contract.companySignatures.some((signature) => signature.email === session.email);
+                return (
+                  <li key={contract.id} className={`rounded border px-3 py-2 ${CONTRACT_COLORS[contract.status === "enviado" && !open ? "vencido" : contract.status]}`}>
+                    <strong>
+                      Contrato nº {contractNumber(order.number, contract.sequence)} · {standingText(contract, now)}
+                    </strong>
+                    <span className="block">
+                      Enviado para {contract.recipientName} ({contract.recipientEmail}) em {showDateTime(contract.createdAt)}
+                      {contract.status === "enviado" && ` · link válido até ${showDateTime(contract.expiresAt)}`}
+                    </span>
+                    {contract.status === "assinado" && (
+                      <span className="block">
+                        Assinou: {contract.signerName}, CPF {formatDocument(contract.signerDocument ?? "")}
+                      </span>
+                    )}
+                    {contract.status === "recusado" && contract.refusalReason && <span className="block">Motivo informado: {contract.refusalReason}</span>}
+                    {contract.companySignatures.map((signature) => (
+                      <span key={signature.email} className="block">
+                        Pela empresa: {signature.name} ({signature.role}) em {showDateTime(signature.signedAt)}
+                      </span>
+                    ))}
+                    <span className="mt-1 flex flex-wrap items-start gap-x-4 gap-y-2 text-slate-900">
+                      <a href={`/api/pedidos/${order.number}/contrato/${contract.id}`} target="_blank" rel="noopener" className="font-medium underline">
+                        {contract.status === "assinado" ? "Contrato assinado (PDF)" : "Abrir o contrato (PDF)"}
+                      </a>
+                      {live && !mine && (
+                        <ActionForm action={signContractAction}>
+                          <input type="hidden" name="number" value={order.number} />
+                          <input type="hidden" name="contractId" value={contract.id} />
+                          <ConfirmButton label="Assinar pela empresa" confirmLabel={`Confirmar: assinar como ${session.name}`} className="rounded border border-slate-300 bg-white px-3 py-1 font-medium hover:bg-slate-50" />
+                        </ActionForm>
+                      )}
+                      {contract.status === "enviado" && (
+                        <>
+                          <ActionForm action={resendContractAction}>
+                            <input type="hidden" name="number" value={order.number} />
+                            <input type="hidden" name="contractId" value={contract.id} />
+                            <ConfirmButton label="Enviar o link de novo" confirmLabel="Confirmar: o link anterior deixa de valer" className="rounded border border-slate-300 bg-white px-3 py-1 font-medium hover:bg-slate-50" />
+                          </ActionForm>
+                          <ActionForm action={cancelContractAction}>
+                            <input type="hidden" name="number" value={order.number} />
+                            <input type="hidden" name="contractId" value={contract.id} />
+                            <ConfirmButton label="Cancelar contrato" confirmLabel="Confirmar: cancelar" className="rounded border border-red-300 bg-white px-3 py-1 font-medium text-red-700 hover:bg-red-50" />
+                          </ActionForm>
+                        </>
+                      )}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {typeof contractDraft === "string" && <p className="mt-3 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-amber-900">{contractDraft}</p>}
+          {contractDraft !== null && typeof contractDraft !== "string" && (
+            <ActionForm action={sendContractAction} className="mt-3 flex flex-wrap items-end gap-3">
+              <input type="hidden" name="number" value={order.number} />
+              {contractDraft.blanks.length > 0 && (
+                <p className="basis-full rounded border border-amber-300 bg-amber-50 px-3 py-2 text-amber-900">
+                  Vai sair em branco no contrato, porque não está cadastrado: {contractDraft.blanks.join("; ")}.
+                </p>
+              )}
+              <div className="min-w-56 flex-1">
+                <label htmlFor="recipientName" className="block text-xs font-medium text-slate-600">
+                  Quem assina pelo cliente
+                </label>
+                <input id="recipientName" name="recipientName" type="text" defaultValue={order.customer?.contactName ?? order.customer?.name ?? ""} autoComplete="off" className={`${INPUT} w-full`} />
+              </div>
+              <div className="min-w-56 flex-1">
+                <label htmlFor="recipientEmail" className="block text-xs font-medium text-slate-600">
+                  E-mail de quem assina (recebe o link e o código)
+                </label>
+                <input id="recipientEmail" name="recipientEmail" type="email" defaultValue={order.customer?.email ?? ""} autoComplete="off" className={`${INPUT} w-full`} />
+              </div>
+              <a href={`/api/pedidos/${order.number}/contrato-previa`} target="_blank" rel="noopener" className="py-2 font-medium text-brand underline">
+                Conferir o contrato (PDF)
+              </a>
+              <button type="submit" className="rounded bg-brand px-4 py-2 font-semibold text-white hover:opacity-90">
+                {contracts.length > 0 ? "Enviar novo contrato para assinatura" : "Enviar contrato para assinatura"}
+              </button>
+            </ActionForm>
+          )}
         </section>
       )}
       {invoice && (

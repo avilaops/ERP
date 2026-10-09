@@ -195,3 +195,14 @@ Se a migração falhar, a versão antiga continua no ar.
   do catálogo do fornecedor — o estado da madrugada, antes das migrações do dia. Os únicos erros
   foram os 33 `role "erp" does not exist`, esperados num servidor sem a role. Banco temporário e
   arquivo apagados. No R2 estão os dumps de 06, 07 e 08/10 com o mesmo tamanho dos locais.
+
+## Contrato do pedido com assinatura eletrônica
+
+- **O que é**: depois de fechado, o pedido ganha o cartão "Contrato". O contrato sai do modelo de Parâmetros → Contrato (texto com campos entre chaves), vira PDF e vai para o cliente por e-mail, com um link. O cliente assina com nome, CPF e um código de 6 números enviado ao mesmo e-mail. Vendedor, gerente e diretoria assinam pela própria conta, no cartão.
+- **Endereço público**: `/contrato/<empresa>/<segredo>` é a única tela do ERP sem login. O segredo tem 32 bytes aleatórios e o banco guarda só o SHA-256 dele; endereço errado, de outra empresa ou de contrato cancelado dá a mesma resposta ("não vale mais"). Depende de `APP_URL` certo no servidor: é ele que vai no e-mail.
+- **Limites**: link vale os dias do modelo (padrão 7); código vale 15 minutos, 5 tentativas, um a cada minuto, 10 por contrato. "Enviar o link de novo" troca o segredo e zera esses contadores.
+- **O que fica guardado** (`order_contracts`, `order_contract_signatures`, `order_contract_events`): o texto e o PDF como saíram, a impressão digital (SHA-256) do PDF, e cada passo com data, hora e IP. O PDF baixado é o original mais a folha "Registro de assinaturas eletrônicas", montada na hora.
+- **IP**: é o último valor de `X-Forwarded-For`, o que o Caddy escreve. Se o ERP passar a ficar atrás de outro proxy (Cloudflare com nuvem laranja, por exemplo), o IP gravado passa a ser o do proxy: rever `clientIp` em `src/lib/contract/public.ts`.
+- **E-mail**: sai pela mesma caixa das notas (a da empresa ou a da Ávila Ops). Sem caixa, o contrato não é enviado e a tela diz por quê.
+- **Pedido reaberto**: contrato aguardando assinatura é cancelado junto; contrato assinado fica, e impede a exclusão do pedido.
+- **Limite jurídico**: é assinatura eletrônica entre particulares (MP 2.200-2/2001, art. 10, § 2º), atestada pelo sistema de quem vende. Não é assinatura com certificado ICP-Brasil. O texto padrão não tem cláusulas comerciais: são da empresa, com o advogado dela.

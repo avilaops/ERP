@@ -24,7 +24,7 @@ export async function listOrderInvoiceMails(orderId: number, conn: Queryable): P
   }));
 }
 
-export const MAIL_NOT_SET = "Envio de e-mail não configurado: cadastre a caixa da empresa em Parâmetros → Fiscal, ou peça à Ávila Ops para ligar a caixa padrão.";
+export const MAIL_NOT_SET = "Envio de e-mail não configurado: cadastre a caixa da empresa em Parâmetros → E-mail das notas, ou peça à Ávila Ops para ligar a caixa padrão.";
 
 export type SendInvoiceMail = {
   invoiceId: number;

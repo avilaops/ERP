@@ -38,13 +38,13 @@ export type QuoteAssets = {
  * character outside WinAnsi (emoji, arrow, ideogram) becomes `?` instead of
  * bringing the whole file down.
  */
-function drawable(text: string, font: PDFFont): string {
+export function drawable(text: string, font: PDFFont): string {
   const known = new Set(font.getCharacterSet());
   return [...text.normalize("NFC").replace(/\s+/g, " ").trim()].map((char) => (known.has(char.codePointAt(0) ?? 0) ? char : "?")).join("");
 }
 
 /** The text in lines no wider than `width`. A word wider than the column is cut by letter. */
-function wrap(text: string, font: PDFFont, size: number, width: number): string[] {
+export function wrap(text: string, font: PDFFont, size: number, width: number): string[] {
   const fits = (line: string) => font.widthOfTextAtSize(line, size) <= width;
   const lines: string[] = [];
   let line = "";

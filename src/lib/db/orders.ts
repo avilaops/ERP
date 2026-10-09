@@ -668,6 +668,13 @@ export async function reopenOrder(number: string, who: string, scope: OrderScope
      ), withdrawn AS (
        -- A request nobody decided leaves with the order: it is asked again at the next closing.
        DELETE FROM order_approvals USING reopened WHERE order_id = reopened.id AND status = 'pendente'
+     ), unsigned AS (
+       -- A contract nobody signed describes an order that is about to change: it leaves too. A signed one stays.
+       UPDATE order_contracts SET status = 'cancelado', cancelled_at = now(), cancelled_by = $2, code_hash = NULL
+         FROM reopened WHERE order_id = reopened.id AND status = 'enviado'
+       RETURNING order_contracts.id
+     ), noted AS (
+       INSERT INTO order_contract_events (contract_id, kind, detail, actor) SELECT id, 'cancelado', 'pedido reaberto', $2 FROM unsigned
      )
      SELECT id FROM reopened`,
     [number, who, scope.sellerEmail],
@@ -682,7 +689,8 @@ export async function reopenOrder(number: string, who: string, scope: OrderScope
  * An order that was once closed or went through approval has history. Only
  * with `withHistory` (the directors) it leaves too, taking that history along,
  * and only while nothing of it reached the money or the tax authority: no
- * amount received, no refund, no bill tied to it and no invoice. Otherwise it
+ * amount received, no refund, no bill tied to it, no invoice and no signed
+ * contract. Otherwise it
  * stays, and the way out of the list is to mark it as lost.
  */
 export async function deleteOrder(number: string, scope: OrderScope, conn: Queryable, { withHistory = false }: { withHistory?: boolean } = {}): Promise<{ sellerEmail: string }> {
@@ -696,11 +704,18 @@ export async function deleteOrder(number: string, scope: OrderScope, conn: Query
                 OR EXISTS (SELECT 1 FROM refund_requests q WHERE q.order_id = o.id)
                 OR EXISTS (SELECT 1 FROM refunds f WHERE f.order_id = o.id)
                 OR EXISTS (SELECT 1 FROM payables b WHERE b.order_id = o.id)
-                OR EXISTS (SELECT 1 FROM fiscal_invoices i WHERE i.order_id = o.id) AS is_bound
+                OR EXISTS (SELECT 1 FROM fiscal_invoices i WHERE i.order_id = o.id)
+                OR EXISTS (SELECT 1 FROM order_contracts k WHERE k.order_id = o.id AND k.status = 'assinado') AS is_bound
          FROM orders o
         WHERE o.number = $1 AND o.status = 'em_negociacao' AND ($2::text IS NULL OR o.seller_email = $2)
      ), free AS (
        SELECT id, seller_email FROM target WHERE NOT is_bound AND (NOT has_history OR $3::boolean)
+     ), trail AS (
+       DELETE FROM order_contract_events e USING order_contracts k, free WHERE e.contract_id = k.id AND k.order_id = free.id RETURNING k.order_id
+     ), signatures AS (
+       DELETE FROM order_contract_signatures g USING order_contracts k, free WHERE g.contract_id = k.id AND k.order_id = free.id RETURNING k.order_id
+     ), contracts AS (
+       DELETE FROM order_contracts USING free WHERE order_id = free.id RETURNING order_id
      ), agreed AS (
        DELETE FROM order_installments USING free WHERE order_id = free.id RETURNING order_id
      ), approvals AS (
@@ -723,7 +738,7 @@ export async function deleteOrder(number: string, scope: OrderScope, conn: Query
   if (row.seller_email === null) {
     throw new OrderError(
       row.is_bound
-        ? "Este pedido tem recebimento, conta ou nota fiscal ligados a ele e não pode ser excluído. Se a venda não saiu, marque o pedido como perdido."
+        ? "Este pedido tem recebimento, conta, nota fiscal ou contrato assinado ligados a ele e não pode ser excluído. Se a venda não saiu, marque o pedido como perdido."
         : "Este pedido já foi fechado ou passou por aprovação: só a diretoria pode excluí-lo. Se a venda não saiu, marque o pedido como perdido.",
     );
   }
