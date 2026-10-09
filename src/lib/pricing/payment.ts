@@ -41,6 +41,26 @@ export function addDays(date: string, days: number): string {
   return formatDate(parseDate(date) + days * DAY_MS);
 }
 
+/**
+ * Days from Monday to Friday added to an `AAAA-MM-DD` date. Counting from a
+ * weekend is counting from the Friday before it: the first working day is the
+ * Monday. Holidays are not taken out: the result is an estimate.
+ */
+export function addBusinessDays(date: string, days: number): string {
+  if (!Number.isInteger(days) || days < 0) throw new Error("Quantidade de dias úteis precisa ser um número inteiro, zero ou mais.");
+  let ms = parseDate(date);
+  if (days === 0) return formatDate(ms);
+  const weekday = () => new Date(ms).getUTCDay();
+  while (weekday() === 0 || weekday() === 6) ms -= DAY_MS;
+  // Whole weeks at once, then the days left one by one.
+  ms += Math.floor(days / 5) * 7 * DAY_MS;
+  for (let left = days % 5; left > 0; ) {
+    ms += DAY_MS;
+    if (weekday() !== 0 && weekday() !== 6) left -= 1;
+  }
+  return formatDate(ms);
+}
+
 export type Installment = {
   number: number;
   amount: number;

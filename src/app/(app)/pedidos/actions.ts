@@ -21,13 +21,14 @@ import {
   OrderError,
   removeOrderItem,
   reopenOrder,
+  saveOrderInstallments,
   saveOrderTerms,
   savePayment,
   setOrderItemQuantity,
 } from "@/lib/db/orders";
 import type { OrderScope } from "@/lib/db/orders";
 import { latestVersion, loadPublishedTable } from "@/lib/db/price-table";
-import { isoDate } from "@/lib/format";
+import { isoDate, parseMoney } from "@/lib/format";
 import { parseOrderPayment, parseOrderTerms, parseQuantity } from "@/lib/order-form";
 import type { ActionState } from "@/lib/order-form";
 import { orderNumber } from "@/lib/order-number";
@@ -275,4 +276,34 @@ export async function saveOrderCustomerAction(_previous: CustomerFormState, form
   revalidatePath(`${ORDERS}/${number}`);
   // Back to the order without the search in the address: the block shows the linked customer.
   redirect(`${ORDERS}/${number}`);
+}
+
+/**
+ * "Salvar parcelas": the installments of the balance agreed one by one. Each
+ * row of the list comes with its date, amount and form; the layer below checks
+ * that they add up to the balance.
+ */
+export async function saveInstallmentsAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
+  const session = await requirePermission("pedidos");
+  const conn = tenantDb(session.tenant.slug);
+  const number = reader(formData)("number") ?? "";
+  const list = (key: string) => formData.getAll(key).map((value) => (typeof value === "string" ? value.trim() : ""));
+  const dates = list("dueDate");
+  const amounts = list("amount");
+  const methods = list("method");
+  if (dates.length === 0 || dates.length !== amounts.length || dates.length !== methods.length) return { error: "Recarregue a página e tente de novo." };
+  const allowed = await listPaymentMethods(conn);
+  const parts = dates.map((dueDate, index) => ({
+    dueDate,
+    // Anything that is not an amount in reais is refused below, with the number of the installment.
+    amount: parseMoney(amounts[index]) ?? Number.NaN,
+    method: allowed.includes(methods[index]) ? methods[index] : null,
+  }));
+  try {
+    await saveOrderInstallments(number, parts, session.email, scopeOf(session), conn);
+  } catch (error) {
+    return { error: problem("gravar as parcelas", error) };
+  }
+  revalidatePath(`${ORDERS}/${number}`);
+  return { error: null, notice: "Parcelas gravadas." };
 }

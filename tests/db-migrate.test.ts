@@ -64,6 +64,8 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "0031_perfis_de_acesso.sql",
     "0032_saldo_na_entrega.sql",
     "0033_medidas_do_equipamento.sql",
+    "0034_prazo_em_dias_uteis.sql",
+    "0035_parcelas_combinadas.sql",
   ]);
 
   const second = await withClient((client) => migrate(client, MIGRATIONS_DIR));
@@ -95,6 +97,7 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "mail_settings",
     "order_approvals",
     "order_closings",
+    "order_installments",
     "order_items",
     "orders",
     "payable_categories",

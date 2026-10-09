@@ -9,7 +9,7 @@ export type ActionState = { error: string | null; /** What went through and is w
 
 export const IDLE_ACTION: ActionState = { error: null };
 
-export type TermsField = "discount" | "deliveryUf" | "taxpayer" | "productionDays" | "freight" | "notes";
+export type TermsField = "discount" | "deliveryUf" | "taxpayer" | "productionDays" | "productionUnit" | "freight" | "notes";
 
 export type ParsedTerms = { ok: true; terms: OrderTerms } | { ok: false; errors: string[] };
 
@@ -40,7 +40,7 @@ export function parseOrderTerms(read: (key: TermsField) => string | null): Parse
   if (errors.length > 0 || discount === null || freight === null) return { ok: false, errors };
   return {
     ok: true,
-    terms: { discount, deliveryUf, taxpayer: text("taxpayer") === "sim", productionDays, freight, notes: text("notes") || null },
+    terms: { discount, deliveryUf, taxpayer: text("taxpayer") === "sim", productionDays, productionUnit: text("productionUnit") === "uteis" ? "uteis" : "corridos", freight, notes: text("notes") || null },
   };
 }
 

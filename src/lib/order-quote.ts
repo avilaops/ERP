@@ -6,14 +6,14 @@ import type { OrderInput, OrderQuote, SaleQuote } from "@/lib/pricing/order";
 import { completenessText, isComplete, missingFields } from "@/lib/customer";
 import { commissionOn } from "@/lib/pricing/commission";
 import { roundCents } from "@/lib/pricing/money";
-import { addDays, installments } from "@/lib/pricing/payment";
+import { addBusinessDays, addDays, installments } from "@/lib/pricing/payment";
 import { realCost } from "@/lib/pricing/product";
 import type { MaxDiscounts } from "@/lib/pricing/table";
 
 /** What the functions here need from an order: no more than the database row and its items. */
 type OrderData = Pick<
   Order,
-  "items" | "discount" | "deliveryUf" | "taxpayer" | "freight" | "productionDays" | "downPaymentDate" | "updatedAt" | "closedAt"
+  "items" | "discount" | "deliveryUf" | "taxpayer" | "freight" | "productionDays" | "productionUnit" | "downPaymentDate" | "updatedAt" | "closedAt"
 >;
 
 /**
@@ -68,6 +68,7 @@ export function simulatedOrder(simulation: Simulation, at: Date): OrderData & Pi
     taxpayer: simulation.taxpayer,
     freight: simulation.freight,
     productionDays: null,
+    productionUnit: "corridos",
     downPaymentDate: null,
     downPayment: 0,
     updatedAt: at,
@@ -89,6 +90,18 @@ export function directorOf(order: OrderData, snapshot: PublishedSnapshot): Direc
   };
 }
 
+/** The day the order is ready: the production time counted from `base`, in calendar or in working days. `null` without a production time. */
+export function completionDate(base: string, days: number | null, unit: Order["productionUnit"] | undefined): string | null {
+  if (days === null) return null;
+  return unit === "uteis" ? addBusinessDays(base, days) : addDays(base, days);
+}
+
+/** `90 dias corridos`, `45 dias úteis`, `1 dia útil`. */
+export function productionText(days: number, unit: Order["productionUnit"] | undefined): string {
+  const working = unit === "uteis";
+  return `${days} ${days === 1 ? "dia" : "dias"} ${working ? (days === 1 ? "útil" : "úteis") : days === 1 ? "corrido" : "corridos"}`;
+}
+
 export type DueDates = {
   /** Until when the proposal holds: counted from the last change of the order. */
   proposalValidUntil: string;
@@ -104,7 +117,7 @@ export function dueDates(order: OrderData, table: PublishedTable, today: string)
   const base = order.downPaymentDate ?? (order.closedAt ? isoDate(order.closedAt) : today);
   return {
     proposalValidUntil: addDays(isoDate(order.updatedAt), table.proposalValidityDays),
-    completion: order.productionDays === null ? null : addDays(base, order.productionDays),
+    completion: completionDate(base, order.productionDays, order.productionUnit),
   };
 }
 
@@ -148,7 +161,7 @@ type PaymentData = Pick<
   | "closedAt"
 > &
   // Absent in what is only being tried out: then the balance follows the installments typed.
-  Partial<Pick<Order, "balanceOnDelivery" | "productionDays">>;
+  Partial<Pick<Order, "balanceOnDelivery" | "productionDays" | "productionUnit" | "customInstallments">>;
 
 /**
  * The payment as agreed: down payment, balance, installments and the commission
@@ -169,8 +182,14 @@ export function paymentOf(order: PaymentData, sale: SaleQuote, table: PublishedT
   }
   // "Na entrega": the whole balance on the day the order is ready (the production time counted from the same day as the rest).
   const onDelivery = order.balanceOnDelivery === true && balance > 0;
-  const parts = onDelivery
-    ? [{ number: 1, dueDate: addDays(base, order.productionDays ?? 0), amount: balance }]
+  // Installments agreed one by one hold while they still add up to the balance: an order whose total changed goes back to the calculated ones.
+  const agreed = order.customInstallments ?? [];
+  const agreedHolds = !onDelivery && agreed.length > 0 && roundCents(agreed.reduce((total, part) => total + part.amount, 0)) === balance;
+  const methodOf = new Map(agreedHolds ? agreed.map((part) => [part.number, part.method]) : []);
+  const parts = agreedHolds
+    ? agreed.map((part) => ({ number: part.number, dueDate: part.dueDate, amount: part.amount }))
+    : onDelivery
+    ? [{ number: 1, dueDate: completionDate(base, order.productionDays ?? 0, order.productionUnit) ?? base, amount: balance }]
     : balance > 0 && order.installmentCount
       ? installments({
           balance,
@@ -184,7 +203,7 @@ export function paymentOf(order: PaymentData, sale: SaleQuote, table: PublishedT
     receipts.push({
       label: `${part.number}/${parts.length}`,
       dueDate: part.dueDate,
-      method: order.balanceMethod,
+      method: methodOf.get(part.number) ?? order.balanceMethod,
       amount: part.amount,
       commission: commission(part.amount),
     });

@@ -19,6 +19,11 @@ import type { Uf } from "@/lib/pricing/states";
 
 export type OrderStatus = "em_negociacao" | "aguardando_aprovacao" | "fechado" | "perdido" | "cancelado";
 
+export type ProductionUnit = "corridos" | "uteis";
+
+/** One installment of the balance as agreed with the customer. `dueDate` is `AAAA-MM-DD`. */
+export type CustomInstallment = { number: number; dueDate: string; amount: number; method: string | null };
+
 export type Order = {
   id: number;
   /** `260930-BBMN`, without the `#`. */
@@ -33,6 +38,8 @@ export type Order = {
   deliveryUf: Uf | null;
   taxpayer: boolean;
   productionDays: number | null;
+  /** How the production time was agreed: calendar days or working days (Monday to Friday). */
+  productionUnit: ProductionUnit;
   /** Freight paid by Ludus, in reais. */
   freight: number;
   notes: string | null;
@@ -46,6 +53,8 @@ export type Order = {
   installmentIntervalDays: number | null;
   /** The balance is one installment, due on the day the order is ready: the form chosen for it says so. */
   balanceOnDelivery: boolean;
+  /** The installments of the balance agreed one by one (date, amount, form). Empty: they are calculated from the count and the days. */
+  customInstallments: CustomInstallment[];
   paymentNotes: string | null;
   updatedAt: Date;
   /** `updated_at` exactly as the database holds it: what "nobody changed it since I read it" is checked against. */
@@ -67,7 +76,7 @@ const FOREIGN_KEY_VIOLATION = "23503";
 
 // The date goes out as text: a `date` read as a JS Date would shift with the server's time zone.
 const COLUMNS = `id, number, status, seller_email, seller_name, customer_id, price_table_version, discount, delivery_uf,
-  taxpayer, production_days, freight, notes, down_payment, down_payment_method,
+  taxpayer, production_days, production_unit, freight, notes, down_payment, down_payment_method,
   to_char(down_payment_date, 'YYYY-MM-DD') AS down_payment_date, balance_method, installment_count,
   first_installment_days, installment_interval_days, balance_on_delivery, payment_notes, updated_at, updated_at::text AS revision, closed_at`;
 
@@ -139,7 +148,9 @@ export async function getOrder(number: string, scope: OrderScope, conn: Queryabl
   const items = await conn.query("SELECT product_id, quantity FROM order_items WHERE order_id = $1 ORDER BY product_id", [
     row.id,
   ]);
+  const agreed = await conn.query("SELECT number, to_char(due_date, 'YYYY-MM-DD') AS due_date, amount, method FROM order_installments WHERE order_id = $1 ORDER BY number", [row.id]);
   return {
+    customInstallments: agreed.rows.map((part) => ({ number: Number(part.number), dueDate: String(part.due_date), amount: Number(part.amount), method: part.method === null ? null : String(part.method) })),
     id: Number(row.id),
     number: String(row.number),
     status: row.status as OrderStatus,
@@ -151,6 +162,7 @@ export async function getOrder(number: string, scope: OrderScope, conn: Queryabl
     deliveryUf: row.delivery_uf as Uf | null,
     taxpayer: row.taxpayer === true,
     productionDays: row.production_days === null ? null : Number(row.production_days),
+    productionUnit: row.production_unit === "uteis" ? "uteis" : "corridos",
     freight: Number(row.freight),
     notes: row.notes === null ? null : String(row.notes),
     downPayment: Number(row.down_payment),
@@ -264,6 +276,8 @@ export type OrderTerms = {
   deliveryUf: Uf | null;
   taxpayer: boolean;
   productionDays: number | null;
+  /** Absent: calendar days. */
+  productionUnit?: ProductionUnit;
   freight: number;
   notes: string | null;
 };
@@ -296,7 +310,7 @@ export async function saveOrderTerms(
   const { rows } = await conn.query(
     `UPDATE orders
         SET discount = $2, delivery_uf = $3, taxpayer = $4, production_days = $5, freight = $6, notes = $7,
-            updated_at = now(), updated_by = $8
+            production_unit = $10, updated_at = now(), updated_by = $8
       WHERE number = $1 AND status = 'em_negociacao' AND ($9::text IS NULL OR seller_email = $9)
       RETURNING id`,
     [
@@ -309,6 +323,7 @@ export async function saveOrderTerms(
       terms.notes?.trim() ? terms.notes.trim() : null,
       who,
       scope.sellerEmail,
+      terms.productionUnit === "uteis" ? "uteis" : "corridos",
     ],
   );
   if (rows.length === 0) throw new OrderError(NOT_EDITABLE);
@@ -451,6 +466,56 @@ export async function savePayment(
     ],
   );
   if (rows.length === 0) throw new OrderError(NOT_EDITABLE);
+  // Saving the form recalculates the installments: what was agreed one by one before is no longer what the form says.
+  await conn.query("DELETE FROM order_installments WHERE order_id = $1", [rows[0].id]);
+}
+
+/**
+ * The installments of the balance as agreed one by one: the date, the amount
+ * and the form of each. They replace the ones calculated from the count and the
+ * days, and have to add up to the balance of the order to the cent. Not for a
+ * balance paid at delivery, which is one installment by definition.
+ */
+export async function saveOrderInstallments(number: string, parts: Omit<CustomInstallment, "number">[], who: string, scope: OrderScope, conn: Queryable): Promise<void> {
+  assertWho(who);
+  const order = await getOrder(number, scope, conn);
+  if (!order || order.status !== "em_negociacao") throw new OrderError(NOT_EDITABLE);
+  if (order.balanceOnDelivery) throw new OrderError("O saldo deste pedido é pago na entrega, numa parcela só. Para parcelar, troque a forma do saldo.");
+  if (parts.length === 0 || parts.length > 60) throw new OrderError("Informe de 1 a 60 parcelas.");
+  parts.forEach((part, index) => {
+    const which = `Parcela ${index + 1}`;
+    try {
+      parseDate(part.dueDate);
+    } catch {
+      throw new OrderError(`${which}: informe a data de vencimento.`);
+    }
+    if (!Number.isFinite(part.amount) || part.amount <= 0) throw new OrderError(`${which}: informe um valor maior que zero.`);
+  });
+  const table = await loadPublishedTable(order.priceTableVersion, conn);
+  if (!table) throw new Error(`Tabela v${order.priceTableVersion} não encontrada.`);
+  const balance = Math.round(Math.max(0, saleOf(order, table).invoiceTotal - order.downPayment) * 100) / 100;
+  const total = Math.round(parts.reduce((sum, part) => sum + part.amount, 0) * 100) / 100;
+  if (total !== balance) {
+    const money = (value: number) => value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+    throw new OrderError(`As parcelas somam ${money(total)} e o saldo é ${money(balance)}: ajuste ${money(Math.abs(Math.round((balance - total) * 100) / 100))} ${total < balance ? "a mais" : "a menos"} em alguma parcela.`);
+  }
+  const sorted = [...parts].sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+  const { rows } = await conn.query(
+    `WITH target AS (
+       UPDATE orders SET installment_count = $2, updated_at = now(), updated_by = $3
+        WHERE id = $1 AND status = 'em_negociacao' RETURNING id
+     ), cleared AS (
+       DELETE FROM order_installments USING target WHERE order_id = target.id RETURNING order_id
+     ), written AS (
+       INSERT INTO order_installments (order_id, number, due_date, amount, method)
+       SELECT target.id, part.number, part.due_date::date, part.amount, part.method
+         FROM target, unnest($4::int[], $5::text[], $6::numeric[], $7::text[]) AS part (number, due_date, amount, method)
+       RETURNING number
+     )
+     SELECT (SELECT count(*) FROM written) AS written, (SELECT count(*) FROM cleared) AS cleared`,
+    [order.id, sorted.length, who, sorted.map((_, index) => index + 1), sorted.map((part) => part.dueDate), sorted.map((part) => part.amount), sorted.map((part) => (part.method?.trim() ? part.method.trim() : null))],
+  );
+  if (Number(rows[0].written) !== sorted.length) throw new OrderError(NOT_EDITABLE);
 }
 
 export type CloseResult = {
@@ -636,6 +701,8 @@ export async function deleteOrder(number: string, scope: OrderScope, conn: Query
         WHERE o.number = $1 AND o.status = 'em_negociacao' AND ($2::text IS NULL OR o.seller_email = $2)
      ), free AS (
        SELECT id, seller_email FROM target WHERE NOT is_bound AND (NOT has_history OR $3::boolean)
+     ), agreed AS (
+       DELETE FROM order_installments USING free WHERE order_id = free.id RETURNING order_id
      ), approvals AS (
        DELETE FROM order_approvals USING free WHERE order_id = free.id RETURNING order_id
      ), closings AS (

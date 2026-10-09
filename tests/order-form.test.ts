@@ -9,16 +9,16 @@ const reader = (values: Partial<Record<TermsField, string>>) => (key: TermsField
 test("condições: o que foi digitado vira desconto em fração, UF, prazo e frete", () => {
   assert.deepEqual(
     parseOrderTerms(reader({ discount: "12,5", deliveryUf: "ma", taxpayer: "sim", productionDays: " 90 ", freight: "1.234,56", notes: "  entrega em novembro " })),
-    { ok: true, terms: { discount: 0.125, deliveryUf: "MA", taxpayer: true, productionDays: 90, freight: 1234.56, notes: "entrega em novembro" } },
+    { ok: true, terms: { discount: 0.125, deliveryUf: "MA", taxpayer: true, productionDays: 90, productionUnit: "corridos", freight: 1234.56, notes: "entrega em novembro" } },
   );
   assert.deepEqual(parseOrderTerms(reader({ discount: "20%" })), {
     ok: true,
-    terms: { discount: 0.2, deliveryUf: null, taxpayer: false, productionDays: null, freight: 0, notes: null },
+    terms: { discount: 0.2, deliveryUf: null, taxpayer: false, productionDays: null, productionUnit: "corridos", freight: 0, notes: null },
   });
 });
 
 test("condições: tudo em branco é pedido sem desconto, sem estado, sem prazo e sem frete", () => {
-  const blank = { ok: true, terms: { discount: 0, deliveryUf: null, taxpayer: false, productionDays: null, freight: 0, notes: null } };
+  const blank = { ok: true, terms: { discount: 0, deliveryUf: null, taxpayer: false, productionDays: null, productionUnit: "corridos", freight: 0, notes: null } };
   assert.deepEqual(parseOrderTerms(() => null), blank);
   assert.deepEqual(parseOrderTerms(reader({ discount: " ", freight: "", productionDays: "", notes: "  ", taxpayer: "nao" })), blank);
 });

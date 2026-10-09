@@ -3,6 +3,7 @@ import type { Order } from "@/lib/db/orders";
 import type { PublishedTable } from "@/lib/db/price-table";
 import { formatPercent, showIsoDate, showMoney, showPercent } from "@/lib/format";
 import { UF_NAMES } from "@/lib/order-form";
+import { productionText } from "@/lib/order-quote";
 import type { DueDates, PaymentPlan } from "@/lib/order-quote";
 import type { SaleQuote } from "@/lib/pricing/order";
 import { compareByCode } from "@/lib/products-view";
@@ -78,7 +79,7 @@ export type QuoteDocument = {
 type QuoteInput = {
   /** Name of the company of the session. */
   company: string;
-  order: Pick<Order, "number" | "sellerName" | "sellerEmail" | "customer" | "deliveryUf" | "productionDays" | "notes" | "items">;
+  order: Pick<Order, "number" | "sellerName" | "sellerEmail" | "customer" | "deliveryUf" | "productionDays" | "notes" | "items"> & Partial<Pick<Order, "productionUnit">>;
   table: Pick<PublishedTable, "version" | "ipi" | "items">;
   /** The team's account of this order (`saleOf`): one line per item, in the order of `order.items`. */
   sale: SaleQuote;
@@ -194,7 +195,7 @@ export function quoteDocument({ company, order, table, sale, dates, products, to
       cityUf: [customer.city, customer.uf].filter(Boolean).join("/") || null,
     },
     delivery: order.deliveryUf === null ? null : UF_NAMES[order.deliveryUf],
-    production: order.productionDays === null ? null : `${order.productionDays} dias corridos, contados do pagamento da entrada`,
+    production: order.productionDays === null ? null : `${productionText(order.productionDays, order.productionUnit)}, contados do pagamento da entrada`,
     notes: blankToNull(order.notes),
     items,
     hasDiscount,

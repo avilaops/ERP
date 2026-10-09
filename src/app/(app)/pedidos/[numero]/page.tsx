@@ -23,7 +23,7 @@ import { latestVersion, loadDiscountLimits, loadPublishedSnapshot, loadPublished
 import { formatMoney, formatPercent, isoDate, showDateTime, showIsoDate, showMoney, showPercent } from "@/lib/format";
 import { BAND_TEXT, REASON_TEXT, STATUS_LABELS, UF_NAMES } from "@/lib/order-form";
 import { ORDER_NUMBER } from "@/lib/order-number";
-import { closingProblems, directorOf, dueDates, paymentOf, saleOf } from "@/lib/order-quote";
+import { closingProblems, directorOf, dueDates, paymentOf, productionText, saleOf } from "@/lib/order-quote";
 import { ORIGIN_UF, UFS } from "@/lib/pricing/states";
 import { compareByCode } from "@/lib/products-view";
 import { CopyButton } from "@/components/CopyButton";
@@ -42,6 +42,7 @@ import {
   removeItemAction,
   reopenOrderAction,
   saveOrderCustomerAction,
+  saveInstallmentsAction,
   savePaymentAction,
   saveTermsAction,
   setItemQuantityAction,
@@ -126,6 +127,9 @@ export default async function PedidoPage({
   const dates = dueDates(order, table, today);
   const editable = order.status === "em_negociacao";
   const plan = paymentOf(order, sale, table, today);
+  // The installments of the balance, as they stand: the rows the seller may change one by one.
+  const installmentRows = plan.receipts.filter((receipt) => receipt.label !== "Entrada");
+  const agreedInstallments = order.customInstallments.length > 0 && installmentRows.length === order.customInstallments.length;
   const missing = editable ? closingProblems(order, sale) : [];
   // The forms of payment are the company's own list; one already used and since turned off still shows.
   const methods = await listPaymentMethods(conn);
@@ -177,7 +181,7 @@ export default async function PedidoPage({
     total: sale.invoiceTotal,
     receipts: plan.receipts,
     validUntil: dates.proposalValidUntil,
-    production: order.productionDays === null ? null : `${order.productionDays} dias`,
+    production: order.productionDays === null ? null : productionText(order.productionDays, order.productionUnit),
     notes: order.notes,
   });
 
@@ -880,11 +884,15 @@ export default async function PedidoPage({
                       defaultValue={order.productionDays ?? ""}
                       className={`${INPUT} w-24 text-right`}
                     />
-                    <span className="text-sm text-slate-600">dias corridos</span>
+                    <select key={order.productionUnit} name="productionUnit" defaultValue={order.productionUnit} aria-label="Unidade do prazo de fabricação" className={`${INPUT} w-auto`}>
+                      <option value="corridos">dias corridos</option>
+                      <option value="uteis">dias úteis</option>
+                    </select>
                   </div>
                   {dates.completion && (
                     <p className={HELP}>
-                      Previsão de conclusão: <strong>{showIsoDate(dates.completion)}</strong>, contando do pagamento da entrada.
+                      Previsão de conclusão: <strong>{showIsoDate(dates.completion)}</strong>, contando do pagamento da entrada
+                      {order.productionUnit === "uteis" ? " (segunda a sexta; feriado não é descontado)" : ""}.
                     </p>
                   )}
                 </div>
@@ -1072,6 +1080,51 @@ export default async function PedidoPage({
                   </div>
                 )}
               </ActionForm>
+              {editable && !order.balanceOnDelivery && installmentRows.length > 0 && (
+                <div className="border-t border-slate-200 p-5">
+                  <h3 className="text-sm font-semibold">Parcelas do saldo</h3>
+                  <p className={HELP}>
+                    Para mudar a data, o valor ou a forma de uma parcela, edite aqui e salve.{" "}
+                    {agreedInstallments ? "Estas parcelas foram combinadas uma a uma." : "Hoje elas são calculadas pelo número de parcelas e pelos prazos acima."} Salvar o
+                    pagamento acima recalcula tudo.
+                  </p>
+                  <ActionForm action={saveInstallmentsAction} className="mt-3 flex flex-col gap-2">
+                    <input type="hidden" name="number" value={order.number} />
+                    {installmentRows.map((part, index) => (
+                      <div key={`${part.label}-${part.dueDate}-${part.amount}-${part.method ?? ""}`} className="grid grid-cols-[3rem_minmax(0,1fr)_minmax(0,1fr)] items-end gap-2 sm:grid-cols-[3rem_11rem_10rem_minmax(0,1fr)]">
+                        <span className="pb-2 text-sm font-medium">{part.label}</span>
+                        <label className="block text-xs font-medium text-slate-600">
+                          {index === 0 ? "Vencimento" : <span className="sr-only">Vencimento da parcela {part.label}</span>}
+                          <input name="dueDate" type="date" defaultValue={part.dueDate} className={`${INPUT} mt-1 w-full`} />
+                        </label>
+                        <label className="block text-xs font-medium text-slate-600">
+                          {index === 0 ? "Valor (R$)" : <span className="sr-only">Valor da parcela {part.label}</span>}
+                          <input name="amount" type="text" inputMode="decimal" defaultValue={formatMoney(part.amount)} className={`${INPUT} mt-1 w-full text-right`} />
+                        </label>
+                        <label className="col-span-3 block text-xs font-medium text-slate-600 sm:col-span-1">
+                          {index === 0 ? "Forma" : <span className="sr-only">Forma da parcela {part.label}</span>}
+                          <select name="method" defaultValue={part.method ?? ""} className={`${INPUT} mt-1 w-full`}>
+                            <option value="">—</option>
+                            {methodsWith(part.method).filter((method) => !onDelivery.includes(method)).map((method) => (
+                              <option key={method} value={method}>
+                                {method}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      </div>
+                    ))}
+                    <p className="text-xs text-slate-600">
+                      As parcelas têm de somar o saldo: <strong>{showMoney(plan.balance)}</strong>.
+                    </p>
+                    <div>
+                      <button type="submit" className="rounded border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50">
+                        Salvar parcelas
+                      </button>
+                    </div>
+                  </ActionForm>
+                </div>
+              )}
               {plan.receipts.length > 0 && (
                 <div className="relative overflow-x-auto border-t border-slate-200">
                   <table className="w-full text-sm">
@@ -1185,7 +1238,7 @@ export default async function PedidoPage({
                 </div>
                 <div className="contents text-xs">
                   <dt className="text-slate-600">Prazo de fabricação</dt>
-                  <dd className="text-right">{order.productionDays === null ? NONE : `${order.productionDays} dias corridos`}</dd>
+                  <dd className="text-right">{order.productionDays === null ? NONE : productionText(order.productionDays, order.productionUnit)}</dd>
                   <dt className="text-slate-600">Validade da proposta</dt>
                   <dd className="text-right">{showIsoDate(dates.proposalValidUntil)}</dd>
                 </div>

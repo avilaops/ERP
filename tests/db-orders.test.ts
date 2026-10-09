@@ -1417,3 +1417,45 @@ test("excluir pedido com histórico: só a diretoria, e só enquanto nada chegou
     assert.equal(Number((await db.pool.query(`SELECT count(*) FROM ${tableName} WHERE ${column} = $1`, [id])).rows[0].count), 0, tableName);
   }
 });
+
+test("parcelas combinadas uma a uma: data, valor e forma de cada; têm de somar o saldo; salvar o pagamento volta ao cálculo", { skip }, async () => {
+  const { saveOrderInstallments } = await import("@/lib/db/orders");
+  const number = await createOrder({ seller: SELLER, version: 1, productId: ID["LD-B001"], quantity: 1 }, numbers("261009-PARC"), db.pool);
+  await linkOrderCustomer(number, customerSp, SELLER.email, MINE, db.pool);
+  await saveOrderTerms(number, { ...TERMS, deliveryUf: "SP", productionDays: 45, productionUnit: "uteis" }, SELLER.email, MINE, db.pool);
+  await savePayment(number, { ...PAYMENT, downPayment: 10000, downPaymentDate: "2026-10-09", balanceMethod: "Boleto", installmentCount: 2, firstInstallmentDays: 30, installmentIntervalDays: 30 }, SELLER.email, MINE, db.pool);
+  const table = (await loadPublishedTable(1, db.pool))!;
+  const before = await order(number);
+  // Prazo em dias úteis: 45 a partir de sexta, 09/10/2026, é 11/12/2026.
+  assert.deepEqual([before.productionUnit, dueDates(before, table, "2026-10-09").completion], ["uteis", "2026-12-11"]);
+  const sale = saleOf(before, table);
+  const balance = paymentOf(before, sale, table, "2026-10-09").balance;
+  assert.deepEqual(before.customInstallments, []);
+
+  const first = Math.round(balance * 0.7 * 100) / 100;
+  const rest = Math.round((balance - first) * 100) / 100;
+  await assert.rejects(() => saveOrderInstallments(number, [{ dueDate: "2026-11-10", amount: first, method: "PIX" }], SELLER.email, MINE, db.pool), /As parcelas somam .* e o saldo é /);
+  await assert.rejects(() => saveOrderInstallments(number, [{ dueDate: "", amount: first, method: null }, { dueDate: "2026-12-10", amount: rest, method: null }], SELLER.email, MINE, db.pool), /Parcela 1: informe a data/);
+  await assert.rejects(() => saveOrderInstallments(number, [{ dueDate: "2026-11-10", amount: Number.NaN, method: null }], SELLER.email, MINE, db.pool), /Parcela 1: informe um valor/);
+  // Gravadas fora de ordem: ficam por data, cada uma com a sua forma.
+  await saveOrderInstallments(number, [{ dueDate: "2026-12-20", amount: rest, method: "Cheque" }, { dueDate: "2026-11-10", amount: first, method: "PIX" }], SELLER.email, MINE, db.pool);
+  const agreed = await order(number);
+  assert.deepEqual(agreed.customInstallments, [{ number: 1, dueDate: "2026-11-10", amount: first, method: "PIX" }, { number: 2, dueDate: "2026-12-20", amount: rest, method: "Cheque" }]);
+  assert.equal(agreed.installmentCount, 2);
+  assert.notEqual(agreed.revision, before.revision);
+  assert.deepEqual(paymentOf(agreed, sale, table, "2026-10-09").receipts.slice(1).map((receipt) => [receipt.label, receipt.dueDate, receipt.method, receipt.amount]), [
+    ["1/2", "2026-11-10", "PIX", first],
+    ["2/2", "2026-12-20", "Cheque", rest],
+  ]);
+  // O total do pedido mudou (desconto): as combinadas não somam mais o saldo e o plano volta ao cálculo.
+  await saveOrderTerms(number, { ...TERMS, deliveryUf: "SP", productionDays: 45, discount: 0.05 }, SELLER.email, MINE, db.pool);
+  const changed = await order(number);
+  const recalculated = paymentOf(changed, saleOf(changed, table), table, "2026-10-09");
+  assert.deepEqual(recalculated.receipts.slice(1).map((receipt) => [receipt.label, receipt.method]), [["1/2", "Boleto"], ["2/2", "Boleto"]]);
+  assert.equal(recalculated.installmentsTotal, recalculated.balance);
+  // Salvar o pagamento limpa as combinadas; saldo na entrega não aceita parcelas.
+  await savePayment(number, { ...PAYMENT, downPayment: 10000, balanceMethod: "Na entrega" }, SELLER.email, MINE, db.pool);
+  assert.deepEqual((await order(number)).customInstallments, []);
+  await assert.rejects(() => saveOrderInstallments(number, [{ dueDate: "2026-11-10", amount: 1, method: null }], SELLER.email, MINE, db.pool), /pago na entrega/);
+  await deleteOrder(number, MINE, db.pool);
+});
