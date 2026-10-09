@@ -3,7 +3,9 @@ import { notFound } from "next/navigation";
 import { CARD, INPUT, LABEL, PageHeader, Pill, PRIMARY, QUIET_LINK, SECONDARY, SECTION_TITLE } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { allows, menuItem, seesAllOrders } from "@/lib/auth/permissions";
+import { listCadences, listEnrollments } from "@/lib/db/cadences";
 import { listCustomers } from "@/lib/db/customers";
+import { listOpportunityMessages, listTemplates } from "@/lib/db/messages";
 import { ACTIVITY_LABELS, getOpportunity, listActivities, listStages, opportunityParty, syncOpportunitiesWithOrders } from "@/lib/db/funnel";
 import { listOrders } from "@/lib/db/orders";
 import { tenantDb } from "@/lib/db/pool";
@@ -11,7 +13,7 @@ import { isoDate, showDateTime, showMoney } from "@/lib/format";
 import { dueLabel } from "@/lib/funnel-view";
 import { ActionForm } from "../../pedidos/ActionForm";
 import { ConfirmButton } from "../../pedidos/ConfirmButton";
-import { addActivityAction, changeActivityAction, deleteOpportunityAction, linkOrderAction, moveOpportunityAction, saveOpportunityAction } from "../actions";
+import { addActivityAction, changeActivityAction, changeCadenceOfOpportunityAction, deleteOpportunityAction, linkOrderAction, moveOpportunityAction, saveOpportunityAction, sendMessageAction } from "../actions";
 import { OpportunityFields } from "../OpportunityFields";
 
 export const metadata = { title: "Oportunidade · ERP" };
@@ -20,6 +22,7 @@ export const dynamic = "force-dynamic";
 const HERE = menuItem("funil").href;
 const TABS = [
   ["atividades", "Atividades"],
+  ["mensagens", "Mensagens"],
   ["dados", "Dados"],
   ["pedido", "Pedido"],
 ] as const;
@@ -37,7 +40,8 @@ export default async function OportunidadePage({ params, searchParams }: { param
   // An opportunity of another seller answers as one that does not exist.
   if (!item) notFound();
 
-  const asked = (await searchParams).aba;
+  const query = await searchParams;
+  const asked = query.aba;
   const tab = TABS.find(([key]) => key === (Array.isArray(asked) ? asked[0] : asked))?.[0] ?? "atividades";
   const stages = await listStages(conn);
   const today = isoDate(new Date());
@@ -103,6 +107,7 @@ export default async function OportunidadePage({ params, searchParams }: { param
       </nav>
 
       {tab === "atividades" && <Activities />}
+      {tab === "mensagens" && <Messages />}
       {tab === "dados" && <Data />}
       {tab === "pedido" && <Order />}
     </div>
@@ -173,6 +178,115 @@ export default async function OportunidadePage({ params, searchParams }: { param
                 </li>
               );
             })}
+          </ul>
+        )}
+      </section>
+    );
+  }
+
+  async function Messages() {
+    const templates = await listTemplates(conn);
+    const picked = templates.find((template) => String(template.id) === (Array.isArray(query.modelo) ? query.modelo[0] : query.modelo)) ?? null;
+    const messages = await listOpportunityMessages(item!.id, conn);
+    const enrollments = await listEnrollments(item!.id, conn);
+    const running = enrollments.find((enrollment) => enrollment.status === "ativa") ?? null;
+    const cadences = (await listCadences(conn)).filter((cadence) => cadence.active && cadence.steps.length > 0);
+    const to = item!.email;
+    return (
+      <section className="mt-3" aria-label="Mensagens">
+        {!to && <p className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">Sem e-mail do contato. Preencha em Dados para poder enviar.</p>}
+        {templates.length > 0 && (
+          <nav aria-label="Modelos" className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="text-slate-600">Começar de um modelo:</span>
+            {templates.slice(0, 6).map((template) => (
+              <Link key={template.id} href={`${HERE}/${item!.id}?aba=mensagens&modelo=${template.id}`} aria-current={picked?.id === template.id ? "true" : undefined} className={`inline-flex min-h-9 items-center rounded-full border px-3 font-medium ${picked?.id === template.id ? "border-brand bg-brand text-white" : "border-slate-300 bg-white hover:bg-slate-100"}`}>
+                {template.name}
+              </Link>
+            ))}
+          </nav>
+        )}
+        <ActionForm action={sendMessageAction} className={`${CARD} mt-2 flex flex-col gap-2 p-3`}>
+          {hidden}
+          <div>
+            <label htmlFor="subject" className={LABEL}>
+              Assunto{to ? ` · para ${to}` : ""}
+            </label>
+            <input id="subject" name="subject" type="text" defaultValue={picked?.subject ?? ""} key={`assunto-${picked?.id ?? 0}`} autoComplete="off" className={INPUT} />
+          </div>
+          <div>
+            <label htmlFor="body" className={LABEL}>
+              Mensagem ({"{contato}"}, {"{empresa}"}, {"{vendedor}"} e {"{minha_empresa}"} são preenchidos no envio)
+            </label>
+            <textarea id="body" name="body" rows={6} defaultValue={picked?.body ?? ""} key={`texto-${picked?.id ?? 0}`} className={`${INPUT} py-2`} />
+          </div>
+          <button type="submit" className={`${PRIMARY} sm:self-start`}>
+            Enviar e-mail
+          </button>
+        </ActionForm>
+
+        <div className={`${CARD} mt-3 p-3 text-sm`}>
+          <p className={SECTION_TITLE}>Cadência</p>
+          {running ? (
+            <ActionForm action={changeCadenceOfOpportunityAction} className="mt-2 flex flex-wrap items-center gap-2">
+              {hidden}
+              <p className="min-w-0 flex-1">
+                <strong>{running.cadenceName}</strong>: passo {running.nextPosition} de {running.steps}, previsto para {showDateTime(running.nextAt)}.
+              </p>
+              <button type="submit" name="what" value="parar" className={SECONDARY}>
+                Parar cadência
+              </button>
+            </ActionForm>
+          ) : cadences.length === 0 ? (
+            <p className="mt-1 text-slate-600">Nenhuma cadência ligada com passos. Elas são criadas em Parâmetros → Cadências.</p>
+          ) : item!.stageKind !== "aberta" ? (
+            <p className="mt-1 text-slate-600">A venda já foi fechada: cadência é para oportunidade em andamento.</p>
+          ) : (
+            <ActionForm action={changeCadenceOfOpportunityAction} className="mt-2 flex flex-wrap items-end gap-2">
+              {hidden}
+              <div className="min-w-40 flex-1">
+                <label htmlFor="cadenceId" className={LABEL}>
+                  O sistema segue sozinho, até a venda fechar
+                </label>
+                <select id="cadenceId" name="cadenceId" defaultValue="" className={INPUT}>
+                  <option value="" disabled>
+                    Escolha a cadência
+                  </option>
+                  {cadences.map((cadence) => (
+                    <option key={cadence.id} value={cadence.id}>
+                      {cadence.name} ({cadence.steps.length} passos)
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <button type="submit" name="what" value="comecar" className={SECONDARY}>
+                Começar cadência
+              </button>
+            </ActionForm>
+          )}
+          {enrollments.filter((enrollment) => enrollment.status !== "ativa").slice(0, 2).map((enrollment) => (
+            <p key={enrollment.id} className="mt-1 text-xs text-slate-600">
+              {enrollment.cadenceName}: {enrollment.status === "concluida" ? "concluída" : `parada${enrollment.stoppedReason ? ` (${enrollment.stoppedReason})` : ""}`}
+            </p>
+          ))}
+        </div>
+
+        {messages.length > 0 && (
+          <ul className={`${CARD} mt-3 divide-y divide-slate-200`}>
+            {messages.slice(0, 8).map((message) => (
+              <li key={message.id} className="px-3 py-2 text-sm">
+                <details>
+                  <summary className="flex cursor-pointer flex-wrap items-center gap-2">
+                    <span className="min-w-0 flex-1 font-medium leading-snug">{message.subject}</span>
+                    <Pill tone={message.status === "enviado" ? "good" : "bad"}>{message.status === "enviado" ? "enviado" : "não saiu"}</Pill>
+                    <span className="basis-full text-xs text-slate-600">
+                      para {message.recipient} · {showDateTime(message.sentAt)} · por {message.sentBy}
+                      {message.detail ? ` · ${message.detail}` : ""}
+                    </span>
+                  </summary>
+                  <p className="mt-2 whitespace-pre-wrap text-slate-800">{message.body}</p>
+                </details>
+              </li>
+            ))}
           </ul>
         )}
       </section>

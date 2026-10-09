@@ -86,6 +86,14 @@ export default async function ParametrosPage({ searchParams }: { searchParams: P
           Etapas do funil
         </Link>
         {" · "}
+        <Link href="/parametros/mensagens" className="font-medium text-brand underline">
+          Modelos de mensagem
+        </Link>
+        {" · "}
+        <Link href="/parametros/cadencias" className="font-medium text-brand underline">
+          Cadências
+        </Link>
+        {" · "}
         <Link href="/parametros/integracoes" className="font-medium text-brand underline">
           Integrações
         </Link>

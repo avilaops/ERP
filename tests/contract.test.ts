@@ -146,7 +146,8 @@ test("página de assinatura: sem sessão, só o contrato do link, nunca indexada
 test("fora da sessão, só o login e o link de assinatura escolhem a empresa", () => {
   const free = sources().filter((file) => /tenantDb\((?!session\.tenant\.slug\))/.test(read(file)) && file !== "lib/db/pool.ts");
   // A API de outros sistemas é a terceira porta: a empresa sai da chave, que tem de ser daquela empresa.
-  assert.deepEqual(free.sort(), ["lib/api/access.ts", "lib/auth/index.ts", "lib/auth/signed-up.ts", "lib/contract/public.ts"]);
+  // E a rotina de fundo, que percorre as empresas da configuração, cada uma no seu banco.
+  assert.deepEqual(free.sort(), ["lib/api/access.ts", "lib/auth/index.ts", "lib/auth/signed-up.ts", "lib/background.ts", "lib/contract/public.ts"]);
   // E só a página de assinatura usa o link.
   const users = sources().filter((file) => read(file).includes("openSigning(") && file !== "lib/contract/public.ts");
   assert.deepEqual(users.sort(), ["app/contrato/[empresa]/[token]/actions.ts", "app/contrato/[empresa]/[token]/page.tsx", "app/contrato/[empresa]/[token]/pdf/route.ts"]);

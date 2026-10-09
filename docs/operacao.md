@@ -26,6 +26,7 @@ Todas descritas em `.env.example`. Nenhuma tem valor real no repositório.
 | `ERP_SMTP_HOST`, `ERP_SMTP_PORT`, `ERP_SMTP_USER`, `ERP_SMTP_PASSWORD`, `ERP_MAIL_FROM` | Caixa de e-mail da Ávila Ops por onde saem o XML e o DANFE das notas de quem não cadastrou caixa própria. Porta 465 (TLS direto) quando `ERP_SMTP_PORT` falta; outra porta usa STARTTLS | Opcionais; sem as quatro (servidor, usuário, senha, remetente) a tela avisa que não há caixa de saída e nenhum e-mail é enviado |
 | `ERP_AUTH_CLIENT_SECRET` (e, se não forem os padrões, `ERP_AUTH_CLIENT_ID` = `erp` e `ERP_AUTH_URL` = `https://auth.avilaops.com`) | Credencial do ERP como integração do login central (`auth.avilaops.com/admin/integracoes`, app ERP). Com ela, "Convidar pessoa" cria a conta da pessoa no login central e manda por e-mail o endereço para ela criar a senha (vale 7 dias, só para conta nova) | Opcional; sem ela a pessoa é cadastrada, nenhum e-mail sai e a tela diz que o convite não foi enviado |
 | `ERP_TWILIO_ACCOUNT_SID`, `ERP_TWILIO_AUTH_TOKEN`, `ERP_TWILIO_FROM` | Conta do Twilio que envia por SMS o segundo código da assinatura do contrato (remetente em `ERP_TWILIO_FROM`, no formato `+5511…` ou o identificador do serviço) | Opcionais; sem as três o segundo código não existe, e a opção em Parâmetros → Contrato avisa que o serviço não está configurado |
+| `ERP_ROTINAS` | `0` desliga a rotina de fundo (lembretes automáticos, passos das cadências e reenvio de avisos), que roda a cada 5 minutos dentro do próprio servidor do ERP | Opcional; ligada por padrão em produção, nunca roda em desenvolvimento |
 | `ERP_LOCAL_LOGIN` | `1` liga o login local de teste (`/dev/login`) | Ignorada: o login local não existe em produção |
 | `ERP_TEST_DATABASE_URL` | Banco dos testes; o nome tem de terminar em `_test` | Não se usa |
 
@@ -223,3 +224,10 @@ Se a migração falhar, a versão antiga continua no ar.
 - **Entrega**: o aviso é gravado na hora (`webhook_deliveries`) e enviado depois da resposta à pessoa; 2xx confirma, o resto conta tentativa, até 5. Redirecionamento não é seguido. "Tentar de novo" fica em Integrações → Entregas.
 - **Para onde um aviso pode ir**: só `https`, porta 443 ou 8443, nome público que resolva para endereço público, conferido ao cadastrar e de novo a cada envio (`src/lib/api/address.ts`). IP, `localhost`, `*.avilaops`, `*.internal` e qualquer nome que resolva para rede privada são recusados: é o que impede um endereço digitado numa empresa de alcançar os outros sistemas do servidor.
 - **n8n**: crie no n8n um nó Webhook, cole o endereço dele como destino e, para gravar no ERP, use um nó HTTP Request com a chave no cabeçalho.
+
+## Mensagens e cadências
+
+- **Onde**: a aba Mensagens de cada oportunidade envia e-mail ao contato pela caixa da empresa (Parâmetros → E-mail; sem ela, a caixa padrão do servidor). Modelos em Parâmetros → Modelos de mensagem; cadências em Parâmetros → Cadências.
+- **Registro**: todo envio, feito ou recusado, fica em `opportunity_messages`, com quem enviou (`cadência` quando foi a rotina).
+- **Cadência**: sequência de passos (e-mail de um modelo ou tarefa para o vendedor) com espera em dias. Cada oportunidade segue uma por vez (`opportunity_cadences`). Para sozinha quando a venda é ganha ou perdida, quando a cadência é desligada e quando um e-mail não pode sair; neste caso deixa uma tarefa ao vendedor dizendo o motivo.
+- **Rotina de fundo**: `src/lib/background.ts`, iniciada em `src/instrumentation.ts`. Uma empresa por vez; a falha de uma não para as outras e sai no log com o prefixo `[rotinas]`.

@@ -7,7 +7,12 @@ import { requirePermission } from "@/lib/auth";
 import { menuItem, seesAllOrders } from "@/lib/auth/permissions";
 import { addActivity, createOpportunity, deleteActivity, deleteOpportunity, FunnelError, getOpportunity, linkOpportunityOrder, moveOpportunity, opportunityParty, setActivityDone, updateOpportunity } from "@/lib/db/funnel";
 import type { OpportunityInput } from "@/lib/db/funnel";
+import { CadenceError, startCadence, stopCadence } from "@/lib/db/cadences";
+import { MessageError, sendOpportunityMail } from "@/lib/db/messages";
 import { tenantDb } from "@/lib/db/pool";
+import { vaultKey } from "@/lib/fiscal/certificate";
+import { MailError } from "@/lib/mail/message";
+import { sendMail } from "@/lib/mail/smtp";
 import { parseMoney } from "@/lib/format";
 import type { ActionState } from "@/lib/order-form";
 import { ORDER_NUMBER } from "@/lib/order-number";
@@ -22,7 +27,7 @@ const reader = (formData: FormData) => (key: string) => {
 const whole = (value: string) => (/^[1-9]\d{0,8}$/.test(value.trim()) ? Number(value.trim()) : null);
 
 function problem(error: unknown): ActionState {
-  if (error instanceof FunnelError) return { error: error.message };
+  if (error instanceof FunnelError || error instanceof MessageError || error instanceof CadenceError || error instanceof MailError) return { error: error.message };
   console.error("[funil] falha ao gravar:", error instanceof Error ? error.message : error);
   return { error: FAILED };
 }
@@ -168,5 +173,51 @@ export async function changeActivityAction(_previous: ActionState, formData: For
   revalidatePath(`${HERE}/tarefas`);
   const id = whole(read("id"));
   if (id !== null) revalidatePath(`${HERE}/${id}`);
+  return { error: null };
+}
+
+/** "Enviar e-mail" to the contact of the opportunity, by the company's mailbox. It is kept with its result. */
+export async function sendMessageAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
+  const session = await requirePermission("funil");
+  const conn = tenantDb(session.tenant.slug);
+  const read = reader(formData);
+  const id = whole(read("id"));
+  if (id === null) return { error: "Oportunidade não encontrada." };
+  let result;
+  try {
+    result = await sendOpportunityMail(
+      {
+        opportunityId: id, ownerEmail: seesAllOrders(session) ? null : session.email, subject: read("subject"), body: read("body"), company: session.tenant.name, sentBy: session.email, now: new Date(),
+        way: { env: process.env, key: () => vaultKey(process.env.ERP_CERT_KEY), send: sendMail },
+      },
+      conn,
+    );
+  } catch (error) {
+    return problem(error);
+  }
+  revalidatePath(`${HERE}/${id}`);
+  if (result.status === "falhou") return { error: `O e-mail para ${result.recipient} não saiu: ${result.detail ?? "falha no envio"}` };
+  return { error: null, notice: `E-mail enviado para ${result.recipient}.` };
+}
+
+/** "Começar cadência" and "Parar cadência" of one opportunity, by the button pressed. */
+export async function changeCadenceOfOpportunityAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
+  const session = await requirePermission("funil");
+  const conn = tenantDb(session.tenant.slug);
+  const read = reader(formData);
+  const id = whole(read("id"));
+  if (id === null) return { error: "Oportunidade não encontrada." };
+  const scope = seesAllOrders(session) ? null : session.email;
+  try {
+    if (read("what") === "parar") await stopCadence(id, `Parada por ${session.name}.`, scope, conn);
+    else {
+      const cadenceId = whole(read("cadenceId"));
+      if (cadenceId === null) return { error: "Escolha a cadência." };
+      await startCadence(id, cadenceId, session.email, scope, new Date(), conn);
+    }
+  } catch (error) {
+    return problem(error);
+  }
+  revalidatePath(`${HERE}/${id}`);
   return { error: null };
 }

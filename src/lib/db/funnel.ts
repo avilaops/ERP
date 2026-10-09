@@ -226,7 +226,9 @@ export async function deleteOpportunity(id: number, scope: FunnelScope, conn: Qu
   const { rows } = await conn.query(
     `WITH target AS (SELECT id FROM opportunities WHERE id = $1 AND ($2::text IS NULL OR owner_email = $2)),
           noted AS (DELETE FROM opportunity_activities a USING target WHERE a.opportunity_id = target.id),
-          walked AS (DELETE FROM opportunity_moves m USING target WHERE m.opportunity_id = target.id)
+          walked AS (DELETE FROM opportunity_moves m USING target WHERE m.opportunity_id = target.id),
+          written AS (DELETE FROM opportunity_messages g USING target WHERE g.opportunity_id = target.id),
+          followed AS (DELETE FROM opportunity_cadences e USING target WHERE e.opportunity_id = target.id)
      DELETE FROM opportunities o USING target WHERE o.id = target.id RETURNING o.id`,
     [id, scope.ownerEmail],
   );

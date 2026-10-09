@@ -7,5 +7,11 @@ export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
     const { assertConfigOrExit } = await import("@/instrumentation-node");
     assertConfigOrExit(process.env);
+    // The routines of the companies (reminders, cadences, notices) run only on the production server.
+    const { isProduction } = await import("@/lib/auth/config");
+    if (isProduction(process.env)) {
+      const { startBackground } = await import("@/lib/background");
+      startBackground(process.env);
+    }
   }
 }

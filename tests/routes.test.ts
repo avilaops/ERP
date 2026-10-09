@@ -333,9 +333,9 @@ test("/pedidos/novo é protegida pelo item Pedidos", () => {
 test("não existe página no grupo protegido sem requirePermission", () => {
   const all = pages();
   // The menu items, plus /pedidos/novo, one order, the record of one customer and of one supplier,
-  // and the users, the forms of payment and the categories of bills of the company, its product lines, its carriers, the e-mail of the invoices, its access profiles the model of its contract, the stages of its funnel, its automatic reminders and its integrations;
+  // and the users, the forms of payment and the categories of bills of the company, its product lines, its carriers, the e-mail of the invoices, its access profiles the model of its contract, the stages of its funnel, its automatic reminders, its integrations, its message templates and its cadences;
   // and, of the funnel, the screen that creates an opportunity, one opportunity, the tasks and the panel.
-  assert.equal(all.length, MENU_ITEMS.length + 28);
+  assert.equal(all.length, MENU_ITEMS.length + 30);
   for (const route of all) {
     assert.match(source(route), /await requirePermission\(/, route);
   }
