@@ -1,10 +1,8 @@
-import { signupEnabled } from "@/lib/auth/signed-up";
-import { parseTenants, TENANT_SLUG } from "@/lib/auth/tenants";
+import { knownTenant } from "@/lib/auth/known";
 import type { Tenant } from "@/lib/auth/tenants";
 import { hashToken, TOKEN } from "@/lib/contract/token";
 import { findContractByToken } from "@/lib/db/contracts";
 import type { SigningContract } from "@/lib/db/contracts";
-import { controlDb, provisionedCompanies } from "@/lib/db/control";
 import { tenantDb } from "@/lib/db/pool";
 import type { Queryable } from "@/lib/db/pool";
 
@@ -21,9 +19,8 @@ export type Signing = { tenant: Tenant; conn: Queryable; token: string; contract
  * and a connection it uses for that contract alone.
  */
 export async function openSigning(company: string, token: string, env: Record<string, string | undefined> = process.env): Promise<Signing | null> {
-  if (!TENANT_SLUG.test(company) || !TOKEN.test(token)) return null;
-  let tenant = parseTenants(env.ERP_TENANTS).find((known) => known.slug === company) ?? null;
-  if (!tenant && signupEnabled(env)) tenant = (await provisionedCompanies(controlDb())).find((known) => known.slug === company) ?? null;
+  if (!TOKEN.test(token)) return null;
+  const tenant = await knownTenant(company, env);
   if (!tenant) return null;
   const conn = tenantDb(tenant.slug);
   const contract = await findContractByToken(hashToken(token), conn);

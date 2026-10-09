@@ -2,7 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
+import { notify } from "@/lib/api/notify";
 import { clientIp, openSigning } from "@/lib/contract/public";
+import { contractNumber } from "@/lib/contract/text";
 import type { Signing } from "@/lib/contract/public";
 import { ContractError, refuseContract } from "@/lib/db/contracts";
 import { requestSigningCode, signOrderContract } from "@/lib/db/send-contract";
@@ -72,6 +74,7 @@ export async function signAction(_previous: ActionState, formData: FormData): Pr
     revalidatePath(pageOf(signing));
     return refusal(error);
   }
+  await notify("contrato.assinado", { pedido: signing.contract.orderNumber, contrato: contractNumber(signing.contract.orderNumber, signing.contract.sequence), assinado_por: signing.contract.pendingName }, signing.conn);
   revalidatePath(pageOf(signing));
   return { error: null, notice: "Contrato assinado." };
 }

@@ -302,7 +302,8 @@ test("e-mail das notas: a senha da caixa só é aberta para enviar, nunca volta 
   }
   // Só a camada que resolve a caixa de saída abre a senha guardada.
   const users = SOURCES_UNDER_SRC().filter(([, code]) => code.includes("openSecret("));
-  assert.deepEqual(users.map(([file]) => file).sort(), ["lib/db/mail.ts", "lib/mail/vault.ts"]);
+  // E o segredo que assina os avisos enviados a outros sistemas, aberto só na hora de enviar.
+  assert.deepEqual(users.map(([file]) => file).sort(), ["lib/db/integrations.ts", "lib/db/mail.ts", "lib/mail/vault.ts"]);
   // O certificado do servidor de e-mail é sempre conferido.
   assert.doesNotMatch(readFileSync(new URL("../src/lib/mail/smtp.ts", import.meta.url), "utf8"), /rejectUnauthorized: false/);
 });
@@ -332,9 +333,9 @@ test("/pedidos/novo é protegida pelo item Pedidos", () => {
 test("não existe página no grupo protegido sem requirePermission", () => {
   const all = pages();
   // The menu items, plus /pedidos/novo, one order, the record of one customer and of one supplier,
-  // and the users, the forms of payment and the categories of bills of the company, its product lines, its carriers, the e-mail of the invoices, its access profiles the model of its contract, the stages of its funnel and its automatic reminders;
+  // and the users, the forms of payment and the categories of bills of the company, its product lines, its carriers, the e-mail of the invoices, its access profiles the model of its contract, the stages of its funnel, its automatic reminders and its integrations;
   // and, of the funnel, the screen that creates an opportunity, one opportunity, the tasks and the panel.
-  assert.equal(all.length, MENU_ITEMS.length + 27);
+  assert.equal(all.length, MENU_ITEMS.length + 28);
   for (const route of all) {
     assert.match(source(route), /await requirePermission\(/, route);
   }
@@ -378,6 +379,18 @@ test("toda rota de src/app/api confere a sessão, e a empresa só sai dela", () 
       assert.ok(methods.length > 0, `${file} não exporta método`);
       for (const [, params] of methods) assert.equal(params.trim(), "", `${file} é pública e recebe o pedido`);
       assert.doesNotMatch(code, /\b(?:request|req)\b|formData\(|arrayBuffer\(|\.text\(|\.body\b|\.headers\b/i, `${file} é pública e lê o pedido`);
+      continue;
+    }
+    if (file.startsWith("v1/")) {
+      // A API de outros sistemas: sem sessão, mas cada método começa pela chave, e a empresa só sai dela.
+      const methods = code.split(/export async function (?:GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\([^)]*\)[^{]*\{/).slice(1);
+      assert.ok(methods.length > 0, `${file} não exporta método`);
+      for (const body of methods) {
+        assert.match(body.trimStart(), /^const access = await apiAccess\(request\);\s+if \(access instanceof Response\) return access;/, `${file}: método sem a conferência da chave no início`);
+      }
+      assert.doesNotMatch(code, /tenantDb|getSession|cookies\(|@\/lib\/db\/(params|products|price-table)|@\/lib\/pricing|seesCosts|loadPublishedSnapshot/, `${file} sai do que a API pode alcançar`);
+      // Só o que é da empresa da chave: toda leitura e gravação usa a conexão que a conferência devolveu.
+      assert.ok(code.includes("access.conn"), file);
       continue;
     }
     assert.ok(code.includes("await getSession()"), `${file} não chama getSession()`);

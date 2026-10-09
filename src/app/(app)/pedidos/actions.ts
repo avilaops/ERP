@@ -3,6 +3,7 @@
 import { randomInt } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { notify } from "@/lib/api/notify";
 import { requirePermission } from "@/lib/auth";
 import { tenantDb } from "@/lib/db/pool";
 import type { Session } from "@/lib/auth";
@@ -188,6 +189,11 @@ export async function closeOrderAction(_previous: ActionState, formData: FormDat
     // Whether the closer is a director comes from the session: the company decides what that is worth.
     const result = await closeOrder(number, session.email, scopeOf(session), conn, { isDirector: approvesAtLoss(session) });
     if (result.missing.length > 0) return { error: `Para fechar: ${result.missing.join(" ")}` };
+    // Closed for good (not waiting for approval): the other systems of the company are told. Number and people only, no value.
+    if (result.status === "fechado") {
+      const closed = await getOrder(number, scopeOf(session), conn);
+      if (closed) await notify("pedido.fechado", { numero: closed.number, cliente: closed.customer?.name ?? null, vendedor: closed.sellerName, uf_de_entrega: closed.deliveryUf }, conn);
+    }
   } catch (error) {
     return { error: problem("fechar o pedido", error) };
   }

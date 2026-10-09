@@ -2,9 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { notify } from "@/lib/api/notify";
 import { requirePermission } from "@/lib/auth";
 import { menuItem, seesAllOrders } from "@/lib/auth/permissions";
-import { addActivity, createOpportunity, deleteActivity, deleteOpportunity, FunnelError, linkOpportunityOrder, moveOpportunity, setActivityDone, updateOpportunity } from "@/lib/db/funnel";
+import { addActivity, createOpportunity, deleteActivity, deleteOpportunity, FunnelError, getOpportunity, linkOpportunityOrder, moveOpportunity, opportunityParty, setActivityDone, updateOpportunity } from "@/lib/db/funnel";
 import type { OpportunityInput } from "@/lib/db/funnel";
 import { tenantDb } from "@/lib/db/pool";
 import { parseMoney } from "@/lib/format";
@@ -49,6 +50,7 @@ export async function createOpportunityAction(_previous: ActionState, formData: 
   } catch (error) {
     return problem(error);
   }
+  await notify("oportunidade.criada", { id, titulo: input.title.trim(), empresa: input.company?.trim() || null, origem: input.source?.trim() || null, responsavel: session.name }, conn);
   revalidatePath(HERE);
   redirect(`${HERE}/${id}`);
 }
@@ -84,6 +86,11 @@ export async function moveOpportunityAction(_previous: ActionState, formData: Fo
     await moveOpportunity(id, stageId, read("lostReason"), session.email, { ownerEmail: seesAllOrders(session) ? null : session.email }, conn);
   } catch (error) {
     return problem(error);
+  }
+  // Won or lost is worth telling the other systems of the company; a move between open stages is not.
+  const moved = await getOpportunity(id, { ownerEmail: seesAllOrders(session) ? null : session.email }, conn);
+  if (moved && moved.stageKind !== "aberta") {
+    await notify(moved.stageKind === "ganha" ? "oportunidade.ganha" : "oportunidade.perdida", { id, titulo: moved.title, empresa: opportunityParty(moved), valor_estimado: moved.estimatedValue, motivo: moved.lostReason, responsavel: moved.ownerName, pedido: moved.orderNumber }, conn);
   }
   revalidatePath(HERE);
   revalidatePath(`${HERE}/${id}`);
