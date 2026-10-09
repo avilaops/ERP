@@ -4,6 +4,7 @@ import { FitRows } from "@/components/FitRows";
 import { CARD, INPUT, Pager, PageHeader, pageOf, Pill, PRIMARY, QUIET_LINK, SECONDARY, SECTION_TITLE } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { menuItem, seesAllOrders } from "@/lib/auth/permissions";
+import { runAutomations } from "@/lib/db/automations";
 import { listOpportunities, listPendingActivities, listStages, opportunityParty, syncOpportunitiesWithOrders } from "@/lib/db/funnel";
 import type { Opportunity } from "@/lib/db/funnel";
 import { tenantDb } from "@/lib/db/pool";
@@ -29,12 +30,14 @@ export default async function FunilPage({ searchParams }: { searchParams: Promis
   const scope = { ownerEmail: everyone ? null : session.email };
 
   await syncOpportunitiesWithOrders(conn);
+  const today = isoDate(new Date());
+  // The reminders the rules of the company ask for are created when the funnel is opened.
+  await runAutomations(today, conn);
   const stages = await listStages(conn);
   const search = (first(query.q) ?? "").trim();
   const opportunities = (await listOpportunities(scope, conn)).filter((item) => matchesOpportunity(item, search));
   const columns = byStage(stages, opportunities);
   const pending = (await listPendingActivities(scope, conn)).length;
-  const today = isoDate(new Date());
 
   // One stage at a time is the view of a phone, and of a wide screen when a stage is asked for.
   const asked = Number(first(query.etapa));

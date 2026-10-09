@@ -271,10 +271,10 @@ export async function syncOpportunitiesWithOrders(conn: Queryable): Promise<void
 export type ActivityKind = "tarefa" | "ligacao" | "reuniao" | "nota";
 export const ACTIVITY_LABELS: Record<ActivityKind, string> = { tarefa: "Tarefa", ligacao: "Ligação", reuniao: "Reunião", nota: "Anotação" };
 
-export type Activity = { id: number; opportunityId: number; kind: ActivityKind; title: string; dueOn: string | null; doneAt: Date | null; doneBy: string | null; ownerEmail: string; createdAt: Date; createdBy: string };
+export type Activity = { id: number; /** `null` for a reminder of an order with no opportunity. */ opportunityId: number | null; kind: ActivityKind; title: string; dueOn: string | null; doneAt: Date | null; doneBy: string | null; ownerEmail: string; createdAt: Date; createdBy: string };
 
 const toActivity = (row: Record<string, unknown>): Activity => ({
-  id: Number(row.id), opportunityId: Number(row.opportunity_id), kind: row.kind as ActivityKind, title: String(row.title), dueOn: text(row.due_on), doneAt: (row.done_at as Date | null) ?? null,
+  id: Number(row.id), opportunityId: row.opportunity_id === null ? null : Number(row.opportunity_id), kind: row.kind as ActivityKind, title: String(row.title), dueOn: text(row.due_on), doneAt: (row.done_at as Date | null) ?? null,
   doneBy: text(row.done_by), ownerEmail: String(row.owner_email), createdAt: row.created_at as Date, createdBy: String(row.created_by),
 });
 
@@ -298,7 +298,8 @@ export async function addActivity(opportunityId: number, input: { kind: string; 
 export async function setActivityDone(activityId: number, done: boolean, who: string, scope: FunnelScope, conn: Queryable): Promise<void> {
   const { rows } = await conn.query(
     `UPDATE opportunity_activities a SET done_at = CASE WHEN $3 THEN now() END, done_by = CASE WHEN $3 THEN $4 END
-       FROM opportunities o WHERE a.id = $1 AND o.id = a.opportunity_id AND ($2::text IS NULL OR o.owner_email = $2) AND a.kind <> 'nota' RETURNING a.id`,
+      WHERE a.id = $1 AND a.kind <> 'nota'
+        AND ($2::text IS NULL OR COALESCE((SELECT o.owner_email FROM opportunities o WHERE o.id = a.opportunity_id), a.owner_email) = $2) RETURNING a.id`,
     [activityId, scope.ownerEmail, done, who],
   );
   if (rows.length === 0) throw new FunnelError("Atividade não encontrada. Recarregue a página.");
@@ -306,7 +307,7 @@ export async function setActivityDone(activityId: number, done: boolean, who: st
 
 export async function deleteActivity(activityId: number, scope: FunnelScope, conn: Queryable): Promise<void> {
   const { rows } = await conn.query(
-    "DELETE FROM opportunity_activities a USING opportunities o WHERE a.id = $1 AND o.id = a.opportunity_id AND ($2::text IS NULL OR o.owner_email = $2) RETURNING a.id",
+    "DELETE FROM opportunity_activities a WHERE a.id = $1 AND ($2::text IS NULL OR COALESCE((SELECT o.owner_email FROM opportunities o WHERE o.id = a.opportunity_id), a.owner_email) = $2) RETURNING a.id",
     [activityId, scope.ownerEmail],
   );
   if (rows.length === 0) throw new FunnelError("Atividade não encontrada. Recarregue a página.");
@@ -318,19 +319,38 @@ export async function listActivities(opportunityId: number, conn: Queryable): Pr
   return rows.map(toActivity);
 }
 
-export type PendingActivity = Activity & { opportunityTitle: string; party: string; ownerName: string };
+export type PendingActivity = Activity & {
+  /** What the task is about: the opportunity, or the order of an automatic reminder. */
+  subject: string;
+  party: string;
+  ownerName: string;
+  /** The order of an automatic reminder that is not tied to an opportunity. */
+  orderNumber: string | null;
+  /** Created by a rule of the company, not by a person. */
+  automatic: boolean;
+};
 
-/** What is still to do in open opportunities, the oldest date first; without a date, last. */
+/**
+ * What is still to do: the tasks of open opportunities and the automatic
+ * reminders of orders, the oldest date first; without a date, last. A seller
+ * gets their own; the scope comes from the session.
+ */
 export async function listPendingActivities(scope: FunnelScope, conn: Queryable): Promise<PendingActivity[]> {
   const { rows } = await conn.query(
     `SELECT a.id, a.opportunity_id, a.kind, a.title, a.due_on::text AS due_on, a.done_at, a.done_by, a.owner_email, a.created_at, a.created_by,
-            o.title AS opportunity_title, COALESCE(c.name, o.company) AS party, o.owner_name
-       FROM opportunity_activities a JOIN opportunities o ON o.id = a.opportunity_id JOIN pipeline_stages s ON s.id = o.stage_id LEFT JOIN customers c ON c.id = o.customer_id
-      WHERE a.done_at IS NULL AND a.kind <> 'nota' AND s.kind = 'aberta' AND ($1::text IS NULL OR o.owner_email = $1)
+            COALESCE(o.title, 'Pedido #' || d.number) AS subject, COALESCE(c.name, o.company, dc.name, '') AS party,
+            COALESCE(o.owner_name, d.seller_name, a.owner_email) AS owner_name, CASE WHEN a.opportunity_id IS NULL THEN d.number END AS order_number, a.auto_key IS NOT NULL AS automatic
+       FROM opportunity_activities a
+       LEFT JOIN opportunities o ON o.id = a.opportunity_id LEFT JOIN pipeline_stages s ON s.id = o.stage_id LEFT JOIN customers c ON c.id = o.customer_id
+       LEFT JOIN orders d ON d.id = a.order_id LEFT JOIN customers dc ON dc.id = d.customer_id
+      WHERE a.done_at IS NULL AND a.kind <> 'nota' AND (a.opportunity_id IS NULL OR s.kind = 'aberta')
+        AND ($1::text IS NULL OR COALESCE(o.owner_email, a.owner_email) = $1)
       ORDER BY a.due_on NULLS LAST, a.id`,
     [scope.ownerEmail],
   );
-  return rows.map((row) => ({ ...toActivity(row), opportunityTitle: String(row.opportunity_title), party: String(row.party ?? ""), ownerName: String(row.owner_name) }));
+  return rows.map((row) => ({
+    ...toActivity(row), subject: String(row.subject), party: String(row.party ?? ""), ownerName: String(row.owner_name), orderNumber: text(row.order_number), automatic: row.automatic === true,
+  }));
 }
 
 export type FunnelReport = {

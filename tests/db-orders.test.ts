@@ -1920,3 +1920,89 @@ test("funil: oportunidade anda por etapas, tem atividades, segue o pedido e cada
   await deleteStage(visit.id, db.pool);
   assert.equal((await listStages(db.pool)).length, 6);
 });
+
+test("lembretes automáticos: orçamento parado, contrato sem assinatura, parcela para vencer e oportunidade parada viram tarefa, uma vez só", { skip }, async () => {
+  const { AutomationError, listAutomationRules, runAutomations, saveAutomationRule } = await import("@/lib/db/automations");
+  const { createOpportunity, deleteOpportunity, listPendingActivities, setActivityDone } = await import("@/lib/db/funnel");
+  const { removeOwnMailbox } = await import("@/lib/db/mail");
+  const { sendOrderContract } = await import("@/lib/db/send-contract");
+  await removeOwnMailbox(DIRECTOR, db.pool);
+  const rules = await listAutomationRules(db.pool);
+  assert.deepEqual(rules.map((rule) => [rule.kind, rule.days, rule.active]), [["orcamento_parado", 3, true], ["contrato_pendente", 2, true], ["parcela_vencendo", 3, true], ["oportunidade_parada", 7, true]]);
+  await assert.rejects(() => saveAutomationRule(rules[0].id, { days: 91, title: "x", active: true }, DIRECTOR, db.pool), (error: unknown) => error instanceof AutomationError && /de 0 a 90 dias.*de 5 a 200 letras/.test(error.message));
+  const today = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
+  const plus = (days: number) => new Date(Date.parse(`${today}T12:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
+  const mine = { ownerEmail: SELLER.email };
+  // Só o que este teste cria entra na conta: os lembretes do que os outros testes deixaram (com a regra de parcela
+  // no maior prazo) são criados e concluídos antes.
+  const everyParcel = rules.find((rule) => rule.kind === "parcela_vencendo")!;
+  await saveAutomationRule(everyParcel.id, { days: 90, title: everyParcel.title, active: true }, DIRECTOR, db.pool);
+  await runAutomations(today, db.pool);
+  await saveAutomationRule(everyParcel.id, { days: 3, title: everyParcel.title, active: true }, DIRECTOR, db.pool);
+  await db.pool.query("UPDATE opportunity_activities SET done_at = now(), done_by = 'teste' WHERE done_at IS NULL AND kind <> 'nota'");
+  const before = (await listPendingActivities({ ownerEmail: null }, db.pool)).length;
+  assert.equal(before, 0);
+
+  // Um orçamento em negociação, parado há 5 dias.
+  const quote = await createOrder({ seller: SELLER, version: 1, productId: ID["LD-B001"], quantity: 1 }, numbers("261009-LEMB"), db.pool);
+  await linkOrderCustomer(quote, customerSp, SELLER.email, MINE, db.pool);
+  await db.pool.query("UPDATE orders SET updated_at = now() - interval '5 days' WHERE number = $1", [quote]);
+  // Um pedido fechado, com contrato enviado há 3 dias e parcelas a vencer.
+  const sold = await createOrder({ seller: SELLER, version: 1, productId: ID["LD-B001"], quantity: 1 }, numbers("261009-LEMC"), db.pool);
+  await linkOrderCustomer(sold, customerSp, SELLER.email, MINE, db.pool);
+  await saveOrderTerms(sold, { ...TERMS, deliveryUf: "SP" }, SELLER.email, MINE, db.pool);
+  await savePayment(sold, { ...PAYMENT, downPayment: 20000 }, SELLER.email, MINE, db.pool);
+  assert.equal((await closeOrder(sold, SELLER.email, MINE, db.pool)).status, "fechado");
+  const closed = (await getOrder(sold, MINE, db.pool))!;
+  const way = { env: { ERP_SMTP_HOST: "mail.avilaops.com", ERP_SMTP_USER: "u", ERP_SMTP_PASSWORD: "x", ERP_MAIL_FROM: "noreply@avilaops.com" }, key: () => { throw new Error("sem cofre"); }, send: async () => undefined };
+  const sent = await sendOrderContract(closed, { name: null, email: "maria@cliente.test" }, { company: "Acme", tenant: "acme", appUrl: "https://erp.teste", sentBy: SELLER.email, now: new Date(), way }, db.pool);
+  await db.pool.query("UPDATE order_contracts SET created_at = now() - interval '3 days' WHERE id = $1", [sent.contract.id]);
+  await db.pool.query("UPDATE receivables SET due_date = $2::date WHERE order_id = $1 AND kind = 'entrada'", [closed.id, plus(2)]);
+  await db.pool.query("UPDATE receivables SET due_date = $2::date WHERE order_id = $1 AND kind = 'parcela'", [closed.id, plus(30)]);
+  // Uma oportunidade em andamento, sem próximo passo, parada há 8 dias.
+  const blank = { customerId: null, contactName: null, phone: null, email: null, source: null, estimatedValue: null, notes: null };
+  const idle = await createOpportunity({ ...blank, title: "Sala do hotel", company: "Hotel Central" }, SELLER, db.pool);
+  await db.pool.query("UPDATE opportunities SET updated_at = now() - interval '8 days' WHERE id = $1", [idle]);
+
+  const created = await runAutomations(today, db.pool);
+  assert.equal(created, 4);
+  const tasks = (await listPendingActivities(mine, db.pool)).filter((task) => task.automatic);
+  const customer = (await getOrder(quote, MINE, db.pool))!.customer!.name;
+  assert.deepEqual(
+    tasks.map((task) => [task.title, task.dueOn, task.subject, task.orderNumber]).sort(),
+    [
+      [`Cobrar a assinatura do contrato do pedido #${sold} (${customer})`, today, `Pedido #${sold}`, sold],
+      ["Definir o próximo passo desta oportunidade", today, "Sala do hotel", null],
+      [`Parcela do pedido #${sold} (${customer}) está para vencer`, plus(2), `Pedido #${sold}`, sold],
+      [`Retomar o orçamento #${quote} com ${customer}`, today, `Pedido #${quote}`, quote],
+    ].sort(),
+  );
+  // Cada vendedor recebe as suas; o outro vendedor não ganhou nenhuma.
+  assert.equal((await listPendingActivities({ ownerEmail: OTHER_SELLER.email }, db.pool)).filter((task) => task.automatic).length, 0);
+  // Rodar de novo não repete; concluída, a tarefa não volta pelo mesmo motivo.
+  assert.equal(await runAutomations(today, db.pool), 0);
+  const quoteTask = tasks.find((task) => task.orderNumber === quote)!;
+  await assert.rejects(() => setActivityDone(quoteTask.id, true, OTHER_SELLER.email, { ownerEmail: OTHER_SELLER.email }, db.pool), /não encontrada/);
+  await setActivityDone(quoteTask.id, true, SELLER.email, mine, db.pool);
+  assert.equal(await runAutomations(today, db.pool), 0);
+  // O orçamento foi mexido e parou de novo: o lembrete volta.
+  await db.pool.query("UPDATE orders SET updated_at = now() - interval '4 days' WHERE number = $1", [quote]);
+  assert.equal(await runAutomations(today, db.pool), 1);
+  // Regra desligada não cria nada; o prazo e o texto são os da empresa.
+  const parcel = rules.find((rule) => rule.kind === "parcela_vencendo")!;
+  await saveAutomationRule(parcel.id, { days: 40, title: "Avisar {cliente} da parcela do {pedido}", active: false }, DIRECTOR, db.pool);
+  assert.equal(await runAutomations(today, db.pool), 0);
+  await saveAutomationRule(parcel.id, { days: 40, title: "Avisar {cliente} da parcela do {pedido}", active: true }, DIRECTOR, db.pool);
+  // Com 40 dias de antecedência entram as parcelas do saldo, uma tarefa por parcela.
+  const installments = Number((await db.pool.query("SELECT count(*) FROM receivables WHERE order_id = $1 AND kind = 'parcela' AND status = 'aberta'", [closed.id])).rows[0].count);
+  assert.ok(installments >= 1);
+  assert.equal(await runAutomations(today, db.pool), installments);
+  assert.ok((await listPendingActivities(mine, db.pool)).some((task) => task.title === `Avisar ${customer} da parcela do #${sold}` && task.dueOn === plus(30)));
+  assert.equal((await listPendingActivities({ ownerEmail: null }, db.pool)).length, before + 4 + installments);
+
+  // Excluir o pedido leva os lembretes dele; excluir a oportunidade, os dela.
+  await deleteOrder(quote, MINE, db.pool);
+  assert.equal(Number((await db.pool.query("SELECT count(*) FROM opportunity_activities WHERE auto_key LIKE 'orcamento:%' AND order_id IS NULL")).rows[0].count), 0);
+  await deleteOpportunity(idle, mine, db.pool);
+  await saveAutomationRule(parcel.id, { days: 3, title: "Parcela do pedido {pedido} ({cliente}) está para vencer", active: true }, DIRECTOR, db.pool);
+});

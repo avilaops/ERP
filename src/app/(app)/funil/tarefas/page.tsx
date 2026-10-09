@@ -4,6 +4,7 @@ import { FitRows } from "@/components/FitRows";
 import { CARD, Pager, PageHeader, pageOf, Pill, QUIET_LINK, SECONDARY } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { menuItem, seesAllOrders } from "@/lib/auth/permissions";
+import { runAutomations } from "@/lib/db/automations";
 import { ACTIVITY_LABELS, listPendingActivities } from "@/lib/db/funnel";
 import { tenantDb } from "@/lib/db/pool";
 import { isoDate } from "@/lib/format";
@@ -21,8 +22,10 @@ export default async function TarefasPage({ searchParams }: { searchParams: Prom
   const session = await requirePermission("funil", "/funil/tarefas");
   const conn = tenantDb(session.tenant.slug);
   const everyone = seesAllOrders(session);
-  const pending = await listPendingActivities({ ownerEmail: everyone ? null : session.email }, conn);
   const today = isoDate(new Date());
+  // The reminders the rules of the company ask for are created here, when the list is opened.
+  await runAutomations(today, conn);
+  const pending = await listPendingActivities({ ownerEmail: everyone ? null : session.email }, conn);
   const late = pending.filter((activity) => activity.dueOn !== null && activity.dueOn < today).length;
   const asked = (await searchParams).p;
   const size = rowsPerPage((await cookies()).get(ROWS_COOKIE)?.value);
@@ -38,7 +41,8 @@ export default async function TarefasPage({ searchParams }: { searchParams: Prom
       <PageHeader title="Tarefas" hint={pending.length === 0 ? "Nada pendente." : `${pending.length} por fazer${late > 0 ? ` · ${late} atrasada${late === 1 ? "" : "s"}` : ""}${everyone ? " · equipe toda" : ""}`} />
       {pending.length === 0 ? (
         <p className={`${CARD} mt-3 p-4 text-sm text-slate-600`}>
-          Nenhuma tarefa em aberto. O próximo passo de cada venda é registrado na oportunidade, em{" "}
+          Nenhuma tarefa em aberto. O próximo passo de cada venda é registrado na oportunidade, e o sistema lembra sozinho de orçamento parado, contrato sem
+          assinatura e parcela para vencer. Veja o{" "}
           <Link href={HERE} className={QUIET_LINK}>
             Funil
           </Link>
@@ -51,19 +55,20 @@ export default async function TarefasPage({ searchParams }: { searchParams: Prom
               const due = dueLabel(activity.dueOn, today);
               return (
                 <li key={activity.id} data-row className="flex items-center gap-3 border-b border-slate-200 px-3 py-2">
-                  <Link href={`${HERE}/${activity.opportunityId}`} className="min-w-0 flex-1">
+                  <Link href={activity.opportunityId !== null ? `${HERE}/${activity.opportunityId}` : `${menuItem("pedidos").href}/${activity.orderNumber}`} className="min-w-0 flex-1">
                     <span className="block font-medium leading-snug">{activity.title}</span>
                     <span className="block text-sm text-slate-600">
-                      {activity.opportunityTitle} · {activity.party}
+                      {activity.subject}
+                      {activity.party ? ` · ${activity.party}` : ""}
                     </span>
                     <span className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                      {ACTIVITY_LABELS[activity.kind]}
+                      {activity.automatic ? "Lembrete automático" : ACTIVITY_LABELS[activity.kind]}
                       {due ? <Pill tone={due.tone}>{due.text}</Pill> : "sem data"}
                       {everyone && activity.ownerName}
                     </span>
                   </Link>
                   <ActionForm action={changeActivityAction}>
-                    <input type="hidden" name="id" value={activity.opportunityId} />
+                    {activity.opportunityId !== null && <input type="hidden" name="id" value={activity.opportunityId} />}
                     <input type="hidden" name="activityId" value={activity.id} />
                     <button type="submit" name="what" value="concluir" aria-label={`Concluir: ${activity.title}`} className={SECONDARY}>
                       Concluir

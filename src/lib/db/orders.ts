@@ -724,6 +724,9 @@ export async function deleteOrder(number: string, scope: OrderScope, conn: Query
        DELETE FROM order_closings USING free WHERE order_id = free.id RETURNING order_id
      ), expected AS (
        DELETE FROM receivables USING free WHERE order_id = free.id RETURNING order_id
+     ), reminded AS (
+       -- The automatic reminders of the order (quote left alone, contract to sign) go with it.
+       DELETE FROM opportunity_activities a USING free WHERE a.order_id = free.id RETURNING a.order_id
      ), unlinked AS (
        -- The opportunity of the funnel that became this order stays; only the link goes.
        UPDATE opportunities SET order_id = NULL FROM free WHERE order_id = free.id RETURNING order_id
