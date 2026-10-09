@@ -14,10 +14,10 @@ const toKey = (row: Record<string, unknown>): ApiKey => ({
   id: Number(row.id), name: String(row.name), prefix: String(row.prefix), canWrite: row.can_write === true, ownerEmail: String(row.owner_email), ownerName: String(row.owner_name),
   createdAt: row.created_at as Date, createdBy: String(row.created_by), lastUsedAt: (row.last_used_at as Date | null) ?? null, revokedAt: (row.revoked_at as Date | null) ?? null,
 });
-const KEY_COLUMNS = "id, name, prefix, can_write, owner_email, owner_name, created_at, created_by, last_used_at, revoked_at";
+const COLUMNS = "id, name, prefix, can_write, owner_email, owner_name, created_at, created_by, last_used_at, revoked_at";
 
 export async function listApiKeys(conn: Queryable): Promise<ApiKey[]> {
-  const { rows } = await conn.query(`SELECT ${KEY_COLUMNS} FROM api_keys ORDER BY (revoked_at IS NOT NULL), id DESC`);
+  const { rows } = await conn.query(`SELECT ${COLUMNS} FROM api_keys ORDER BY (revoked_at IS NOT NULL), id DESC`);
   return rows.map(toKey);
 }
 
@@ -33,7 +33,7 @@ export async function createApiKey(tenant: string, input: { name: string; canWri
   if (!owner.rows[0]) throw new IntegrationError("Escolha, na lista, em nome de quem a chave grava: uma pessoa da empresa com acesso.");
   const made = newApiKey(tenant);
   const { rows } = await conn.query(
-    `INSERT INTO api_keys (name, prefix, key_hash, can_write, owner_email, owner_name, created_by) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING ${KEY_COLUMNS}`,
+    `INSERT INTO api_keys (name, prefix, key_hash, can_write, owner_email, owner_name, created_by) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING ${COLUMNS}`,
     [name, made.prefix, made.hash, input.canWrite, String(owner.rows[0].email), String(owner.rows[0].name), who],
   );
   return { key: made.key, record: toKey(rows[0]) };
@@ -47,7 +47,7 @@ export async function revokeApiKey(id: number, who: string, conn: Queryable): Pr
 
 /** The key a request came with, when it is one of this company and still good. Marks that it was used. */
 export async function matchApiKey(key: string, conn: Queryable): Promise<ApiKey | null> {
-  const { rows } = await conn.query(`UPDATE api_keys SET last_used_at = now() WHERE key_hash = $1 AND revoked_at IS NULL RETURNING ${KEY_COLUMNS}`, [hashApiKey(key)]);
+  const { rows } = await conn.query(`UPDATE api_keys SET last_used_at = now() WHERE key_hash = $1 AND revoked_at IS NULL RETURNING ${COLUMNS}`, [hashApiKey(key)]);
   return rows[0] ? toKey(rows[0]) : null;
 }
 
