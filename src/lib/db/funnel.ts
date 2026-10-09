@@ -228,7 +228,8 @@ export async function deleteOpportunity(id: number, scope: FunnelScope, conn: Qu
           noted AS (DELETE FROM opportunity_activities a USING target WHERE a.opportunity_id = target.id),
           walked AS (DELETE FROM opportunity_moves m USING target WHERE m.opportunity_id = target.id),
           written AS (DELETE FROM opportunity_messages g USING target WHERE g.opportunity_id = target.id),
-          followed AS (DELETE FROM opportunity_cadences e USING target WHERE e.opportunity_id = target.id)
+          followed AS (DELETE FROM opportunity_cadences e USING target WHERE e.opportunity_id = target.id),
+          captured AS (UPDATE capture_submissions p SET opportunity_id = NULL FROM target WHERE p.opportunity_id = target.id)
      DELETE FROM opportunities o USING target WHERE o.id = target.id RETURNING o.id`,
     [id, scope.ownerEmail],
   );

@@ -14,6 +14,8 @@ export type MailMessage = {
   /** Plain text. */
   text: string;
   attachments: MailAttachment[];
+  /** The address where the recipient leaves the list: goes in `List-Unsubscribe`, with the one-click form. */
+  unsubscribe?: string | null;
 };
 
 /** A refusal the user can act on. The message goes to the screen as it is. */
@@ -71,6 +73,7 @@ export function buildMessage(message: MailMessage, now: Date, id: string = rando
   for (const [label, address] of [["remetente", message.from], ["destinatário", message.to], ["responder para", message.replyTo]] as const) {
     if (address !== null && !isMailAddress(address)) throw new MailError(`E-mail do ${label} inválido.`);
   }
+  if (message.unsubscribe && !/^https?:\/\/[^\s<>"]+$/.test(message.unsubscribe)) throw new MailError("Endereço de descadastro inválido.");
   const boundary = `=_erp_${id.replace(/[^A-Za-z0-9]/g, "")}`;
   const domain = message.from.slice(message.from.indexOf("@") + 1);
   const headers = [
@@ -80,6 +83,8 @@ export function buildMessage(message: MailMessage, now: Date, id: string = rando
     `Subject: ${encodedWord(message.subject)}`,
     `Date: ${now.toUTCString().replace("GMT", "+0000")}`,
     `Message-ID: <${id}@${domain}>`,
+    message.unsubscribe ? `List-Unsubscribe: <${message.unsubscribe}/agora>` : null,
+    message.unsubscribe ? "List-Unsubscribe-Post: List-Unsubscribe=One-Click" : null,
     "MIME-Version: 1.0",
     `Content-Type: multipart/mixed; boundary="${boundary}"`,
   ].filter((line): line is string => line !== null);

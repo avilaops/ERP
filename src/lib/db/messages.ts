@@ -1,4 +1,5 @@
 import { loadMailInfo, mailChannel } from "@/lib/db/mail";
+import { isOptedOut, unsubscribeUrl, withUnsubscribe } from "@/lib/db/optout";
 import { pgErrorCode } from "@/lib/db/pool";
 import type { Queryable } from "@/lib/db/pool";
 import { MAIL_NOT_SET } from "@/lib/db/send-nfe-mail";
@@ -85,6 +86,13 @@ export type OpportunityMail = {
   sentBy: string;
   now: Date;
   way: MailWay;
+  /**
+   * For what the system sends by itself (a cadence): the company's name in the
+   * addresses and the public address of the ERP. Then the message carries the
+   * way out, and who took it gets nothing. What a person writes and sends by
+   * hand, one to one, goes without it.
+   */
+  automatic?: { tenantSlug: string; appUrl: string };
 };
 
 /**
@@ -104,6 +112,7 @@ export async function sendOpportunityMail(mail: OpportunityMail, conn: Queryable
   const recipient = String(target.email ?? target.customer_email ?? "").trim().toLowerCase();
   if (recipient === "") throw new MessageError("Esta oportunidade não tem e-mail do contato. Preencha em Dados.");
   if (!isMailAddress(recipient)) throw new MessageError("O e-mail do contato é inválido. Corrija em Dados.");
+  if (mail.automatic && (await isOptedOut(recipient, conn))) throw new MessageError("Este contato pediu para não receber mais e-mails automáticos.");
   const words = { contato: String(target.contact_name ?? target.customer_contact ?? target.party ?? ""), empresa: String(target.party ?? ""), vendedor: String(target.owner_name), minha_empresa: mail.company };
   const subject = fillMessage(mail.subject.trim(), words);
   const body = fillMessage(mail.body.replace(/\r\n?/g, "\n").trim(), words);
@@ -112,7 +121,9 @@ export async function sendOpportunityMail(mail: OpportunityMail, conn: Queryable
   const channel = await mailChannel(conn, mail.way.env, mail.way.key);
   if (!channel) throw new MailError(MAIL_NOT_SET);
   const { replyTo } = await loadMailInfo(conn);
-  const message = buildMessage({ from: channel.from, fromName: mail.company, to: recipient, replyTo, subject, text: body, attachments: [] }, mail.now);
+  const unsubscribe = mail.automatic ? await unsubscribeUrl(recipient, mail.automatic.appUrl, mail.automatic.tenantSlug, conn) : null;
+  const text = unsubscribe ? withUnsubscribe(body, mail.company, unsubscribe) : body;
+  const message = buildMessage({ from: channel.from, fromName: mail.company, to: recipient, replyTo, subject, text, attachments: [], unsubscribe }, mail.now);
   let status: "enviado" | "falhou" = "enviado";
   let detail: string | null = null;
   try {

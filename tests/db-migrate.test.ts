@@ -76,6 +76,7 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "0042_lembretes_automaticos.sql",
     "0043_api_e_avisos.sql",
     "0044_mensagens_e_cadencias.sql",
+    "0045_marketing.sql",
   ]);
 
   const second = await withClient((client) => migrate(client, MIGRATIONS_DIR));
@@ -95,6 +96,10 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "automation_rules",
     "cadence_steps",
     "cadences",
+    "campaign_recipients",
+    "campaigns",
+    "capture_forms",
+    "capture_submissions",
     "carriers",
     "commissions",
     "company_settings",
@@ -109,7 +114,10 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "fixed_expenses",
     "idempotency_keys",
     "lost_reasons",
+    "mail_optouts",
     "mail_settings",
+    "mail_unsubscribe_links",
+    "marketing_settings",
     "message_templates",
     "opportunities",
     "opportunity_activities",

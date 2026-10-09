@@ -1,3 +1,4 @@
+import { publicAppUrl } from "@/lib/contract/public";
 import { MessageError, sendOpportunityMail } from "@/lib/db/messages";
 import type { MailWay } from "@/lib/db/messages";
 import { pgErrorCode } from "@/lib/db/pool";
@@ -150,7 +151,7 @@ export async function stopCadence(opportunityId: number, reason: string, ownerEm
  * seller saying why, instead of trying forever. Each enrollment is taken by one
  * caller only, so two runs at the same time never send the same step twice.
  */
-export async function runCadences(company: string, now: Date, way: MailWay, conn: Queryable): Promise<{ sent: number; tasks: number; stopped: number }> {
+export async function runCadences(tenant: { slug: string; name: string }, now: Date, way: MailWay, conn: Queryable): Promise<{ sent: number; tasks: number; stopped: number }> {
   const closed = await conn.query(
     `UPDATE opportunity_cadences e SET status = 'parada', finished_at = now(),
             stopped_reason = CASE WHEN s.kind = 'ganha' THEN 'A venda foi ganha.' WHEN s.kind = 'perdida' THEN 'A venda foi perdida.' ELSE 'A cadência foi desligada.' END
@@ -193,7 +194,7 @@ export async function runCadences(company: string, now: Date, way: MailWay, conn
     } else {
       let failure: string | null = null;
       try {
-        const result = await sendOpportunityMail({ opportunityId, ownerEmail: null, subject: String(current.subject), body: String(current.body), company, sentBy: "cadência", now, way }, conn);
+        const result = await sendOpportunityMail({ opportunityId, ownerEmail: null, subject: String(current.subject), body: String(current.body), company: tenant.name, sentBy: "cadência", now, way, automatic: { tenantSlug: tenant.slug, appUrl: publicAppUrl(way.env) } }, conn);
         if (result.status === "falhou") failure = `O e-mail da cadência para ${result.recipient} não saiu: ${result.detail ?? "falha no envio"}`;
       } catch (error) {
         if (!(error instanceof MessageError || error instanceof MailError)) throw error;

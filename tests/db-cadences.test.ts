@@ -19,6 +19,7 @@ after(async () => {
 const SELLER = { email: "ana@empresa.test", name: "Ana Souza" };
 const OTHER = { email: "caio@empresa.test", name: "Caio" };
 const BOSS = "diretoria@empresa.test";
+const ACME = { slug: "acme", name: "Acme" };
 const blank = { customerId: null, contactName: null, phone: null, email: null, source: null, estimatedValue: null, notes: null };
 const textOf = (message: string) => Buffer.from(message.split("Content-Transfer-Encoding: base64\r\n\r\n")[1].split("\r\n--")[0], "base64").toString("utf8");
 
@@ -94,28 +95,28 @@ test("cadência: os passos saem na hora certa, uma vez cada; para quando a venda
   await assert.rejects(() => deleteCadence(cadence, db.pool), /Há oportunidades seguindo/);
 
   // Passo 1 na hora: o e-mail sai uma vez, mesmo rodando duas vezes.
-  assert.deepEqual(await runCadences("Acme", now, way, db.pool), { sent: 1, tasks: 0, stopped: 0 });
-  assert.deepEqual(await runCadences("Acme", now, way, db.pool), { sent: 0, tasks: 0, stopped: 0 });
+  assert.deepEqual(await runCadences(ACME, now, way, db.pool), { sent: 1, tasks: 0, stopped: 0 });
+  assert.deepEqual(await runCadences(ACME, now, way, db.pool), { sent: 0, tasks: 0, stopped: 0 });
   assert.deepEqual(outbox, ["paula@fitclub.test"]);
   let [enrollment] = await listEnrollments(id, db.pool);
   assert.deepEqual([enrollment.status, enrollment.nextPosition, enrollment.nextAt.toISOString()], ["ativa", 2, at(2).toISOString()]);
   assert.deepEqual((await listOpportunityMessages(id, db.pool)).map((message) => message.sentBy), ["cadência"]);
   // Antes da hora nada acontece; na hora, o passo 2 vira tarefa do vendedor.
-  assert.deepEqual(await runCadences("Acme", at(1), way, db.pool), { sent: 0, tasks: 0, stopped: 0 });
-  assert.deepEqual(await runCadences("Acme", at(2), way, db.pool), { sent: 0, tasks: 1, stopped: 0 });
+  assert.deepEqual(await runCadences(ACME, at(1), way, db.pool), { sent: 0, tasks: 0, stopped: 0 });
+  assert.deepEqual(await runCadences(ACME, at(2), way, db.pool), { sent: 0, tasks: 1, stopped: 0 });
   assert.deepEqual((await listPendingActivities({ ownerEmail: SELLER.email }, db.pool)).map((task) => task.title), ["Ligar para o contato"]);
   [enrollment] = await listEnrollments(id, db.pool);
   assert.deepEqual([enrollment.nextPosition, enrollment.nextAt.toISOString()], [3, at(5).toISOString()]);
   // Último passo: envia e conclui.
-  assert.deepEqual(await runCadences("Acme", at(5), way, db.pool), { sent: 1, tasks: 0, stopped: 0 });
+  assert.deepEqual(await runCadences(ACME, at(5), way, db.pool), { sent: 1, tasks: 0, stopped: 0 });
   assert.equal((await listEnrollments(id, db.pool))[0].status, "concluida");
-  assert.deepEqual(await runCadences("Acme", at(30), way, db.pool), { sent: 0, tasks: 0, stopped: 0 });
+  assert.deepEqual(await runCadences(ACME, at(30), way, db.pool), { sent: 0, tasks: 0, stopped: 0 });
 
   // A venda fechou no meio do caminho: a cadência para sozinha e não envia mais nada.
   const stages = await listStages(db.pool);
   await startCadence(id, cadence, SELLER.email, SELLER.email, at(30), db.pool);
   await moveOpportunity(id, stages.find((stage) => stage.kind === "ganha")!.id, null, SELLER.email, { ownerEmail: SELLER.email }, db.pool);
-  assert.deepEqual(await runCadences("Acme", at(30), way, db.pool), { sent: 0, tasks: 0, stopped: 1 });
+  assert.deepEqual(await runCadences(ACME, at(30), way, db.pool), { sent: 0, tasks: 0, stopped: 1 });
   assert.deepEqual([(await listEnrollments(id, db.pool))[0].status, (await listEnrollments(id, db.pool))[0].stoppedReason], ["parada", "A venda foi ganha."]);
   await assert.rejects(() => startCadence(id, cadence, SELLER.email, SELLER.email, at(30), db.pool), /Só oportunidade em andamento/);
   assert.equal(outbox.length, 2);
@@ -123,13 +124,13 @@ test("cadência: os passos saem na hora certa, uma vez cada; para quando a venda
   // Sem e-mail do contato: a cadência para e deixa a tarefa dizendo por quê, em vez de tentar para sempre.
   const silent = await createOpportunity({ ...blank, title: "Sem e-mail", company: "Studio Corpo" }, SELLER, db.pool);
   await startCadence(silent, cadence, SELLER.email, SELLER.email, at(30), db.pool);
-  assert.deepEqual(await runCadences("Acme", at(30), way, db.pool), { sent: 0, tasks: 1, stopped: 1 });
+  assert.deepEqual(await runCadences(ACME, at(30), way, db.pool), { sent: 0, tasks: 1, stopped: 1 });
   assert.match((await listEnrollments(silent, db.pool))[0].stoppedReason ?? "", /não tem e-mail do contato/);
   assert.ok((await listPendingActivities({ ownerEmail: SELLER.email }, db.pool)).some((task) => /A cadência parou: Esta oportunidade não tem e-mail/.test(task.title)));
   // O servidor de e-mail recusou: mesma coisa.
   const bounced = await createOpportunity({ ...blank, title: "Caixa cheia", company: "Iron Box", email: "x@ironbox.test" }, SELLER, db.pool);
   await startCadence(bounced, cadence, SELLER.email, SELLER.email, at(30), db.pool);
-  assert.deepEqual(await runCadences("Acme", at(30), { ...way, send: async () => { throw new MailError("O servidor de e-mail recusou (destinatário): 550 caixa inexistente"); } }, db.pool), { sent: 0, tasks: 1, stopped: 1 });
+  assert.deepEqual(await runCadences(ACME, at(30), { ...way, send: async () => { throw new MailError("O servidor de e-mail recusou (destinatário): 550 caixa inexistente"); } }, db.pool), { sent: 0, tasks: 1, stopped: 1 });
   // Parar à mão, por quem alcança a oportunidade; desligar a cadência para quem a segue.
   const manual = await createOpportunity({ ...blank, title: "Manual", company: "Clube Náutico", email: "c@clube.test" }, SELLER, db.pool);
   await startCadence(manual, cadence, SELLER.email, SELLER.email, at(30), db.pool);
@@ -137,7 +138,7 @@ test("cadência: os passos saem na hora certa, uma vez cada; para quando a venda
   await stopCadence(manual, "Parada por Ana Souza.", SELLER.email, db.pool);
   await startCadence(manual, cadence, SELLER.email, SELLER.email, at(30), db.pool);
   await saveCadence(cadence, { name: "Retomada de orçamento", active: false }, BOSS, db.pool);
-  assert.deepEqual(await runCadences("Acme", at(30), way, db.pool), { sent: 0, tasks: 0, stopped: 1 });
+  assert.deepEqual(await runCadences(ACME, at(30), way, db.pool), { sent: 0, tasks: 0, stopped: 1 });
   assert.equal((await listEnrollments(manual, db.pool))[0].stoppedReason, "A cadência foi desligada.");
   await assert.rejects(() => startCadence(manual, cadence, SELLER.email, SELLER.email, at(30), db.pool), (error: unknown) => error instanceof CadenceError && /desligada/.test(error.message));
 

@@ -72,17 +72,35 @@ export default async function FunilPage({ searchParams }: { searchParams: Promis
     <>
       <PageHeader
         title={ITEM.label}
-        hint={`${openCount} em andamento · ${showMoney(openTotal)}${everyone ? " · equipe toda" : ""}`}
+        hint={
+          <>
+            {openCount} em andamento · {showMoney(openTotal)}
+            {everyone && (
+              <>
+                {" · equipe toda · "}
+                <Link href={`${ITEM.href}/campanhas`} className={`${QUIET_LINK} md:hidden`}>
+                  Campanhas
+                </Link>
+              </>
+            )}
+          </>
+        }
         actions={
           <>
             <Link href={`${ITEM.href}/painel`} className={SECONDARY}>
               Painel
             </Link>
+            {everyone && (
+              <Link href={`${ITEM.href}/campanhas`} className={`${SECONDARY} max-md:hidden`}>
+                Campanhas
+              </Link>
+            )}
             <Link href={`${ITEM.href}/tarefas`} className={SECONDARY}>
               Tarefas{pending > 0 ? ` (${pending})` : ""}
             </Link>
-            <Link href={`${ITEM.href}/nova`} className={PRIMARY}>
-              + Oportunidade
+            <Link href={`${ITEM.href}/nova`} aria-label="Nova oportunidade" className={PRIMARY}>
+              + <span className="max-[400px]:hidden">Oportunidade</span>
+              <span className="min-[401px]:hidden">Nova</span>
             </Link>
           </>
         }
