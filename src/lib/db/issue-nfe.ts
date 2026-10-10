@@ -6,6 +6,7 @@ import { issueInstant, previewOrderNfe } from "@/lib/db/order-nfe";
 import { getOrder } from "@/lib/db/orders";
 import type { Queryable } from "@/lib/db/pool";
 import type { Send } from "@/lib/fiscal/channel";
+import type { LayoutCheck } from "@/lib/fiscal/precheck";
 import { openCertificate } from "@/lib/fiscal/certificate";
 import { NfeError, accessKey, buildNfeXml, isAcceptableRandomCode } from "@/lib/fiscal/nfe";
 import {
@@ -32,8 +33,10 @@ export type IssueResult = { invoice: Invoice; message: string };
  * stored before anything is sent, so a call that dies half way leaves a trace
  * and never a second number. A rejected invoice is issued again with its own
  * number; an invoice sent without an answer is sent again exactly as signed.
+ * With `check`, a new invoice is first conferred against the official layout,
+ * before any number is taken: one that fails is not numbered nor sent.
  */
-export async function issueOrderNfe(orderNumber: string, who: string, now: Date, vault: Buffer, send: Send, conn: Queryable): Promise<IssueResult> {
+export async function issueOrderNfe(orderNumber: string, who: string, now: Date, vault: Buffer, send: Send, conn: Queryable, check: LayoutCheck | null = null): Promise<IssueResult> {
   const preview = await previewOrderNfe(orderNumber, now, conn);
   if (!preview) throw new IssueError("Pedido não encontrado ou ainda não fechado: só pedido fechado tem nota.");
   if (preview.problems.length > 0) throw new IssueError(`A nota ainda não pode ser emitida. Falta: ${preview.problems.join(" ")}`);
@@ -72,6 +75,17 @@ export async function issueOrderNfe(orderNumber: string, who: string, now: Date,
       throw new IssueError(`A SEFAZ respondeu sobre a nota ${waiting.number} (${known.code}): ${known.reason}. Nada foi reenviado; confira com o contador.`);
     }
   } else {
+    if (check) {
+      let draft: string;
+      try {
+        draft = signNfeXml(buildNfeXml(preview.input).xml, signingKeyOf(certificate.pfx, certificate.password));
+      } catch (error) {
+        if (error instanceof NfeError) throw new IssueError(error.message);
+        throw error;
+      }
+      const problems = await check(draft);
+      if (problems.length > 0) throw new IssueError(`A nota não passou na conferência do leiaute oficial e não foi enviada; nenhum número foi usado. ${problems.join(" · ")}`);
+    }
     const rejected = previous.find((item) => item.status === "rejeitada" && item.series === series);
     // A rejected invoice is issued again with its number, unless that number was made unusable meanwhile
     // or the rejection itself says the number already belongs to another invoice at SEFAZ (204, 539…).

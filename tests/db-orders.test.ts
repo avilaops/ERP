@@ -1187,6 +1187,16 @@ test("emissão: guarda a nota assinada antes de enviar; rejeitada reemite com o 
   const keyOf = (envelope: string) => /Id="NFe(\d{44})"/.exec(envelope)![1];
   const sent: string[] = [];
 
+  // 0. A conferência do leiaute recusa: nada é numerado, guardado nem enviado.
+  const checked: string[] = [];
+  await assert.rejects(
+    () => issueOrderNfe(number, who, now, vault, never, db.pool, async (xml) => { checked.push(xml); return ["infNFe: campo fora do leiaute"]; }),
+    (error: Error) => error instanceof IssueError && /conferência do leiaute oficial/.test(error.message) && /campo fora do leiaute/.test(error.message),
+  );
+  assert.ok(checked[0].includes("<Signature ") && checked[0].includes("<nNF>42</nNF>"));
+  assert.deepEqual(await listOrderInvoices(orderId, db.pool), []);
+  assert.equal((await db.pool.query("SELECT nfe_next_number FROM company_settings")).rows[0].nfe_next_number, 42);
+
   // 1. A rede cai: a nota fica guardada, aguardando resposta, com o número 42.
   await assert.rejects(
     () => issueOrderNfe(number, who, now, vault, async (_url, _action, envelope) => { sent.push(envelope); throw new SefazError("A SEFAZ não respondeu a tempo."); }, db.pool),

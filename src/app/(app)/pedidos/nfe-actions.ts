@@ -13,6 +13,7 @@ import { sendInvoiceMail } from "@/lib/db/send-nfe-mail";
 import { tenantDb } from "@/lib/db/pool";
 import { vaultKey } from "@/lib/fiscal/certificate";
 import { sendToSefaz } from "@/lib/fiscal/channel";
+import { layoutCheck } from "@/lib/fiscal/precheck";
 import { MailError } from "@/lib/mail/message";
 import { sendMail } from "@/lib/mail/smtp";
 import type { ActionState } from "@/lib/order-form";
@@ -59,7 +60,7 @@ export async function issueNfeAction(_previous: ActionState, formData: FormData)
 
   let notice: string | null = null;
   try {
-    const result = await issueOrderNfe(number, session.email, new Date(), vaultKey(process.env.ERP_CERT_KEY), send, conn);
+    const result = await issueOrderNfe(number, session.email, new Date(), vaultKey(process.env.ERP_CERT_KEY), send, conn, layoutCheck({ ERP_FISCAL_URL: process.env.ERP_FISCAL_URL }));
     console.info(`[nfe] pedido ${number}: nota ${result.invoice.number} ${result.invoice.status} (${result.invoice.statusCode ?? "-"}), por ${session.email}`);
     if (result.invoice.status === "autorizada") notice = await mailAfter("nota", result.invoice.id, session.email, conn);
   } catch (error) {
