@@ -65,7 +65,7 @@ export async function whatsappTemplateAction(_previous: ActionState, formData: F
     if (what === "remover") {
       if (id === null) return { error: "Modelo não encontrado." };
       await deleteWhatsappTemplate(id, conn);
-    } else await saveWhatsappTemplate(id, { name: field(formData, "name"), language: field(formData, "language"), preview: field(formData, "preview") }, session.email, conn);
+    } else await saveWhatsappTemplate(id, { name: field(formData, "name"), language: field(formData, "language"), preview: field(formData, "preview"), params: field(formData, "params") }, session.email, conn);
   } catch (error) {
     return problem(error);
   }

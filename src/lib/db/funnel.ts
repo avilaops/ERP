@@ -233,7 +233,7 @@ export async function deleteOpportunity(id: number, scope: FunnelScope, conn: Qu
           captured AS (UPDATE capture_submissions p SET opportunity_id = NULL FROM target WHERE p.opportunity_id = target.id),
           answered AS (DELETE FROM opportunity_inbox i USING target WHERE i.opportunity_id = target.id),
           assisted AS (UPDATE opportunity_assists h SET opportunity_id = NULL FROM target WHERE h.opportunity_id = target.id),
-          rung AS (UPDATE voice_calls v SET opportunity_id = NULL FROM target WHERE v.opportunity_id = target.id),
+          rung AS (UPDATE voice_calls v SET opportunity_id = NULL, activity_id = NULL FROM target WHERE v.opportunity_id = target.id),
           -- The company goes back to the list of prospects, to be worked again.
           prospected AS (UPDATE prospects q SET status = 'novo', opportunity_id = NULL FROM target WHERE q.opportunity_id = target.id)
      DELETE FROM opportunities o USING target WHERE o.id = target.id RETURNING o.id`,
@@ -317,7 +317,8 @@ export async function setActivityDone(activityId: number, done: boolean, who: st
 export async function deleteActivity(activityId: number, scope: FunnelScope, conn: Queryable): Promise<void> {
   const { rows } = await conn.query(
     `WITH target AS (SELECT a.id FROM opportunity_activities a WHERE a.id = $1 AND ($2::text IS NULL OR COALESCE((SELECT o.owner_email FROM opportunities o WHERE o.id = a.opportunity_id), a.owner_email) = $2)),
-          loose AS (UPDATE opportunity_meetings m SET activity_id = NULL FROM target WHERE m.activity_id = target.id)
+          loose AS (UPDATE opportunity_meetings m SET activity_id = NULL FROM target WHERE m.activity_id = target.id),
+          hung AS (UPDATE voice_calls v SET activity_id = NULL FROM target WHERE v.activity_id = target.id)
      DELETE FROM opportunity_activities a USING target WHERE a.id = target.id RETURNING a.id`,
     [activityId, scope.ownerEmail],
   );

@@ -18,6 +18,7 @@ import { lookupCnpj } from "@/lib/cnpj";
 import { callOpportunity } from "@/lib/db/voice";
 import { sendWhatsapp } from "@/lib/db/whatsapp";
 import { startCall, VoiceError, voiceConfig } from "@/lib/voice/call";
+import { callStatusUrl } from "@/lib/voice/public";
 import { WhatsappError, whatsappSender } from "@/lib/whatsapp/api";
 import { vaultKey } from "@/lib/fiscal/certificate";
 import { MailError } from "@/lib/mail/message";
@@ -343,7 +344,7 @@ export async function sendWhatsappAction(_previous: ActionState, formData: FormD
   if (id === null) return { error: "Oportunidade não encontrada." };
   let result;
   try {
-    result = await sendWhatsapp(id, { text: read("text"), templateId: whole(read("templateId")) }, session.email, { ownerEmail: seesAllOrders(session) ? null : session.email }, { key: () => vaultKey(process.env.ERP_CERT_KEY), send: whatsappSender(), now: new Date() }, conn);
+    result = await sendWhatsapp(id, { text: read("text"), templateId: whole(read("templateId")) }, session.email, { ownerEmail: seesAllOrders(session) ? null : session.email }, { key: () => vaultKey(process.env.ERP_CERT_KEY), send: whatsappSender(), now: new Date(), company: session.tenant.name }, conn);
   } catch (error) {
     return problem(error);
   }
@@ -405,7 +406,7 @@ export async function systemCallAction(_previous: ActionState, formData: FormDat
   const id = whole(read("id"));
   if (id === null) return { error: "Oportunidade não encontrada." };
   try {
-    await callOpportunity(id, read("myPhone"), { email: session.email, name: session.name }, { ownerEmail: seesAllOrders(session) ? null : session.email }, { config: voiceConfig(), start: startCall, now: new Date() }, conn);
+    await callOpportunity(id, read("myPhone"), { email: session.email, name: session.name }, { ownerEmail: seesAllOrders(session) ? null : session.email }, { config: voiceConfig(), start: startCall, now: new Date(), statusUrl: callStatusUrl(session.tenant.slug) }, conn);
   } catch (error) {
     return problem(error);
   }

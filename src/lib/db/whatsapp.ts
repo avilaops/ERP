@@ -53,14 +53,18 @@ export async function whatsappAccount(conn: Queryable, key: () => Buffer): Promi
   };
 }
 
-export type WhatsappTemplate = { id: number; name: string; language: string; preview: string };
+export type WhatsappTemplate = { id: number; name: string; language: string; preview: string; /** What each field ({{1}}, {{2}}…) of the template gets, in order. */ params: TemplateWord[] };
+
+/** What a field of a template may be filled with. */
+export const TEMPLATE_WORDS = { contato: "Nome do contato", empresa: "Empresa do cliente", vendedor: "Nome do vendedor", minha_empresa: "Nome da sua empresa" } as const;
+export type TemplateWord = keyof typeof TEMPLATE_WORDS;
 
 export async function listWhatsappTemplates(conn: Queryable): Promise<WhatsappTemplate[]> {
-  const { rows } = await conn.query("SELECT id, name, language, preview FROM whatsapp_templates ORDER BY name");
-  return rows.map((row) => ({ id: Number(row.id), name: String(row.name), language: String(row.language), preview: String(row.preview) }));
+  const { rows } = await conn.query("SELECT id, name, language, preview, params FROM whatsapp_templates ORDER BY name");
+  return rows.map((row) => ({ id: Number(row.id), name: String(row.name), language: String(row.language), preview: String(row.preview), params: String(row.params).split(",").filter(Boolean) as TemplateWord[] }));
 }
 
-export async function saveWhatsappTemplate(id: number | null, input: { name: string; language: string; preview: string }, who: string, conn: Queryable): Promise<void> {
+export async function saveWhatsappTemplate(id: number | null, input: { name: string; language: string; preview: string; params?: string }, who: string, conn: Queryable): Promise<void> {
   const name = input.name.trim().toLowerCase();
   const language = input.language.trim() || "pt_BR";
   const preview = input.preview.replace(/\r\n?/g, "\n").trim();
@@ -68,11 +72,15 @@ export async function saveWhatsappTemplate(id: number | null, input: { name: str
   if (!/^[a-z0-9_]{1,100}$/.test(name)) problems.push("Nome do modelo: exatamente como está na Meta (letras minúsculas, números e _).");
   if (!/^[a-z]{2}(_[A-Z]{2})?$/.test(language)) problems.push("Idioma: como pt_BR.");
   if (preview.length < 2 || preview.length > 1000) problems.push("Texto do modelo: de 2 a 1.000 letras, para a equipe saber o que ele diz.");
+  const params = (input.params ?? "").split(/[\s,;]+/).map((word) => word.replace(/[{}]/g, "").trim().toLowerCase()).filter(Boolean);
+  if (params.length > 10 || params.some((word) => !(word in TEMPLATE_WORDS))) problems.push(`Campos do modelo: até 10, na ordem de {{1}}, {{2}}…, escolhidos entre ${Object.keys(TEMPLATE_WORDS).join(", ")}.`);
+  const fields = new Set([...preview.matchAll(/\{\{(\d+)\}\}/g)].map((match) => Number(match[1])));
+  if (problems.length === 0 && (fields.size !== params.length || [...fields].some((position) => position < 1 || position > params.length))) problems.push(`O texto tem ${fields.size} ${fields.size === 1 ? "campo" : "campos"} ({{1}}, {{2}}…) e foram informados ${params.length}. Os dois têm de bater.`);
   if (problems.length > 0) throw new WhatsappError(problems.join(" "));
   try {
     const { rows } = id === null
-      ? await conn.query("INSERT INTO whatsapp_templates (name, language, preview, updated_by) VALUES ($1, $2, $3, $4) RETURNING id", [name, language, preview, who])
-      : await conn.query("UPDATE whatsapp_templates SET name = $2, language = $3, preview = $4, updated_at = now(), updated_by = $5 WHERE id = $1 RETURNING id", [id, name, language, preview, who]);
+      ? await conn.query("INSERT INTO whatsapp_templates (name, language, preview, params, updated_by) VALUES ($1, $2, $3, $5, $4) RETURNING id", [name, language, preview, who, params.join(",")])
+      : await conn.query("UPDATE whatsapp_templates SET name = $2, language = $3, preview = $4, params = $6, updated_at = now(), updated_by = $5 WHERE id = $1 RETURNING id", [id, name, language, preview, who, params.join(",")]);
     if (rows.length === 0) throw new WhatsappError("Modelo não encontrado. Recarregue a página.");
   } catch (error) {
     if (pgErrorCode(error) === "23505") throw new WhatsappError("Já existe um modelo com esse nome.");
@@ -199,7 +207,7 @@ export async function listConversations(scope: FunnelScope, conn: Queryable): Pr
   return conversations.sort((a, b) => b.lastAt.getTime() - a.lastAt.getTime());
 }
 
-export type WhatsappWay = { key: () => Buffer; send: WhatsappSender; now: Date };
+export type WhatsappWay = { key: () => Buffer; send: WhatsappSender; now: Date; /** The name of the company that sends: what `minha_empresa` becomes. */ company: string };
 
 /**
  * Sends a message to the contact of an opportunity within reach, by the
@@ -209,7 +217,9 @@ export type WhatsappWay = { key: () => Buffer; send: WhatsappSender; now: Date }
  */
 export async function sendWhatsapp(opportunityId: number, input: { text: string; templateId: number | null }, who: string, scope: FunnelScope, way: WhatsappWay, conn: Queryable): Promise<{ status: "enviada" | "falhou"; detail: string | null }> {
   const found = await conn.query(
-    "SELECT COALESCE(NULLIF(btrim(o.phone), ''), c.phone) AS phone FROM opportunities o LEFT JOIN customers c ON c.id = o.customer_id WHERE o.id = $1 AND ($2::text IS NULL OR o.owner_email = $2)",
+    `SELECT COALESCE(NULLIF(btrim(o.phone), ''), c.phone) AS phone, COALESCE(NULLIF(btrim(o.contact_name), ''), NULLIF(btrim(c.contact_name), ''), c.name, o.company, '') AS contact,
+            COALESCE(c.name, o.company, '') AS party, o.owner_name
+       FROM opportunities o LEFT JOIN customers c ON c.id = o.customer_id WHERE o.id = $1 AND ($2::text IS NULL OR o.owner_email = $2)`,
     [opportunityId, scope.ownerEmail],
   );
   if (!found.rows[0]) throw new WhatsappError("Oportunidade não encontrada. Recarregue a página.");
@@ -222,8 +232,11 @@ export async function sendWhatsapp(opportunityId: number, input: { text: string;
   if (input.templateId !== null) {
     const template = (await listWhatsappTemplates(conn)).find((row) => row.id === input.templateId);
     if (!template) throw new WhatsappError("Modelo não encontrado. Recarregue a página.");
-    body = template.preview;
-    message = { to: contact, template: { name: template.name, language: template.language } };
+    // WhatsApp refuses a field that is empty or has a line break: each value is one line, never blank.
+    const words: Record<TemplateWord, string> = { contato: String(found.rows[0].contact), empresa: String(found.rows[0].party), vendedor: String(found.rows[0].owner_name), minha_empresa: way.company };
+    const values = template.params.map((word) => words[word].replace(/\s+/g, " ").trim().slice(0, 200) || "-");
+    body = template.preview.replace(/\{\{(\d+)\}\}/g, (_match, position: string) => values[Number(position) - 1] ?? "");
+    message = { to: contact, template: { name: template.name, language: template.language, ...(values.length > 0 ? { values } : {}) } };
   } else {
     body = input.text.replace(/\r\n?/g, "\n").trim();
     if (body.length < 1 || body.length > 4000) throw new WhatsappError("Escreva a mensagem (até 4.000 letras).");

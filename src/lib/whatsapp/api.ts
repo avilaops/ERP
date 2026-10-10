@@ -4,7 +4,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 export class WhatsappError extends Error {}
 
 export type WhatsappAccount = { phoneNumberId: string; token: string };
-export type WhatsappSend = { to: string } & ({ text: string } | { template: { name: string; language: string } });
+export type WhatsappSend = { to: string } & ({ text: string } | { template: { name: string; language: string; /** The values of {{1}}, {{2}}… of the body, in order. */ values?: string[] } });
 export type WhatsappSender = (account: WhatsappAccount, message: WhatsappSend) => Promise<{ id: string }>;
 
 const GRAPH = "https://graph.facebook.com/v21.0";
@@ -18,7 +18,7 @@ export function whatsappSender(fetcher: typeof fetch = fetch): WhatsappSender {
   return async (account, message) => {
     const payload = "text" in message
       ? { messaging_product: "whatsapp", recipient_type: "individual", to: message.to, type: "text", text: { preview_url: false, body: message.text } }
-      : { messaging_product: "whatsapp", recipient_type: "individual", to: message.to, type: "template", template: { name: message.template.name, language: { code: message.template.language } } };
+      : { messaging_product: "whatsapp", recipient_type: "individual", to: message.to, type: "template", template: { name: message.template.name, language: { code: message.template.language }, ...(message.template.values?.length ? { components: [{ type: "body", parameters: message.template.values.map((text) => ({ type: "text", text })) }] } : {}) } };
     let response: Response;
     try {
       response = await fetcher(`${GRAPH}/${account.phoneNumberId}/messages`, {

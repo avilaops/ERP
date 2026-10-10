@@ -3,7 +3,7 @@ import { CARD, INPUT, LABEL, PageHeader, PRIMARY, QUIET_LINK } from "@/component
 import { requirePermission } from "@/lib/auth";
 import { menuItem } from "@/lib/auth/permissions";
 import { tenantDb } from "@/lib/db/pool";
-import { callsThisMonth, loadVoiceSettings } from "@/lib/db/voice";
+import { callsThisMonth, loadVoiceSettings, minutesThisMonth } from "@/lib/db/voice";
 import { voiceConfig } from "@/lib/voice/call";
 import { ActionForm } from "../../pedidos/ActionForm";
 import { saveVoiceAction } from "./actions";
@@ -16,6 +16,7 @@ export default async function TelefoniaPage() {
   const conn = tenantDb(session.tenant.slug);
   const settings = await loadVoiceSettings(conn);
   const used = await callsThisMonth(new Date(), conn);
+  const minutes = await minutesThisMonth(new Date(), conn);
   const configured = voiceConfig() !== null;
 
   return (
@@ -50,7 +51,7 @@ export default async function TelefoniaPage() {
           </div>
         </div>
         <p className="mt-3 text-sm text-slate-700">
-          Neste mês: {used} de {settings.monthlyLimit} ligações. Cada ligação é cobrada por minuto; ao chegar no limite, só o discador do aparelho funciona até o mês virar.
+          Neste mês: {used} de {settings.monthlyLimit} ligações, {minutes} {minutes === 1 ? "minuto" : "minutos"}. Cada ligação é cobrada por minuto; ao chegar no limite, só o discador do aparelho funciona até o mês virar.
         </p>
         <p className="mt-2 text-sm text-slate-600">Nenhuma ligação é gravada. Cada uma fica anotada na oportunidade, com quem ligou e quando.</p>
         <button type="submit" className={`${PRIMARY} mt-3`}>

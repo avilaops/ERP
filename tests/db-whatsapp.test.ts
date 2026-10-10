@@ -69,6 +69,8 @@ test("envio pelo WhatsApp oficial: endereço fixo, chave só no cabeçalho, text
   assert.deepEqual(JSON.parse(String(calls[0].init.body)), { messaging_product: "whatsapp", recipient_type: "individual", to: "5517999990000", type: "text", text: { preview_url: false, body: "Olá" } });
   await whatsappSender(answering(200, { messages: [{ id: "wamid.11" }] }))(account, { to: "5517999990000", template: { name: "retomada", language: "pt_BR" } });
   assert.deepEqual(JSON.parse(String(calls[1].init.body)).template, { name: "retomada", language: { code: "pt_BR" } });
+  await whatsappSender(answering(200, { messages: [{ id: "wamid.12" }] }))(account, { to: "5517999990000", template: { name: "com_campos", language: "pt_BR", values: ["Paula", "Acme"] } });
+  assert.deepEqual(JSON.parse(String(calls[2].init.body)).template, { name: "com_campos", language: { code: "pt_BR" }, components: [{ type: "body", parameters: [{ type: "text", text: "Paula" }, { type: "text", text: "Acme" }] }] });
   const refused = (status: number, body: unknown, expected: RegExp) => assert.rejects(() => whatsappSender(answering(status, body))(account, { to: "5517999990000", text: "Olá" }), (error: unknown) => error instanceof WhatsappError && expected.test(error.message) && !error.message.includes("chave-de-acesso"));
   await refused(401, { error: { message: "Invalid OAuth access token chave-de-acesso-de-teste", code: 190 } }, /recusou a chave de acesso/);
   await refused(400, { error: { message: "(#131047) Re-engagement message\nmais", code: 131047 } }, /recusou a mensagem: \(#131047\) Re-engagement message mais/);
@@ -111,7 +113,7 @@ test("conversas: a conta fica cifrada; a mensagem do cliente entra uma vez, para
   const theirs = await createOpportunity({ ...blank, title: "Do Caio", company: "Iron Box", phone: "11 98888-7777" }, OTHER, db.pool);
   const sent: WhatsappSend[] = [];
   const way = (at: Date, fail: string | null = null) => ({
-    key: () => key, now: at,
+    key: () => key, now: at, company: "Acme",
     send: async (account: { phoneNumberId: string; token: string }, message: WhatsappSend) => {
       assert.deepEqual(account, { phoneNumberId: "111222333", token: "chave-de-acesso-de-teste-bem-longa" });
       if (fail) throw new WhatsappError(fail);
@@ -128,6 +130,17 @@ test("conversas: a conta fica cifrada; a mensagem do cliente entra uma vez, para
   assert.equal(sent.length, 0);
   assert.deepEqual(await sendWhatsapp(id, { text: "", templateId: template.id }, SELLER.email, mine, way(now), db.pool), { status: "enviada", detail: null });
   assert.deepEqual(sent[0], { to: "5517999990000", template: { name: "retomada_de_orcamento", language: "pt_BR" } });
+
+  // Modelo com campos: o texto e os campos têm de bater, e cada campo vai preenchido, em uma linha, nunca vazio.
+  await assert.rejects(() => saveWhatsappTemplate(null, { name: "com_campos", language: "pt_BR", preview: "Olá, {{1}}! Aqui é {{2}}.", params: "contato" }, BOSS, db.pool), /tem 2 campos.*informados 1/);
+  await assert.rejects(() => saveWhatsappTemplate(null, { name: "com_campos", language: "pt_BR", preview: "Olá, {{1}}!", params: "preco" }, BOSS, db.pool), /escolhidos entre contato, empresa, vendedor, minha_empresa/);
+  await saveWhatsappTemplate(null, { name: "com_campos", language: "pt_BR", preview: "Olá, {{1}}! Aqui é {{2}}, da {{3}}.", params: "{contato}, vendedor; minha_empresa" }, BOSS, db.pool);
+  const fields = (await listWhatsappTemplates(db.pool)).find((row) => row.name === "com_campos")!;
+  assert.deepEqual(fields.params, ["contato", "vendedor", "minha_empresa"]);
+  await sendWhatsapp(id, { text: "", templateId: fields.id }, SELLER.email, mine, way(now), db.pool);
+  assert.deepEqual(sent.pop(), { to: "5517999990000", template: { name: "com_campos", language: "pt_BR", values: ["Paula", "Ana Souza", "Acme"] } });
+  await db.pool.query("DELETE FROM whatsapp_messages WHERE body LIKE 'Olá, Paula! Aqui é Ana Souza, da Acme.'").then((result) => assert.equal(result.rowCount, 1));
+  await deleteWhatsappTemplate(fields.id, db.pool);
 
   // O cliente responde (a Meta manda o número sem o nono dígito): entra uma vez, para a cadência e deixa uma tarefa só.
   const { saveTemplate, listTemplates } = await import("@/lib/db/messages");

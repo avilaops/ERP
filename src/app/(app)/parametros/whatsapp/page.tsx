@@ -39,6 +39,12 @@ function TemplateFields({ saved }: { saved: WhatsappTemplate | null }) {
         </label>
         <textarea id={`texto-${suffix}`} name="preview" rows={2} defaultValue={saved?.preview ?? ""} className={`${INPUT} py-2`} />
       </div>
+      <div className="sm:col-span-3">
+        <label htmlFor={`campos-${suffix}`} className={LABEL}>
+          Campos do modelo, na ordem de {"{{1}}"}, {"{{2}}"}… (contato, empresa, vendedor, minha_empresa); vazio se não tiver
+        </label>
+        <input id={`campos-${suffix}`} name="params" type="text" defaultValue={saved?.params.join(", ") ?? ""} placeholder="contato, minha_empresa" autoComplete="off" className={INPUT} />
+      </div>
     </div>
   );
 }
@@ -134,7 +140,7 @@ export default async function WhatsappParametrosPage({ searchParams }: { searchP
       {tab === "modelos" && (
         <>
           <p className="mt-3 text-sm text-slate-700">
-            Depois de 24 horas sem o cliente escrever, o WhatsApp só deixa enviar um modelo aprovado pela Meta. Cadastre aqui os que a sua conta já tem aprovados, sem campos variáveis.
+            Depois de 24 horas sem o cliente escrever, o WhatsApp só deixa enviar um modelo aprovado pela Meta. Cadastre aqui os que a sua conta já tem aprovados, com o texto e os campos na mesma ordem da Meta.
           </p>
           <ul className="mt-2 flex flex-col gap-2">
             {templates.map((template) => (

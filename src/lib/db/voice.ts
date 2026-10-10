@@ -37,7 +37,7 @@ export async function callPhoneOf(email: string, conn: Queryable): Promise<strin
   return rows[0]?.call_phone ? String(rows[0].call_phone) : null;
 }
 
-export type VoiceWay = { config: VoiceConfig | null; start: CallStarter; now: Date };
+export type VoiceWay = { config: VoiceConfig | null; start: CallStarter; now: Date; /** Where the provider tells how the call ended, when the ERP has a public address. */ statusUrl?: string | null };
 
 /**
  * Makes the system call: the provider rings the phone of who asks and, when
@@ -61,12 +61,41 @@ export async function callOpportunity(opportunityId: number, typedPhone: string,
   const customer = callNumber(found.rows[0].phone === null ? null : String(found.rows[0].phone));
   if (!customer) throw new VoiceError("Esta oportunidade não tem um telefone com DDD. Preencha em Dados.");
   if (customer === seller) throw new VoiceError("O seu telefone e o do cliente são o mesmo número.");
-  const call = await way.start(way.config, { seller, customer });
+  const call = await way.start(way.config, { seller, customer, statusUrl: way.statusUrl ?? null });
   await conn.query("UPDATE users SET call_phone = $2 WHERE email = $1", [who.email.trim().toLowerCase(), seller]);
-  await conn.query("INSERT INTO voice_calls (opportunity_id, provider_id, created_by, created_at) VALUES ($1, $2, $3, $4)", [opportunityId, call.id.slice(0, 100), who.email, way.now]);
-  await conn.query(
-    "INSERT INTO opportunity_activities (opportunity_id, kind, title, done_at, done_by, owner_email, created_by) VALUES ($1, 'ligacao', $2, $3, $4, $5, $4)",
-    [opportunityId, `Ligação pelo sistema para ${String(found.rows[0].contact ?? "o cliente")}`.slice(0, 300), way.now, who.email, found.rows[0].owner_email],
+  const noted = await conn.query(
+    "INSERT INTO opportunity_activities (opportunity_id, kind, title, done_at, done_by, owner_email, created_by) VALUES ($1, 'ligacao', $2, $3, $4, $5, $4) RETURNING id",
+    [opportunityId, `Ligação pelo sistema para ${String(found.rows[0].contact ?? "o cliente")}`.slice(0, 280), way.now, who.email, found.rows[0].owner_email],
   );
+  await conn.query("INSERT INTO voice_calls (opportunity_id, activity_id, provider_id, created_by, created_at) VALUES ($1, $2, $3, $4, $5)", [opportunityId, noted.rows[0].id, call.id.slice(0, 100), who.email, way.now]);
   await conn.query("UPDATE opportunities SET updated_at = now(), updated_by = $2 WHERE id = $1", [opportunityId, who.email]);
+}
+
+const ENDINGS: Record<string, string> = { completed: "", "no-answer": "não atendida", busy: "ocupado", failed: "não completou", canceled: "cancelada" };
+
+/**
+ * What the provider said when a call ended: how, and how long it lasted. Kept
+ * on the call and written at the end of its activity, once. A notice about a
+ * call this company did not make changes nothing.
+ */
+export async function noteCallEnded(providerId: string, status: string, seconds: number | null, conn: Queryable): Promise<boolean> {
+  if (!(status in ENDINGS)) return false;
+  const duration = seconds !== null && Number.isInteger(seconds) && seconds >= 0 && seconds < 86_400 ? seconds : null;
+  const said = status === "completed" ? (duration === null ? "" : duration < 60 ? `${duration} s` : `${Math.round(duration / 60)} min`) : ENDINGS[status];
+  const { rows } = await conn.query(
+    `WITH ended AS (UPDATE voice_calls SET status = $2, duration_seconds = $3 WHERE provider_id = $1 AND status IS NULL RETURNING activity_id),
+          noted AS (UPDATE opportunity_activities a SET title = left(a.title || ' (' || $4 || ')', 300) FROM ended WHERE a.id = ended.activity_id AND $4 <> '')
+     SELECT 1 FROM ended`,
+    [providerId, status, duration, said],
+  );
+  return rows.length > 0;
+}
+
+/** The minutes of the calls of the month of `now` (São Paulo) that the provider already told the length of. */
+export async function minutesThisMonth(now: Date, conn: Queryable): Promise<number> {
+  const { rows } = await conn.query(
+    "SELECT COALESCE(sum(duration_seconds), 0) AS seconds FROM voice_calls WHERE date_trunc('month', created_at AT TIME ZONE 'America/Sao_Paulo') = date_trunc('month', $1::timestamptz AT TIME ZONE 'America/Sao_Paulo')",
+    [now],
+  );
+  return Math.ceil(Number(rows[0].seconds) / 60);
 }
