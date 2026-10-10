@@ -1,7 +1,8 @@
 import { exchangeCode, mcpEnabled, refreshTokens } from "@/lib/db/mcp";
 import { openMcpTenant } from "@/lib/mcp/access";
 import { json, preflight } from "@/lib/mcp/http";
-import { clientOf, SCOPE } from "@/lib/mcp/oauth";
+import { resolveClient } from "@/lib/mcp/client";
+import { SCOPE } from "@/lib/mcp/oauth";
 
 /**
  * Where an application exchanges the code a person gave it for the keys, and
@@ -15,7 +16,7 @@ export async function POST(request: Request): Promise<Response> {
   if (raw.length > 10_000) return refused();
   const form = new URLSearchParams(raw);
   const field = (name: string) => form.get(name) ?? "";
-  const client = clientOf(field("client_id"), process.env.SSO_JWT_SECRET);
+  const client = await resolveClient(field("client_id"), process.env.SSO_JWT_SECRET);
   if (!client) return json({ error: "invalid_client" }, 401);
   const grant = field("grant_type");
   const now = new Date();

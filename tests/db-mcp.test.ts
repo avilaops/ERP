@@ -10,6 +10,7 @@ import { addActivity, createOpportunity, listActivities } from "@/lib/db/funnel"
 import { exchangeCode, grantCode, grantOfAccess, listConnections, mcpEnabled, noteCall, refreshTokens, revokeConnection, setMcpEnabled } from "@/lib/db/mcp";
 import { authorizationServer, protectedResource } from "@/lib/mcp/http";
 import { clientOf, hashSecret, isRedirectUri, newSecret, pkceMatches, registerClient, tenantOfSecret } from "@/lib/mcp/oauth";
+import { resolveClient } from "@/lib/mcp/client";
 import { handleMcp } from "@/lib/mcp/server";
 import { callTool, ToolError, TOOLS, toolsOf } from "@/lib/mcp/tools";
 import { openTestDb, SKIP_WITHOUT_DB } from "./db-helpers.ts";
@@ -61,6 +62,38 @@ test("OAuth do MCP: aplicativo assinado sem guardar nada, retorno só para https
   assert.deepEqual(protectedResource(env), { resource: "https://erp.exemplo.test/mcp", authorization_servers: ["https://erp.exemplo.test"], scopes_supported: ["erp"], bearer_methods_supported: ["header"], resource_name: "ERP Ávila Ops" });
   const server = authorizationServer(env);
   assert.deepEqual([server.issuer, server.authorization_endpoint, server.token_endpoint, server.registration_endpoint, server.code_challenge_methods_supported, server.token_endpoint_auth_methods_supported], ["https://erp.exemplo.test", "https://erp.exemplo.test/oauth/authorize", "https://erp.exemplo.test/oauth/token", "https://erp.exemplo.test/oauth/register", ["S256"], ["none"]]);
+});
+
+test("aplicativo que se apresenta por endereço: só https público, sem seguir redirecionamento, e o documento tem de dizer o próprio endereço", async () => {
+  const address = "https://app.exemplo.test/oauth/client.json";
+  const publicHost = async () => ["93.184.216.34"];
+  const asked: { url: string; redirect: string }[] = [];
+  const serving = (status: number, body: unknown) => async (url: string, init: { redirect: "error" }) => {
+    asked.push({ url, redirect: init.redirect });
+    return { status, text: async () => (typeof body === "string" ? body : JSON.stringify(body)) };
+  };
+  const document = { client_id: address, client_name: " Assistente <b> ", redirect_uris: ["https://app.exemplo.test/callback"] };
+  assert.deepEqual(await resolveClient(address, SECRET, 1, serving(200, document), publicHost), { clientId: address, name: "Assistente b", redirectUris: ["https://app.exemplo.test/callback"] });
+  assert.deepEqual(asked, [{ url: address, redirect: "error" }]);
+  // Guardado por um tempo: a tela seguinte não pergunta de novo; passado o tempo, pergunta.
+  await resolveClient(address, SECRET, 2, serving(500, {}), publicHost);
+  assert.equal(asked.length, 1);
+  assert.equal(await resolveClient(address, SECRET, 11 * 60_000, serving(500, {}), publicHost), null);
+  // O que não é aplicativo: documento de outro endereço, retorno inseguro, resposta que não é JSON ou grande demais.
+  const refused = async (id: string, status: number, body: unknown, resolve = publicHost) => resolveClient(id, SECRET, 1, serving(status, body), resolve);
+  assert.equal(await refused("https://a.exemplo.test/c1", 200, { ...document, client_id: "https://outro.test/c" }), null);
+  assert.equal(await refused("https://a.exemplo.test/c2", 200, { client_id: "https://a.exemplo.test/c2", redirect_uris: ["http://evil.test/cb"] }), null);
+  assert.equal(await refused("https://a.exemplo.test/c3", 200, "<html>"), null);
+  assert.equal(await refused("https://a.exemplo.test/c4", 200, `{"client_id":"https://a.exemplo.test/c4","redirect_uris":["https://a.exemplo.test/cb"],"x":"${"a".repeat(20_000)}"}`), null);
+  // Endereço que não é https com caminho, ou que aponta para a rede interna, nem é buscado.
+  const before = asked.length;
+  for (const id of ["http://app.exemplo.test/client.json", "https://app.exemplo.test", "https://app.exemplo.test/c?x=1", "nada", ""]) assert.equal(await refused(id, 200, document), null, id);
+  assert.equal(await refused("https://interno.exemplo.test/c", 200, { ...document, client_id: "https://interno.exemplo.test/c" }, async () => ["10.0.0.5"]), null);
+  assert.equal(asked.length, before);
+  // O aplicativo registrado aqui continua valendo, sem busca nenhuma.
+  const signed = registerClient({ name: "Claude", redirectUris: ["https://claude.ai/api/mcp/auth_callback"] }, SECRET);
+  assert.deepEqual(await resolveClient(signed.clientId, SECRET, 1, serving(500, {}), publicHost), signed);
+  assert.equal(asked.length, before);
 });
 
 test("ferramentas por cargo: cada perfil recebe só as das suas telas, e perfil da empresa com menos telas recebe menos", () => {

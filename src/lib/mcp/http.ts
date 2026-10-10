@@ -17,5 +17,5 @@ export const protectedResource = (env: Record<string, string | undefined> = proc
 /** RFC 8414: how an application gets a key. Public applications only, always with PKCE. */
 export const authorizationServer = (env: Record<string, string | undefined> = process.env) => ({
   issuer: issuer(env), authorization_endpoint: `${issuer(env)}/oauth/authorize`, token_endpoint: `${issuer(env)}/oauth/token`, registration_endpoint: `${issuer(env)}/oauth/register`,
-  response_types_supported: ["code"], grant_types_supported: ["authorization_code", "refresh_token"], code_challenge_methods_supported: ["S256"], token_endpoint_auth_methods_supported: ["none"], scopes_supported: [SCOPE],
+  response_types_supported: ["code"], grant_types_supported: ["authorization_code", "refresh_token"], code_challenge_methods_supported: ["S256"], token_endpoint_auth_methods_supported: ["none"], scopes_supported: [SCOPE], client_id_metadata_document_supported: true,
 });

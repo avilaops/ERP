@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { requireSession } from "@/lib/auth";
 import { grantCode, mcpEnabled } from "@/lib/db/mcp";
 import { tenantDb } from "@/lib/db/pool";
-import { clientOf } from "@/lib/mcp/oauth";
+import { resolveClient } from "@/lib/mcp/client";
 import type { ActionState } from "@/lib/order-form";
 
 /**
@@ -20,7 +20,7 @@ export async function decideAuthorizationAction(_previous: ActionState, formData
     const value = formData.get(name);
     return typeof value === "string" ? value : "";
   };
-  const client = clientOf(field("client_id"), process.env.SSO_JWT_SECRET);
+  const client = await resolveClient(field("client_id"), process.env.SSO_JWT_SECRET);
   const redirectUri = field("redirect_uri");
   if (!client || !client.redirectUris.includes(redirectUri)) return { error: "Este pedido de acesso não é válido. Comece de novo pelo aplicativo." };
   const back = new URL(redirectUri);

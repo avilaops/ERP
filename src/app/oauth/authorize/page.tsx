@@ -5,7 +5,7 @@ import { ROLE_LABELS } from "@/lib/auth/roles";
 import { mcpEnabled } from "@/lib/db/mcp";
 import { tenantDb } from "@/lib/db/pool";
 import { resourceUrl } from "@/lib/mcp/http";
-import { clientOf } from "@/lib/mcp/oauth";
+import { resolveClient } from "@/lib/mcp/client";
 import { toolsOf } from "@/lib/mcp/tools";
 import { decideAuthorizationAction } from "./actions";
 
@@ -24,7 +24,7 @@ export default async function AuthorizePage({ searchParams }: { searchParams: Pr
   const query = await searchParams;
   const params = Object.fromEntries(["response_type", "client_id", "redirect_uri", "code_challenge", "code_challenge_method", "state", "scope", "resource"].map((name) => [name, first(query[name])]));
   const session = await requireSession(`/oauth/authorize?${new URLSearchParams(params).toString()}`);
-  const client = clientOf(params.client_id, process.env.SSO_JWT_SECRET);
+  const client = await resolveClient(params.client_id, process.env.SSO_JWT_SECRET);
   // What is wrong with the request itself is never sent back to the application: the address to go back to is part of what is not trusted yet.
   const valid = client !== null && client.redirectUris.includes(params.redirect_uri) && params.response_type === "code" && params.code_challenge_method === "S256" && /^[A-Za-z0-9_-]{43}$/.test(params.code_challenge) && (params.resource === "" || params.resource === resourceUrl());
   if (!valid) {
