@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { lineWords } from "@/lib/line-words";
 import { IDLE_FORM_STATE, PARAM_SECTIONS, STATE_RATE_COLUMNS } from "@/lib/params-form";
 import type { ParamField, ParamsFormState, ParamsFormValues, StateRateKey } from "@/lib/params-form";
@@ -30,6 +30,12 @@ export function ParamsForm({ saved, action, lineId, imported }: { saved: ParamsF
   };
   const [state, formAction, pending] = useActionState(action, IDLE_FORM_STATE);
   const values = state.status === "error" && state.values ? state.values : saved;
+  // One part of the rule at a time; the others stay in the form, only out of sight, and are saved with it.
+  // A refused form shows every part: the mistake may be in any of them.
+  const parts = [...PARAM_SECTIONS.map((section) => section.title), "ICMS por estado"];
+  const [part, setPart] = useState(0);
+  const everyPart = state.status === "error";
+  const out = (index: number) => (everyPart || index === part ? "" : " hidden");
 
   return (
     <form action={formAction} className="flex flex-col gap-6" noValidate>
@@ -51,8 +57,25 @@ export function ParamsForm({ saved, action, lineId, imported }: { saved: ParamsF
         </p>
       )}
 
-      {PARAM_SECTIONS.map((section) => (
-        <fieldset key={section.title} className="rounded-lg border border-slate-200 bg-white">
+      {!everyPart && (
+        <div role="tablist" aria-label="Partes da regra de preço" className="flex flex-wrap gap-2">
+          {parts.map((title, index) => (
+            <button
+              key={title}
+              type="button"
+              role="tab"
+              aria-selected={index === part}
+              onClick={() => setPart(index)}
+              className={`inline-flex min-h-9 items-center rounded-full border px-4 text-sm font-medium ${index === part ? "border-brand bg-brand text-white" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100"}`}
+            >
+              {title}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {PARAM_SECTIONS.map((section, index) => (
+        <fieldset key={section.title} className={`rounded-lg border border-slate-200 bg-white${out(index)}`}>
           <legend className="sr-only">{section.title}</legend>
           <h2 className="border-b border-slate-200 px-5 py-3 text-sm font-semibold uppercase tracking-wide">
             {section.title}
@@ -97,7 +120,7 @@ export function ParamsForm({ saved, action, lineId, imported }: { saved: ParamsF
         </fieldset>
       ))}
 
-      <fieldset className="rounded-lg border border-slate-200 bg-white">
+      <fieldset className={`rounded-lg border border-slate-200 bg-white${out(PARAM_SECTIONS.length)}`}>
         <legend className="sr-only">ICMS por estado de destino</legend>
         <h2 className="border-b border-slate-200 px-5 py-3 text-sm font-semibold uppercase tracking-wide">
           ICMS por estado de destino

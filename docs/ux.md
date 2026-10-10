@@ -90,11 +90,11 @@ Telas que ainda não obedecem à regra e o caminho previsto para cada uma:
 | Tela | Situação | Caminho |
 |---|---|---|
 | Produtos e custos | Catálogo paginado desde 10/10/2026 (1 a 1,7 tela, por causa do cabeçalho com as ferramentas) | Enxugar o cabeçalho; edição em tela própria também no computador |
-| Parâmetros | Em abas desde 10/10/2026: índice por assunto, Regra de preço, Empresa e Aprovação. A Regra de preço ainda é um formulário de 2 a 8 telas | Separar o formulário da regra de preço em partes (impostos por estado, canal, política) |
+| Parâmetros | Em abas desde 10/10/2026: índice por assunto, Regra de preço, Empresa e Aprovação. A Regra de preço mostra uma parte por vez (política, impostos, canal, provisões, despesas, ICMS por estado), gravadas juntas: 1,2 tela no computador, 2,5 a 3,3 no celular por causa do quadro Resultado | No celular, pôr o quadro Resultado numa parte própria |
 | Dashboard | Em abas desde 10/10/2026 (Resumo, Vendas, Em aberto, Dinheiro): 1 tela no computador, até 1,7 no celular (2,3 na aba Dinheiro em 360×640) | Trocar as tabelas da aba Dinheiro por linhas compactas |
 | Preços e metas | Em abas desde 10/10/2026 (Resumo, Metas, Tabela): 1 tela, salvo a aba Tabela no celular (2 a 2,6) | Paginar as publicações e o quadro por destino no celular |
 | Fornecedores | Lista paginada e cadastro separado desde 10/10/2026; o formulário de novo fornecedor passa de uma tela no celular | Formulário em etapas, se incomodar |
 | Pedido (um pedido) | Longa, com abas de âncora | Partes do pedido como etapas reais |
 | Tabela de preços e Simulador em 360×640 | 1,05 a 1,25 tela | Rever o cabeçalho de página para telas muito baixas |
-| Clientes, Comissões, Recebimentos, Aprovações, Equipe | Desde 10/10/2026 a tabela empilha as células no celular (classe `stack-sm`), sem rolagem lateral. Recebimentos e Comissões ainda passam de uma tela no celular (1,2 a 1,9) | Paginar as listas e separar "em aberto" de "últimos" em abas |
+| Clientes, Comissões, Recebimentos, Aprovações, Equipe | Desde 10/10/2026 a tabela empilha as células no celular (classe `stack-sm`), sem rolagem lateral. Recebimentos está em abas (em aberto, estornos, recebidos) e Comissões dobra os lançamentos por vendedor; no celular ainda chegam a 1,5 e 1,9 tela em 360×640 | Paginar as parcelas em aberto |
 | Novo pedido, Comissões, Recebimentos no celular | 1,2 a 1,8 tela | Usar `EquipmentPicker` no novo pedido; paginar as listas |

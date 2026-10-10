@@ -271,9 +271,9 @@ export default async function PrecosMetasPage({ searchParams }: { searchParams: 
             {(() => {
               const top = Math.max(...director.byState.map((bar) => bar.value), director.params.freeDiscount, 0.0001);
               return (
-                <ul className="grid gap-x-8 gap-y-1.5 sm:grid-cols-2">
+                <ul className="grid grid-cols-2 gap-x-3 gap-y-1.5 sm:gap-x-8">
                   {director.byState.map((bar) => (
-                    <li key={bar.label} className="grid grid-cols-[3.5rem_minmax(0,1fr)_3.25rem] items-center gap-2 text-sm">
+                    <li key={bar.label} className="grid grid-cols-[2.75rem_minmax(0,1fr)_3rem] items-center gap-1.5 text-xs sm:grid-cols-[3.5rem_minmax(0,1fr)_3.25rem] sm:gap-2 sm:text-sm">
                       <span className="truncate">{bar.label}</span>
                       <span className="relative h-2.5 rounded bg-slate-100">
                         <span

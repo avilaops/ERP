@@ -108,6 +108,14 @@ export default async function ComissoesPage({ searchParams }: { searchParams: Pr
                   <span className={`mt-1 inline-block rounded-full px-3 py-1 text-xs font-medium ${color}`}>{label}</span>
                 </div>
               </div>
+              {/* The entries stay folded when there is more than one seller: the total of each is what the screen is for. */}
+              <details open={groups.length === 1} className="group">
+              <summary className="flex min-h-[var(--control)] cursor-pointer items-center justify-between px-5 text-sm font-medium text-slate-700">
+                Ver os lançamentos
+                <span className="text-slate-500 transition-transform group-open:rotate-90" aria-hidden="true">
+                  ›
+                </span>
+              </summary>
               <div className="relative overflow-x-auto">
                 <table className="stack-sm w-full text-sm">
                   <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
@@ -152,6 +160,7 @@ export default async function ComissoesPage({ searchParams }: { searchParams: Pr
                   </tbody>
                 </table>
               </div>
+              </details>
               {group.status !== "paga" && (
                 <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-5 py-4 text-sm">
                   <p className="text-slate-700">

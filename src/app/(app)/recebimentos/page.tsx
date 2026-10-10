@@ -19,7 +19,9 @@ const CARD = "rounded-lg border border-slate-200 bg-white";
 const INPUT = "rounded border border-slate-300 bg-white px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-brand";
 const count = (n: number) => `${n} ${n === 1 ? "valor" : "valores"}`;
 
-export default async function RecebimentosPage() {
+const HERE = menuItem("recebimentos").href;
+
+export default async function RecebimentosPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const session = await requirePermission("recebimentos");
   const conn = tenantDb(session.tenant.slug);
 
@@ -31,6 +33,10 @@ export default async function RecebimentosPage() {
   const decides = confirmsRefunds(session);
   const summary = receivablesSummary(open, today, addDays(today, 30));
   const received = await receivedInMonth(today.slice(0, 7), conn);
+  // One part at a time: what is still to come in, the refunds waiting for a decision, and what came in.
+  const TABS = [["aberto", `Em aberto (${open.length})`], ...(refunds.length > 0 ? ([["estornos", `Estornos (${refunds.length})`]] as [string, string][]) : []), ["recebidos", "Recebidos"]] as [string, string][];
+  const asked = (await searchParams).ver;
+  const tab = TABS.find(([key]) => key === (Array.isArray(asked) ? asked[0] : asked))?.[0] ?? "aberto";
 
   const cards = [
     ["A receber", showMoney(summary.open.total), count(summary.open.count), ""],
@@ -44,7 +50,21 @@ export default async function RecebimentosPage() {
       <h1 className="text-2xl font-semibold">{menuItem("recebimentos").label}</h1>
       <p className="mt-1 text-slate-600">Entradas e parcelas dos pedidos fechados. A baixa gera a comissão do vendedor.</p>
 
-      <dl className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+      <nav aria-label="Partes dos recebimentos" className="mt-3 flex flex-wrap gap-x-1 border-b border-slate-200">
+        {TABS.map(([key, label]) => (
+          <Link
+            key={key}
+            href={key === "aberto" ? HERE : `${HERE}?ver=${key}`}
+            aria-current={key === tab ? "page" : undefined}
+            className={`inline-flex min-h-[var(--control)] items-center border-b-2 px-3 text-sm font-medium ${key === tab ? "border-brand text-brand" : "border-transparent text-slate-600 hover:text-slate-900"}`}
+          >
+            {label}
+          </Link>
+        ))}
+      </nav>
+      {tab === "aberto" && (
+        <>
+      <dl className="mt-4 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         {cards.map(([label, value, note, color]) => (
           <div key={label} className={`${CARD} p-4`}>
             <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</dt>
@@ -139,7 +159,10 @@ export default async function RecebimentosPage() {
           </ul>
         )}
       </section>
-
+        </>
+      )}
+      {tab === "estornos" && (
+        <>
       {refunds.length > 0 && (
         <section className={`${CARD} mt-8 border-amber-300`} aria-labelledby="estornos">
           <h2 id="estornos" className="border-b border-slate-200 px-5 py-3 text-sm font-semibold uppercase tracking-wide">
@@ -183,7 +206,11 @@ export default async function RecebimentosPage() {
           </ul>
         </section>
       )}
-
+        </>
+      )}
+      {tab === "recebidos" && (
+        <>
+      {receipts.length === 0 && <p className={`${CARD} mt-4 p-4 text-sm text-slate-700`}>Nenhum recebimento registrado ainda.</p>}
       {receipts.length > 0 && (
         <section className={`${CARD} mt-8`} aria-labelledby="recebidos">
           <h2 id="recebidos" className="border-b border-slate-200 px-5 py-3 text-sm font-semibold uppercase tracking-wide">
@@ -251,6 +278,8 @@ export default async function RecebimentosPage() {
             </table>
           </div>
         </section>
+      )}
+        </>
       )}
     </>
   );
