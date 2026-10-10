@@ -1,4 +1,5 @@
 import { request } from "node:https";
+import { ACCESS_KEY_PATTERN, CNPJ_PATTERN } from "@/lib/fiscal/nfe";
 
 /**
  * The conversation with SEFAZ for authorising an NF-e (web service
@@ -56,9 +57,27 @@ export type AuthorizationResult =
 const pick = (xml: string, name: string) => new RegExp(`<(?:\\w+:)?${name}>([^<]*)</(?:\\w+:)?${name}>`).exec(xml)?.[1] ?? null;
 const unescape = (text: string) => text.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&amp;/g, "&");
 
-/** Authorised: 100, and 150 (outside the deadline). Denied: 110, 301, 302, 303. */
-const AUTHORIZED = new Set(["100", "150"]);
+/**
+ * Authorised: 100, 150 (outside the deadline) and 120 (with an alert, NT
+ * 2026.002: today only the NFC-e gets it, and an invoice that comes back with
+ * it is as authorised as any other). Denied: 110, 301, 302, 303.
+ */
+const AUTHORIZED = new Set(["100", "120", "150"]);
 const DENIED = new Set(["110", "301", "302", "303"]);
+/**
+ * Refusals of the call, not of the invoice: SEFAZ did not look at it. 656 is
+ * "consumo indevido" (MOC 7.0, Anexo I, 4.3): the same invoice is sent again
+ * later, and correcting it would only add to the count that caused the block.
+ */
+const NOT_A_VERDICT = new Set(["656"]);
+/**
+ * Rejections that say the number already belongs to another invoice at SEFAZ
+ * (rules 2B08-10, 2B08-30, 2B08-40 and 3B08-100): another key, cancelled,
+ * denied or made unusable. An invoice rejected with one of them is never
+ * issued again with that number. 204 (the same invoice, duplicated) is not
+ * here: it is settled by consulting the key, not by a new number.
+ */
+export const NUMBER_TAKEN = new Set(["205", "206", "218", "539"]);
 
 /**
  * Reads the answer of the authorisation for the invoice of `accessKey`. The
@@ -85,7 +104,7 @@ export function parseAuthorization(response: string, accessKey: string): Authori
   const code = pick(batch, "cStat") ?? "";
   const reason = unescape(pick(batch, "xMotivo") ?? "");
   // 2xx and above at the level of the batch are rejections; 1xx without a protocol is not a verdict yet.
-  return Number(code) >= 200 ? { status: "rejeitada", code, reason } : { status: "sem-resposta", code, reason };
+  return Number(code) >= 200 && !NOT_A_VERDICT.has(code) ? { status: "rejeitada", code, reason } : { status: "sem-resposta", code, reason };
 }
 
 /** What the company keeps and sends to its customer: the signed invoice with the protocol of SEFAZ. */
@@ -165,7 +184,7 @@ export function consultUrl(uf: string, environment: "homologacao" | "producao"):
 
 /** Asks SEFAZ what it knows about one access key. Nothing to sign: the certificate of the connection identifies who asks. */
 export function consultEnvelope(accessKey: string, environment: "homologacao" | "producao"): string {
-  if (!/^\d{44}$/.test(accessKey)) throw new Error("Chave de acesso inválida.");
+  if (!ACCESS_KEY_PATTERN.test(accessKey)) throw new Error("Chave de acesso inválida.");
   return (
     `<?xml version="1.0" encoding="UTF-8"?><soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope"><soap12:Body>` +
     `<nfeDadosMsg xmlns="${CONSULT_WSDL}"><consSitNFe xmlns="${NFE_NS}" versao="4.00"><tpAmb>${environment === "producao" ? "1" : "2"}</tpAmb><xServ>CONSULTAR</xServ><chNFe>${accessKey}</chNFe></consSitNFe></nfeDadosMsg>` +
@@ -199,6 +218,30 @@ export function parseConsult(response: string, accessKey: string): ConsultResult
   if (DENIED.has(code)) return { status: "denegada", code, reason };
   if (code === "217") return { status: "nao-consta", code, reason };
   return { status: "outra", code, reason };
+}
+
+export type ConsultedEvent = { kind: "cancelamento" | "correcao"; sequence: number; protocol: string; code: string; text: string; xml: string };
+
+/**
+ * The events SEFAZ has for the invoice, out of the answer of the consultation
+ * (it brings every `procEventoNFe` linked to the key): the cancellation and the
+ * correction letters, each with its own protocol. It is how an event whose
+ * answer was lost is found again, instead of being sent twice (rejection 573).
+ */
+export function consultEvents(response: string, accessKey: string): ConsultedEvent[] {
+  const events: ConsultedEvent[] = [];
+  for (const [xml] of response.matchAll(/<procEventoNFe[\s\S]*?<\/procEventoNFe>/g)) {
+    const sent = /<evento[\s\S]*?<\/evento>/.exec(xml)?.[0] ?? "";
+    const answer = /<retEvento[\s\S]*?<\/retEvento>/.exec(xml)?.[0] ?? "";
+    const type = pick(sent, "tpEvento");
+    const protocol = pick(answer, "nProt");
+    const sequence = Number(pick(sent, "nSeqEvento"));
+    const code = pick(answer, "cStat") ?? "";
+    if (pick(sent, "chNFe") !== accessKey || !protocol || !Number.isInteger(sequence) || !["135", "136", "155"].includes(code)) continue;
+    if (type === "110111") events.push({ kind: "cancelamento", sequence, protocol, code, text: unescape(pick(sent, "xJust") ?? ""), xml });
+    if (type === "110110") events.push({ kind: "correcao", sequence, protocol, code, text: unescape(pick(sent, "xCorrecao") ?? ""), xml });
+  }
+  return events;
 }
 
 /* ---------- Inutilização de numeração (NFeInutilizacao4) ---------- */
@@ -239,7 +282,7 @@ export function voidXml(request: NumberVoid): { id: string; xml: string } {
   const whole = (value: number, max: number) => Number.isInteger(value) && value >= 1 && value <= max;
   if (!whole(request.series, 999)) throw new SefazError("Série: de 1 a 999.");
   if (!whole(request.first, 999_999_999) || !whole(request.last, 999_999_999) || request.last < request.first) throw new SefazError("Informe o primeiro e o último número da faixa, em ordem.");
-  if (!/^\d{2}$/.test(request.stateCode) || !/^\d{2}$/.test(request.year) || !/^\d{14}$/.test(request.cnpj)) throw new Error("Dados do emitente inválidos para a inutilização.");
+  if (!/^\d{2}$/.test(request.stateCode) || !/^\d{2}$/.test(request.year) || !CNPJ_PATTERN.test(request.cnpj)) throw new Error("Dados do emitente inválidos para a inutilização.");
   const pad = (value: number, size: number) => String(value).padStart(size, "0");
   const id = `ID${request.stateCode}${request.year}${request.cnpj}55${pad(request.series, 3)}${pad(request.first, 9)}${pad(request.last, 9)}`;
   const text = reason.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");

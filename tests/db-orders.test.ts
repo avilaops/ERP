@@ -1370,6 +1370,119 @@ test("nota autorizada: carta de correção numera 1, 2…; cancelamento grava o 
   assert.deepEqual((await listNumberVoids(db.pool)).map((item) => [item.first, item.last, item.protocol]), [[45, 45, "135260000000009"]]);
 });
 
+test("resposta perdida: evento duplicado (573) vem da consulta; número que já é de outra nota na SEFAZ (539) não é reaproveitado; duplicidade (204) traz o protocolo ou espera", { skip }, async () => {
+  const { registerOrderNfeEvent, issueOrderNfe, IssueError } = await import("@/lib/db/issue-nfe");
+  const { listOrderInvoiceEvents, listOrderInvoices } = await import("@/lib/db/invoices");
+  const { saveCertificate } = await import("@/lib/db/fiscal");
+  const { isAcceptableRandomCode } = await import("@/lib/fiscal/nfe");
+  const { SefazError } = await import("@/lib/fiscal/sefaz");
+  const { testPfx } = await import("./fiscal-helpers.ts");
+  const { randomBytes } = await import("node:crypto");
+
+  const closed = await db.pool.query("SELECT o.id, o.number, i.id AS invoice_id, i.number AS invoice_number, i.access_key FROM orders o JOIN fiscal_invoices i ON i.order_id = o.id WHERE i.status = 'autorizada' LIMIT 1");
+  const { id: orderId, number, invoice_id: invoiceId, invoice_number: invoiceNumber, access_key: key } = closed.rows[0];
+  const now = new Date("2026-10-08T16:00:00Z");
+  const who = "diretoria@teste.local";
+  const vault = randomBytes(32);
+  await saveCertificate(testPfx({ name: "EMPRESA DE TESTE LTDA:11222333000181" }), "senha-de-teste", vault, who, now, db.pool);
+
+  // O que a SEFAZ guarda da nota: os eventos registrados em chamadas cuja resposta nunca chegou.
+  const atSefaz: string[] = [];
+  const registered = (type: "110110" | "110111", sequence: number, detail: string, protocol: string) =>
+    `<procEventoNFe versao="1.00"><evento versao="1.00"><infEvento Id="ID${type}${key}0${sequence}"><chNFe>${key}</chNFe><tpEvento>${type}</tpEvento><nSeqEvento>${sequence}</nSeqEvento><detEvento versao="1.00">${detail}</detEvento></infEvento></evento>` +
+    `<retEvento versao="1.00"><infEvento><cStat>135</cStat><xMotivo>Evento registrado e vinculado a NF-e</xMotivo><chNFe>${key}</chNFe><nProt>${protocol}</nProt></infEvento></retEvento></procEventoNFe>`;
+  const duplicated = async (url: string, _action: string, envelope: string) => {
+    if (/nfeconsultaprotocolo4/.test(url)) return `<retConsSitNFe versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe"><cStat>100</cStat><xMotivo>Autorizado o uso da NF-e</xMotivo><chNFe>${key}</chNFe>${atSefaz.join("")}</retConsSitNFe>`;
+    assert.match(url, /nferecepcaoevento4/);
+    assert.ok(envelope.includes(`<chNFe>${key}</chNFe>`));
+    return `<retEnvEvento versao="1.00" xmlns="http://www.portalfiscal.inf.br/nfe"><cStat>128</cStat><xMotivo>Lote processado</xMotivo><retEvento versao="1.00"><infEvento><cStat>573</cStat><xMotivo>Rejeição: Duplicidade de Evento</xMotivo><chNFe>${key}</chNFe></infEvento></retEvento></retEnvEvento>`;
+  };
+  const eventsOfInvoice = async () => (await listOrderInvoiceEvents(orderId, db.pool)).filter((event) => event.invoiceId === invoiceId).map((event) => [event.kind, event.sequence, event.protocol, event.text]);
+
+  // Carta 1: a SEFAZ já tinha, com o mesmo texto. É gravada com o protocolo de lá, e a pessoa fica sabendo.
+  atSefaz.push(registered("110110", 1, "<descEvento>Carta de Correção</descEvento><xCorrecao>Onde se lê Rua A, leia-se Rua B, número 20.</xCorrecao>", "135260000088801"));
+  assert.match((await registerOrderNfeEvent(number, "correcao", "Onde se lê Rua A, leia-se Rua B, número 20.", who, now, vault, duplicated, db.pool)).message, /carta de correção 1 já estava registrada na SEFAZ\. Protocolo 135260000088801/);
+  // Carta 2: a SEFAZ tem outra, de texto diferente. Grava a de lá e avisa que a de agora não foi registrada.
+  atSefaz.push(registered("110110", 2, "<descEvento>Carta de Correção</descEvento><xCorrecao>Onde se lê Centro, leia-se Jardim das Flores.</xCorrecao>", "135260000088802"));
+  await assert.rejects(
+    () => registerOrderNfeEvent(number, "correcao", "Onde se lê 10 volumes, leia-se 12 volumes.", who, now, vault, duplicated, db.pool),
+    (error: Error) => error instanceof IssueError && /já estava registrada na SEFAZ com outro texto \("Onde se lê Centro, leia-se Jardim das Flores\."/.test(error.message) && /carta 3/.test(error.message),
+  );
+  // Carta 3: duplicada, e a consulta não a traz. Nada é gravado.
+  await assert.rejects(() => registerOrderNfeEvent(number, "correcao", "Onde se lê 10 volumes, leia-se 12 volumes.", who, now, vault, duplicated, db.pool), /A consulta da nota não trouxe esse evento/);
+  assert.deepEqual(await eventsOfInvoice(), [
+    ["correcao", 1, "135260000088801", "Onde se lê Rua A, leia-se Rua B, número 20."],
+    ["correcao", 2, "135260000088802", "Onde se lê Centro, leia-se Jardim das Flores."],
+  ]);
+  // Consulta fora do ar: nada gravado, a nota segue autorizada.
+  await assert.rejects(
+    () => registerOrderNfeEvent(number, "cancelamento", "Cliente desistiu da compra antes da saída.", who, now, vault, async (url, action, envelope) => {
+      if (/nfeconsultaprotocolo4/.test(url)) throw new SefazError("A SEFAZ não respondeu a tempo.");
+      return duplicated(url, action, envelope);
+    }, db.pool),
+    /a consulta da nota falhou/,
+  );
+  assert.equal((await listOrderInvoices(orderId, db.pool)).find((invoice) => invoice.id === invoiceId)?.status, "autorizada");
+  // Cancelamento que a SEFAZ já tinha: a nota vira cancelada, com o protocolo e o arquivo do evento de lá.
+  atSefaz.push(registered("110111", 1, "<descEvento>Cancelamento</descEvento><xJust>Cliente desistiu da compra antes da saída.</xJust>", "135260000088803"));
+  assert.match((await registerOrderNfeEvent(number, "cancelamento", "Cliente desistiu da compra antes da saída.", who, now, vault, duplicated, db.pool)).message, new RegExp(`nota ${invoiceNumber} já estava cancelada na SEFAZ\\. Protocolo 135260000088803`));
+  assert.equal((await listOrderInvoices(orderId, db.pool)).find((invoice) => invoice.id === invoiceId)?.status, "cancelada");
+  const stored = await db.pool.query("SELECT signed_xml FROM fiscal_invoice_events WHERE invoice_id = $1 AND kind = 'cancelamento'", [invoiceId]);
+  assert.ok(String(stored.rows[0].signed_xml).startsWith("<procEventoNFe") && String(stored.rows[0].signed_xml).includes("<nProt>135260000088803</nProt>"));
+
+  // Nota nova do pedido. A SEFAZ responde que o número já é de outra chave (539): a seguinte não reaproveita o número.
+  const { rows: counter } = await db.pool.query("SELECT nfe_next_number FROM company_settings");
+  const first = Number(counter[0].nfe_next_number);
+  const sentNumbers: number[] = [];
+  const batch = (envelope: string, code: string, reason: string) => {
+    const sentKey = /Id="NFe(\d{44})"/.exec(envelope)![1];
+    const sentNumber = Number(/<nNF>(\d+)<\/nNF>/.exec(envelope)![1]);
+    sentNumbers.push(sentNumber);
+    // Regra B03-10: o código da chave nunca é o número da nota nem uma sequência óbvia.
+    assert.ok(isAcceptableRandomCode(/<cNF>(\d{8})<\/cNF>/.exec(envelope)![1], sentNumber));
+    return `<retEnviNFe versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe"><cStat>104</cStat><xMotivo>Lote processado</xMotivo><protNFe versao="4.00"><infProt><chNFe>${sentKey}</chNFe><cStat>${code}</cStat><xMotivo>${reason}</xMotivo></infProt></protNFe></retEnviNFe>`;
+  };
+  const consult = (envelope: string, code: string, protocol: string | null) => {
+    const asked = /<chNFe>(\d{44})<\/chNFe>/.exec(envelope)![1];
+    const inner = protocol ? `<protNFe versao="4.00"><infProt><chNFe>${asked}</chNFe><nProt>${protocol}</nProt><cStat>100</cStat><xMotivo>Autorizado o uso da NF-e</xMotivo></infProt></protNFe>` : "";
+    return `<retConsSitNFe versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe"><cStat>${code}</cStat><xMotivo>motivo</xMotivo><chNFe>${asked}</chNFe>${inner}</retConsSitNFe>`;
+  };
+  const taken = await issueOrderNfe(number, who, now, vault, async (_url, _action, envelope) => batch(envelope, "539", "Rejeição: Duplicidade de NF-e com diferença na Chave de Acesso"), db.pool);
+  assert.deepEqual([taken.invoice.status, taken.invoice.statusCode, taken.invoice.number], ["rejeitada", "539", first]);
+  assert.match(taken.message, /a próxima emissão sai com um número novo/);
+
+  // Duplicidade (204) e a consulta diz que a chave não consta: pode ser a mesma nota ainda não visível, ou o número ser de outra.
+  // Nada é dado por rejeitado (emitir de novo com outro número poderia duplicar a venda): a nota fica aguardando.
+  const unseen = async (url: string, _action: string, envelope: string) => (/nfeconsultaprotocolo4/.test(url) ? consult(envelope, "217", null) : batch(envelope, "204", "Rejeição: Duplicidade de NF-e"));
+  await assert.rejects(() => issueOrderNfe(number, who, now, vault, unseen, db.pool), (error: Error) => error instanceof IssueError && /já existe \(204\), mas a consulta da chave respondeu 217/.test(error.message));
+  const waitingNow = async () => (await listOrderInvoices(orderId, db.pool)).slice(0, 1).map((invoice) => [invoice.number, invoice.status]);
+  assert.deepEqual(await waitingNow(), [[first + 1, "assinada"]]);
+
+  // De novo, e a consulta depois do 204 falha: continua aguardando.
+  let consults = 0;
+  await assert.rejects(
+    () => issueOrderNfe(number, who, now, vault, async (url, _action, envelope) => {
+      if (!/nfeconsultaprotocolo4/.test(url)) return batch(envelope, "204", "Rejeição: Duplicidade de NF-e");
+      if ((consults += 1) === 1) return consult(envelope, "217", null);
+      throw new SefazError("A SEFAZ não respondeu a tempo.");
+    }, db.pool),
+    (error: Error) => error instanceof IssueError && /já existe \(204\) e a consulta dela falhou/.test(error.message),
+  );
+  assert.deepEqual(await waitingNow(), [[first + 1, "assinada"]]);
+
+  // De novo: a consulta ainda não acha, a mesma nota é reenviada, vem 204 e agora a consulta traz o protocolo. Autorizada, sem número novo.
+  consults = 0;
+  const found = await issueOrderNfe(number, who, now, vault, async (url, _action, envelope) => {
+    if (/nfeconsultaprotocolo4/.test(url)) return (consults += 1) === 1 ? consult(envelope, "217", null) : consult(envelope, "100", "135260000000099");
+    return batch(envelope, "204", "Rejeição: Duplicidade de NF-e");
+  }, db.pool);
+  assert.deepEqual([found.invoice.status, found.invoice.number, found.invoice.protocol, consults], ["autorizada", first + 1, "135260000000099", 2]);
+  assert.match(found.message, /já estava autorizada na SEFAZ/);
+  // O 539 gastou o primeiro número; o 204 nunca gastou outro: a mesma nota foi enviada três vezes, byte a byte.
+  assert.deepEqual(sentNumbers, [first, first + 1, first + 1, first + 1]);
+  assert.equal(Number((await db.pool.query("SELECT nfe_next_number FROM company_settings")).rows[0].nfe_next_number), first + 2);
+});
+
 test("saldo na entrega: a forma marcada vira uma parcela só, no dia em que o pedido fica pronto; parcelas e prazos digitados não ficam", { skip }, async () => {
   const number = await createOrder({ seller: SELLER, version: 1, productId: ID["LD-B001"], quantity: 1 }, numbers("261009-ENTR"), db.pool);
   await linkOrderCustomer(number, customerSp, SELLER.email, MINE, db.pool);

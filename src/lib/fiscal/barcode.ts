@@ -32,3 +32,50 @@ export function code128cSymbols(digits: string): number[] {
 export function code128cWidths(digits: string): number[] {
   return code128cSymbols(digits).flatMap((symbol) => [...PATTERNS[symbol]].map(Number));
 }
+
+const CODE_A = 101;
+const CODE_C = 99;
+
+/**
+ * The symbols of an access key that may carry letters (alphanumeric CNPJ): the
+ * hybrid of NT Conjunta 2025.001, item 6. It starts in set C, changes to set A
+ * before anything that is not a pair of digits, and comes back to C as soon as
+ * four or more digits follow (or the digits that close the data), leaving the
+ * first one in A when they are an odd number. A key with digits only comes out
+ * exactly as `code128cSymbols` writes it.
+ */
+export function code128Symbols(text: string): number[] {
+  if (!/^[0-9A-Z]+$/.test(text) || !/^\d\d/.test(text)) throw new Error("O código de barras leva dígitos e letras maiúsculas, começando por dois dígitos.");
+  const symbols: number[] = [START_C];
+  let set: "A" | "C" = "C";
+  let at = 0;
+  while (at < text.length) {
+    const digits = /^\d*/.exec(text.slice(at))![0].length;
+    if (set === "C") {
+      if (digits >= 2) {
+        symbols.push(Number(text.slice(at, at + 2)));
+        at += 2;
+      } else {
+        symbols.push(CODE_A);
+        set = "A";
+      }
+      continue;
+    }
+    const back = digits >= 4 || (digits >= 2 && at + digits === text.length);
+    if (back && digits % 2 === 0) {
+      symbols.push(CODE_C);
+      set = "C";
+      continue;
+    }
+    // Set A: the value of a character is its ASCII code less 32.
+    symbols.push(text.charCodeAt(at) - 32);
+    at += 1;
+  }
+  const check = symbols.reduce((sum, value, index) => sum + value * Math.max(1, index), 0) % 103;
+  return [...symbols, check, STOP];
+}
+
+/** The bars of `code128Symbols` as widths in modules, starting with a bar and alternating with spaces. */
+export function code128Widths(text: string): number[] {
+  return code128Symbols(text).flatMap((symbol) => [...PATTERNS[symbol]].map(Number));
+}

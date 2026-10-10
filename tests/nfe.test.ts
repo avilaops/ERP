@@ -43,7 +43,7 @@ test("chave de acesso: dígito verificador pelo módulo 11, pesos de 2 a 9 a par
   assert.equal(accessKeyDigit(`${"0".repeat(35)}10000001`), "0");
   assert.equal(accessKeyDigit(`${"0".repeat(35)}10000010`), "0");
   assert.equal(accessKeyDigit(`${"0".repeat(38)}10001`), "3");
-  assert.throws(() => accessKeyDigit("123"), /43 dígitos/);
+  assert.throws(() => accessKeyDigit("123"), /43 posições/);
 });
 
 test("chave de acesso: estado, ano e mês, CNPJ, modelo 55, série, número, forma de emissão e código", () => {

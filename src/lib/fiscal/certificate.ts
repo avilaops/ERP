@@ -75,10 +75,11 @@ function holderCnpj(certificate: forge.pki.Certificate): string | null {
     const [oid, wrapped] = name.value as forge.asn1.Asn1[];
     if (!oid || !wrapped || forge.asn1.derToOid(oid.value as string) !== OID_CNPJ) continue;
     const inner = Array.isArray(wrapped.value) ? (wrapped.value[0] as forge.asn1.Asn1 | undefined)?.value : wrapped.value;
-    const digits = String(inner ?? "").replace(/\D/g, "");
-    if (digits.length === 14) return digits;
+    // Digits only, or with letters in the first twelve positions (alphanumeric CNPJ, NT Conjunta 2025.001).
+    const holder = String(inner ?? "").replace(/[^0-9A-Za-z]/g, "").toUpperCase();
+    if (/^[0-9A-Z]{12}\d{2}$/.test(holder)) return holder;
   }
-  const fromName = /:(\d{14})$/.exec(String(certificate.subject.getField("CN")?.value ?? ""));
+  const fromName = /:([0-9A-Z]{12}\d{2})$/.exec(String(certificate.subject.getField("CN")?.value ?? ""));
   return fromName ? fromName[1] : null;
 }
 

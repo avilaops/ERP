@@ -51,6 +51,11 @@ test("dados fiscais: começam em branco, em homologação; gravam só dígitos e
   await refuse({ taxRegime: 9 as never }, /regime tributário/);
   await refuse({ environment: "teste" as never }, /ambiente/);
   assert.equal((await loadFiscalSettings(db.pool)).cnpj, "48240052000161");
+  // CNPJ alfanumérico (NT 2026.004): as letras ficam, só a pontuação sai; dígito verificador errado é recusado.
+  await refuse({ cnpj: "12.ABC.345/01DE-36" }, /CNPJ inválido/);
+  await saveFiscalSettings({ ...FILLED, cnpj: "12.abc.345/01de-35" }, BOSS, db.pool);
+  assert.equal((await loadFiscalSettings(db.pool)).cnpj, "12ABC34501DE35");
+  await saveFiscalSettings(FILLED, BOSS, db.pool);
 });
 
 test("certificado: guardado selado, mostrado sem o arquivo, e só o da própria empresa e em vigor", { skip }, async () => {

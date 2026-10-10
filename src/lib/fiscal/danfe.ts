@@ -1,7 +1,7 @@
 import { degrees, PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import type { PDFFont, PDFPage } from "pdf-lib";
 import { formatCep, formatDocument, formatPhone } from "@/lib/customer";
-import { code128cWidths } from "@/lib/fiscal/barcode";
+import { code128Widths } from "@/lib/fiscal/barcode";
 
 /**
  * The DANFE: the printed companion of an NF-e. It is drawn from the XML of the
@@ -33,6 +33,23 @@ export type DanfeData = {
   delivery: string | null;
   carrier: { name: string; document: string; registration: string; address: string; city: string; uf: string } | null;
   volumes: { quantity: string; kind: string; netWeight: string; grossWeight: string };
+  /**
+   * Fields the model of MOC 7.0, Anexo II (item 3.8) has and this system does
+   * not write in the invoice: the paper keeps their boxes and prints what the
+   * XML carries, which is nothing for an invoice issued here.
+   */
+  model: {
+    /** `tpNF`: 0 entrada, 1 saída. */
+    direction: string;
+    /** `IEST` of the issuer. */
+    substituteRegistration: string;
+    /** `dhSaiEnt`, or blank. */
+    leftAt: string;
+    vehicle: { antt: string; plate: string; uf: string };
+    volumeBrand: string; volumeNumbering: string;
+    /** `infAdFisco`: what the layout reserves for the tax authority. */
+    taxAuthorityInfo: string;
+  };
 };
 
 const block = (xml: string, name: string) => new RegExp(`<${name}[ >][\\s\\S]*?</${name}>`).exec(xml)?.[0] ?? "";
@@ -67,13 +84,15 @@ function deliveryLine(xml: string): string | null {
 }
 
 export function danfeData(xml: string): DanfeData {
-  const key = /Id="NFe(\d{44})"/.exec(xml)?.[1];
+  // Letters only in the CNPJ of the issuer (NT 2026.004).
+  const key = /Id="NFe(\d{6}[0-9A-Z]{12}\d{26})"/.exec(xml)?.[1];
   if (!key) throw new Error("O XML não é de uma NF-e deste sistema.");
   const ide = block(xml, "ide");
   const totals = block(xml, "ICMSTot");
   const protocol = block(xml, "protNFe");
   const carrierXml = block(block(xml, "transp"), "transporta");
   const volumesXml = block(block(xml, "transp"), "vol");
+  const vehicleXml = block(block(xml, "transp"), "veicTransp");
   const items = [...xml.matchAll(/<det nItem="\d+">[\s\S]*?<\/det>/g)].map(([item]) => {
     const icms = block(item, "ICMS");
     const ipi = block(item, "IPI");
@@ -113,6 +132,11 @@ export function danfeData(xml: string): DanfeData {
     delivery: deliveryLine(xml),
     carrier: carrierXml === "" ? null : { name: value(carrierXml, "xNome"), document: value(carrierXml, "CNPJ") || value(carrierXml, "CPF"), registration: value(carrierXml, "IE"), address: value(carrierXml, "xEnder"), city: value(carrierXml, "xMun"), uf: value(carrierXml, "UF") },
     volumes: { quantity: value(volumesXml, "qVol"), kind: value(volumesXml, "esp"), netWeight: value(volumesXml, "pesoL"), grossWeight: value(volumesXml, "pesoB") },
+    model: {
+      direction: value(ide, "tpNF"), substituteRegistration: value(block(xml, "emit"), "IEST"), leftAt: value(ide, "dhSaiEnt"),
+      vehicle: { antt: value(vehicleXml, "RNTC"), plate: value(vehicleXml, "placa"), uf: value(vehicleXml, "UF") },
+      volumeBrand: value(volumesXml, "marca"), volumeNumbering: value(volumesXml, "nVol"), taxAuthorityInfo: value(block(xml, "infAdic"), "infAdFisco"),
+    },
   };
 }
 
@@ -121,11 +145,11 @@ const MARGIN = 22;
 const WIDTH = PAGE.width - 2 * MARGIN;
 const INK = rgb(0, 0, 0);
 const GRAY = rgb(0.86, 0.86, 0.86);
-const FREIGHT: Record<string, string> = { "0": "0 - Por conta do remetente (CIF)", "1": "1 - Por conta do destinatário (FOB)", "2": "2 - Por conta de terceiros", "3": "3 - Transporte próprio do remetente", "4": "4 - Transporte próprio do destinatário", "9": "9 - Sem ocorrência de transporte" };
+const FREIGHT: Record<string, string> = { "0": "0 - Remetente (CIF)", "1": "1 - Destinatário (FOB)", "2": "2 - Terceiros", "3": "3 - Próprio, remetente", "4": "4 - Próprio, destinatário", "9": "9 - Sem transporte" };
 
 const money = (amount: number) => amount.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const dateTime = (iso: string) => (iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)} ${iso.slice(11, 19)}` : "");
-const formattedKey = (key: string) => key.match(/\d{4}/g)!.join(" ");
+const formattedKey = (key: string) => key.match(/.{4}/g)!.join(" ");
 
 const ROW = 17;
 /** In the layout of the tax reform each item lists its taxes one under the other. */
@@ -222,7 +246,7 @@ export async function renderDanfe(data: DanfeData, { reform = false }: { reform?
     text("0 - ENTRADA", mx + 6, top - 42, 6.5);
     text("1 - SAÍDA", mx + 6, top - 50, 6.5);
     box(mx + middle - 22, top - 36, 14, 16);
-    text("1", mx + middle - 22, top - 48, 10, bold, "center", 14);
+    text(data.model.direction, mx + middle - 22, top - 48, 10, bold, "center", 14);
     text(`Nº ${data.number.padStart(9, "0").replace(/(\d{3})(?=\d)/g, "$1.")}`, mx, top - 62, 8, bold, "center", middle);
     text(`SÉRIE ${data.series.padStart(3, "0")}`, mx, top - 71, 8, bold, "center", middle);
     text(`FOLHA ${pageNumber}/${pages}`, mx, top - 80, 7, regular, "center", middle);
@@ -231,7 +255,8 @@ export async function renderDanfe(data: DanfeData, { reform = false }: { reform?
     const right = WIDTH - left - middle;
     box(rx, top, right, height);
     // The barcode: bars drawn as rectangles, with the quiet zone the readers ask for.
-    const widths = code128cWidths(data.key);
+    // Code 128 set C; a key with letters (alphanumeric CNPJ) alternates with set A (NT Conjunta 2025.001, item 6).
+    const widths = code128Widths(data.key);
     const unit = (right - 24) / widths.reduce((sum, width) => sum + width, 0);
     let cursor = rx + 12;
     widths.forEach((width, index) => {
@@ -245,8 +270,8 @@ export async function renderDanfe(data: DanfeData, { reform = false }: { reform?
 
     let y = top - height;
     y = row(y, [["NATUREZA DA OPERAÇÃO", data.nature, 0.56], ["PROTOCOLO DE AUTORIZAÇÃO DE USO", data.protocol ? `${data.protocol} - ${dateTime(data.authorizedAt ?? "")}` : "SEM AUTORIZAÇÃO DE USO", 0.44]]);
-    if (!reform) return row(y, [["INSCRIÇÃO ESTADUAL", data.issuer.registration, 0.5], ["CNPJ", formatDocument(data.issuer.document), 0.5]]);
-    y = row(y, [["INSCRIÇÃO ESTADUAL", data.issuer.registration, 0.34], ["INSCRIÇÃO ESTADUAL DO SUBSTITUTO TRIBUTÁRIO", "", 0.33], ["CNPJ / CPF", formatDocument(data.issuer.document), 0.33]]);
+    y = row(y, [["INSCRIÇÃO ESTADUAL", data.issuer.registration, 0.34], ["INSCRIÇÃO ESTADUAL DO SUBSTITUTO TRIBUTÁRIO", data.model.substituteRegistration, 0.33], [reform ? "CNPJ / CPF" : "CNPJ", formatDocument(data.issuer.document), 0.33]]);
+    if (!reform) return y;
     // The second field is reserved by the technical note: nothing is printed in it until its source is published.
     y = row(y, [["CÓDIGO DO REGIME TRIBUTÁRIO", REGIMES[data.issuer.regime] ?? data.issuer.regime, 0.5], ["TIPO DE REGIME DE APURAÇÃO DO IBS E DA CBS", "", 0.5]]);
     return y;
@@ -297,8 +322,10 @@ export async function renderDanfe(data: DanfeData, { reform = false }: { reform?
       heading("DESTINATÁRIO / REMETENTE", y);
       y -= 9;
       y = row(y, [["NOME / RAZÃO SOCIAL", to.name, 0.6], ["CNPJ / CPF", formatDocument(to.document), 0.22], ["DATA DA EMISSÃO", dateTime(data.issuedAt).slice(0, 10), 0.18]]);
-      y = row(y, [["ENDEREÇO", to.street, 0.55], ["BAIRRO / DISTRITO", to.district, 0.3], ["CEP", formatCep(to.cep), 0.15]]);
-      y = row(y, [["MUNICÍPIO", to.city, 0.45], ["UF", to.uf, 0.07], ["FONE", to.phone ? formatPhone(to.phone) : "", 0.2], ["INSCRIÇÃO ESTADUAL", to.registration, 0.28]]);
+      // Date and time the goods leave: boxes of the model, filled only when the XML has `dhSaiEnt`.
+      const left = dateTime(data.model.leftAt);
+      y = row(y, [["ENDEREÇO", to.street, 0.47], ["BAIRRO / DISTRITO", to.district, 0.23], ["CEP", formatCep(to.cep), 0.12], ["DATA DA SAÍDA / ENTRADA", left.slice(0, 10), 0.18]]);
+      y = row(y, [["MUNICÍPIO", to.city, 0.38], ["UF", to.uf, 0.06], ["FONE / FAX", to.phone ? formatPhone(to.phone) : "", 0.16], ["INSCRIÇÃO ESTADUAL", to.registration, 0.22], ["HORA DA SAÍDA / ENTRADA", left.slice(11), 0.18]]);
 
       const t = data.totals;
       if (!reform) {
@@ -326,9 +353,10 @@ export async function renderDanfe(data: DanfeData, { reform = false }: { reform?
       y -= 9;
       const weight = (kilos: string) => (kilos ? Number(kilos).toLocaleString("pt-BR", { minimumFractionDigits: 3, maximumFractionDigits: 3 }) : "");
       const who = data.carrier;
-      y = row(y, [["RAZÃO SOCIAL", who?.name ?? "", 0.4], ["FRETE POR CONTA", FREIGHT[data.freightMode] ?? data.freightMode, 0.3], ["CNPJ / CPF", who?.document ? formatDocument(who.document) : "", 0.3]]);
+      const vehicle = data.model.vehicle;
+      y = row(y, [["RAZÃO SOCIAL", who?.name ?? "", 0.3], ["FRETE POR CONTA", FREIGHT[data.freightMode] ?? data.freightMode, 0.2], ["CÓDIGO ANTT", vehicle.antt, 0.12], ["PLACA DO VEÍCULO", vehicle.plate, 0.13], ["UF", vehicle.uf, 0.05], ["CNPJ / CPF", who?.document ? formatDocument(who.document) : "", 0.2]]);
       y = row(y, [["ENDEREÇO", who?.address ?? "", 0.45], ["MUNICÍPIO", who?.city ?? "", 0.27], ["UF", who?.uf ?? "", 0.06], ["INSCRIÇÃO ESTADUAL", who?.registration ?? "", 0.22]]);
-      y = row(y, [["QUANTIDADE", data.volumes.quantity, 0.2], ["ESPÉCIE", data.volumes.kind, 0.3], ["PESO BRUTO (kg)", weight(data.volumes.grossWeight), 0.25, "right"], ["PESO LÍQUIDO (kg)", weight(data.volumes.netWeight), 0.25, "right"]]);
+      y = row(y, [["QUANTIDADE", data.volumes.quantity, 0.12], ["ESPÉCIE", data.volumes.kind, 0.2], ["MARCA", data.model.volumeBrand, 0.18], ["NUMERAÇÃO", data.model.volumeNumbering, 0.18], ["PESO BRUTO (kg)", weight(data.volumes.grossWeight), 0.16, "right"], ["PESO LÍQUIDO (kg)", weight(data.volumes.netWeight), 0.16, "right"]]);
     }
 
     y = tableHead(y);
@@ -388,8 +416,13 @@ export async function renderDanfe(data: DanfeData, { reform = false }: { reform?
 
     const foot = MARGIN + FOOT;
     heading("DADOS ADICIONAIS", foot + 9);
-    box(MARGIN, foot, WIDTH, FOOT);
+    // Two boxes, as in the model: what the company adds and what the layout reserves for the tax authority (`infAdFisco`).
+    const INFO = WIDTH * 0.66;
+    box(MARGIN, foot, INFO, FOOT);
+    box(MARGIN + INFO, foot, WIDTH - INFO, FOOT);
     text("INFORMAÇÕES COMPLEMENTARES", MARGIN + 2, foot - 6.5, 5);
+    text("RESERVADO AO FISCO", MARGIN + INFO + 2, foot - 6.5, 5);
+    wrap(data.model.taxAuthorityInfo, regular, 7, WIDTH - INFO - 8, 6).forEach((line, at) => text(line, MARGIN + INFO + 3, foot - 15 - at * 8, 7));
     const extra = [
       data.homologation ? "NF-e EMITIDA EM AMBIENTE DE HOMOLOGAÇÃO - SEM VALOR FISCAL." : "",
       data.delivery ? `LOCAL DE ENTREGA: ${data.delivery}.` : "",
@@ -397,7 +430,7 @@ export async function renderDanfe(data: DanfeData, { reform = false }: { reform?
       !reform && (data.totals.ibs > 0 || data.totals.cbs > 0) ? `Reforma tributária: IBS R$ ${money(data.totals.ibs)}; CBS R$ ${money(data.totals.cbs)} (não somam ao total da nota em 2026).` : "",
       data.info,
     ].filter(Boolean).join(" ");
-    wrap(extra, regular, 7, WIDTH - 8, 6).forEach((line, at) => text(line, MARGIN + 3, foot - 15 - at * 8, 7));
+    wrap(extra, regular, 7, INFO - 8, 6).forEach((line, at) => text(line, MARGIN + 3, foot - 15 - at * 8, 7));
   }
   return pdf.save();
 }

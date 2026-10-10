@@ -26,6 +26,8 @@ test("certificado: lê de quem é, o CNPJ e a validade, só com a senha certa", 
   assert.throws(() => readCertificate(testPfx({ withKey: false }), "senha-de-teste"), /não traz a chave privada/);
   // Nome sem CNPJ: o certificado abre, só não diz de qual empresa é.
   assert.equal(readCertificate(testPfx({ name: "Fulano de Tal" }), "senha-de-teste").holderCnpj, null);
+  // CNPJ alfanumérico (NT Conjunta 2025.001): letras nas doze primeiras posições.
+  assert.equal(readCertificate(testPfx({ name: "EMPRESA NOVA LTDA:12ABC34501DE35" }), "senha-de-teste").holderCnpj, "12ABC34501DE35");
 });
 
 test("cofre: o que é selado só abre com a mesma chave, e nada do certificado aparece no que é guardado", () => {

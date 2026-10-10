@@ -1,4 +1,4 @@
-import { isValidCnpj } from "@/lib/customer";
+import { isValidCnpj, normalizeDocument } from "@/lib/customer";
 import type { Queryable } from "@/lib/db/pool";
 import { readCertificate, sealCertificate } from "@/lib/fiscal/certificate";
 import type { CertificateInfo } from "@/lib/fiscal/certificate";
@@ -76,7 +76,8 @@ export function missingFiscalData(settings: FiscalSettings): string[] {
 /** Writes the fiscal data. Blank fields are allowed, wrong ones are not. */
 export async function saveFiscalSettings(input: FiscalSettings, updatedBy: string, conn: Queryable): Promise<void> {
   if (updatedBy.trim() === "") throw new Error("Falta dizer quem está alterando os dados fiscais.");
-  const cnpj = digits(input.cnpj);
+  // Letters are part of a CNPJ since July 2026 (NT 2026.004): only the punctuation is dropped.
+  const cnpj = normalizeDocument(input.cnpj ?? "") || null;
   if (cnpj !== null && !isValidCnpj(cnpj)) throw new FiscalError("CNPJ inválido. Confira os números.");
   const registration = digits(input.stateRegistration);
   if (registration !== null && (registration.length < 2 || registration.length > 14)) throw new FiscalError("Inscrição estadual: só os números, de 2 a 14 dígitos.");

@@ -73,7 +73,7 @@ const NOT_CANONICAL = /<\w+\/>|<!--|<\?|<!\[CDATA\[|\r/;
  * refused: the canonical form is only known for what this system wrote.
  */
 export function signNfeXml(xml: string, key: SigningKey): string {
-  const match = /^(<\?xml version="1\.0" encoding="UTF-8"\?>)<NFe xmlns="http:\/\/www\.portalfiscal\.inf\.br\/nfe"><infNFe versao="4\.00" Id="(NFe\d{44})">([\s\S]*)<\/infNFe><\/NFe>$/.exec(xml);
+  const match = /^(<\?xml version="1\.0" encoding="UTF-8"\?>)<NFe xmlns="http:\/\/www\.portalfiscal\.inf\.br\/nfe"><infNFe versao="4\.00" Id="(NFe\d{6}[0-9A-Z]{12}\d{26})">([\s\S]*)<\/infNFe><\/NFe>$/.exec(xml);
   if (!match) throw new Error("O XML a assinar não é o que este sistema monta.");
   const [, declaration, id, body] = match;
   if (NOT_CANONICAL.test(body)) throw new Error("O XML a assinar não está na forma canônica.");
@@ -84,7 +84,7 @@ export function signNfeXml(xml: string, key: SigningKey): string {
 
 /** Signs the `infEvento` of an event built by `eventXml` (cancellation, correction letter) and answers with the whole `evento`. */
 export function signEventXml(xml: string, key: SigningKey): string {
-  const match = /^<evento xmlns="http:\/\/www\.portalfiscal\.inf\.br\/nfe" versao="1\.00"><infEvento Id="(ID\d{52})">([\s\S]*)<\/infEvento><\/evento>$/.exec(xml);
+  const match = /^<evento xmlns="http:\/\/www\.portalfiscal\.inf\.br\/nfe" versao="1\.00"><infEvento Id="(ID\d{12}[0-9A-Z]{12}\d{28})">([\s\S]*)<\/infEvento><\/evento>$/.exec(xml);
   if (!match) throw new Error("O evento a assinar não é o que este sistema monta.");
   const [, id, body] = match;
   if (NOT_CANONICAL.test(body)) throw new Error("O evento a assinar não está na forma canônica.");
@@ -94,7 +94,7 @@ export function signEventXml(xml: string, key: SigningKey): string {
 
 /** Signs the `infInut` of a request built by `voidXml` (numbers made unusable) and answers with the whole `inutNFe`. */
 export function signVoidXml(xml: string, key: SigningKey): string {
-  const match = /^<inutNFe xmlns="http:\/\/www\.portalfiscal\.inf\.br\/nfe" versao="4\.00"><infInut Id="(ID\d{41})">([\s\S]*)<\/infInut><\/inutNFe>$/.exec(xml);
+  const match = /^<inutNFe xmlns="http:\/\/www\.portalfiscal\.inf\.br\/nfe" versao="4\.00"><infInut Id="(ID\d{4}[0-9A-Z]{12}\d{25})">([\s\S]*)<\/infInut><\/inutNFe>$/.exec(xml);
   if (!match) throw new Error("O pedido a assinar não é o que este sistema monta.");
   const [, id, body] = match;
   if (NOT_CANONICAL.test(body)) throw new Error("O pedido a assinar não está na forma canônica.");

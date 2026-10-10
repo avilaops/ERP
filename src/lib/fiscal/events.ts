@@ -1,4 +1,4 @@
-import { NfeError, UF_CODES } from "@/lib/fiscal/nfe";
+import { ACCESS_KEY_PATTERN, NfeError, UF_CODES } from "@/lib/fiscal/nfe";
 import { SefazError } from "@/lib/fiscal/sefaz";
 
 /**
@@ -50,7 +50,7 @@ const clean = (text: string) => text.replace(/\s+/g, " ").trim();
 
 /** The event, not signed. Throws `NfeError` with what the user has to fix. */
 export function eventXml(event: NfeEvent): { id: string; xml: string } {
-  if (!/^\d{44}$/.test(event.accessKey)) throw new Error("Chave de acesso inválida.");
+  if (!ACCESS_KEY_PATTERN.test(event.accessKey)) throw new Error("Chave de acesso inválida.");
   const text = clean(event.text);
   const limit = event.kind === "cancelamento" ? 255 : 1000;
   if (text.length < 15) throw new NfeError(event.kind === "cancelamento" ? "Escreva o motivo do cancelamento com pelo menos 15 letras." : "Escreva a correção com pelo menos 15 letras.");

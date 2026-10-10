@@ -182,20 +182,40 @@ function tag(name: string, value: string | number | null | undefined): string {
 }
 const group = (name: string, inner: string, attributes = "") => (inner === "" ? "" : `<${name}${attributes}>${inner}</${name}>`);
 
-/** Check digit of the access key: modulus 11, weights 2 to 9 from the right. */
+/** A CNPJ as the layout takes it since NT 2026.004: letters allowed in the first twelve positions, two check digits. */
+export const CNPJ_PATTERN = /^[0-9A-Z]{12}\d{2}$/;
+/** The 44 positions of an access key: only the CNPJ of the issuer (positions 7 to 18) may carry letters (NT Conjunta 2025.001, item 5). */
+export const ACCESS_KEY_PATTERN = /^\d{6}[0-9A-Z]{12}\d{26}$/;
+
+/**
+ * Check digit of the access key: modulus 11, weights 2 to 9 from the right.
+ * Each position counts as its ASCII code less 48, so a digit is itself and a
+ * letter of an alphanumeric CNPJ is 17 to 42 (NT Conjunta 2025.001, item 5).
+ */
 export function accessKeyDigit(key43: string): string {
-  if (!/^\d{43}$/.test(key43)) throw new Error("A chave de acesso tem 43 dígitos antes do verificador.");
+  if (!/^\d{6}[0-9A-Z]{12}\d{25}$/.test(key43)) throw new Error("A chave de acesso tem 43 posições antes do verificador, com letras só no CNPJ.");
   let sum = 0;
-  for (let index = 0; index < 43; index += 1) sum += Number(key43[42 - index]) * (2 + (index % 8));
+  for (let index = 0; index < 43; index += 1) sum += (key43.charCodeAt(42 - index) - 48) * (2 + (index % 8));
   const digit = 11 - (sum % 11);
   return digit >= 10 ? "0" : String(digit);
+}
+
+/** The codes rule B03-10 refuses (rejection 897) besides the number of the invoice itself: repeated and sequential digits. */
+const WEAK_RANDOM_CODES = new Set([
+  ...Array.from({ length: 10 }, (_, digit) => String(digit).repeat(8)),
+  ...Array.from({ length: 10 }, (_, start) => Array.from({ length: 8 }, (_, index) => (start + index) % 10).join("")),
+]);
+
+/** Whether `cNF` is one SEFAZ accepts for the invoice of this number (rule B03-10 of NT 2019.001). */
+export function isAcceptableRandomCode(code: string, number: number): boolean {
+  return /^\d{8}$/.test(code) && !WEAK_RANDOM_CODES.has(code) && Number(code) !== number;
 }
 
 /** The 44 digits that identify the invoice: state, year and month, CNPJ, model, series, number, way of issuing, random code and check digit. */
 export function accessKey(input: Pick<NfeInput, "issuer" | "issuedAt" | "series" | "number" | "randomCode">): string {
   const uf = UF_CODES[input.issuer.uf];
   if (!uf) throw new NfeError(`Estado do emitente inválido: ${input.issuer.uf}.`);
-  if (!/^\d{8}$/.test(input.randomCode)) throw new Error("O código aleatório da nota tem oito dígitos.");
+  if (!isAcceptableRandomCode(input.randomCode, input.number)) throw new Error("O código aleatório da nota tem oito dígitos, diferentes do número da nota e sem sequência óbvia.");
   const body = [
     uf,
     input.issuedAt.slice(2, 4) + input.issuedAt.slice(5, 7),
@@ -237,6 +257,22 @@ export const destinationUf = (input: Pick<NfeInput, "recipient" | "delivery">): 
 
 /** The CSTs of IPI that carry base, rate and amount; every other one only names itself. */
 const IPI_TAXED_CSTS = ["00", "49", "50", "99"];
+/** The CSTs of IPI the schema takes without figures (group IPINT). */
+const IPI_UNTAXED_CSTS = ["01", "02", "03", "04", "05", "51", "52", "53", "54", "55"];
+/** The CSTs of PIS and COFINS this system writes, as the schema groups them: by rate (01, 02), without figures (04 to 09) and "other operations" (49 to 99). 03 is by quantity: not issued here. */
+const CONTRIBUTION_RATE_CSTS = ["01", "02"];
+const CONTRIBUTION_UNTAXED_CSTS = ["04", "05", "06", "07", "08", "09"];
+const CONTRIBUTION_OTHER_CSTS = ["49", "50", "51", "52", "53", "54", "55", "56", "60", "61", "62", "63", "64", "65", "66", "67", "70", "71", "72", "73", "74", "75", "98", "99"];
+/** Origins of imported goods: they leave the state at 4% (Resolução do Senado 13/2012; rules NA09-10 and NA09-20). */
+const IMPORTED_ORIGINS = [1, 2, 3, 8];
+/** South and Southeast except Espírito Santo: from them to the other states the rate is 7%, 12% in every other case (rule NA09-30). */
+const SOUTH_AND_SOUTHEAST = ["MG", "PR", "RJ", "RS", "SC", "SP"];
+
+/** The interstate rate the layout demands in the group of the DIFAL, by the origin of the goods and the two states. */
+export function interstateRate(origin: number, fromUf: string, toUf: string): number {
+  if (IMPORTED_ORIGINS.includes(origin)) return 0.04;
+  return SOUTH_AND_SOUTHEAST.includes(fromUf) && !SOUTH_AND_SOUTHEAST.includes(toUf) ? 0.07 : 0.12;
+}
 
 /** What is missing or wrong before any XML is written. Every problem at once, each naming the register that fixes it. */
 export function nfeProblems(input: NfeInput): string[] {
@@ -245,14 +281,16 @@ export function nfeProblems(input: NfeInput): string[] {
   const need = (ok: boolean, message: string) => {
     if (!ok) problems.push(message);
   };
-  need(/^\d{14}$/.test(issuer.cnpj), "Empresa: CNPJ com 14 dígitos (Parâmetros → Fiscal).");
+  // The CNPJ may have letters since July 2026 (NT 2026.004); the register already checked its digits.
+  need(CNPJ_PATTERN.test(issuer.cnpj), "Empresa: CNPJ com 14 posições (Parâmetros → Fiscal).");
   need(/^\d{2,14}$/.test(issuer.stateRegistration), "Empresa: inscrição estadual (Parâmetros → Fiscal).");
   need(issuer.legalName.trim().length >= 2, "Empresa: razão social (Parâmetros → Fiscal).");
   need(/^\d{7}$/.test(issuer.cityCode) && /^\d{8}$/.test(issuer.cep) && Boolean(UF_CODES[issuer.uf]), "Empresa: endereço com código do município no IBGE, UF e CEP (Parâmetros → Fiscal).");
+  // Rule C10-20 (rejection 273): the city belongs to the state of the issuer.
+  need(!/^\d{7}$/.test(issuer.cityCode) || !UF_CODES[issuer.uf] || issuer.cityCode.slice(0, 2) === UF_CODES[issuer.uf], "Empresa: o código do município no IBGE não é do estado informado (Parâmetros → Fiscal).");
   need(issuer.street.trim() !== "" && issuer.number.trim() !== "" && issuer.district.trim() !== "" && issuer.city.trim() !== "", "Empresa: rua, número, bairro e cidade (Parâmetros → Fiscal).");
 
-  // The CNPJ may have letters since 2026 (NT 2026.004); the register already checked its digits.
-  need(recipient.kind === "PJ" ? /^[0-9A-Z]{12}\d{2}$/.test(recipient.document) : /^\d{11}$/.test(recipient.document), "Cliente: CNPJ ou CPF completo.");
+  need(recipient.kind === "PJ" ? CNPJ_PATTERN.test(recipient.document) : /^\d{11}$/.test(recipient.document), "Cliente: CNPJ ou CPF completo.");
   need(recipient.name.trim().length >= 2, "Cliente: nome ou razão social.");
   need(/^\d{7}$/.test(recipient.cityCode), "Cliente: código do município no IBGE (cadastro do cliente).");
   need(/^\d{8}$/.test(recipient.cep) && Boolean(UF_CODES[recipient.uf]), "Cliente: CEP e UF.");
@@ -261,7 +299,7 @@ export function nfeProblems(input: NfeInput): string[] {
 
   const delivery = input.delivery;
   if (delivery) {
-    need(delivery.kind === "PJ" ? /^[0-9A-Z]{12}\d{2}$/.test(delivery.document) : /^\d{11}$/.test(delivery.document), "Local de entrega: CNPJ ou CPF de quem recebe.");
+    need(delivery.kind === "PJ" ? CNPJ_PATTERN.test(delivery.document) : /^\d{11}$/.test(delivery.document), "Local de entrega: CNPJ ou CPF de quem recebe.");
     // Rules G07-20 and G07-30: the city exists in the IBGE table and belongs to the state of the delivery.
     need(/^\d{7}$/.test(delivery.cityCode) && delivery.cityCode.slice(0, 2) === UF_CODES[delivery.uf], "Local de entrega: cidade da tabela do IBGE, no estado informado.");
     need(/^\d{8}$/.test(delivery.cep), "Local de entrega: CEP com oito dígitos.");
@@ -275,8 +313,13 @@ export function nfeProblems(input: NfeInput): string[] {
   const simples = issuer.taxRegime === 1;
   need(simples ? ["102", "103", "300", "400"].includes(rules.icmsCode) : ["00", "40", "41", "50"].includes(rules.icmsCode),
     simples ? "Regras fiscais: CSOSN aceito hoje é 102, 103, 300 ou 400." : "Regras fiscais: CST do ICMS aceito hoje é 00, 40, 41 ou 50.");
-  need(/^\d{2}$/.test(rules.pisCst) && /^\d{2}$/.test(rules.cofinsCst), "Regras fiscais: CST do PIS e da COFINS com dois dígitos.");
-  need(rules.ipiCst === null || /^\d{2}$/.test(rules.ipiCst), "Regras fiscais: CST do IPI com dois dígitos, ou em branco para nota sem IPI.");
+  // Rule E16a-40 (rejection 696): a sale to who does not pay ICMS is a sale to a final consumer.
+  need(recipient.taxpayer || rules.finalConsumer, "Regras fiscais: venda a não contribuinte do ICMS tem de ser a consumidor final. Marque a linha como venda a consumidor final ou informe a inscrição estadual do cliente.");
+  // Rule N12-70 (rejection 508): with a non taxpayer the CST is 00, 20, 40, 41 or 60; suspension (50) is not a sale to them.
+  need(simples || recipient.taxpayer || rules.icmsCode !== "50", "Regras fiscais: o CST 50 (suspensão) do ICMS não vale em venda a não contribuinte. Use 00, 40 ou 41.");
+  const contributionCsts = [...CONTRIBUTION_RATE_CSTS, ...CONTRIBUTION_UNTAXED_CSTS, ...CONTRIBUTION_OTHER_CSTS];
+  need(contributionCsts.includes(rules.pisCst) && contributionCsts.includes(rules.cofinsCst), "Regras fiscais: CST do PIS e da COFINS aceito hoje é 01, 02, 04 a 09 ou da tabela de 49 a 99 (o 03, por quantidade, não é emitido por aqui).");
+  need(rules.ipiCst === null || IPI_TAXED_CSTS.includes(rules.ipiCst) || IPI_UNTAXED_CSTS.includes(rules.ipiCst), "Regras fiscais: CST do IPI da tabela (00 a 05, 49 a 55 ou 99), ou em branco para nota sem IPI.");
   need(rules.ipiCst !== null || input.items.every((item) => item.ipiRate === 0), "Regras fiscais: a linha tem IPI na tabela, falta o CST do IPI.");
   // An untaxed CST writes no IPI in the item while the price of the order carries it: the total would not match the items.
   need(rules.ipiCst === null || IPI_TAXED_CSTS.includes(rules.ipiCst) || input.items.every((item) => item.ipiRate === 0), "Regras fiscais: a linha tem IPI na tabela e o CST do IPI é de saída sem imposto. Use um CST tributado (50 ou 99) ou zere o IPI da linha.");
@@ -288,10 +331,17 @@ export function nfeProblems(input: NfeInput): string[] {
   const carrier = input.transport.carrier;
   // Rule X07-10 of the layout: a carrier with a state registration has to say its state.
   need(!carrier || carrier.stateRegistration === null || Boolean(carrier.uf), "Transportadora: com inscrição estadual, informe a UF (Parâmetros → Transportadoras).");
-  need(!carrier || (carrier.kind === "PJ" ? /^[0-9A-Z]{12}\d{2}$/ : /^\d{11}$/).test(carrier.document), "Transportadora: CNPJ ou CPF completo (Parâmetros → Transportadoras).");
+  need(!carrier || (carrier.kind === "PJ" ? CNPJ_PATTERN : /^\d{11}$/).test(carrier.document), "Transportadora: CNPJ ou CPF completo (Parâmetros → Transportadoras).");
   need(input.items.length > 0, "Pedido sem itens.");
+  // Rule NA01-20: with the group of the DIFAL, the rates are the ones the layout checks (NA09-10 to NA09-30 and the schema: 4%, 7% or 12%).
+  const difal = issuer.taxRegime !== 1 && rules.icmsCode === "00" && Boolean(UF_CODES[issuer.uf]) && issuer.uf !== destinationUf(input) && !recipient.taxpayer && rules.finalConsumer;
+  need(!difal || input.destination.internalIcms > 0, `Parâmetros: falta a alíquota interna do ICMS de ${destinationUf(input)}, para o DIFAL da venda a não contribuinte.`);
   input.items.forEach((item, index) => {
     const which = `Item ${index + 1} (${item.name})`;
+    if (difal && Number.isInteger(item.origin) && item.origin >= 0 && item.origin <= 8) {
+      const expected = interstateRate(item.origin, issuer.uf, destinationUf(input));
+      need(Math.abs(input.icmsRate - expected) < 1e-9, `${which}: a origem ${item.origin} pede ICMS interestadual de ${(expected * 100).toFixed(0)}% de ${issuer.uf} para ${destinationUf(input)}, e os parâmetros do pedido trazem ${(input.icmsRate * 100).toFixed(2).replace(".", ",")}%. Corrija a origem do equipamento ou o ICMS de saída do estado.`);
+    }
     need(/^\d{8}$/.test(item.ncm), `${which}: NCM com oito dígitos (tela do equipamento).`);
     need(Number.isInteger(item.origin) && item.origin >= 0 && item.origin <= 8, `${which}: origem da mercadoria (tela do equipamento).`);
     need(item.quantity > 0 && item.unitPrice > 0, `${which}: quantidade e preço maiores que zero.`);
@@ -317,8 +367,9 @@ function figuresOf(item: NfeItem, input: NfeInput): ItemFigures {
   const interstate = issuer.uf !== destinationUf(input);
   const owesDifal = taxed && interstate && !recipient.taxpayer && rules.finalConsumer;
   const icms = roundCents(icmsBase * input.icmsRate);
-  const pis = roundCents(product * rules.pisRate);
-  const cofins = roundCents(product * rules.cofinsRate);
+  // A CST without figures (04 to 09) writes no value in the item: counting one would leave the total different from the sum of the items (rules W13-10 and W14-10).
+  const pis = CONTRIBUTION_UNTAXED_CSTS.includes(rules.pisCst) ? 0 : roundCents(product * rules.pisRate);
+  const cofins = CONTRIBUTION_UNTAXED_CSTS.includes(rules.cofinsCst) ? 0 : roundCents(product * rules.cofinsRate);
   const difal = owesDifal ? roundCents(icmsBase * Math.max(0, input.destination.internalIcms - input.icmsRate)) : 0;
   const fcp = owesDifal ? roundCents(icmsBase * input.destination.fcp) : 0;
   // Base of IBS and CBS (rule UB16-10): the product less the taxes it carries inside.
@@ -370,8 +421,8 @@ function contribution(name: "PIS" | "COFINS", cst: string, base: number, fractio
   const p = name === "PIS" ? "pPIS" : "pCOFINS";
   const v = name === "PIS" ? "vPIS" : "vCOFINS";
   const figures = tag("vBC", money(base)) + tag(p, rate(fraction)) + tag(v, money(value));
-  if (cst === "01" || cst === "02") return group(name, group(`${name}Aliq`, tag("CST", cst) + figures));
-  if (["04", "05", "06", "07", "08", "09"].includes(cst)) return group(name, group(`${name}NT`, tag("CST", cst)));
+  if (CONTRIBUTION_RATE_CSTS.includes(cst)) return group(name, group(`${name}Aliq`, tag("CST", cst) + figures));
+  if (CONTRIBUTION_UNTAXED_CSTS.includes(cst)) return group(name, group(`${name}NT`, tag("CST", cst)));
   return group(name, group(`${name}Outr`, tag("CST", cst) + figures));
 }
 
@@ -535,7 +586,8 @@ export function buildNfeXml(input: NfeInput): { key: string; xml: string; totals
       address("enderDest", recipient) +
       tag("indIEDest", recipient.taxpayer ? "1" : "9") +
       tag("IE", recipient.taxpayer ? recipient.stateRegistration : null) +
-      tag("email", recipient.email ? clean(recipient.email, 60) : null),
+      // An address cut at 60 letters is another address: one that does not fit is left out (the field is optional).
+      tag("email", recipient.email && clean(recipient.email, 61).length <= 60 ? clean(recipient.email, 60) : null),
   );
 
   const place = input.delivery;

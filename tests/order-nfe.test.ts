@@ -11,7 +11,8 @@ const RULES: FiscalRules = {
   ...EMPTY_FISCAL_RULES, operationNature: "Venda de mercadoria", cfopInternal: "5102", cfopInterstate: "6102", cfopInterstateNonTaxpayer: "6108",
   icmsCode: "00", pisCst: "01", pisRate: 0.0065, cofinsCst: "01", cofinsRate: 0.03, additionalInfo: "Texto fixo", ibsCbsCst: "000", ibsCbsClass: "000001",
 };
-const params = { ...DEFAULT_PARAMS, ipi: 0, stateRates: { ...DEFAULT_PARAMS.stateRates, MA: { ...DEFAULT_PARAMS.stateRates.MA, outboundIcms: 0.07 } } };
+// Mercadoria nacional sai de São Paulo para o Norte e o Nordeste com 7% (a nota com DIFAL é conferida nisso: regra NA09-30).
+const params = { ...DEFAULT_PARAMS, ipi: 0, stateRates: { ...DEFAULT_PARAMS.stateRates, MA: { ...DEFAULT_PARAMS.stateRates.MA, outboundIcms: 0.07 }, PI: { ...DEFAULT_PARAMS.stateRates.PI, outboundIcms: 0.07 } } };
 
 const SOURCE: OrderNfeSource = {
   settings: {
@@ -36,7 +37,7 @@ const SOURCE: OrderNfeSource = {
   transport: { carrier: null, volumes: null, volumeKind: null, netWeight: null, grossWeight: null },
   delivery: null,
   number: 7,
-  randomCode: "12345678",
+  randomCode: "48291736",
   issuedAt: "2026-10-08T10:00:00-03:00",
   software: "ERP Avila Ops",
 };
@@ -83,7 +84,11 @@ test("entrega em outro endereço: a nota leva o grupo de entrega, e o estado da 
   assert.deepEqual(problems, []);
   assert.equal(input.delivery?.cityCode, "2211001");
   assert.equal(input.delivery?.document, SOURCE.order.customer!.document);
-  assert.equal(input.icmsRate, SOURCE.params.stateRates.PI.outboundIcms ?? SOURCE.params.icmsInterstate);
+  assert.equal(input.icmsRate, 0.07);
+  // Sem o ICMS de saída do estado vale o interestadual geral (4%, de importado): com mercadoria nacional e DIFAL, a nota avisa em vez de ser rejeitada (697).
+  const general = orderNfe({ ...SOURCE, params: { ...params, stateRates: DEFAULT_PARAMS.stateRates }, order, delivery: place });
+  assert.equal(general.input.icmsRate, SOURCE.params.icmsInterstate);
+  assert.ok(general.problems.length === 2 && general.problems.every((problem) => problem.includes("a origem 0 pede ICMS interestadual de 7% de SP para PI")));
   assert.deepEqual(input.destination, { internalIcms: SOURCE.params.stateRates.PI.internalIcms, fcp: SOURCE.params.stateRates.PI.fcp });
   // Local de entrega em estado diferente do que formou o preço do pedido é barrado.
   assert.ok(orderNfe({ ...SOURCE, delivery: place }).problems.some((problem) => problem.includes("corrija o local de entrega")));
