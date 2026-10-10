@@ -2006,3 +2006,45 @@ test("lembretes automáticos: orçamento parado, contrato sem assinatura, parcel
   await deleteOpportunity(idle, mine, db.pool);
   await saveAutomationRule(parcel.id, { days: 3, title: "Parcela do pedido {pedido} ({cliente}) está para vencer", active: true }, DIRECTOR, db.pool);
 });
+
+test("histórico do cliente: junta pedidos, contratos, notas e funil do mais novo ao mais antigo; o vendedor só lê as suas vendas e recebimento só para quem tem a tela", { skip }, async () => {
+  const { customerTimeline, TIMELINE_KINDS } = await import("@/lib/db/customer-timeline");
+  const { addActivity, createOpportunity, deleteOpportunity } = await import("@/lib/db/funnel");
+  const { logCall } = await import("@/lib/db/meetings");
+  // O cliente com mais história nos testes acima.
+  const busiest = await db.pool.query("SELECT customer_id, count(*) FROM orders GROUP BY customer_id ORDER BY count(*) DESC LIMIT 1");
+  const customerId = Number(busiest.rows[0].customer_id);
+  const opportunity = await createOpportunity({ title: "Ampliação da academia", customerId, company: null, contactName: null, phone: null, email: null, source: "Indicação", estimatedValue: null, notes: null }, SELLER, db.pool);
+  await addActivity(opportunity, { kind: "nota", title: "Cliente quer ampliar em janeiro", dueOn: null }, SELLER.email, { ownerEmail: null }, db.pool);
+  await addActivity(opportunity, { kind: "tarefa", title: "Tarefa ainda por fazer", dueOn: null }, SELLER.email, { ownerEmail: null }, db.pool);
+  await logCall(opportunity, { outcome: "atendeu", note: "Combinamos visita", againOn: null }, SELLER.email, { ownerEmail: null }, db.pool);
+
+  const everything = await customerTimeline(customerId, { sellerEmail: null, receipts: true }, db.pool);
+  const kinds = new Set(everything.map((entry) => entry.kind));
+  for (const entry of everything) assert.ok(entry.kind in TIMELINE_KINDS && entry.title.trim() !== "" && entry.at instanceof Date);
+  assert.ok(kinds.has("pedido") && kinds.has("oportunidade") && kinds.has("atividade"));
+  // Do mais novo ao mais antigo.
+  assert.deepEqual(everything.map((entry) => entry.at.getTime()), [...everything.map((entry) => entry.at.getTime())].sort((a, b) => b - a));
+  // Todo pedido do cliente aparece ao menos como criado, e leva ao pedido.
+  const orders = await db.pool.query("SELECT number FROM orders WHERE customer_id = $1", [customerId]);
+  for (const { number } of orders.rows) assert.ok(everything.some((entry) => entry.kind === "pedido" && entry.title === `Pedido #${number} criado` && entry.orderNumber === number), number);
+  // Do funil: a criação, a anotação e a ligação feita; a tarefa por fazer ainda não é história.
+  const fromFunnel = everything.filter((entry) => entry.opportunityId === opportunity).map((entry) => [entry.kind, entry.title]);
+  assert.deepEqual(fromFunnel.sort(), [["atividade", "Cliente quer ampliar em janeiro"], ["atividade", "Ligação (atendeu): Combinamos visita"], ["oportunidade", "Oportunidade criada: Ampliação da academia"]]);
+  assert.equal(everything.find((entry) => entry.title === "Oportunidade criada: Ampliação da academia")!.detail, `origem: Indicação · de ${SELLER.name}`);
+  // Valor só de venda: fechamento e recebimento. Sem a tela de recebimentos, eles não vêm.
+  for (const entry of everything.filter((row) => row.amount !== null)) assert.ok(/fechado$|^Recebimento/.test(entry.title), entry.title);
+  const noReceipts = await customerTimeline(customerId, { sellerEmail: null, receipts: false }, db.pool);
+  assert.ok(!noReceipts.some((entry) => entry.kind === "recebimento"));
+  assert.equal(noReceipts.length, everything.filter((entry) => entry.kind !== "recebimento").length);
+
+  // Outro vendedor: nada das vendas e do funil alheios.
+  const stranger = await customerTimeline(customerId, { sellerEmail: "ninguem@teste.local", receipts: false }, db.pool);
+  assert.deepEqual(stranger, []);
+  const own = await customerTimeline(customerId, { sellerEmail: SELLER.email, receipts: false }, db.pool);
+  const ownOrders = await db.pool.query("SELECT number FROM orders WHERE customer_id = $1 AND seller_email = $2", [customerId, SELLER.email]);
+  assert.deepEqual([...new Set(own.filter((entry) => entry.orderNumber).map((entry) => entry.orderNumber))].sort(), ownOrders.rows.map((row) => String(row.number)).sort());
+  // Cliente que não existe: lista vazia.
+  assert.deepEqual(await customerTimeline(999_999, { sellerEmail: null, receipts: true }, db.pool), []);
+  await deleteOpportunity(opportunity, { ownerEmail: null }, db.pool);
+});

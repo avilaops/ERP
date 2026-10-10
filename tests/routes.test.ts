@@ -336,8 +336,9 @@ test("não existe página no grupo protegido sem requirePermission", () => {
   // and the users, the forms of payment and the categories of bills of the company, its product lines, its carriers, the e-mail of the invoices, its access profiles the model of its contract, the stages of its funnel, its automatic reminders, its integrations, its message templates and its cadences;
   // and, of the funnel, the screen that creates an opportunity, one opportunity, the tasks and the panel;
   // and, of marketing, the campaigns, the screen that creates one, one campaign and the capture forms;
-  // and, of one opportunity, the screen that writes down a call and the one that schedules a meeting.
-  assert.equal(all.length, MENU_ITEMS.length + 36);
+  // and, of one opportunity, the screen that writes down a call and the one that schedules a meeting;
+  // and the history of one customer.
+  assert.equal(all.length, MENU_ITEMS.length + 37);
   for (const route of all) {
     assert.match(source(route), /await requirePermission\(/, route);
   }

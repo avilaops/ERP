@@ -116,6 +116,9 @@ export default async function ClientePage({
         >
           {completenessText(customer)}
         </span>
+        <Link href={`${ITEM.href}/${customer.id}/historico`} className="text-sm font-medium text-brand underline">
+          Histórico
+        </Link>
         {/* The sales in progress with this customer live in the funnel; each seller finds their own there. */}
         {allows(session, "funil") && (
           <Link href={`${menuItem("funil").href}?q=${encodeURIComponent(customer.name)}`} className="text-sm font-medium text-brand underline">

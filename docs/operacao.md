@@ -248,3 +248,8 @@ Se a migração falhar, a versão antiga continua no ar.
 - **Agendar reunião** (`/funil/<id>/reuniao`): dia e hora de Brasília, duração, endereço da videochamada (colado pela pessoa: Meet, Zoom, Teams) ou local. Fica em `opportunity_meetings` e vira tarefa do tipo Reunião. Com o envio marcado, o contato recebe o convite por e-mail com o arquivo de agenda (`.ics`); respostas vão para o e-mail do vendedor.
 - **Remarcar e cancelar**: quem já foi convidado recebe a nova versão ou o cancelamento do mesmo evento (mesmo identificador, versão seguinte). Se o e-mail não sair, a reunião fica gravada e a tela diz por quê. Reunião cancelada pode ser removida da lista.
 - **O que não tem**: ligação pelo sistema, gravação e transcrição (dependem de um provedor de telefonia) e criação automática da sala de vídeo.
+
+## Histórico do cliente
+
+- **Onde**: ficha do cliente → Histórico (`/clientes/<id>/historico`). Do mais novo ao mais antigo: pedidos (criado, fechado, reaberto, perdido), contratos (enviado, assinado, recusado), notas fiscais e seus e-mails, e do funil as oportunidades, o que foi feito nelas, os e-mails e as reuniões.
+- **Alcance**: o cadastro do cliente é de toda a equipe, mas as vendas são de cada vendedor; o vendedor lê só os próprios pedidos e oportunidades. Recebimentos aparecem só para quem tem a tela Recebimentos. Nenhum custo entra aqui.
