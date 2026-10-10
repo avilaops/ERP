@@ -87,6 +87,7 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "0053_modelos_com_campos_e_duracao.sql",
     "0054_materiais_da_producao.sql",
     "0055_apontamento_e_maquinas.sql",
+    "0056_mcp.sql",
   ]);
 
   const second = await withClient((client) => migrate(client, MIGRATIONS_DIR));
@@ -132,6 +133,8 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "marketing_settings",
     "material_moves",
     "materials",
+    "mcp_calls",
+    "mcp_grants",
     "message_templates",
     "opportunities",
     "opportunity_activities",

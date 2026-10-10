@@ -8,6 +8,7 @@ import { createCombinedDirectory, createEnvDirectory } from "@/lib/auth/director
 import type { DirectoryUser, UserDirectory } from "@/lib/auth/directory";
 import { LOCAL_COOKIE, LOCAL_LOGIN_PATH, localProvider } from "@/lib/auth/local-provider";
 import { menuItem } from "@/lib/auth/permissions";
+import { ROLES } from "@/lib/auth/roles";
 import type { MenuItemKey } from "@/lib/auth/permissions";
 import { signedUpMemberships } from "@/lib/auth/signed-up";
 import { loginUrl, SSO_COOKIE, verifySsoToken } from "@/lib/auth/sso";
@@ -154,4 +155,40 @@ export async function requirePermission(item: MenuItemKey, path?: string): Promi
   }
   if (decision.kind === "no-access") redirect(NO_ACCESS_PATH);
   return decision.session;
+}
+
+/**
+ * Gate for a page that any signed-in user of the ERP may open, whatever their
+ * screens: returns the session or sends the visitor to the login and back to
+ * `path`. Signed in but unknown to the ERP goes to "sem acesso".
+ */
+export async function requireSession(path: string): Promise<Session> {
+  const { config, identity } = await currentIdentity();
+  if (!identity.authenticated) {
+    if (localProvider(process.env).available) redirect(LOCAL_LOGIN_PATH);
+    redirect(loginUrl(config.appUrl, path));
+  }
+  const session = sessionFrom(identity);
+  if (!session) redirect(NO_ACCESS_PATH);
+  return session;
+}
+
+/**
+ * The session of a person in a company, as the ERP's own directory says it is
+ * right now. For a request that proves who the person is by something other
+ * than the login cookie (a key the person authorised): the profile, the
+ * screens and the powers are read again on every request, so a person who was
+ * removed or had the profile changed loses or changes access at once. `null`
+ * when the e-mail no longer belongs to that company.
+ */
+export async function sessionOf(email: string, tenantSlug: string, env: AuthEnv = process.env): Promise<Session | null> {
+  const local = localProvider(env);
+  if (local.available) {
+    const tenant = local.tenants.find((candidate) => candidate.slug === tenantSlug);
+    const user = tenant ? ROLES.map((role) => local.userFromCookie(`${role}@${tenant.slug}`)).find((candidate) => candidate?.email === email) : null;
+    if (user) return sessionFrom({ authenticated: true, user, companies: local.tenants.length });
+  }
+  const memberships = await membershipsOf(env, runtime(env), email);
+  const user = memberships.find((membership) => membership.tenant.slug === tenantSlug) ?? null;
+  return sessionFrom({ authenticated: true, user, companies: memberships.length });
 }
