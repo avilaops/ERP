@@ -102,6 +102,10 @@ export default async function ParametrosPage({ searchParams }: { searchParams: P
           Assistente
         </Link>
         {" · "}
+        <Link href="/parametros/whatsapp" className="font-medium text-brand underline">
+          WhatsApp
+        </Link>
+        {" · "}
         <Link href="/parametros/automacoes" className="font-medium text-brand underline">
           Lembretes automáticos
         </Link>

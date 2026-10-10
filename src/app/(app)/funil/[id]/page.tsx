@@ -15,6 +15,7 @@ import { tenantDb } from "@/lib/db/pool";
 import { isoDate, showDateTime, showMoney } from "@/lib/format";
 import { dueLabel } from "@/lib/funnel-view";
 import { dialable, listMeetings } from "@/lib/db/meetings";
+import { loadWhatsappInfo } from "@/lib/db/whatsapp";
 import { ActionForm } from "../../pedidos/ActionForm";
 import { ConfirmButton } from "../../pedidos/ConfirmButton";
 import { addActivityAction, changeActivityAction, changeCadenceOfOpportunityAction, changeMeetingAction, deleteOpportunityAction, linkOrderAction, moveOpportunityAction, saveOpportunityAction, sendMessageAction } from "../actions";
@@ -121,6 +122,8 @@ export default async function OportunidadePage({ params, searchParams }: { param
     const activities = await listActivities(item!.id, conn);
     const meetings = await listMeetings(item!.id, conn);
     const number = dialable(item!.phone);
+    // With the company's official account the conversation happens here; without it, the link opens the person's own WhatsApp.
+    const official = (await loadWhatsappInfo(conn)) !== null;
     const assistant = aiConfigured() && (await loadAiSettings(conn)).enabled;
     const QUICK = "inline-flex min-h-[var(--control)] items-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium hover:bg-slate-50";
     return (
@@ -131,9 +134,15 @@ export default async function OportunidadePage({ params, searchParams }: { param
               <a href={`tel:+${number}`} className={QUICK}>
                 Ligar
               </a>
-              <a href={`https://wa.me/${number}`} target="_blank" rel="noreferrer" className={QUICK}>
-                WhatsApp
-              </a>
+              {official ? (
+                <Link href={`${HERE}/${item!.id}/whatsapp`} className={QUICK}>
+                  WhatsApp
+                </Link>
+              ) : (
+                <a href={`https://wa.me/${number}`} target="_blank" rel="noreferrer" className={QUICK}>
+                  WhatsApp
+                </a>
+              )}
             </>
           )}
           <Link href={`${HERE}/${item!.id}/ligacao`} className={QUICK}>

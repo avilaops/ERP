@@ -148,7 +148,7 @@ test("fora da sessão, só o login e o link de assinatura escolhem a empresa", (
   // A API de outros sistemas é a terceira porta: a empresa sai da chave, que tem de ser daquela empresa.
   // E a rotina de fundo, que percorre as empresas da configuração, cada uma no seu banco.
   // E as duas portas públicas do marketing: o formulário de captura e o descadastro, cada uma só com o que o endereço nomeia.
-  assert.deepEqual(free.sort(), ["lib/api/access.ts", "lib/auth/index.ts", "lib/auth/signed-up.ts", "lib/background.ts", "lib/contract/public.ts", "lib/marketing/public.ts"]);
+  assert.deepEqual(free.sort(), ["lib/api/access.ts", "lib/auth/index.ts", "lib/auth/signed-up.ts", "lib/background.ts", "lib/contract/public.ts", "lib/marketing/public.ts", "lib/whatsapp/public.ts"]);
   // E só a página de assinatura usa o link.
   const users = sources().filter((file) => read(file).includes("openSigning(") && file !== "lib/contract/public.ts");
   assert.deepEqual(users.sort(), ["app/contrato/[empresa]/[token]/actions.ts", "app/contrato/[empresa]/[token]/page.tsx", "app/contrato/[empresa]/[token]/pdf/route.ts"]);

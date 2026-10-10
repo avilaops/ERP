@@ -13,6 +13,8 @@ import { CadenceError, startCadence, stopCadence } from "@/lib/db/cadences";
 import { cancelMeeting, deleteMeeting, logCall, MeetingError, saveMeeting } from "@/lib/db/meetings";
 import { MessageError, sendOpportunityMail } from "@/lib/db/messages";
 import { tenantDb } from "@/lib/db/pool";
+import { sendWhatsapp } from "@/lib/db/whatsapp";
+import { WhatsappError, whatsappSender } from "@/lib/whatsapp/api";
 import { vaultKey } from "@/lib/fiscal/certificate";
 import { MailError } from "@/lib/mail/message";
 import { sendMail } from "@/lib/mail/smtp";
@@ -30,7 +32,7 @@ const reader = (formData: FormData) => (key: string) => {
 const whole = (value: string) => (/^[1-9]\d{0,8}$/.test(value.trim()) ? Number(value.trim()) : null);
 
 function problem(error: unknown): ActionState {
-  if (error instanceof FunnelError || error instanceof MessageError || error instanceof CadenceError || error instanceof MeetingError || error instanceof AssistError || error instanceof MailError) return { error: error.message };
+  if (error instanceof FunnelError || error instanceof MessageError || error instanceof CadenceError || error instanceof MeetingError || error instanceof AssistError || error instanceof WhatsappError || error instanceof MailError) return { error: error.message };
   console.error("[funil] falha ao gravar:", error instanceof Error ? error.message : error);
   return { error: FAILED };
 }
@@ -326,4 +328,22 @@ export async function assistAction(_previous: ActionState, formData: FormData): 
   revalidatePath(`${HERE}/${id}`);
   if (draft !== null) redirect(`${HERE}/${id}?aba=mensagens&rascunho=${draft}`);
   return { error: null, notice: what === "tarefa" ? "Tarefa criada com o próximo passo." : "Resumo atualizado." };
+}
+
+/** "Enviar" on the WhatsApp conversation of an opportunity: a free text, or the approved template chosen. */
+export async function sendWhatsappAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
+  const session = await requirePermission("funil");
+  const conn = tenantDb(session.tenant.slug);
+  const read = reader(formData);
+  const id = whole(read("id"));
+  if (id === null) return { error: "Oportunidade não encontrada." };
+  let result;
+  try {
+    result = await sendWhatsapp(id, { text: read("text"), templateId: whole(read("templateId")) }, session.email, { ownerEmail: seesAllOrders(session) ? null : session.email }, { key: () => vaultKey(process.env.ERP_CERT_KEY), send: whatsappSender(), now: new Date() }, conn);
+  } catch (error) {
+    return problem(error);
+  }
+  revalidatePath(`${HERE}/${id}/whatsapp`);
+  if (result.status === "falhou") return { error: result.detail ?? "O WhatsApp recusou a mensagem." };
+  return { error: null, notice: "Mensagem enviada." };
 }

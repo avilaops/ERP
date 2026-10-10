@@ -271,3 +271,12 @@ Se a migração falhar, a versão antiga continua no ar.
 - **O que ele não faz**: não envia e-mail, não muda etapa, não fecha pedido. O texto dos e-mails do cliente vai marcado como dado, com a instrução de ignorar pedidos escritos nele.
 - **Registro e custo**: cada pedido fica em `opportunity_assists` com o que foi devolvido, o modelo e os tokens; é essa tabela que conta o limite do mês. Excluir a oportunidade mantém o uso contado.
 
+
+## WhatsApp (conta oficial da empresa)
+
+- **Onde**: Parâmetros → WhatsApp. A empresa cadastra a própria conta do WhatsApp Business na Meta: identificador do número, chave de acesso permanente e segredo do aplicativo. Os dois últimos ficam cifrados com `ERP_CERT_KEY` e não voltam à tela. Só a API oficial da Meta é usada (`graph.facebook.com`); nenhum serviço não oficial.
+- **Aviso da Meta**: a tela mostra o endereço de retorno (`/whatsapp/<empresa>`) e a palavra de conferência para colar no painel da Meta, assinando o campo `messages`. O GET devolve o desafio só com a palavra certa; o POST só é aceito com `X-Hub-Signature-256` conferida com o segredo do aplicativo. Toda recusa responde 404.
+- **Conversa**: `/funil/<id>/whatsapp`, pelo atalho WhatsApp da oportunidade (sem conta cadastrada, o atalho abre o WhatsApp da própria pessoa). O número do cliente é o telefone da oportunidade ou do cadastro. Texto livre só nas 24 horas depois da última mensagem do cliente; fora disso, só modelo aprovado, cadastrado pelo nome em Parâmetros → WhatsApp → Modelos aprovados (sem campos variáveis).
+- **Entrada**: a mensagem do cliente entra uma vez (`whatsapp_messages`), para a cadência da oportunidade e deixa uma tarefa de responder (uma só enquanto estiver aberta). Imagem, áudio e documento entram como aviso; o arquivo não é trazido.
+- **Lista**: Funil → Conversas. O vendedor vê as das próprias oportunidades; gerência e diretoria veem todas e os números que ainda não são de ninguém, com atalho para criar a oportunidade com aquele telefone.
+- **Custo**: a Meta cobra da conta da empresa as conversas iniciadas por modelo.

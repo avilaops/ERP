@@ -32,6 +32,9 @@ export default async function NovaOportunidadePage({ searchParams }: { searchPar
       refused = error.message;
     }
   }
+  // From a WhatsApp conversation of a number that is of nobody yet: the phone comes filled in, and ties the conversation to the new opportunity.
+  const askedPhone = (await searchParams).telefone;
+  const phoned = /^\d{10,11}$/.test((Array.isArray(askedPhone) ? askedPhone[0] : askedPhone) ?? "") ? String(Array.isArray(askedPhone) ? askedPhone[0] : askedPhone) : null;
   // A company that is already a customer is offered as the customer, not typed again.
   const known = found ? (all.find((customer) => customer.document === found.cnpj) ?? null) : null;
   const filled = found
@@ -39,7 +42,9 @@ export default async function NovaOportunidadePage({ searchParams }: { searchPar
         customerId: known?.id ?? null, company: known ? null : (found.tradeName ?? found.legalName), phone: found.phone, email: found.email,
         notes: `CNPJ ${found.cnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5")} · ${found.legalName}\n${companySummary(found)}`,
       } as Partial<Opportunity> as Opportunity)
-    : null;
+    : phoned
+      ? ({ phone: phoned } as Partial<Opportunity> as Opportunity)
+      : null;
 
   return (
     <div className="mx-auto max-w-2xl">

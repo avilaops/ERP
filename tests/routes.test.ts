@@ -303,7 +303,8 @@ test("e-mail das notas: a senha da caixa só é aberta para enviar, nunca volta 
   // Só a camada que resolve a caixa de saída abre a senha guardada.
   const users = SOURCES_UNDER_SRC().filter(([, code]) => code.includes("openSecret("));
   // E o segredo que assina os avisos enviados a outros sistemas, aberto só na hora de enviar.
-  assert.deepEqual(users.map(([file]) => file).sort(), ["lib/db/integrations.ts", "lib/db/mail.ts", "lib/mail/vault.ts"]);
+  // E a chave de acesso e o segredo da conta de WhatsApp da empresa, abertos para enviar e para conferir o aviso da Meta.
+  assert.deepEqual(users.map(([file]) => file).sort(), ["lib/db/integrations.ts", "lib/db/mail.ts", "lib/db/whatsapp.ts", "lib/mail/vault.ts"]);
   // O certificado do servidor de e-mail é sempre conferido.
   assert.doesNotMatch(readFileSync(new URL("../src/lib/mail/smtp.ts", import.meta.url), "utf8"), /rejectUnauthorized: false/);
 });
@@ -338,8 +339,9 @@ test("não existe página no grupo protegido sem requirePermission", () => {
   // and, of marketing, the campaigns, the screen that creates one, one campaign and the capture forms;
   // and, of one opportunity, the screen that writes down a call and the one that schedules a meeting;
   // and the history of one customer;
-  // and the assistant: its screen on one opportunity and its switch in the parameters.
-  assert.equal(all.length, MENU_ITEMS.length + 39);
+  // and the assistant: its screen on one opportunity and its switch in the parameters;
+  // and WhatsApp: the conversation of one opportunity, the list of conversations and the company's account.
+  assert.equal(all.length, MENU_ITEMS.length + 42);
   for (const route of all) {
     assert.match(source(route), /await requirePermission\(/, route);
   }

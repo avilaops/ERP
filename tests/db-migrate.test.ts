@@ -80,6 +80,7 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "0046_ligacoes_e_reunioes.sql",
     "0047_email_recebido.sql",
     "0048_assistente.sql",
+    "0049_whatsapp.sql",
   ]);
 
   const second = await withClient((client) => migrate(client, MIGRATIONS_DIR));
@@ -163,6 +164,9 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "users",
     "webhook_deliveries",
     "webhooks",
+    "whatsapp_messages",
+    "whatsapp_settings",
+    "whatsapp_templates",
   ]);
 });
 

@@ -8,6 +8,7 @@ import { runAutomations } from "@/lib/db/automations";
 import { listOpportunities, listPendingActivities, listStages, opportunityParty, syncOpportunitiesWithOrders } from "@/lib/db/funnel";
 import type { Opportunity } from "@/lib/db/funnel";
 import { tenantDb } from "@/lib/db/pool";
+import { loadWhatsappInfo } from "@/lib/db/whatsapp";
 import { isoDate, showMoney } from "@/lib/format";
 import { byStage, dueLabel, matchesOpportunity } from "@/lib/funnel-view";
 import { rowsPerPage, ROWS_COOKIE } from "@/lib/rows";
@@ -30,6 +31,7 @@ export default async function FunilPage({ searchParams }: { searchParams: Promis
   const scope = { ownerEmail: everyone ? null : session.email };
 
   await syncOpportunitiesWithOrders(conn);
+  const conversations = (await loadWhatsappInfo(conn)) !== null;
   const today = isoDate(new Date());
   // The reminders the rules of the company ask for are created when the funnel is opened.
   await runAutomations(today, conn);
@@ -75,9 +77,18 @@ export default async function FunilPage({ searchParams }: { searchParams: Promis
         hint={
           <>
             {openCount} em andamento · {showMoney(openTotal)}
+            {conversations && (
+              <>
+                {" · "}
+                <Link href={`${ITEM.href}/conversas`} className={`${QUIET_LINK} md:hidden`}>
+                  Conversas
+                </Link>
+              </>
+            )}
             {everyone && (
               <>
-                {" · equipe toda · "}
+                <span className="max-md:hidden"> · equipe toda</span>
+                {" · "}
                 <Link href={`${ITEM.href}/campanhas`} className={`${QUIET_LINK} md:hidden`}>
                   Campanhas
                 </Link>
@@ -93,6 +104,11 @@ export default async function FunilPage({ searchParams }: { searchParams: Promis
             {everyone && (
               <Link href={`${ITEM.href}/campanhas`} className={`${SECONDARY} max-md:hidden`}>
                 Campanhas
+              </Link>
+            )}
+            {conversations && (
+              <Link href={`${ITEM.href}/conversas`} className={`${SECONDARY} max-md:hidden`}>
+                Conversas
               </Link>
             )}
             <Link href={`${ITEM.href}/tarefas`} className={SECONDARY}>
