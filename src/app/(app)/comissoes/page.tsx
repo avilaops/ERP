@@ -109,7 +109,7 @@ export default async function ComissoesPage({ searchParams }: { searchParams: Pr
                 </div>
               </div>
               <div className="relative overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="stack-sm w-full text-sm">
                   <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                     <tr>
                       {["Pedido", "Quando", "Pagar em"].map((column) => (
@@ -139,11 +139,11 @@ export default async function ComissoesPage({ searchParams }: { searchParams: Pr
                             {entry.refund ? " · estorno" : ""}
                           </span>
                         </td>
-                        <td className="whitespace-nowrap px-4 py-3">{showIsoDate(entry.happenedOn)}</td>
-                        <td className="whitespace-nowrap px-4 py-3">{showIsoDate(entry.paymentDue)}</td>
-                        <td className="whitespace-nowrap px-4 py-3 text-right">{showMoney(entry.base)}</td>
-                        <td className="whitespace-nowrap px-4 py-3 text-right">{showPercent(entry.rate)}</td>
-                        <td className={`whitespace-nowrap px-4 py-3 text-right font-semibold ${entry.amount < 0 ? "text-red-700" : ""}`}>
+                        <td data-label="Em" className="whitespace-nowrap px-4 py-3">{showIsoDate(entry.happenedOn)}</td>
+                        <td data-label="Paga em" className="whitespace-nowrap px-4 py-3">{showIsoDate(entry.paymentDue)}</td>
+                        <td data-label="Base" className="whitespace-nowrap px-4 py-3 text-right">{showMoney(entry.base)}</td>
+                        <td data-label="Taxa" className="whitespace-nowrap px-4 py-3 text-right">{showPercent(entry.rate)}</td>
+                        <td data-label="Comissão" className={`whitespace-nowrap px-4 py-3 text-right font-semibold ${entry.amount < 0 ? "text-red-700" : ""}`}>
                           {showMoney(entry.amount)}
                         </td>
                         <td className="whitespace-nowrap px-4 py-3 text-slate-600">{entry.paidAt ? `paga em ${showDate(entry.paidAt)}` : "em aberto"}</td>

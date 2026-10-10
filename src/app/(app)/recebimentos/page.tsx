@@ -190,7 +190,7 @@ export default async function RecebimentosPage() {
             Últimos recebimentos
           </h2>
           <div className="relative overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="stack-sm w-full text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>
                   {["Pedido", "Recebido em", "Forma", "Vendedor"].map((column) => (
@@ -219,11 +219,11 @@ export default async function RecebimentosPage() {
                         #{receipt.orderNumber} · {receipt.label}
                       </span>
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3">{showIsoDate(receipt.receivedOn)}</td>
-                    <td className="px-4 py-3">{receipt.method ?? "—"}</td>
-                    <td className="px-4 py-3">{receipt.sellerName}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right font-semibold">{showMoney(receipt.amount)}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right">{showMoney(receipt.commission)}</td>
+                    <td data-label="Recebido em" className="whitespace-nowrap px-4 py-3">{showIsoDate(receipt.receivedOn)}</td>
+                    <td data-label="Forma" className="px-4 py-3">{receipt.method ?? "—"}</td>
+                    <td data-label="Vendedor" className="px-4 py-3">{receipt.sellerName}</td>
+                    <td data-label="Valor" className="whitespace-nowrap px-4 py-3 text-right font-semibold">{showMoney(receipt.amount)}</td>
+                    <td data-label="Comissão" className="whitespace-nowrap px-4 py-3 text-right">{showMoney(receipt.commission)}</td>
                     <td className="px-4 py-3">
                       {receipt.state === "estornado" ? (
                         <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-900">Estornado</span>

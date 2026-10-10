@@ -79,7 +79,7 @@ export default async function ClientesPage({
           </p>
         ) : (
           <div className="relative overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="stack-sm w-full text-sm">
               <thead className="border-t border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>
                   {COLUMNS.map((column) => (
@@ -100,8 +100,8 @@ export default async function ClientesPage({
                     </td>
                     <td className="whitespace-nowrap px-4 py-3">{formatDocument(customer.document)}</td>
                     <td className="px-4 py-3">{[customer.city, customer.uf].filter(Boolean).join("/") || NONE}</td>
-                    <td className="whitespace-nowrap px-4 py-3">{customer.phone ? formatPhone(customer.phone) : NONE}</td>
-                    <td className="px-4 py-3">
+                    <td data-label="Celular" className="whitespace-nowrap px-4 py-3">{customer.phone ? formatPhone(customer.phone) : NONE}</td>
+                    <td data-label="Contribuinte do ICMS" className="px-4 py-3">
                       {taxpayerFromRegistration(customer.kind, customer.stateRegistration) ? "Sim" : "Não"}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3">

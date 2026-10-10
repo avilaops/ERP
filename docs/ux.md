@@ -96,5 +96,5 @@ Telas que ainda não obedecem à regra e o caminho previsto para cada uma:
 | Fornecedores | Lista paginada e cadastro separado desde 10/10/2026; o formulário de novo fornecedor passa de uma tela no celular | Formulário em etapas, se incomodar |
 | Pedido (um pedido) | Longa, com abas de âncora | Partes do pedido como etapas reais |
 | Tabela de preços e Simulador em 360×640 | 1,05 a 1,25 tela | Rever o cabeçalho de página para telas muito baixas |
-| Clientes, Comissões, Recebimentos, Aprovações, Equipe, Dashboard, Preços e metas | Tabela com rolagem lateral dentro do cartão, no celular | Trocar a tabela por linhas compactas com detalhe, como na Tabela de preços |
+| Clientes, Comissões, Recebimentos, Aprovações, Equipe | Desde 10/10/2026 a tabela empilha as células no celular (classe `stack-sm`), sem rolagem lateral. Recebimentos e Comissões ainda passam de uma tela no celular (1,2 a 1,9) | Paginar as listas e separar "em aberto" de "últimos" em abas |
 | Novo pedido, Comissões, Recebimentos no celular | 1,2 a 1,8 tela | Usar `EquipmentPicker` no novo pedido; paginar as listas |

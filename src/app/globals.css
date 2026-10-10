@@ -175,3 +175,40 @@ summary::-webkit-details-marker {
   outline: 2px solid var(--color-brand);
   outline-offset: 2px;
 }
+
+/*
+ * A table on a phone: each row becomes a block with its cells one under the
+ * other, instead of a table wider than the screen. The header stays for screen
+ * readers; a cell that needs its column named says so in data-label.
+ */
+@media (max-width: 767px) {
+  table.stack-sm,
+  table.stack-sm tbody,
+  table.stack-sm tr,
+  table.stack-sm td {
+    display: block;
+  }
+  table.stack-sm thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  table.stack-sm tr {
+    padding-block: 0.5rem;
+  }
+  table.stack-sm td {
+    padding-block: 0.125rem;
+    text-align: left;
+    white-space: normal;
+  }
+  table.stack-sm td[data-label]::before {
+    content: attr(data-label) ": ";
+    font-size: 0.75rem;
+    font-weight: 400;
+    color: var(--color-slate-600);
+  }
+}
+

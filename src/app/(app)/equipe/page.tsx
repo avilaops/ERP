@@ -111,7 +111,7 @@ export default async function EquipePage() {
           <p className="p-5 text-sm text-slate-600">Nenhum pedido ainda.</p>
         ) : (
           <div className="relative overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="stack-sm w-full text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>
                   <th scope="col" className="px-4 py-2 text-left font-semibold">
@@ -131,10 +131,10 @@ export default async function EquipePage() {
                       {row.sellerName}
                       <span className="block text-xs text-slate-500">{row.sellerEmail}</span>
                     </td>
-                    <td className="px-4 py-3 text-right">{row.orders}</td>
-                    <td className="px-4 py-3 text-right">{row.open}</td>
-                    <td className="px-4 py-3 text-right">{row.closed}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right font-semibold">{showMoney(row.closedTotal)}</td>
+                    <td data-label="Pedidos" className="px-4 py-3 text-right">{row.orders}</td>
+                    <td data-label="Em aberto" className="px-4 py-3 text-right">{row.open}</td>
+                    <td data-label="Fechados" className="px-4 py-3 text-right">{row.closed}</td>
+                    <td data-label="Total fechado" className="whitespace-nowrap px-4 py-3 text-right font-semibold">{showMoney(row.closedTotal)}</td>
                   </tr>
                 ))}
               </tbody>

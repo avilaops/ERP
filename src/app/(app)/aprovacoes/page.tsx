@@ -115,7 +115,7 @@ export default async function AprovacoesPage() {
             Últimas decisões
           </h2>
           <div className="relative overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="stack-sm w-full text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>
                   {["Pedido", "Decisão", "Por", "Quando", "Comentário"].map((column) => (
@@ -143,9 +143,9 @@ export default async function AprovacoesPage() {
                         {decision.approved ? "Aprovado" : "Recusado"}
                       </span>
                     </td>
-                    <td className="px-4 py-3">{decision.decidedBy === session.email ? "Você" : decision.decidedBy}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-slate-600">{showDateTime(decision.decidedAt)}</td>
-                    <td className="px-4 py-3">{decision.comment ?? "—"}</td>
+                    <td data-label="Por" className="px-4 py-3">{decision.decidedBy === session.email ? "Você" : decision.decidedBy}</td>
+                    <td data-label="Em" className="whitespace-nowrap px-4 py-3 text-slate-600">{showDateTime(decision.decidedAt)}</td>
+                    <td data-label="Comentário" className="px-4 py-3">{decision.comment ?? "—"}</td>
                   </tr>
                 ))}
               </tbody>
