@@ -24,7 +24,7 @@ O menu fica à esquerda em todas as telas. Ele mostra apenas os itens liberados 
 | Aprovações | Pedidos que pediram aprovação por desconto ou entrada. |
 | Funil | As vendas em andamento, antes do pedido: oportunidades por etapa e as tarefas de cada uma. |
 | Pedidos | Todos os pedidos e orçamentos. |
-| Produção | Os pedidos fechados viram ordens de produção, que andam por etapas até ficarem prontas. |
+| Produção | Os pedidos fechados viram ordens de produção, que andam por etapas até ficarem prontas. Só aparece na empresa que ligou o módulo em Parâmetros → Produção. |
 | Clientes | Cadastro de clientes. |
 | Recebimentos | Parcelas a receber e recebidas. |
 | Contas a pagar | Despesas e pagamentos da empresa. |

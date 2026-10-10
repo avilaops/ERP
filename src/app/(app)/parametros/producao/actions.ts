@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/auth";
 import { tenantDb } from "@/lib/db/pool";
+import { setProductionEnabled } from "@/lib/db/modules";
 import { createProductionStage, deleteProductionStage, moveProductionStage, ProductionError, renameProductionStage } from "@/lib/db/production";
 import type { ActionState } from "@/lib/order-form";
 
@@ -49,4 +50,17 @@ export async function changeProductionStageAction(_previous: ActionState, formDa
   revalidatePath("/parametros/producao");
   revalidatePath("/producao");
   return { error: null };
+}
+
+/** "Ligar" and "Desligar" of the production module, for the whole company. */
+export async function switchProductionAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
+  const session = await requirePermission("parametros");
+  const enabled = field(formData, "enabled") === "1";
+  try {
+    await setProductionEnabled(enabled, session.email, tenantDb(session.tenant.slug));
+  } catch (error) {
+    return problem(error);
+  }
+  revalidatePath("/", "layout");
+  return { error: null, notice: enabled ? "Produção ligada: já aparece no menu." : "Produção desligada: saiu do menu." };
 }

@@ -15,6 +15,7 @@ import { loginUrl, SSO_COOKIE, verifySsoToken } from "@/lib/auth/sso";
 import { chooseMembership, parseTenants } from "@/lib/auth/tenants";
 import type { Tenant } from "@/lib/auth/tenants";
 import { tenantDb } from "@/lib/db/pool";
+import { modulesOff } from "@/lib/db/modules";
 import { findActiveUser } from "@/lib/db/users";
 
 export type { Session } from "@/lib/auth/access";
@@ -108,13 +109,28 @@ async function resolveIdentity(env: AuthEnv, config: Runtime, store: CookieStore
 }
 
 /**
+ * The person with the modules their company turned off. A company whose
+ * settings cannot be read hides nothing: hiding is tidiness, not a lock.
+ */
+async function withModules(user: DirectoryUser | null): Promise<DirectoryUser | null> {
+  if (!user) return null;
+  try {
+    return { ...user, off: await modulesOff(tenantDb(user.tenant.slug)) };
+  } catch (error) {
+    console.error(`[auth] módulos de ${user.tenant.slug} não puderam ser lidos:`, error instanceof Error ? error.message : error);
+    return user;
+  }
+}
+
+/**
  * Cookies are read before the configuration: `cookies()` is what tells Next the
  * route is per-request, so `next build` never evaluates the production check.
  */
 async function currentIdentity(): Promise<{ config: Runtime; identity: Identity }> {
   const store = await cookies();
   const config = runtime(process.env);
-  return { config, identity: await resolveIdentity(process.env, config, store) };
+  const identity = await resolveIdentity(process.env, config, store);
+  return { config, identity: { ...identity, user: await withModules(identity.user) } };
 }
 
 /** Every company the signed-in person belongs to, to switch among. Empty when signed out. */
@@ -186,9 +202,9 @@ export async function sessionOf(email: string, tenantSlug: string, env: AuthEnv 
   if (local.available) {
     const tenant = local.tenants.find((candidate) => candidate.slug === tenantSlug);
     const user = tenant ? ROLES.map((role) => local.userFromCookie(`${role}@${tenant.slug}`)).find((candidate) => candidate?.email === email) : null;
-    if (user) return sessionFrom({ authenticated: true, user, companies: local.tenants.length });
+    if (user) return sessionFrom({ authenticated: true, user: await withModules(user), companies: local.tenants.length });
   }
   const memberships = await membershipsOf(env, runtime(env), email);
   const user = memberships.find((membership) => membership.tenant.slug === tenantSlug) ?? null;
-  return sessionFrom({ authenticated: true, user, companies: memberships.length });
+  return sessionFrom({ authenticated: true, user: await withModules(user), companies: memberships.length });
 }

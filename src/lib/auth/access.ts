@@ -1,5 +1,5 @@
 import type { DirectoryUser } from "@/lib/auth/directory";
-import { allows } from "@/lib/auth/permissions";
+import { allows, menuFor } from "@/lib/auth/permissions";
 import type { MenuItemKey } from "@/lib/auth/permissions";
 import type { Role } from "@/lib/auth/roles";
 
@@ -38,12 +38,14 @@ export type AccessDecision =
 
 export function sessionFrom(identity: Identity): Session | null {
   if (!identity.authenticated || !identity.user) return null;
-  const { email, name, role, tenant, items, denied, profile } = identity.user;
+  const { email, name, role, tenant, items, denied, profile, off } = identity.user;
+  // A module the company turned off leaves the screens of everyone, whatever the profile says.
+  const left = off?.length ? (items ?? menuFor(role).map((item) => item.key)).filter((key) => !off.includes(key)) : (items ?? null);
   return {
     email,
     name: identity.displayName ?? name,
     role,
-    items: items ?? null,
+    items: left,
     denied: denied ?? [],
     profile: profile ?? null,
     tenant: { slug: tenant.slug, name: tenant.name },

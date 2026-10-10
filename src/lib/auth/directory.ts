@@ -13,6 +13,8 @@ export type DirectoryUser = {
   /** From the profile of the company, when the person has one: the powers given up and its name. */
   denied?: string[];
   profile?: string | null;
+  /** The modules the company turned off for everyone: nobody of it opens their screens. */
+  off?: readonly string[];
 };
 
 /**

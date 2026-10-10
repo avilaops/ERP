@@ -284,7 +284,8 @@ Se a migração falhar, a versão antiga continua no ar.
 
 ## Produção
 
-- **Onde**: item Produção do menu (por padrão só a diretoria; para o chão de fábrica, crie em Equipe e acessos um perfil só com Produção). As etapas ficam em Parâmetros → Etapas da produção: a empresa cria, renomeia, reordena e remove; a de pronto sempre existe.
+- **Ligar**: o módulo nasce desligado em cada empresa (quem revende equipamento pronto não precisa dele). A diretoria liga e desliga em Parâmetros → Produção; desligado, some do menu, das telas e das ferramentas do assistente de todos, e nada do que foi gravado se perde.
+- **Onde**: item Produção do menu (por padrão só a diretoria; para o chão de fábrica, crie em Equipe e acessos um perfil só com Produção). As etapas ficam em Parâmetros → Produção: a empresa cria, renomeia, reordena e remove; a de pronto sempre existe.
 - **Fluxo**: o pedido fechado aparece em "A enviar". "Mandar para a produção" cria uma ordem por equipamento do pedido (`production_orders`, número `<pedido>/<n>`), na primeira etapa, com prazo igual ao fechamento mais o tempo de fabricação do pedido. Cada ordem anda de etapa em etapa; chegar em pronto grava quando terminou.
 - **Histórico**: cada passo fica em `production_moves`, com quem moveu e o nome da etapa na hora.
 - **O que não entra**: preço, custo e margem. A ordem só tem o equipamento, a quantidade, o cliente, o prazo e as observações.
