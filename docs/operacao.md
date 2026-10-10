@@ -283,6 +283,14 @@ Se a migração falhar, a versão antiga continua no ar.
 - **Lista**: Funil → Conversas. O vendedor vê as das próprias oportunidades; gerência e diretoria veem todas e os números que ainda não são de ninguém, com atalho para criar a oportunidade com aquele telefone.
 - **Custo**: a Meta cobra da conta da empresa as conversas iniciadas por modelo.
 
+## Relatórios
+
+- **Onde**: item Relatórios do menu, para os quatro tipos de perfil. Cada relatório pede também a tela de onde vêm os números (Vendas pede Pedidos; Notas fiscais pede Parâmetros; Contas a pagar pede Contas a pagar), então cada pessoa vê só os que pode.
+- **O que tem**: Vendas, Funil, Clientes, Notas fiscais, Recebimentos, Contas a pagar, Comissões e Produtos e dados fiscais. Cada um com um resumo no alto, a lista paginada e "Exportar planilha" (CSV com `;` e vírgula decimal, que o Excel abre direto).
+- **Período**: este mês, mês passado, este ano (o padrão) ou tudo, e "Outro período" com duas datas. Clientes e Produtos não têm período.
+- **Quem vê o quê**: vendedor lê só as vendas, as oportunidades e as comissões dele, e em Clientes o total comprado conta só os pedidos dele. Nenhum relatório mostra custo, margem ou lucro. Nota de homologação aparece na lista e não entra no total autorizado.
+- **Código**: `src/lib/db/reports.ts` (um SQL por relatório), `src/lib/reports-view.ts` (período, escopo e planilha), telas em `src/app/(app)/relatorios/` e exportação em `/api/relatorios/<tipo>/exportar/<período>`.
+
 ## Produção
 
 - **Ligar**: o módulo nasce desligado em cada empresa (quem revende equipamento pronto não precisa dele). A diretoria liga e desliga em Parâmetros → Produção; desligado, some do menu, das telas e das ferramentas do assistente de todos, e nada do que foi gravado se perde.

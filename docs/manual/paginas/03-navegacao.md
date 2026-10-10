@@ -20,6 +20,7 @@ O menu fica à esquerda em todas as telas. Ele mostra apenas os itens liberados 
 | Item | Para que serve |
 | --- | --- |
 | Dashboard | Visão geral de vendas, funil, lucro e ranking. |
+| Relatórios | Um resumo e uma lista de cada área (vendas, funil, clientes, notas, recebimentos, contas, comissões e produtos), com exportação para planilha. Cada pessoa vê os relatórios das telas que tem. |
 | Preços e metas | Metas de venda e acompanhamento da tabela. |
 | Aprovações | Pedidos que pediram aprovação por desconto ou entrada. |
 | Funil | As vendas em andamento, antes do pedido: oportunidades por etapa e as tarefas de cada uma. |

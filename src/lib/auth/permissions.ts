@@ -8,6 +8,7 @@ import type { Role } from "@/lib/auth/roles";
  */
 const MENU = [
   { key: "dashboard", label: "Dashboard", href: "/dashboard", roles: ["DIRETORIA", "GERENTE_COMERCIAL", "VENDEDOR"] },
+  { key: "relatorios", label: "Relatórios", href: "/relatorios", roles: ["DIRETORIA", "GERENTE_COMERCIAL", "VENDEDOR", "FINANCEIRO"] },
   { key: "precos-metas", label: "Preços e metas", href: "/precos-metas", roles: ["DIRETORIA", "GERENTE_COMERCIAL"] },
   { key: "aprovacoes", label: "Aprovações", href: "/aprovacoes", roles: ["DIRETORIA", "GERENTE_COMERCIAL"] },
   { key: "funil", label: "Funil", href: "/funil", roles: ["DIRETORIA", "GERENTE_COMERCIAL", "VENDEDOR"] },
