@@ -36,13 +36,18 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const sellers = everyone ? [...new Map(orders.map((order) => [order.sellerEmail, order.sellerName])).entries()].sort((a, b) => a[1].localeCompare(b[1], "pt-BR")) : [];
   const seller = sellers.find(([email]) => email === first(query.vendedor))?.[0] ?? null;
   const view = dashboardView(seller ? orders.filter((order) => order.sellerEmail === seller) : orders, period, today);
-  const periodHref = (key: string) => {
+  // One part at a time. The money part exists only for who has those screens (or sees profit).
+  const askedTab = first(query.ver);
+  const linkTo = (to: { period?: string; tab?: string }) => {
     const params = new URLSearchParams();
-    if (key !== "mes") params.set("periodo", key);
+    const wantedTab = to.tab ?? askedTab ?? "resumo";
+    if ((to.period ?? period) !== "mes") params.set("periodo", to.period ?? period);
     if (seller) params.set("vendedor", seller);
+    if (wantedTab !== "resumo") params.set("ver", wantedTab);
     const text = params.toString();
     return text === "" ? HERE : `${HERE}?${text}`;
   };
+  const periodHref = (key: string) => linkTo({ period: key });
   const periodLabel = PERIODS.find((item) => item.key === period)?.label.toLowerCase() ?? "";
 
   // Profit is read only for who may see costs.
@@ -77,6 +82,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       </span>
     );
   const { funnel } = view;
+  const tabs: [string, string][] = [["resumo", "Resumo"], ["vendas", "Vendas"], ["aberto", "Em aberto"], ...(cash || profitByMonth || receivables || payables ? ([["dinheiro", "Dinheiro"]] as [string, string][]) : [])];
+  const tab = tabs.find(([key]) => key === askedTab)?.[0] ?? "resumo";
 
   return (
     <>
@@ -101,6 +108,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       {sellers.length > 1 && (
         <form method="get" action={HERE} className="mt-3 flex flex-wrap items-center gap-2 text-sm">
           {period !== "mes" && <input type="hidden" name="periodo" value={period} />}
+          {tab !== "resumo" && <input type="hidden" name="ver" value={tab} />}
           <label htmlFor="vendedor" className="text-slate-600">
             Vendedor
           </label>
@@ -118,7 +126,21 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         </form>
       )}
 
-      <dl className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+      <nav aria-label="Partes do dashboard" className="mt-3 flex flex-wrap gap-x-1 border-b border-slate-200">
+        {tabs.map(([key, label]) => (
+          <Link
+            key={key}
+            href={linkTo({ tab: key })}
+            aria-current={key === tab ? "page" : undefined}
+            className={`inline-flex min-h-[var(--control)] items-center border-b-2 px-3 text-sm font-medium ${key === tab ? "border-brand text-brand" : "border-transparent text-slate-600 hover:text-slate-900"}`}
+          >
+            {label}
+          </Link>
+        ))}
+      </nav>
+
+      {tab === "resumo" && (
+      <dl className="mt-4 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <Kpi label="Vendas fechadas" value={showMoney(view.closed.total)} note={<>com IPI{versus(change(view.closed.total, view.previous.closed.total))}</>} />
         <Kpi
           label="Pedidos fechados"
@@ -145,7 +167,10 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           </>
         )}
       </dl>
+      )}
 
+      {tab === "resumo" && (
+        <>
       <section className={`${CARD} mt-6`} aria-labelledby="por-mes">
         <h2 id="por-mes" className={TITLE}>
           Vendas fechadas por mês
@@ -154,6 +179,10 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         <Columns bars={view.byMonth} format={showMoney} />
       </section>
 
+        </>
+      )}
+      {tab === "vendas" && (
+        <>
       <div className="mt-6 grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-2">
         <section className={CARD} aria-labelledby="funil">
           <h2 id="funil" className={TITLE}>
@@ -197,6 +226,10 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         </section>
       </div>
 
+        </>
+      )}
+      {tab === "aberto" && (
+        <>
       <section className={`${CARD} mt-6`} aria-labelledby="em-aberto">
         <div className="flex items-baseline justify-between gap-3">
           <h2 id="em-aberto" className={TITLE}>
@@ -227,6 +260,10 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         )}
       </section>
 
+        </>
+      )}
+      {tab === "dinheiro" && (
+        <>
       {(cash || profitByMonth) && (
         <div className="mt-6 grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-2">
           {cash && (
@@ -337,6 +374,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             </section>
           )}
         </div>
+      )}
+        </>
       )}
     </>
   );

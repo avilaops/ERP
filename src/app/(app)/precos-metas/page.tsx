@@ -1,7 +1,7 @@
 import { LineTabs } from "@/components/LineTabs";
 import { lineWords } from "@/lib/line-words";
 import { listLines } from "@/lib/db/product-lines";
-import { LINE_PARAM, pickLine } from "@/lib/lines-view";
+import { LINE_PARAM, lineHref, pickLine } from "@/lib/lines-view";
 import Link from "next/link";
 import { Kpi } from "@/components/Charts";
 import { requirePermission } from "@/lib/auth";
@@ -46,7 +46,12 @@ export default async function PrecosMetasPage({ searchParams }: { searchParams: 
   const pending = (await listPendingApprovals(conn)).length;
   // Sales, goals and approvals are of the company; table, costs and parameters are of one product line.
   const lines = await listLines(conn);
-  const line = pickLine(lines, (await searchParams)[LINE_PARAM]);
+  const query = await searchParams;
+  const line = pickLine(lines, query[LINE_PARAM]);
+  // One part at a time: what asks for attention, the goals of the month, and the table of this line.
+  const tabs = [["resumo", "Resumo"], ["metas", "Metas"], ["tabela", "Tabela"]] as const;
+  const askedTab = Array.isArray(query.ver) ? query.ver[0] : query.ver;
+  const tab = tabs.find(([key]) => key === askedTab)?.[0] ?? "resumo";
   const versions = (await listVersions(conn)).filter((item) => item.lineId === line.id);
   const products = await listProducts({ active: true, lineId: line.id }, conn);
   const withoutCost = products.filter((product) => product.advisoryCost === null).length;
@@ -94,7 +99,20 @@ export default async function PrecosMetasPage({ searchParams }: { searchParams: 
       <p className="mt-1 text-slate-600">Como estão a tabela, as metas de {monthLabel(month)} e o que espera decisão.</p>
       <LineTabs lines={lines} current={line.id} path={menuItem("precos-metas").href} />
 
-      <dl className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+      <nav aria-label="Partes de preços e metas" className="mt-3 flex flex-wrap gap-x-1 border-b border-slate-200">
+        {tabs.map(([key, label]) => (
+          <Link
+            key={key}
+            href={lineHref(menuItem("precos-metas").href, line.id, { ver: key === "resumo" ? undefined : key })}
+            aria-current={key === tab ? "page" : undefined}
+            className={`inline-flex min-h-[var(--control)] items-center border-b-2 px-3 text-sm font-medium ${key === tab ? "border-brand text-brand" : "border-transparent text-slate-600 hover:text-slate-900"}`}
+          >
+            {label}
+          </Link>
+        ))}
+      </nav>
+      {tab === "resumo" && (
+      <dl className="mt-4 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <Kpi
           label="Esperando você"
           value={pending}
@@ -130,8 +148,10 @@ export default async function PrecosMetasPage({ searchParams }: { searchParams: 
           </>
         )}
       </dl>
+      )}
 
-      <div className="mt-6 grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-2">
+      <div className="mt-4 grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-2">
+        {tab === "metas" && (
         <section className={CARD} aria-labelledby="metas">
           <h2 id="metas" className={TITLE}>
             Metas de venda de {monthLabel(month)}
@@ -190,7 +210,8 @@ export default async function PrecosMetasPage({ searchParams }: { searchParams: 
             </ActionForm>
           )}
         </section>
-
+        )}
+        {tab === "resumo" && (
         <section className={CARD} aria-labelledby="atencao">
           <h2 id="atencao" className={TITLE}>
             Atenção
@@ -210,7 +231,9 @@ export default async function PrecosMetasPage({ searchParams }: { searchParams: 
             </ul>
           )}
         </section>
-
+        )}
+        {tab === "tabela" && (
+          <>
         {director && (
           <section className={CARD} aria-labelledby="equilibrio">
             <h2 id="equilibrio" className={TITLE}>
@@ -268,7 +291,6 @@ export default async function PrecosMetasPage({ searchParams }: { searchParams: 
             <p className="mt-3 text-xs text-slate-600">É a alçada do gerente: ele aprova até aqui sem saber qual é a meta.</p>
           </section>
         )}
-
         <section className={`${CARD} lg:col-span-2`} aria-labelledby="publicacoes">
           <h2 id="publicacoes" className={TITLE}>
             Publicações da tabela
@@ -307,6 +329,8 @@ export default async function PrecosMetasPage({ searchParams }: { searchParams: 
             </div>
           )}
         </section>
+          </>
+        )}
       </div>
     </>
   );
