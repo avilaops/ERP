@@ -98,6 +98,12 @@ test("dentro do estado e para contribuinte: CFOP da operação, sem DIFAL; com I
   assert.deepEqual([taxed.totals.products, taxed.totals.ipi, taxed.totals.icmsBase, taxed.totals.invoice], [1000, 130, 1130, 1130]);
   assert.ok(taxed.xml.includes("<IPI><cEnq>999</cEnq><IPITrib><CST>50</CST><vBC>1000.00</vBC><pIPI>13.0000</pIPI><vIPI>130.00</vIPI></IPITrib></IPI>"));
   assert.equal(nfeTotals({ ...withIpi, rules: { ...withIpi.rules, ipiInIcmsBase: false } }).icmsBase, 1000);
+
+  // An untaxed CST with IPI in the table would leave the total with an IPI no item shows.
+  const untaxed = { ...withIpi, rules: { ...withIpi.rules, ipiCst: "53" } };
+  assert.ok(nfeProblems(untaxed).some((problem) => problem.includes("CST do IPI é de saída sem imposto")));
+  assert.deepEqual(nfeProblems({ ...untaxed, items: [{ ...untaxed.items[0], ipiRate: 0 }], payments: [{ code: "17", description: null, amount: 1000 }] }), []);
+  assert.deepEqual(nfeProblems(withIpi), []);
 });
 
 test("Simples Nacional: CSOSN, sem base nem valor de ICMS; homologação troca o nome do cliente e do primeiro item", () => {

@@ -235,6 +235,9 @@ function address(prefix: "enderEmit" | "enderDest", place: NfeAddress): string {
  */
 export const destinationUf = (input: Pick<NfeInput, "recipient" | "delivery">): string => input.delivery?.uf ?? input.recipient.uf;
 
+/** The CSTs of IPI that carry base, rate and amount; every other one only names itself. */
+const IPI_TAXED_CSTS = ["00", "49", "50", "99"];
+
 /** What is missing or wrong before any XML is written. Every problem at once, each naming the register that fixes it. */
 export function nfeProblems(input: NfeInput): string[] {
   const problems: string[] = [];
@@ -275,6 +278,8 @@ export function nfeProblems(input: NfeInput): string[] {
   need(/^\d{2}$/.test(rules.pisCst) && /^\d{2}$/.test(rules.cofinsCst), "Regras fiscais: CST do PIS e da COFINS com dois dígitos.");
   need(rules.ipiCst === null || /^\d{2}$/.test(rules.ipiCst), "Regras fiscais: CST do IPI com dois dígitos, ou em branco para nota sem IPI.");
   need(rules.ipiCst !== null || input.items.every((item) => item.ipiRate === 0), "Regras fiscais: a linha tem IPI na tabela, falta o CST do IPI.");
+  // An untaxed CST writes no IPI in the item while the price of the order carries it: the total would not match the items.
+  need(rules.ipiCst === null || IPI_TAXED_CSTS.includes(rules.ipiCst) || input.items.every((item) => item.ipiRate === 0), "Regras fiscais: a linha tem IPI na tabela e o CST do IPI é de saída sem imposto. Use um CST tributado (50 ou 99) ou zere o IPI da linha.");
 
   need(rules.ibsCbs !== null || issuer.taxRegime !== 3, "Regras fiscais: CST e classificação tributária do IBS/CBS (obrigatórios para o regime normal desde 03/08/2026).");
   need(rules.ibsCbs === null || (/^\d{3}$/.test(rules.ibsCbs.cst) && /^\d{6}$/.test(rules.ibsCbs.classCode)), "Regras fiscais: CST do IBS/CBS com três dígitos e classificação tributária com seis.");
@@ -411,7 +416,7 @@ function itemXml(item: NfeItem, index: number, input: NfeInput): string {
       : group(
           "IPI",
           tag("cEnq", rules.ipiFrameCode) +
-            (["00", "49", "50", "99"].includes(rules.ipiCst)
+            (IPI_TAXED_CSTS.includes(rules.ipiCst)
               ? group("IPITrib", tag("CST", rules.ipiCst) + tag("vBC", money(figures.product)) + tag("pIPI", rate(item.ipiRate)) + tag("vIPI", money(figures.ipi)))
               : group("IPINT", tag("CST", rules.ipiCst))),
         );
