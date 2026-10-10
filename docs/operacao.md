@@ -305,3 +305,11 @@ Se a migração falhar, a versão antiga continua no ar.
 - **Fim da ligação**: com o ERP em endereço https, o provedor avisa em `/telefonia/<empresa>` como a ligação terminou e quanto durou; o aviso só é aceito com a assinatura `X-Twilio-Signature` conferida. A duração entra em `voice_calls` e no fim da atividade, e os minutos do mês aparecem em Parâmetros → Telefonia.
 - **O que não tem**: gravação e transcrição. Nunca foi testada contra o provedor de verdade: falta a conta.
 
+## Produção: materiais, lista por equipamento, horas e máquinas
+
+- **Materiais** (Produção → Materiais): cadastro com unidade, saldo e estoque mínimo; lançamentos de entrada, saída e contagem (a contagem grava a diferença). Só quantidades: nenhum preço. O saldo pode ficar negativo, e a tela avisa.
+- **Lista por equipamento** (Materiais → Listas por equipamento): quanto de cada material vai em uma unidade. Quando a ordem chega em pronto, o estoque baixa pela lista (`material_moves`, tipo consumo); se a ordem volta de pronto ou sai da produção, o estoque é devolvido. A soma dos lançamentos é sempre o saldo.
+- **O que vai faltar** (Materiais → O que vai faltar): o que as ordens em andamento ainda vão usar, contra o estoque de hoje. Ordem de equipamento sem lista não entra na conta, e a tela diz quantas são.
+- **Horas** (em cada ordem, Começar e Parar): o tempo de cada pessoa por ordem, com a etapa e, se quiser, a máquina. Uma pessoa trabalha em uma ordem por vez: começar em outra fecha a anterior. Produção → Horas mostra o total por etapa, por pessoa e por máquina em 7, 30 ou 90 dias, e cadastra as máquinas.
+- **O que não tem**: custo de material e de hora, compra automática, roteiro com tempo padrão e capacidade por máquina.
+

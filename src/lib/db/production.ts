@@ -1,3 +1,4 @@
+import { settleConsumption } from "@/lib/db/materials";
 import { pgErrorCode } from "@/lib/db/pool";
 import type { Queryable } from "@/lib/db/pool";
 import { completionDate } from "@/lib/order-quote";
@@ -175,6 +176,8 @@ export async function moveProductionOrder(id: number, stageId: number, who: stri
   );
   if (!rows[0].found) throw new ProductionError(ORDER_GONE);
   if (Number(rows[0].stages) === 0) throw new ProductionError(STAGE_GONE);
+  // A finished order has taken its materials from the stock; one brought back from "ready" gives them back.
+  await settleConsumption(id, who, conn);
 }
 
 /** Changes the day an order is due and what is noted on it. */
@@ -190,9 +193,13 @@ export async function saveProductionOrder(id: number, input: { dueOn: string | n
 }
 
 /** Takes an order out of production, with its history. The sales order is not touched, and can be sent again. */
-export async function deleteProductionOrder(id: number, conn: Queryable): Promise<void> {
+export async function deleteProductionOrder(id: number, conn: Queryable, who = "sistema"): Promise<void> {
+  // What it took from the stock comes back before it goes.
+  await settleConsumption(id, who, conn, { gone: true });
   const { rows } = await conn.query(
-    `WITH target AS (SELECT id FROM production_orders WHERE id = $1), walked AS (DELETE FROM production_moves m USING target WHERE m.production_order_id = target.id)
+    `WITH target AS (SELECT id FROM production_orders WHERE id = $1), walked AS (DELETE FROM production_moves m USING target WHERE m.production_order_id = target.id),
+          kept AS (UPDATE material_moves v SET production_order_id = NULL FROM target WHERE v.production_order_id = target.id),
+          worked AS (DELETE FROM production_work k USING target WHERE k.production_order_id = target.id)
      DELETE FROM production_orders w USING target WHERE w.id = target.id RETURNING w.id`,
     [id],
   );

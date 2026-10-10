@@ -40,11 +40,19 @@ export default async function ProducaoPage({ searchParams }: { searchParams: Pro
         title={ITEM.label}
         hint={`${inProgress} em produção · ${waiting.length} ${waiting.length === 1 ? "pedido esperando" : "pedidos esperando"}`}
         actions={
-          allows(session, "parametros") ? (
-            <Link href="/parametros/producao" className={SECONDARY}>
-              Etapas
+          <>
+            <Link href={`${ITEM.href}/materiais`} className={SECONDARY}>
+              Materiais
             </Link>
-          ) : undefined
+            <Link href={`${ITEM.href}/horas`} className={SECONDARY}>
+              Horas
+            </Link>
+            {allows(session, "parametros") && (
+              <Link href="/parametros/producao" className={SECONDARY}>
+                Etapas
+              </Link>
+            )}
+          </>
         }
       />
       <nav aria-label="Etapas da produção" className="mt-3 flex flex-wrap gap-2">

@@ -2121,3 +2121,152 @@ test("produção: pedido fechado vira uma ordem por equipamento, anda por etapas
   assert.ok((await production.listOrdersToProduce(db.pool)).some((waitingOrder) => waitingOrder.number === number));
   assert.equal((await db.pool.query("SELECT count(*) FROM production_moves")).rows[0].count, "0");
 });
+
+test("materiais: estoque com entradas e saídas, lista por equipamento, baixa quando a ordem fica pronta e o que vai faltar", { skip }, async () => {
+  const materials = await import("@/lib/db/materials");
+  const production = await import("@/lib/db/production");
+  const { MaterialError } = materials;
+  const WHO = "fabrica@teste.local";
+
+  await assert.rejects(() => materials.saveMaterial(null, { name: "x", unit: "litros", minimum: -1, stock: -5 }, WHO, db.pool), (error: unknown) => error instanceof MaterialError && /Nome do material.*unidade.*mínimo.*inicial/.test(error.message));
+  await materials.saveMaterial(null, { name: " Tubo  50x30 ", unit: "m", minimum: 20, stock: 100 }, WHO, db.pool);
+  await materials.saveMaterial(null, { name: "Tinta preta", unit: "L", minimum: 5 }, WHO, db.pool);
+  await assert.rejects(() => materials.saveMaterial(null, { name: "tubo 50x30", unit: "m", minimum: 0 }, WHO, db.pool), /Já existe um material/);
+  let [paint, tube] = (await materials.listMaterials(db.pool)).sort((a, b) => a.name.localeCompare(b.name));
+  // Abaixo do mínimo vem primeiro; o estoque inicial ficou registrado como entrada.
+  assert.deepEqual((await materials.listMaterials(db.pool)).map((row) => [row.name, row.stock, row.minimum]), [["Tinta preta", 0, 5], ["Tubo 50x30", 100, 20]]);
+  assert.deepEqual((await materials.listMaterialMoves(tube.id, db.pool)).map((move) => [move.kind, move.quantity, move.note]), [["entrada", 100, "Estoque inicial"]]);
+
+  // Entrada, saída e contagem: o saldo e o registro mudam juntos; a contagem grava a diferença.
+  await assert.rejects(() => materials.moveMaterial(paint.id, { kind: "doacao", quantity: 1, note: null }, WHO, db.pool), /entrada, saída ou contagem/);
+  await assert.rejects(() => materials.moveMaterial(paint.id, { kind: "entrada", quantity: 0, note: null }, WHO, db.pool), /maior que zero/);
+  await assert.rejects(() => materials.moveMaterial(999_999, { kind: "entrada", quantity: 1, note: null }, WHO, db.pool), /não encontrado/);
+  await materials.moveMaterial(paint.id, { kind: "entrada", quantity: 18.5, note: " Nota 123 " }, WHO, db.pool);
+  await materials.moveMaterial(paint.id, { kind: "saida", quantity: 2.25, note: null }, WHO, db.pool);
+  await materials.moveMaterial(paint.id, { kind: "ajuste", quantity: 16, note: "Contagem do mês" }, WHO, db.pool);
+  await materials.moveMaterial(paint.id, { kind: "ajuste", quantity: 16, note: null }, WHO, db.pool);
+  assert.deepEqual((await materials.listMaterialMoves(paint.id, db.pool)).map((move) => [move.kind, move.quantity, move.note]), [["ajuste", -0.25, "Contagem do mês"], ["saida", -2.25, null], ["entrada", 18.5, "Nota 123"]]);
+  assert.equal((await materials.listMaterials(db.pool)).find((row) => row.id === paint.id)!.stock, 16);
+
+  // A ordem de produção de um pedido fechado, e a lista do equipamento dela.
+  const waiting = await production.listOrdersToProduce(db.pool);
+  const number = waiting[0].number;
+  await production.sendToProduction(number, WHO, db.pool);
+  const stages = await production.listProductionStages(db.pool);
+  const done = stages.find((stage) => stage.kind === "pronta")!;
+  const jobs = (await production.listProductionOrders(stages[0].id, db.pool)).filter((order) => order.orderNumber === number);
+  const job = jobs[0];
+  const productId = Number((await db.pool.query("SELECT product_id FROM production_orders WHERE id = $1", [job.id])).rows[0].product_id);
+  assert.equal(await materials.getBill(999_999, db.pool), null);
+  await assert.rejects(() => materials.setBillLine(productId, tube.id, 0, WHO, db.pool), /maior que zero/);
+  await assert.rejects(() => materials.setBillLine(productId, 999_999, 1, WHO, db.pool), /não encontrado/);
+  await materials.setBillLine(productId, tube.id, 12.5, WHO, db.pool);
+  await materials.setBillLine(productId, paint.id, 30, WHO, db.pool);
+  await materials.setBillLine(productId, paint.id, 3, WHO, db.pool);
+  assert.deepEqual((await materials.getBill(productId, db.pool))!.lines.map((line) => [line.name, line.quantity]), [["Tinta preta", 3], ["Tubo 50x30", 12.5]]);
+  assert.ok((await materials.listProductsForMaterials(db.pool)).some((product) => product.id === productId && product.materials === 2));
+  // Material em uso numa lista não sai.
+  await assert.rejects(() => materials.deleteMaterial(tube.id, db.pool), /está na lista de algum equipamento/);
+
+  // O que vai faltar: o que as ordens em andamento ainda levam, contra o estoque.
+  const needs = await materials.materialNeeds(db.pool);
+  const q = job.quantity;
+  assert.deepEqual(needs.needs.map((need) => [need.name, need.needed, need.stock, need.missing, need.orders]).sort(), [["Tinta preta", 3 * q, 16, Math.max(0, 3 * q - 16), 1], ["Tubo 50x30", 12.5 * q, 100, Math.max(0, 12.5 * q - 100), 1]]);
+  assert.equal(needs.withoutList, jobs.length - 1);
+
+  // Pronta: o estoque baixa pela lista, uma vez só. Voltou de pronta: devolve. Pronta de novo: baixa de novo.
+  await production.moveProductionOrder(job.id, done.id, WHO, db.pool);
+  await materials.settleConsumption(job.id, WHO, db.pool);
+  const stockOf = async () => Object.fromEntries((await materials.listMaterials(db.pool)).map((row) => [row.name, row.stock]));
+  assert.deepEqual(await stockOf(), { "Tinta preta": 16 - 3 * q, "Tubo 50x30": 100 - 12.5 * q });
+  assert.deepEqual((await materials.listMaterialMoves(tube.id, db.pool))[0], { kind: "consumo", quantity: -12.5 * q, note: null, productionNumber: job.number, at: (await materials.listMaterialMoves(tube.id, db.pool))[0].at, by: WHO });
+  assert.ok(!(await materials.materialNeeds(db.pool)).needs.some((need) => need.name === "Tubo 50x30"));
+  await production.moveProductionOrder(job.id, stages[1].id, WHO, db.pool);
+  assert.deepEqual(await stockOf(), { "Tinta preta": 16, "Tubo 50x30": 100 });
+  assert.equal((await materials.listMaterialMoves(tube.id, db.pool))[0].kind, "estorno");
+  await production.moveProductionOrder(job.id, done.id, WHO, db.pool);
+  // A lista mudou depois de pronta: acertar leva só a diferença.
+  await materials.setBillLine(productId, tube.id, 10, WHO, db.pool);
+  await materials.settleConsumption(job.id, WHO, db.pool);
+  assert.deepEqual(await stockOf(), { "Tinta preta": 16 - 3 * q, "Tubo 50x30": 100 - 10 * q });
+
+  // Tirar a ordem da produção devolve o que ela levou, e o registro fica sem a ordem.
+  for (const row of jobs) await production.deleteProductionOrder(row.id, db.pool, WHO);
+  assert.deepEqual(await stockOf(), { "Tinta preta": 16, "Tubo 50x30": 100 });
+  assert.equal((await db.pool.query("SELECT count(*) FROM material_moves WHERE production_order_id IS NOT NULL")).rows[0].count, "0");
+  // A soma dos lançamentos é sempre o saldo.
+  const sums = await db.pool.query("SELECT m.stock, COALESCE(sum(v.quantity), 0) AS moved FROM materials m LEFT JOIN material_moves v ON v.material_id = m.id GROUP BY m.id");
+  for (const row of sums.rows) assert.equal(Number(row.stock), Number(row.moved));
+
+  await materials.saveMaterial(tube.id, { name: "Tubo 50x30 2 mm", unit: "m", minimum: 30 }, WHO, db.pool);
+  await materials.removeBillLine(productId, tube.id, db.pool);
+  await materials.removeBillLine(productId, paint.id, db.pool);
+  await assert.rejects(() => materials.removeBillLine(productId, paint.id, db.pool), /não está na lista/);
+  [paint, tube] = (await materials.listMaterials(db.pool)).sort((a, b) => a.name.localeCompare(b.name));
+  assert.deepEqual([tube.name, tube.minimum, tube.stock], ["Tubo 50x30 2 mm", 30, 100]);
+  await materials.deleteMaterial(tube.id, db.pool);
+  await materials.deleteMaterial(paint.id, db.pool);
+  assert.deepEqual(await materials.listMaterials(db.pool), []);
+});
+
+test("apontamento: uma pessoa trabalha em uma ordem por vez, as horas somam por etapa, pessoa e máquina, e ordem pronta não recebe hora", { skip }, async () => {
+  const production = await import("@/lib/db/production");
+  const work = await import("@/lib/db/work");
+  const ANA = { email: "ana@fabrica.test", name: "Ana" };
+  const BETO = { email: "beto@fabrica.test", name: "Beto" };
+  assert.deepEqual([work.showMinutes(45), work.showMinutes(60), work.showMinutes(125)], ["45 min", "1 h 00 min", "2 h 05 min"]);
+
+  await assert.rejects(() => work.saveMachine(null, { name: "x", active: true }, ANA.email, db.pool), /de 2 a 60 letras/);
+  await work.saveMachine(null, { name: " Serra  1 ", active: true }, ANA.email, db.pool);
+  await work.saveMachine(null, { name: "Cabine de pintura", active: true }, ANA.email, db.pool);
+  await assert.rejects(() => work.saveMachine(null, { name: "serra 1", active: true }, ANA.email, db.pool), /Já existe uma máquina/);
+  const [booth, saw] = (await work.listMachines(db.pool)).sort((a, b) => a.name.localeCompare(b.name));
+  assert.equal(saw.name, "Serra 1");
+
+  const number = (await production.listOrdersToProduce(db.pool))[0].number;
+  await production.sendToProduction(number, ANA.email, db.pool);
+  const stages = await production.listProductionStages(db.pool);
+  const jobs = (await production.listProductionOrders(stages[0].id, db.pool)).filter((order) => order.orderNumber === number);
+  const [first, second] = [jobs[0], jobs[1] ?? jobs[0]];
+  const at = (minutes: number) => new Date(Date.parse("2026-10-09T12:00:00Z") + minutes * 60_000);
+
+  await assert.rejects(() => work.stopWork(ANA.email, at(0), db.pool), /nenhuma ordem em andamento/);
+  await assert.rejects(() => work.startWork(first.id, 999_999, ANA, at(0), db.pool), /Máquina não encontrada/);
+  await work.startWork(first.id, saw.id, ANA, at(0), db.pool);
+  await work.startWork(first.id, null, BETO, at(10), db.pool);
+  // A Ana começa em outra ordem (ou de novo): o que estava aberto fecha na mesma hora.
+  await production.moveProductionOrder(second.id, stages[1].id, ANA.email, db.pool);
+  await work.startWork(second.id, booth.id, ANA, at(90), db.pool);
+  await work.stopWork(BETO.email, at(40), db.pool);
+  await work.stopWork(ANA.email, at(120), db.pool);
+  const noted = await work.listWork(first.id, at(200), db.pool);
+  if (first.id !== second.id) assert.deepEqual(noted.map((period) => [period.workerName, period.stageName, period.machine, period.minutes, period.endedAt !== null]), [["Beto", stages[0].name, null, 30, true], ["Ana", stages[0].name, "Serra 1", 90, true]]);
+  // Um período em aberto conta até agora.
+  await work.startWork(first.id, null, BETO, at(200), db.pool);
+  assert.equal((await work.listWork(first.id, at(215), db.pool))[0].minutes, 15);
+
+  const report = await work.hoursReport(at(-60), at(215), db.pool);
+  assert.equal(report.total, 90 + 30 + 30 + 15);
+  assert.equal(report.open, 1);
+  assert.deepEqual(report.byWorker, [{ label: "Ana", minutes: 120, periods: 2 }, { label: "Beto", minutes: 45, periods: 2 }]);
+  assert.deepEqual(report.byMachine.map((row) => [row.label, row.minutes]), [["Serra 1", 90], ["Sem máquina", 45], ["Cabine de pintura", 30]]);
+  assert.equal(report.byStage.reduce((sum, row) => sum + row.minutes, 0), report.total);
+  // Fora do período, nada.
+  assert.equal((await work.hoursReport(at(1000), at(1100), db.pool)).total, 0);
+
+  // Ordem pronta não recebe hora; máquina com hora apontada não sai, só fica fora de uso.
+  await work.stopWork(BETO.email, at(215), db.pool);
+  await production.moveProductionOrder(first.id, stages.find((stage) => stage.kind === "pronta")!.id, ANA.email, db.pool);
+  await assert.rejects(() => work.startWork(first.id, null, ANA, at(300), db.pool), /ainda não está pronta/);
+  await assert.rejects(() => work.deleteMachine(saw.id, db.pool), /Há horas apontadas/);
+  await work.saveMachine(saw.id, { name: "Serra 1", active: false }, ANA.email, db.pool);
+  assert.equal((await work.listMachines(db.pool)).at(-1)!.active, false);
+  // Remover um período apontado por engano; tirar a ordem da produção leva as horas dela.
+  const wrong = (await work.listWork(first.id, at(300), db.pool))[0];
+  await work.deleteWork(wrong.id, first.id, db.pool);
+  await assert.rejects(() => work.deleteWork(wrong.id, first.id, db.pool), /não encontrado/);
+  for (const row of jobs) await production.deleteProductionOrder(row.id, db.pool, ANA.email);
+  assert.equal((await db.pool.query("SELECT count(*) FROM production_work")).rows[0].count, "0");
+  await work.deleteMachine(saw.id, db.pool);
+  await work.deleteMachine(booth.id, db.pool);
+});
