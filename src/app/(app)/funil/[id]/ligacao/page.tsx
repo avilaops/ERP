@@ -6,8 +6,10 @@ import { seesAllOrders } from "@/lib/auth/permissions";
 import { getOpportunity, opportunityParty } from "@/lib/db/funnel";
 import { CALL_OUTCOMES, dialable } from "@/lib/db/meetings";
 import { tenantDb } from "@/lib/db/pool";
+import { callPhoneOf, loadVoiceSettings } from "@/lib/db/voice";
+import { voiceConfig } from "@/lib/voice/call";
 import { ActionForm } from "../../../pedidos/ActionForm";
-import { logCallAction } from "../../actions";
+import { logCallAction, systemCallAction } from "../../actions";
 
 export const metadata = { title: "Registrar ligação · ERP" };
 export const dynamic = "force-dynamic";
@@ -21,6 +23,9 @@ export default async function LigacaoPage({ params }: { params: Promise<{ id: st
   // An opportunity of another seller answers as one that does not exist.
   if (!item) notFound();
   const number = dialable(item.phone);
+  // The call by the system: only with a provider on the server and the company having turned it on.
+  const bySystem = number !== null && voiceConfig() !== null && (await loadVoiceSettings(conn)).enabled;
+  const myPhone = bySystem ? await callPhoneOf(session.email, conn) : null;
 
   return (
     <div className="mx-auto max-w-xl">
@@ -36,6 +41,20 @@ export default async function LigacaoPage({ params }: { params: Promise<{ id: st
             Ligar agora
           </a>
         </p>
+      )}
+      {bySystem && (
+        <ActionForm action={systemCallAction} className={`${CARD} mt-3 flex flex-wrap items-end gap-2 p-3`}>
+          <input type="hidden" name="id" value={item.id} />
+          <div className="min-w-40 flex-1">
+            <label htmlFor="myPhone" className={LABEL}>
+              Seu telefone (o sistema liga para você e conecta com o cliente)
+            </label>
+            <input id="myPhone" name="myPhone" type="tel" inputMode="tel" defaultValue={myPhone ? myPhone.slice(2) : ""} autoComplete="tel" className={INPUT} />
+          </div>
+          <button type="submit" className={SECONDARY}>
+            Ligar pelo sistema
+          </button>
+        </ActionForm>
       )}
       <ActionForm action={logCallAction} className={`${CARD} mt-3 flex flex-col gap-3 p-3`}>
         <input type="hidden" name="id" value={item.id} />

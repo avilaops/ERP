@@ -15,7 +15,9 @@ import { MessageError, sendOpportunityMail } from "@/lib/db/messages";
 import { tenantDb } from "@/lib/db/pool";
 import { convertProspect, deleteProspect, importProspects, ProspectError, setProspectDiscarded } from "@/lib/db/prospects";
 import { lookupCnpj } from "@/lib/cnpj";
+import { callOpportunity } from "@/lib/db/voice";
 import { sendWhatsapp } from "@/lib/db/whatsapp";
+import { startCall, VoiceError, voiceConfig } from "@/lib/voice/call";
 import { WhatsappError, whatsappSender } from "@/lib/whatsapp/api";
 import { vaultKey } from "@/lib/fiscal/certificate";
 import { MailError } from "@/lib/mail/message";
@@ -34,7 +36,7 @@ const reader = (formData: FormData) => (key: string) => {
 const whole = (value: string) => (/^[1-9]\d{0,8}$/.test(value.trim()) ? Number(value.trim()) : null);
 
 function problem(error: unknown): ActionState {
-  if (error instanceof FunnelError || error instanceof MessageError || error instanceof CadenceError || error instanceof MeetingError || error instanceof AssistError || error instanceof WhatsappError || error instanceof ProspectError || error instanceof MailError) return { error: error.message };
+  if (error instanceof FunnelError || error instanceof MessageError || error instanceof CadenceError || error instanceof MeetingError || error instanceof AssistError || error instanceof WhatsappError || error instanceof ProspectError || error instanceof VoiceError || error instanceof MailError) return { error: error.message };
   console.error("[funil] falha ao gravar:", error instanceof Error ? error.message : error);
   return { error: FAILED };
 }
@@ -393,4 +395,20 @@ export async function prospectAction(_previous: ActionState, formData: FormData)
     redirect(`${HERE}/${opened}`);
   }
   return { error: null, notice: what === "descartar" ? "Empresa descartada." : what === "voltar" ? "Empresa de volta à lista." : "Empresa removida." };
+}
+
+/** "Ligar pelo sistema": the provider rings who asks and connects to the contact of the opportunity. */
+export async function systemCallAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
+  const session = await requirePermission("funil");
+  const conn = tenantDb(session.tenant.slug);
+  const read = reader(formData);
+  const id = whole(read("id"));
+  if (id === null) return { error: "Oportunidade não encontrada." };
+  try {
+    await callOpportunity(id, read("myPhone"), { email: session.email, name: session.name }, { ownerEmail: seesAllOrders(session) ? null : session.email }, { config: voiceConfig(), start: startCall, now: new Date() }, conn);
+  } catch (error) {
+    return problem(error);
+  }
+  revalidatePath(`${HERE}/${id}`);
+  return { error: null, notice: "O seu telefone vai tocar. Ao atender, o sistema conecta com o cliente." };
 }

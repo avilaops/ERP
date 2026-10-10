@@ -27,6 +27,7 @@ Todas descritas em `.env.example`. Nenhuma tem valor real no repositório.
 | `ERP_AUTH_CLIENT_SECRET` (e, se não forem os padrões, `ERP_AUTH_CLIENT_ID` = `erp` e `ERP_AUTH_URL` = `https://auth.avilaops.com`) | Credencial do ERP como integração do login central (`auth.avilaops.com/admin/integracoes`, app ERP). Com ela, "Convidar pessoa" cria a conta da pessoa no login central e manda por e-mail o endereço para ela criar a senha (vale 7 dias, só para conta nova) | Opcional; sem ela a pessoa é cadastrada, nenhum e-mail sai e a tela diz que o convite não foi enviado |
 | `ERP_TWILIO_ACCOUNT_SID`, `ERP_TWILIO_AUTH_TOKEN`, `ERP_TWILIO_FROM` | Conta do Twilio que envia por SMS o segundo código da assinatura do contrato (remetente em `ERP_TWILIO_FROM`, no formato `+5511…` ou o identificador do serviço) | Opcionais; sem as três o segundo código não existe, e a opção em Parâmetros → Contrato avisa que o serviço não está configurado |
 | `ERP_ROTINAS` | `0` desliga a rotina de fundo (lembretes automáticos, passos das cadências e reenvio de avisos), que roda a cada 5 minutos dentro do próprio servidor do ERP | Opcional; ligada por padrão em produção, nunca roda em desenvolvimento |
+| `ERP_TWILIO_VOICE_FROM` | Número de voz do Twilio (`+5511…`) de onde saem as ligações pelo sistema; usa a mesma conta de `ERP_TWILIO_ACCOUNT_SID` e `ERP_TWILIO_AUTH_TOKEN` | Opcional; sem ele a ligação pelo sistema não aparece, e Parâmetros → Telefonia avisa que o serviço não foi ligado |
 | `ERP_ANTHROPIC_API_KEY`, `ERP_AI_MODEL` | Chave do serviço de inteligência artificial que o Assistente usa, e o modelo (padrão `claude-sonnet-5-5`) | Opcionais; sem a chave o Assistente não aparece no funil, e a tela de Parâmetros avisa que o serviço não foi ligado. A chave só é lida em `src/lib/ai/client.ts` e nunca vai a log |
 | `ERP_LOCAL_LOGIN` | `1` liga o login local de teste (`/dev/login`) | Ignorada: o login local não existe em produção |
 | `ERP_TEST_DATABASE_URL` | Banco dos testes; o nome tem de terminar em `_test` | Não se usa |
@@ -295,3 +296,11 @@ Se a migração falhar, a versão antiga continua no ar.
 - **Trazer empresas**: cola-se até 20 CNPJs por vez; cada um é consultado no cadastro público da Receita (BrasilAPI, a mesma consulta do cadastro de clientes) e a empresa entra em `prospects` com razão social, atividade, porte, cidade, telefone e e-mail do cadastro. Só dados da empresa: nenhum sócio. Trazer de novo atualiza os dados e mantém o estado.
 - **Trabalhar a lista**: filtro por nome, atividade, CNPJ, cidade e estado. "Virar oportunidade" cria a oportunidade na primeira etapa, de quem clicou, com origem "Prospecção" (empresa que já é cliente entra como o cliente do cadastro) e só acontece uma vez; "Descartar" tira da frente; "Remover" apaga da lista. Excluir a oportunidade devolve a empresa à lista.
 - **O que não tem**: a base inteira da Receita com busca por ramo e região. Ela não cabe nos servidores atuais, e o endereço dos arquivos públicos que eu conhecia respondeu "não encontrado" em 09/10/2026; a carga em massa fica para quando houver servidor e o endereço atual for confirmado.
+
+## Telefonia (ligação pelo sistema)
+
+- **Onde**: Parâmetros → Telefonia liga e desliga por empresa (desligado por padrão) e define o limite de ligações por mês (300 por padrão, tabela `voice_settings`). Com o servidor configurado e a empresa ligada, a tela "Registrar ligação" da oportunidade ganha "Ligar pelo sistema".
+- **Como funciona**: o provedor (Twilio) liga para o telefone que o vendedor informa e, quando ele atende, conecta com o telefone da oportunidade; o cliente vê o número da empresa. O telefone do vendedor fica lembrado em `users.call_phone`.
+- **Registro**: cada ligação pedida fica em `voice_calls` (é o que conta o limite) e como atividade feita na oportunidade. Nenhuma ligação é gravada.
+- **O que não tem**: gravação, transcrição e duração da chamada. Nunca foi testada contra o provedor de verdade: falta a conta.
+

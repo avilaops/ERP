@@ -110,6 +110,10 @@ export default async function ParametrosPage({ searchParams }: { searchParams: P
           Etapas da produção
         </Link>
         {" · "}
+        <Link href="/parametros/telefonia" className="font-medium text-brand underline">
+          Telefonia
+        </Link>
+        {" · "}
         <Link href="/parametros/automacoes" className="font-medium text-brand underline">
           Lembretes automáticos
         </Link>
