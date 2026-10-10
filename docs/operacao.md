@@ -288,3 +288,10 @@ Se a migração falhar, a versão antiga continua no ar.
 - **Histórico**: cada passo fica em `production_moves`, com quem moveu e o nome da etapa na hora.
 - **O que não entra**: preço, custo e margem. A ordem só tem o equipamento, a quantidade, o cliente, o prazo e as observações.
 - **Trava**: pedido com ordem de produção não pode ser excluído. "Tirar da produção" remove a ordem e o histórico; o pedido volta a esperar.
+
+## Prospecção
+
+- **Onde**: Funil → Prospecção, para quem tem o Funil. A lista é de toda a equipe, como o cadastro de clientes.
+- **Trazer empresas**: cola-se até 20 CNPJs por vez; cada um é consultado no cadastro público da Receita (BrasilAPI, a mesma consulta do cadastro de clientes) e a empresa entra em `prospects` com razão social, atividade, porte, cidade, telefone e e-mail do cadastro. Só dados da empresa: nenhum sócio. Trazer de novo atualiza os dados e mantém o estado.
+- **Trabalhar a lista**: filtro por nome, atividade, CNPJ, cidade e estado. "Virar oportunidade" cria a oportunidade na primeira etapa, de quem clicou, com origem "Prospecção" (empresa que já é cliente entra como o cliente do cadastro) e só acontece uma vez; "Descartar" tira da frente; "Remover" apaga da lista. Excluir a oportunidade devolve a empresa à lista.
+- **O que não tem**: a base inteira da Receita com busca por ramo e região. Ela não cabe nos servidores atuais, e o endereço dos arquivos públicos que eu conhecia respondeu "não encontrado" em 09/10/2026; a carga em massa fica para quando houver servidor e o endereço atual for confirmado.

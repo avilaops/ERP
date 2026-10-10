@@ -8,7 +8,10 @@ import { TENANT_SLUG } from "@/lib/auth/tenants";
  * the whole key is ever stored.
  */
 export function newApiKey(tenant: string): { key: string; prefix: string; hash: string } {
-  const key = `erp_${tenant}_${randomBytes(32).toString("base64url")}`;
+  // The secret never starts with "_": that would leave two ways of reading where the name of the company ends.
+  let secret = randomBytes(32).toString("base64url");
+  while (secret.startsWith("_")) secret = randomBytes(32).toString("base64url");
+  const key = `erp_${tenant}_${secret}`;
   return { key, prefix: key.slice(0, 5 + tenant.length + 6), hash: hashApiKey(key) };
 }
 
@@ -16,8 +19,10 @@ export const hashApiKey = (key: string) => createHash("sha256").update(`api:${ke
 
 /** The company a key says it is of, or `null` for what is not a key. */
 export function tenantOfKey(key: string): string | null {
-  const match = /^erp_([a-z][a-z0-9_]{1,30})_[A-Za-z0-9_-]{43}$/.exec(key);
-  return match && TENANT_SLUG.test(match[1]) ? match[1] : null;
+  // Read from the end: the secret is the last 43 characters, and what is before its "_" is the company. One reading only.
+  if (!/^erp_[a-z][a-z0-9_]{1,30}_[A-Za-z0-9-][A-Za-z0-9_-]{42}$/.test(key)) return null;
+  const tenant = key.slice(4, -44);
+  return TENANT_SLUG.test(tenant) ? tenant : null;
 }
 
 /** A new secret to sign the notices of one address. */

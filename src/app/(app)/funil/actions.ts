@@ -13,6 +13,8 @@ import { CadenceError, startCadence, stopCadence } from "@/lib/db/cadences";
 import { cancelMeeting, deleteMeeting, logCall, MeetingError, saveMeeting } from "@/lib/db/meetings";
 import { MessageError, sendOpportunityMail } from "@/lib/db/messages";
 import { tenantDb } from "@/lib/db/pool";
+import { convertProspect, deleteProspect, importProspects, ProspectError, setProspectDiscarded } from "@/lib/db/prospects";
+import { lookupCnpj } from "@/lib/cnpj";
 import { sendWhatsapp } from "@/lib/db/whatsapp";
 import { WhatsappError, whatsappSender } from "@/lib/whatsapp/api";
 import { vaultKey } from "@/lib/fiscal/certificate";
@@ -32,7 +34,7 @@ const reader = (formData: FormData) => (key: string) => {
 const whole = (value: string) => (/^[1-9]\d{0,8}$/.test(value.trim()) ? Number(value.trim()) : null);
 
 function problem(error: unknown): ActionState {
-  if (error instanceof FunnelError || error instanceof MessageError || error instanceof CadenceError || error instanceof MeetingError || error instanceof AssistError || error instanceof WhatsappError || error instanceof MailError) return { error: error.message };
+  if (error instanceof FunnelError || error instanceof MessageError || error instanceof CadenceError || error instanceof MeetingError || error instanceof AssistError || error instanceof WhatsappError || error instanceof ProspectError || error instanceof MailError) return { error: error.message };
   console.error("[funil] falha ao gravar:", error instanceof Error ? error.message : error);
   return { error: FAILED };
 }
@@ -346,4 +348,49 @@ export async function sendWhatsappAction(_previous: ActionState, formData: FormD
   revalidatePath(`${HERE}/${id}/whatsapp`);
   if (result.status === "falhou") return { error: result.detail ?? "O WhatsApp recusou a mensagem." };
   return { error: null, notice: "Mensagem enviada." };
+}
+
+/** "Buscar na Receita e guardar": the CNPJs pasted, each looked up in the public register and kept in the list. */
+export async function importProspectsAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
+  const session = await requirePermission("funil");
+  const conn = tenantDb(session.tenant.slug);
+  let results;
+  try {
+    results = await importProspects(reader(formData)("cnpjs"), session.email, (cnpj) => lookupCnpj(cnpj), conn);
+  } catch (error) {
+    return problem(error);
+  }
+  revalidatePath(`${HERE}/prospeccao`);
+  const count = (outcome: string) => results.filter((result) => result.outcome === outcome).length;
+  const refused = results.filter((result) => result.outcome === "recusado").map((result) => `${result.cnpj}: ${result.detail}`);
+  const summary = `${count("novo")} ${count("novo") === 1 ? "empresa nova" : "empresas novas"}, ${count("atualizado")} já na lista.`;
+  // "Nada foi gravado" would be false when part of the list went in: only a list with nothing kept is an error.
+  if (refused.length === results.length) return { error: `Nenhuma empresa entrou. ${refused.join(" ")}`.slice(0, 900) };
+  return { error: null, notice: refused.length > 0 ? `${summary} Não entraram: ${refused.join(" ")}`.slice(0, 900) : summary };
+}
+
+/** The buttons of one company of the list: "Virar oportunidade" (opens it), "Descartar", "Voltar para a lista" and "Remover". */
+export async function prospectAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
+  const session = await requirePermission("funil");
+  const conn = tenantDb(session.tenant.slug);
+  const read = reader(formData);
+  const cnpj = read("cnpj").trim();
+  // "Remover" asks once more, and its confirmation is a plain submit: with no button named, it is the removal.
+  const what = read("what") || "remover";
+  if (!/^[0-9A-Z]{14}$/.test(cnpj)) return { error: "Empresa não encontrada." };
+  let opened: number | null = null;
+  try {
+    if (what === "virar") opened = await convertProspect(cnpj, { email: session.email, name: session.name }, conn);
+    else if (what === "descartar" || what === "voltar") await setProspectDiscarded(cnpj, what === "descartar", session.email, conn);
+    else await deleteProspect(cnpj, conn);
+  } catch (error) {
+    return problem(error);
+  }
+  revalidatePath(`${HERE}/prospeccao`);
+  if (opened !== null) {
+    await notify("oportunidade.criada", { id: opened, titulo: "Prospecção", empresa: null, origem: "Prospecção", responsavel: session.name }, conn);
+    revalidatePath(HERE);
+    redirect(`${HERE}/${opened}`);
+  }
+  return { error: null, notice: what === "descartar" ? "Empresa descartada." : what === "voltar" ? "Empresa de volta à lista." : "Empresa removida." };
 }

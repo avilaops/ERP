@@ -77,6 +77,10 @@ export default async function FunilPage({ searchParams }: { searchParams: Promis
         hint={
           <>
             {openCount} em andamento · {showMoney(openTotal)}
+            {" · "}
+            <Link href={`${ITEM.href}/prospeccao`} className={`${QUIET_LINK} md:hidden`}>
+              Prospecção
+            </Link>
             {conversations && (
               <>
                 {" · "}
@@ -98,6 +102,9 @@ export default async function FunilPage({ searchParams }: { searchParams: Promis
         }
         actions={
           <>
+            <Link href={`${ITEM.href}/prospeccao`} className={`${SECONDARY} max-md:hidden`}>
+              Prospecção
+            </Link>
             <Link href={`${ITEM.href}/painel`} className={SECONDARY}>
               Painel
             </Link>

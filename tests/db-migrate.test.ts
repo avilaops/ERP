@@ -82,6 +82,7 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "0048_assistente.sql",
     "0049_whatsapp.sql",
     "0050_producao.sql",
+    "0051_prospeccao.sql",
   ]);
 
   const second = await withClient((client) => migrate(client, MIGRATIONS_DIR));
@@ -156,6 +157,7 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "production_orders",
     "production_stages",
     "products",
+    "prospects",
     "receipts",
     "receivables",
     "refund_requests",

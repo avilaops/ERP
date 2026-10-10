@@ -25,6 +25,13 @@ test("chave da API: leva a empresa, só o resumo é guardado, e o formato errado
   assert.equal(made.hash, hashApiKey(made.key));
   assert.ok(!made.hash.includes(made.key.slice(-20)) && made.key.startsWith(made.prefix) && made.prefix.length < 20);
   assert.notEqual(newApiKey("ludus").key, made.key);
+  // Mil chaves: toda uma lê a empresa certa, e nenhuma vira chave com uma letra a mais ou a menos.
+  for (let count = 0; count < 1000; count += 1) {
+    const { key } = newApiKey("a_b");
+    assert.equal(tenantOfKey(key), "a_b", key);
+    assert.equal(tenantOfKey(`${key}x`), null, key);
+    assert.equal(tenantOfKey(key.slice(0, -1)), null, key);
+  }
   for (const junk of ["", "erp_ludus_curta", "erp__" + "a".repeat(43), "erp_LUDUS_" + "a".repeat(43), "outra_ludus_" + "a".repeat(43), `${made.key}x`, "erp_ludus; drop_" + "a".repeat(43)]) assert.equal(tenantOfKey(junk), null, junk);
 });
 
