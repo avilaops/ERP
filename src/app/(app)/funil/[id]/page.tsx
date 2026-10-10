@@ -11,9 +11,10 @@ import { listOrders } from "@/lib/db/orders";
 import { tenantDb } from "@/lib/db/pool";
 import { isoDate, showDateTime, showMoney } from "@/lib/format";
 import { dueLabel } from "@/lib/funnel-view";
+import { dialable, listMeetings } from "@/lib/db/meetings";
 import { ActionForm } from "../../pedidos/ActionForm";
 import { ConfirmButton } from "../../pedidos/ConfirmButton";
-import { addActivityAction, changeActivityAction, changeCadenceOfOpportunityAction, deleteOpportunityAction, linkOrderAction, moveOpportunityAction, saveOpportunityAction, sendMessageAction } from "../actions";
+import { addActivityAction, changeActivityAction, changeCadenceOfOpportunityAction, changeMeetingAction, deleteOpportunityAction, linkOrderAction, moveOpportunityAction, saveOpportunityAction, sendMessageAction } from "../actions";
 import { OpportunityFields } from "../OpportunityFields";
 
 export const metadata = { title: "Oportunidade · ERP" };
@@ -115,8 +116,67 @@ export default async function OportunidadePage({ params, searchParams }: { param
 
   async function Activities() {
     const activities = await listActivities(item!.id, conn);
+    const meetings = await listMeetings(item!.id, conn);
+    const number = dialable(item!.phone);
+    const QUICK = "inline-flex min-h-[var(--control)] items-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium hover:bg-slate-50";
     return (
       <section className="mt-3" aria-label="Atividades">
+        <nav aria-label="Contato" className="mb-2 flex flex-wrap gap-2">
+          {number && (
+            <>
+              <a href={`tel:+${number}`} className={QUICK}>
+                Ligar
+              </a>
+              <a href={`https://wa.me/${number}`} target="_blank" rel="noreferrer" className={QUICK}>
+                WhatsApp
+              </a>
+            </>
+          )}
+          <Link href={`${HERE}/${item!.id}/ligacao`} className={QUICK}>
+            Registrar ligação
+          </Link>
+          <Link href={`${HERE}/${item!.id}/reuniao`} className={QUICK}>
+            Agendar reunião
+          </Link>
+        </nav>
+        {meetings.length > 0 && (
+          <ul className={`${CARD} mb-2 divide-y divide-slate-200`} aria-label="Reuniões">
+            {meetings.map((meeting) => (
+              <li key={meeting.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
+                <p className="min-w-0 basis-full sm:flex-1 sm:basis-0">
+                  <span className={`block leading-snug ${meeting.status === "cancelada" ? "text-slate-500 line-through" : "font-medium"}`}>{meeting.title}</span>
+                  <span className="block text-xs text-slate-500">
+                    {meeting.day.split("-").reverse().join("/")} às {meeting.time} · {meeting.minutes} min
+                    {meeting.place ? ` · ${meeting.place}` : ""}
+                    {meeting.invited ? ` · convite para ${meeting.invited}` : ""}
+                    {meeting.status === "cancelada" ? " · cancelada" : ""}
+                  </span>
+                </p>
+                {meeting.status === "agendada" && meeting.link && (
+                  <a href={meeting.link} target="_blank" rel="noreferrer" className={SECONDARY}>
+                    Entrar
+                  </a>
+                )}
+                {meeting.status === "agendada" && (
+                  <Link href={`${HERE}/${item!.id}/reuniao?reuniao=${meeting.id}`} className={SECONDARY}>
+                    Remarcar
+                  </Link>
+                )}
+                {/* A cancelled meeting is another form: the confirmation asked for the cancelling does not stay open for the removal. */}
+                <ActionForm key={meeting.status} action={changeMeetingAction}>
+                  {hidden}
+                  <input type="hidden" name="meetingId" value={meeting.id} />
+                  <input type="hidden" name="what" value={meeting.status === "agendada" ? "cancelar" : "remover"} />
+                  <ConfirmButton
+                    label={meeting.status === "agendada" ? "Cancelar" : "Remover"}
+                    confirmLabel={meeting.status === "agendada" ? "Confirmar: cancelar a reunião" : "Confirmar: remover"}
+                    className="inline-flex min-h-[var(--control)] items-center rounded-lg px-2 text-sm text-red-700 hover:bg-red-50"
+                  />
+                </ActionForm>
+              </li>
+            ))}
+          </ul>
+        )}
         <ActionForm action={addActivityAction} className={`${CARD} grid grid-cols-2 gap-2 p-3 sm:grid-cols-[9rem_minmax(0,1fr)_10rem_auto] sm:items-end`}>
           {hidden}
           <div>

@@ -225,6 +225,7 @@ export async function moveOpportunity(id: number, stageId: number, lostReason: s
 export async function deleteOpportunity(id: number, scope: FunnelScope, conn: Queryable): Promise<void> {
   const { rows } = await conn.query(
     `WITH target AS (SELECT id FROM opportunities WHERE id = $1 AND ($2::text IS NULL OR owner_email = $2)),
+          met AS (DELETE FROM opportunity_meetings t USING target WHERE t.opportunity_id = target.id),
           noted AS (DELETE FROM opportunity_activities a USING target WHERE a.opportunity_id = target.id),
           walked AS (DELETE FROM opportunity_moves m USING target WHERE m.opportunity_id = target.id),
           written AS (DELETE FROM opportunity_messages g USING target WHERE g.opportunity_id = target.id),
@@ -310,7 +311,9 @@ export async function setActivityDone(activityId: number, done: boolean, who: st
 
 export async function deleteActivity(activityId: number, scope: FunnelScope, conn: Queryable): Promise<void> {
   const { rows } = await conn.query(
-    "DELETE FROM opportunity_activities a WHERE a.id = $1 AND ($2::text IS NULL OR COALESCE((SELECT o.owner_email FROM opportunities o WHERE o.id = a.opportunity_id), a.owner_email) = $2) RETURNING a.id",
+    `WITH target AS (SELECT a.id FROM opportunity_activities a WHERE a.id = $1 AND ($2::text IS NULL OR COALESCE((SELECT o.owner_email FROM opportunities o WHERE o.id = a.opportunity_id), a.owner_email) = $2)),
+          loose AS (UPDATE opportunity_meetings m SET activity_id = NULL FROM target WHERE m.activity_id = target.id)
+     DELETE FROM opportunity_activities a USING target WHERE a.id = target.id RETURNING a.id`,
     [activityId, scope.ownerEmail],
   );
   if (rows.length === 0) throw new FunnelError("Atividade não encontrada. Recarregue a página.");

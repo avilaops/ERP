@@ -8,6 +8,7 @@ import { menuItem, seesAllOrders } from "@/lib/auth/permissions";
 import { addActivity, createOpportunity, deleteActivity, deleteOpportunity, FunnelError, getOpportunity, linkOpportunityOrder, moveOpportunity, opportunityParty, setActivityDone, updateOpportunity } from "@/lib/db/funnel";
 import type { OpportunityInput } from "@/lib/db/funnel";
 import { CadenceError, startCadence, stopCadence } from "@/lib/db/cadences";
+import { cancelMeeting, deleteMeeting, logCall, MeetingError, saveMeeting } from "@/lib/db/meetings";
 import { MessageError, sendOpportunityMail } from "@/lib/db/messages";
 import { tenantDb } from "@/lib/db/pool";
 import { vaultKey } from "@/lib/fiscal/certificate";
@@ -27,7 +28,7 @@ const reader = (formData: FormData) => (key: string) => {
 const whole = (value: string) => (/^[1-9]\d{0,8}$/.test(value.trim()) ? Number(value.trim()) : null);
 
 function problem(error: unknown): ActionState {
-  if (error instanceof FunnelError || error instanceof MessageError || error instanceof CadenceError || error instanceof MailError) return { error: error.message };
+  if (error instanceof FunnelError || error instanceof MessageError || error instanceof CadenceError || error instanceof MeetingError || error instanceof MailError) return { error: error.message };
   console.error("[funil] falha ao gravar:", error instanceof Error ? error.message : error);
   return { error: FAILED };
 }
@@ -220,4 +221,76 @@ export async function changeCadenceOfOpportunityAction(_previous: ActionState, f
   }
   revalidatePath(`${HERE}/${id}`);
   return { error: null };
+}
+
+/** "Registrar ligação": the call that was just made, how it went, and when to call again. Goes back to the opportunity. */
+export async function logCallAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
+  const session = await requirePermission("funil");
+  const conn = tenantDb(session.tenant.slug);
+  const read = reader(formData);
+  const id = whole(read("id"));
+  if (id === null) return { error: "Oportunidade não encontrada." };
+  try {
+    await logCall(id, { outcome: read("outcome"), note: read("note"), againOn: read("againOn") || null }, session.email, { ownerEmail: seesAllOrders(session) ? null : session.email }, conn);
+  } catch (error) {
+    return problem(error);
+  }
+  revalidatePath(HERE);
+  redirect(`${HERE}/${id}`);
+}
+
+/** "Agendar reunião" and "Salvar" of a meeting: with the box ticked, the contact gets the invitation by e-mail. */
+export async function saveMeetingAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
+  const session = await requirePermission("funil");
+  const conn = tenantDb(session.tenant.slug);
+  const read = reader(formData);
+  const id = whole(read("id"));
+  if (id === null) return { error: "Oportunidade não encontrada." };
+  const minutes = read("minutes").trim();
+  let saved;
+  try {
+    saved = await saveMeeting(
+      whole(read("meetingId")),
+      id,
+      { title: read("title"), day: read("day"), time: read("time"), minutes: /^\d{2,3}$/.test(minutes) ? Number(minutes) : Number.NaN, link: read("link") || null, place: read("place") || null, invite: read("invite") === "sim" },
+      session.email,
+      { ownerEmail: seesAllOrders(session) ? null : session.email },
+      { company: session.tenant.name, now: new Date(), way: { env: process.env, key: () => vaultKey(process.env.ERP_CERT_KEY), send: sendMail } },
+      conn,
+    );
+  } catch (error) {
+    return problem(error);
+  }
+  revalidatePath(HERE);
+  revalidatePath(`${HERE}/${id}`);
+  // The meeting is kept even when the invitation did not go: the person reads why and stays to try again.
+  if (saved.invite.problem) return { error: `A reunião foi gravada, mas ${saved.invite.problem.charAt(0).toLowerCase()}${saved.invite.problem.slice(1)}` };
+  redirect(`${HERE}/${id}`);
+}
+
+/** "Cancelar reunião" (who was invited is told) and "Remover" of a cancelled one, by the button pressed. */
+export async function changeMeetingAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
+  const session = await requirePermission("funil");
+  const conn = tenantDb(session.tenant.slug);
+  const read = reader(formData);
+  const id = whole(read("id"));
+  const meetingId = whole(read("meetingId"));
+  if (id === null || meetingId === null) return { error: "Reunião não encontrada." };
+  const scope = { ownerEmail: seesAllOrders(session) ? null : session.email };
+  let notice: string;
+  try {
+    if (read("what") === "remover") {
+      await deleteMeeting(meetingId, id, scope, conn);
+      notice = "Reunião removida.";
+    } else {
+      const told = await cancelMeeting(meetingId, id, session.email, scope, { company: session.tenant.name, now: new Date(), way: { env: process.env, key: () => vaultKey(process.env.ERP_CERT_KEY), send: sendMail } }, conn);
+      if (told.problem) return { error: `A reunião foi cancelada, mas ${told.problem.charAt(0).toLowerCase()}${told.problem.slice(1)}` };
+      notice = told.sent ? `Reunião cancelada. ${told.sent} foi avisado.` : "Reunião cancelada.";
+    }
+  } catch (error) {
+    return problem(error);
+  }
+  revalidatePath(HERE);
+  revalidatePath(`${HERE}/${id}`);
+  return { error: null, notice };
 }

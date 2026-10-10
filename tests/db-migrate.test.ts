@@ -77,6 +77,7 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "0043_api_e_avisos.sql",
     "0044_mensagens_e_cadencias.sql",
     "0045_marketing.sql",
+    "0046_ligacoes_e_reunioes.sql",
   ]);
 
   const second = await withClient((client) => migrate(client, MIGRATIONS_DIR));
@@ -122,6 +123,7 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "opportunities",
     "opportunity_activities",
     "opportunity_cadences",
+    "opportunity_meetings",
     "opportunity_messages",
     "opportunity_moves",
     "order_approvals",
