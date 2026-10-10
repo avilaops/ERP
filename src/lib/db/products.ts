@@ -23,6 +23,8 @@ export type Product = {
   lineId: number;
   /** Whether there is a photo. The bytes never come with the product: see product-photos.ts. */
   hasPhoto: boolean;
+  /** NCM of the invoice, eight digits, or `null` while nobody filled it in. Edited on the screen of the equipment. */
+  ncm: string | null;
 };
 
 export type ProductInput = {
@@ -47,7 +49,7 @@ export type ProductPatch = Partial<ProductInput>;
 export class ProductError extends Error {}
 
 const COLUMNS =
-  "id, name, code, description, supplier_name, supplier_model, supplier_price_usd, advisory_cost, tax_credit, packaging, active, line_id, " +
+  "id, name, code, description, supplier_name, supplier_model, supplier_price_usd, advisory_cost, tax_credit, packaging, active, line_id, ncm, " +
   "EXISTS (SELECT 1 FROM product_photos WHERE product_photos.product_id = products.id) AS has_photo";
 
 const numberOrNull = (value: unknown) => (value === null ? null : Number(value));
@@ -70,6 +72,7 @@ function toProduct(row: Record<string, unknown>): Product {
     active: row.active === true,
     lineId: Number(row.line_id),
     hasPhoto: row.has_photo === true,
+    ncm: textOrNull(row.ncm),
   };
 }
 

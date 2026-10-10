@@ -14,6 +14,8 @@ export type ProductRowData = {
   hasPhoto: boolean;
   /** `DHZ · SM5001 · US$ 605`, or empty. */
   supplier: string;
+  /** `NCM 9506.91.00`, or `sem NCM` while the equipment has none. */
+  ncm: string;
   realCost: string;
   table: string;
   /** `null` when there is no table price. */
@@ -108,6 +110,7 @@ export function ProductRow({
                 </a>
               </div>
               {row.supplier && <span className="mt-1 block truncate text-xs text-slate-500">{row.supplier}</span>}
+              <span className="mt-0.5 block truncate text-xs text-slate-500">{row.ncm}</span>
             </div>
           </div>
         </td>

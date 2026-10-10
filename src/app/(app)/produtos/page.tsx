@@ -49,6 +49,9 @@ const COLUMNS = (cost: string): [string, string][] => [
   ["Desc. máx. na meta", "min-w-24"],
 ];
 
+/** `95069100` as the invoice and the tax table print it: `9506.91.00`. */
+const formatNcm = (ncm: string) => (/^\d{8}$/.test(ncm) ? `${ncm.slice(0, 4)}.${ncm.slice(4, 6)}.${ncm.slice(6)}` : ncm);
+
 /** Every figure of the row is calculated here, on the server, by the engine. */
 function toRow(product: Product, params: PricingParams): ProductRowData {
   const prices = hasCost(product)
@@ -65,6 +68,7 @@ function toRow(product: Product, params: PricingParams): ProductRowData {
     values: productToRow(product),
     hasPhoto: product.hasPhoto,
     supplier: supplierLine(product),
+    ncm: product.ncm ? `NCM ${formatNcm(product.ncm)}` : "sem NCM",
     realCost: prices ? money(prices.realCost) : NONE,
     table: prices ? money(prices.table) : NONE,
     tableWithIpi: prices ? money(prices.tableWithIpi) : null,
@@ -182,6 +186,7 @@ export default async function ProdutosPage({
                     <span className="min-w-0">
                       <span className="block truncate font-medium">{row.values.name}</span>
                       <span className="block truncate text-xs text-slate-500">{[row.values.code || "sem código", row.supplier].filter(Boolean).join(" · ")}</span>
+                      <span className="block truncate text-xs text-slate-500">{row.ncm}</span>
                     </span>
                     <span className="shrink-0 text-right">
                       <span className="block font-semibold">{row.tableWithIpi ?? "sem custo"}</span>

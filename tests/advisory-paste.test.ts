@@ -146,7 +146,7 @@ const product = (change: Partial<Product>): Product => ({
   taxCredit: 0.2811565,
   packaging: 0,
   active: true,
-  hasPhoto: false, lineId: 1,
+  hasPhoto: false, ncm: null, lineId: 1,
   ...change,
 });
 
