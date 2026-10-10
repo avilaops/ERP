@@ -5,14 +5,17 @@ import { runAutomations } from "@/lib/db/automations";
 import { runCadences } from "@/lib/db/cadences";
 import { runCampaigns } from "@/lib/db/campaigns";
 import { controlDb, provisionedCompanies } from "@/lib/db/control";
+import { receiveMail } from "@/lib/db/inbox";
 import { deliverPending } from "@/lib/db/integrations";
 import { tenantDb } from "@/lib/db/pool";
 import { vaultKey } from "@/lib/fiscal/certificate";
 import { isoDate } from "@/lib/format";
+import { fetchNewMail } from "@/lib/mail/imap";
 import { sendMail } from "@/lib/mail/smtp";
 
 /**
- * What the ERP does by itself, with nobody on a screen: the reminders of the
+ * What the ERP does by itself, with nobody on a screen: the answers of the
+ * customers read from the company's mailbox, the reminders of the
  * rules of each company, the steps of the cadences that fell due, the next messages of the campaigns
  * on their way and the notices to other systems that are still to be delivered. One company at a
  * time, each in its own database; a company that fails does not stop the others.
@@ -32,6 +35,8 @@ export async function runBackground(env: Record<string, string | undefined>, now
     const conn = tenantDb(tenant.slug);
     for (const [name, job] of [
       ["lembretes", () => runAutomations(isoDate(now), conn)],
+      // The answers come first: one read now stops the cadence before its next step leaves.
+      ["caixa de entrada", () => receiveMail(now, { key, fetch: fetchNewMail }, conn)],
       ["cadências", () => runCadences(tenant, now, { env, key, send: sendMail }, conn)],
       ["campanhas", () => runCampaigns(tenant, now, { env, key, send: sendMail }, conn)],
       ["avisos", () => deliverPending(key, now, conn)],

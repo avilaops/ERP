@@ -253,3 +253,11 @@ Se a migração falhar, a versão antiga continua no ar.
 
 - **Onde**: ficha do cliente → Histórico (`/clientes/<id>/historico`). Do mais novo ao mais antigo: pedidos (criado, fechado, reaberto, perdido), contratos (enviado, assinado, recusado), notas fiscais e seus e-mails, e do funil as oportunidades, o que foi feito nelas, os e-mails e as reuniões.
 - **Alcance**: o cadastro do cliente é de toda a equipe, mas as vendas são de cada vendedor; o vendedor lê só os próprios pedidos e oportunidades. Recebimentos aparecem só para quem tem a tela Recebimentos. Nenhum custo entra aqui.
+
+## E-mail recebido (respostas dos clientes)
+
+- **Onde**: Parâmetros → E-mail das notas → "Receber as respostas dos clientes". A empresa informa servidor de entrada (IMAP), porta (993), usuário e senha; o ERP abre a caixa antes de gravar, e uma caixa que não abre não é guardada. A senha fica cifrada com `ERP_CERT_KEY`, como a da caixa de saída.
+- **Leitura**: pela rotina de fundo, a cada 5 minutos, até 30 mensagens por vez, sempre por TLS com o certificado conferido. A caixa é aberta só para leitura (`EXAMINE`, `BODY.PEEK`): nada é apagado, movido nem marcado como lido. O que já estava na caixa no cadastro não é trazido.
+- **O que é guardado**: só a mensagem cujo remetente é o e-mail de contato de uma oportunidade (a em andamento primeiro; senão a mais recente), em `opportunity_inbox`, sem o trecho citado. O resto da caixa é lido e descartado. Resposta automática, devolução e lista não entram.
+- **Efeito**: a cadência da oportunidade para ("O cliente respondeu.") e o vendedor recebe a tarefa de responder. As respostas aparecem na aba Mensagens.
+- **Falha**: o motivo fica em `mail_settings.imap_problem` e aparece na tela; a leitura tenta de novo na rodada seguinte.

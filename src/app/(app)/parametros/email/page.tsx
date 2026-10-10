@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { requirePermission } from "@/lib/auth";
 import { menuItem } from "@/lib/auth/permissions";
-import { DEFAULT_NFE_BODY, DEFAULT_NFE_SUBJECT, defaultMailbox, loadMailInfo } from "@/lib/db/mail";
+import { DEFAULT_NFE_BODY, DEFAULT_NFE_SUBJECT, defaultMailbox, loadInboxInfo, loadMailInfo } from "@/lib/db/mail";
 import { tenantDb } from "@/lib/db/pool";
 import { ActionForm } from "../../pedidos/ActionForm";
 import { ConfirmButton } from "../../pedidos/ConfirmButton";
-import { removeOwnMailboxAction, saveMailTextsAction, saveOwnMailboxAction, testMailAction } from "./actions";
+import { showDateTime } from "@/lib/format";
+import { removeInboxAction, removeOwnMailboxAction, saveInboxAction, saveMailTextsAction, saveOwnMailboxAction, testMailAction } from "./actions";
 
 export const metadata = { title: "E-mail das notas · ERP" };
 export const dynamic = "force-dynamic";
@@ -15,10 +16,15 @@ const INPUT = "mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2 ou
 const LABEL = "block text-xs font-medium text-slate-600";
 const BUTTON = "rounded bg-brand px-4 py-2 text-sm font-semibold text-white hover:opacity-90";
 
-export default async function EmailPage() {
+const TABS = [["saida", "Por onde sai"], ["mensagem", "Mensagem"], ["caixa", "Caixa da empresa"], ["entrada", "Respostas"]] as const;
+
+export default async function EmailPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const session = await requirePermission("parametros");
+  const asked = (await searchParams).ver;
+  const tab = TABS.find(([key]) => key === (Array.isArray(asked) ? asked[0] : asked))?.[0] ?? "saida";
   const conn = tenantDb(session.tenant.slug);
   const info = await loadMailInfo(conn);
+  const inbox = await loadInboxInfo(conn);
   const standard = defaultMailbox(process.env);
   const leavesBy = info.own ? `pela caixa da empresa (${info.own.from})` : standard ? `pela caixa da Ávila Ops (${standard.from})` : null;
 
@@ -35,7 +41,21 @@ export default async function EmailPage() {
         cancelada, quem recebeu a nota recebe o aviso do cancelamento.
       </p>
 
-      <section className={`${CARD} mt-6 p-5`} aria-labelledby="saida">
+      {/* One part at a time: each is a decision of its own. */}
+      <nav aria-label="Partes do e-mail" className="mt-4 flex flex-wrap gap-x-1 border-b border-slate-200">
+        {TABS.map(([key, label]) => (
+          <Link
+            key={key}
+            href={`/parametros/email?ver=${key}`}
+            aria-current={key === tab ? "page" : undefined}
+            className={`inline-flex min-h-[var(--control)] items-center border-b-2 px-3 text-sm font-medium ${key === tab ? "border-brand text-brand" : "border-transparent text-slate-600 hover:text-slate-900"}`}
+          >
+            {label}
+          </Link>
+        ))}
+      </nav>
+      {tab === "saida" && (
+      <section className={`${CARD} mt-3 p-5`} aria-labelledby="saida">
         <h2 id="saida" className="text-sm font-semibold uppercase tracking-wide">
           Por onde sai
         </h2>
@@ -56,8 +76,10 @@ export default async function EmailPage() {
           </ActionForm>
         ) : null}
       </section>
+      )}
 
-      <section className={`${CARD} mt-6 p-5`} aria-labelledby="mensagem">
+      {tab === "mensagem" && (
+      <section className={`${CARD} mt-3 p-5`} aria-labelledby="mensagem">
         <h2 id="mensagem" className="text-sm font-semibold uppercase tracking-wide">
           Mensagem
         </h2>
@@ -100,8 +122,10 @@ export default async function EmailPage() {
           </div>
         </ActionForm>
       </section>
+      )}
 
-      <section className={`${CARD} mt-6 p-5`} aria-labelledby="caixa">
+      {tab === "caixa" && (
+      <section className={`${CARD} mt-3 p-5`} aria-labelledby="caixa">
         <h2 id="caixa" className="text-sm font-semibold uppercase tracking-wide">
           Caixa da empresa (opcional)
         </h2>
@@ -158,6 +182,61 @@ export default async function EmailPage() {
           </ActionForm>
         ) : null}
       </section>
+      )}
+
+      {tab === "entrada" && (
+      <section className={`${CARD} mt-3 p-5`} aria-labelledby="entrada">
+        <h2 id="entrada" className="text-sm font-semibold uppercase tracking-wide">
+          Receber as respostas dos clientes
+        </h2>
+        <p className="mt-2 max-w-3xl text-sm text-slate-600">
+          Com a caixa de entrada cadastrada, o ERP lê o que chega a cada 5 minutos e guarda, na oportunidade, as mensagens de quem é contato dela. A resposta
+          para a cadência e vira tarefa para o vendedor. O resto da caixa não é guardado, e nada é apagado nem marcado como lido no servidor.
+        </p>
+        {inbox ? (
+          <p className={`mt-3 rounded border px-3 py-2 text-sm ${inbox.problem ? "border-amber-300 bg-amber-50 text-amber-900" : "border-emerald-300 bg-emerald-50 text-emerald-900"}`}>
+            Lendo a caixa de <strong>{inbox.username}</strong>, servidor {inbox.host}, porta {inbox.port}.{" "}
+            {inbox.problem ? `A última leitura não deu certo: ${inbox.problem}` : inbox.checkedAt ? `Última leitura em ${showDateTime(inbox.checkedAt)}.` : ""} Para trocar, preencha de novo abaixo.
+          </p>
+        ) : null}
+        <ActionForm action={saveInboxAction} className="mt-4 grid gap-4 sm:grid-cols-4">
+          <div className="sm:col-span-3">
+            <label htmlFor="imapHost" className={LABEL}>
+              Servidor de entrada (IMAP)
+            </label>
+            <input key={inbox?.host ?? ""} id="imapHost" name="imapHost" type="text" defaultValue={inbox?.host ?? ""} placeholder="imap.suaempresa.com.br" autoComplete="off" className={INPUT} />
+          </div>
+          <div>
+            <label htmlFor="imapPort" className={LABEL}>
+              Porta
+            </label>
+            <input key={inbox?.port ?? ""} id="imapPort" name="imapPort" type="text" inputMode="numeric" defaultValue={inbox?.port ?? "993"} autoComplete="off" className={INPUT} />
+          </div>
+          <div className="sm:col-span-2">
+            <label htmlFor="imapUsername" className={LABEL}>
+              Usuário da caixa
+            </label>
+            <input key={inbox?.username ?? ""} id="imapUsername" name="imapUsername" type="text" defaultValue={inbox?.username ?? ""} autoComplete="off" className={INPUT} />
+          </div>
+          <div className="sm:col-span-2">
+            <label htmlFor="imapPassword" className={LABEL}>
+              Senha da caixa
+            </label>
+            <input id="imapPassword" name="imapPassword" type="password" autoComplete="new-password" className={INPUT} />
+          </div>
+          <div className="sm:col-span-4">
+            <button type="submit" className={BUTTON}>
+              Testar e salvar caixa de entrada
+            </button>
+          </div>
+        </ActionForm>
+        {inbox ? (
+          <ActionForm action={removeInboxAction} className="mt-3">
+            <ConfirmButton label="Parar de ler as respostas" confirmLabel="Confirmar: parar de ler" className="rounded border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50" />
+          </ActionForm>
+        ) : null}
+      </section>
+      )}
     </>
   );
 }

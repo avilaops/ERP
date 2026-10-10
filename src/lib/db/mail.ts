@@ -1,5 +1,6 @@
 import type { Queryable } from "@/lib/db/pool";
 import { isMailAddress } from "@/lib/mail/message";
+import type { ImapConfig, InboxMark } from "@/lib/mail/imap";
 import type { SmtpConfig } from "@/lib/mail/smtp";
 import { openSecret, sealSecret } from "@/lib/mail/vault";
 
@@ -124,4 +125,70 @@ export async function mailChannel(conn: Queryable, env: Record<string, string | 
   if (!row) return defaultMailbox(env);
   const password = openSecret({ ciphertext: row.smtp_password as Buffer, iv: row.smtp_iv as Buffer, authTag: row.smtp_tag as Buffer }, key());
   return { channel: "empresa", smtp: { host: String(row.smtp_host), port: Number(row.smtp_port), username: String(row.smtp_username), password }, from: String(row.smtp_from) };
+}
+
+/** What the screen shows of the mailbox the answers are read from. The password is never here. */
+export type InboxInfo = { host: string; port: number; username: string; checkedAt: Date | null; problem: string | null };
+
+export async function loadInboxInfo(conn: Queryable): Promise<InboxInfo | null> {
+  const { rows } = await conn.query("SELECT imap_host, imap_port, imap_username, imap_checked_at, imap_problem FROM mail_settings WHERE imap_host IS NOT NULL");
+  const row = rows[0];
+  return row ? { host: String(row.imap_host), port: Number(row.imap_port), username: String(row.imap_username), checkedAt: (row.imap_checked_at as Date | null) ?? null, problem: text(row.imap_problem) } : null;
+}
+
+export type InboxInput = { host: string; port: number; username: string; password: string };
+
+/** What is wrong with an incoming mailbox as typed, every problem at once. */
+export function inboxProblems(input: InboxInput): string[] {
+  const problems: string[] = [];
+  if (!/^[A-Za-z0-9.-]{3,253}$/.test(input.host.trim())) problems.push("Servidor: o endereço do servidor de entrada (ex.: imap.suaempresa.com.br).");
+  if (!Number.isInteger(input.port) || input.port < 1 || input.port > 65535) problems.push("Porta: 993, na maioria dos provedores.");
+  if (input.username.trim() === "" || input.username.trim().length > 254) problems.push("Usuário: o da caixa de e-mail.");
+  if (input.password === "" || input.password.length > 500) problems.push("Senha: a da caixa de e-mail.");
+  return problems;
+}
+
+/**
+ * Stores the mailbox the answers are read from, with its password sealed, and
+ * where the reading starts: `mark` is the mailbox as it stands now, so what
+ * was already there is never brought in.
+ */
+export async function saveInbox(input: InboxInput, mark: { uidValidity: number; lastUid: number }, key: Buffer, updatedBy: string, conn: Queryable): Promise<void> {
+  const problems = inboxProblems(input);
+  if (problems.length > 0) throw new MailSettingsError(problems.join(" "));
+  const sealed = sealSecret(input.password, key);
+  await conn.query(
+    `INSERT INTO mail_settings (imap_host, imap_port, imap_username, imap_password, imap_iv, imap_tag, imap_uidvalidity, imap_last_uid, imap_checked_at, updated_by) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now(), $9)
+     ON CONFLICT (id) DO UPDATE SET imap_host = EXCLUDED.imap_host, imap_port = EXCLUDED.imap_port, imap_username = EXCLUDED.imap_username,
+       imap_password = EXCLUDED.imap_password, imap_iv = EXCLUDED.imap_iv, imap_tag = EXCLUDED.imap_tag, imap_uidvalidity = EXCLUDED.imap_uidvalidity,
+       imap_last_uid = EXCLUDED.imap_last_uid, imap_checked_at = now(), imap_problem = NULL, updated_at = now(), updated_by = EXCLUDED.updated_by`,
+    [input.host.trim().toLowerCase(), input.port, input.username.trim(), sealed.ciphertext, sealed.iv, sealed.authTag, mark.uidValidity, mark.lastUid, updatedBy],
+  );
+}
+
+/** Stops reading the answers. What was already brought into the opportunities stays. */
+export async function removeInbox(updatedBy: string, conn: Queryable): Promise<void> {
+  await conn.query(
+    `UPDATE mail_settings SET imap_host = NULL, imap_port = NULL, imap_username = NULL, imap_password = NULL, imap_iv = NULL, imap_tag = NULL,
+       imap_uidvalidity = NULL, imap_last_uid = NULL, imap_checked_at = NULL, imap_problem = NULL, updated_at = now(), updated_by = $1`,
+    [updatedBy],
+  );
+}
+
+/** The mailbox to read and where the reading stopped, or `null` when the company reads none. `key` opens its password. */
+export async function inboxChannel(conn: Queryable, key: () => Buffer): Promise<{ imap: ImapConfig; mark: InboxMark } | null> {
+  const { rows } = await conn.query("SELECT imap_host, imap_port, imap_username, imap_password, imap_iv, imap_tag, imap_uidvalidity, imap_last_uid FROM mail_settings WHERE imap_host IS NOT NULL");
+  const row = rows[0];
+  if (!row) return null;
+  const password = openSecret({ ciphertext: row.imap_password as Buffer, iv: row.imap_iv as Buffer, authTag: row.imap_tag as Buffer }, key());
+  return {
+    imap: { host: String(row.imap_host), port: Number(row.imap_port), username: String(row.imap_username), password },
+    mark: { uidValidity: row.imap_uidvalidity === null ? null : Number(row.imap_uidvalidity), lastUid: row.imap_last_uid === null ? null : Number(row.imap_last_uid) },
+  };
+}
+
+/** Writes down how the last reading went: where it stopped, or why it failed. */
+export async function noteInboxReading(result: { mark: { uidValidity: number; lastUid: number } } | { problem: string }, now: Date, conn: Queryable): Promise<void> {
+  if ("problem" in result) await conn.query("UPDATE mail_settings SET imap_checked_at = $1, imap_problem = $2 WHERE imap_host IS NOT NULL", [now, result.problem.slice(0, 300)]);
+  else await conn.query("UPDATE mail_settings SET imap_checked_at = $1, imap_problem = NULL, imap_uidvalidity = $2, imap_last_uid = $3 WHERE imap_host IS NOT NULL", [now, result.mark.uidValidity, result.mark.lastUid]);
 }

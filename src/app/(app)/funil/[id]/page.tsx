@@ -5,6 +5,7 @@ import { requirePermission } from "@/lib/auth";
 import { allows, menuItem, seesAllOrders } from "@/lib/auth/permissions";
 import { listCadences, listEnrollments } from "@/lib/db/cadences";
 import { listCustomers } from "@/lib/db/customers";
+import { listInbox } from "@/lib/db/inbox";
 import { listOpportunityMessages, listTemplates } from "@/lib/db/messages";
 import { ACTIVITY_LABELS, getOpportunity, listActivities, listStages, opportunityParty, syncOpportunitiesWithOrders } from "@/lib/db/funnel";
 import { listOrders } from "@/lib/db/orders";
@@ -248,6 +249,7 @@ export default async function OportunidadePage({ params, searchParams }: { param
     const templates = await listTemplates(conn);
     const picked = templates.find((template) => String(template.id) === (Array.isArray(query.modelo) ? query.modelo[0] : query.modelo)) ?? null;
     const messages = await listOpportunityMessages(item!.id, conn);
+    const received = await listInbox(item!.id, conn);
     const enrollments = await listEnrollments(item!.id, conn);
     const running = enrollments.find((enrollment) => enrollment.status === "ativa") ?? null;
     const cadences = (await listCadences(conn)).filter((cadence) => cadence.active && cadence.steps.length > 0);
@@ -329,6 +331,25 @@ export default async function OportunidadePage({ params, searchParams }: { param
             </p>
           ))}
         </div>
+
+        {received.length > 0 && (
+          <ul className={`${CARD} mt-3 divide-y divide-slate-200`} aria-label="Respostas do contato">
+            {received.slice(0, 8).map((message) => (
+              <li key={message.id} className="px-3 py-2 text-sm">
+                <details>
+                  <summary className="flex cursor-pointer flex-wrap items-center gap-2">
+                    <span className="min-w-0 flex-1 font-medium leading-snug">{message.subject}</span>
+                    <Pill tone="warn">recebido</Pill>
+                    <span className="basis-full text-xs text-slate-600">
+                      de {message.senderName ? `${message.senderName} (${message.sender})` : message.sender} · {showDateTime(message.receivedAt)}
+                    </span>
+                  </summary>
+                  <p className="mt-2 whitespace-pre-line text-slate-700">{message.body}</p>
+                </details>
+              </li>
+            ))}
+          </ul>
+        )}
 
         {messages.length > 0 && (
           <ul className={`${CARD} mt-3 divide-y divide-slate-200`}>
