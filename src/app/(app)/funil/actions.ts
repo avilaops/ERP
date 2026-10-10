@@ -2,11 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { aiCaller, aiConfigured } from "@/lib/ai/client";
 import { notify } from "@/lib/api/notify";
 import { requirePermission } from "@/lib/auth";
 import { menuItem, seesAllOrders } from "@/lib/auth/permissions";
 import { addActivity, createOpportunity, deleteActivity, deleteOpportunity, FunnelError, getOpportunity, linkOpportunityOrder, moveOpportunity, opportunityParty, setActivityDone, updateOpportunity } from "@/lib/db/funnel";
 import type { OpportunityInput } from "@/lib/db/funnel";
+import { AssistError, draftReply, latestAssists, summarizeOpportunity } from "@/lib/db/assist";
 import { CadenceError, startCadence, stopCadence } from "@/lib/db/cadences";
 import { cancelMeeting, deleteMeeting, logCall, MeetingError, saveMeeting } from "@/lib/db/meetings";
 import { MessageError, sendOpportunityMail } from "@/lib/db/messages";
@@ -28,7 +30,7 @@ const reader = (formData: FormData) => (key: string) => {
 const whole = (value: string) => (/^[1-9]\d{0,8}$/.test(value.trim()) ? Number(value.trim()) : null);
 
 function problem(error: unknown): ActionState {
-  if (error instanceof FunnelError || error instanceof MessageError || error instanceof CadenceError || error instanceof MeetingError || error instanceof MailError) return { error: error.message };
+  if (error instanceof FunnelError || error instanceof MessageError || error instanceof CadenceError || error instanceof MeetingError || error instanceof AssistError || error instanceof MailError) return { error: error.message };
   console.error("[funil] falha ao gravar:", error instanceof Error ? error.message : error);
   return { error: FAILED };
 }
@@ -293,4 +295,35 @@ export async function changeMeetingAction(_previous: ActionState, formData: Form
   revalidatePath(HERE);
   revalidatePath(`${HERE}/${id}`);
   return { error: null, notice };
+}
+
+/**
+ * The buttons of the assistant on one opportunity: "Resumir a venda",
+ * "Rascunhar resposta" (opens the e-mail form with the draft, to be read and
+ * sent by the person) and "Criar tarefa" with the next step it suggested.
+ */
+export async function assistAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
+  const session = await requirePermission("funil");
+  const conn = tenantDb(session.tenant.slug);
+  const read = reader(formData);
+  const id = whole(read("id"));
+  if (id === null) return { error: "Oportunidade não encontrada." };
+  const scope = { ownerEmail: seesAllOrders(session) ? null : session.email };
+  const way = { ask: aiCaller(), configured: aiConfigured(), now: new Date() };
+  const what = read("what");
+  let draft: number | null = null;
+  try {
+    if (what === "rascunhar") draft = (await draftReply(id, session.email, session.name, scope, way, conn)).id;
+    else if (what === "tarefa") {
+      if (!(await getOpportunity(id, scope, conn))) return { error: "Oportunidade não encontrada." };
+      const next = (await latestAssists(id, conn)).summary?.content.nextAction ?? "";
+      if (next === "") return { error: "Peça o resumo antes: é dele que sai o próximo passo." };
+      await addActivity(id, { kind: "tarefa", title: next, dueOn: null }, session.email, scope, conn);
+    } else await summarizeOpportunity(id, session.email, scope, way, conn);
+  } catch (error) {
+    return problem(error);
+  }
+  revalidatePath(`${HERE}/${id}`);
+  if (draft !== null) redirect(`${HERE}/${id}?aba=mensagens&rascunho=${draft}`);
+  return { error: null, notice: what === "tarefa" ? "Tarefa criada com o próximo passo." : "Resumo atualizado." };
 }

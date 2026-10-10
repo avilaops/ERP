@@ -98,6 +98,10 @@ export default async function ParametrosPage({ searchParams }: { searchParams: P
           Integrações
         </Link>
         {" · "}
+        <Link href="/parametros/assistente" className="font-medium text-brand underline">
+          Assistente
+        </Link>
+        {" · "}
         <Link href="/parametros/automacoes" className="font-medium text-brand underline">
           Lembretes automáticos
         </Link>

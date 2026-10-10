@@ -5,6 +5,8 @@ import { requirePermission } from "@/lib/auth";
 import { allows, menuItem, seesAllOrders } from "@/lib/auth/permissions";
 import { listCadences, listEnrollments } from "@/lib/db/cadences";
 import { listCustomers } from "@/lib/db/customers";
+import { aiConfigured } from "@/lib/ai/client";
+import { getDraft, loadAiSettings } from "@/lib/db/assist";
 import { listInbox } from "@/lib/db/inbox";
 import { listOpportunityMessages, listTemplates } from "@/lib/db/messages";
 import { ACTIVITY_LABELS, getOpportunity, listActivities, listStages, opportunityParty, syncOpportunitiesWithOrders } from "@/lib/db/funnel";
@@ -119,6 +121,7 @@ export default async function OportunidadePage({ params, searchParams }: { param
     const activities = await listActivities(item!.id, conn);
     const meetings = await listMeetings(item!.id, conn);
     const number = dialable(item!.phone);
+    const assistant = aiConfigured() && (await loadAiSettings(conn)).enabled;
     const QUICK = "inline-flex min-h-[var(--control)] items-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium hover:bg-slate-50";
     return (
       <section className="mt-3" aria-label="Atividades">
@@ -139,6 +142,11 @@ export default async function OportunidadePage({ params, searchParams }: { param
           <Link href={`${HERE}/${item!.id}/reuniao`} className={QUICK}>
             Agendar reunião
           </Link>
+          {assistant && (
+            <Link href={`${HERE}/${item!.id}/assistente`} className={QUICK}>
+              Assistente
+            </Link>
+          )}
         </nav>
         {meetings.length > 0 && (
           <ul className={`${CARD} mb-2 divide-y divide-slate-200`} aria-label="Reuniões">
@@ -247,7 +255,11 @@ export default async function OportunidadePage({ params, searchParams }: { param
 
   async function Messages() {
     const templates = await listTemplates(conn);
-    const picked = templates.find((template) => String(template.id) === (Array.isArray(query.modelo) ? query.modelo[0] : query.modelo)) ?? null;
+    const chosen = templates.find((template) => String(template.id) === (Array.isArray(query.modelo) ? query.modelo[0] : query.modelo)) ?? null;
+    // A draft of the assistant opens the form filled in, like a template: the person reads, changes and sends.
+    const askedDraft = Array.isArray(query.rascunho) ? query.rascunho[0] : query.rascunho;
+    const drafted = askedDraft && /^[1-9]\d{0,8}$/.test(askedDraft) ? await getDraft(Number(askedDraft), item!.id, conn) : null;
+    const picked = drafted ? { id: -Number(askedDraft), name: "Rascunho do assistente", subject: drafted.subject, body: drafted.body } : chosen;
     const messages = await listOpportunityMessages(item!.id, conn);
     const received = await listInbox(item!.id, conn);
     const enrollments = await listEnrollments(item!.id, conn);
@@ -257,6 +269,7 @@ export default async function OportunidadePage({ params, searchParams }: { param
     return (
       <section className="mt-3" aria-label="Mensagens">
         {!to && <p className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">Sem e-mail do contato. Preencha em Dados para poder enviar.</p>}
+        {drafted && <p className="mb-2 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">Rascunho escrito pelo assistente. Leia e ajuste antes de enviar: quem envia é você.</p>}
         {templates.length > 0 && (
           <nav aria-label="Modelos" className="flex flex-wrap items-center gap-2 text-sm">
             <span className="text-slate-600">Começar de um modelo:</span>

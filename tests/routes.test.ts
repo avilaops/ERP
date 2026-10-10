@@ -337,8 +337,9 @@ test("não existe página no grupo protegido sem requirePermission", () => {
   // and, of the funnel, the screen that creates an opportunity, one opportunity, the tasks and the panel;
   // and, of marketing, the campaigns, the screen that creates one, one campaign and the capture forms;
   // and, of one opportunity, the screen that writes down a call and the one that schedules a meeting;
-  // and the history of one customer.
-  assert.equal(all.length, MENU_ITEMS.length + 37);
+  // and the history of one customer;
+  // and the assistant: its screen on one opportunity and its switch in the parameters.
+  assert.equal(all.length, MENU_ITEMS.length + 39);
   for (const route of all) {
     assert.match(source(route), /await requirePermission\(/, route);
   }

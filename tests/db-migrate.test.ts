@@ -79,6 +79,7 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "0045_marketing.sql",
     "0046_ligacoes_e_reunioes.sql",
     "0047_email_recebido.sql",
+    "0048_assistente.sql",
   ]);
 
   const second = await withClient((client) => migrate(client, MIGRATIONS_DIR));
@@ -93,6 +94,7 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
   );
   assert.deepEqual(tables.rows.map((row) => row.table_name), [
     "access_profiles",
+    "ai_settings",
     "api_keys",
     "audit_log",
     "automation_rules",
@@ -123,6 +125,7 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "message_templates",
     "opportunities",
     "opportunity_activities",
+    "opportunity_assists",
     "opportunity_cadences",
     "opportunity_inbox",
     "opportunity_meetings",

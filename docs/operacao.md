@@ -27,6 +27,7 @@ Todas descritas em `.env.example`. Nenhuma tem valor real no repositório.
 | `ERP_AUTH_CLIENT_SECRET` (e, se não forem os padrões, `ERP_AUTH_CLIENT_ID` = `erp` e `ERP_AUTH_URL` = `https://auth.avilaops.com`) | Credencial do ERP como integração do login central (`auth.avilaops.com/admin/integracoes`, app ERP). Com ela, "Convidar pessoa" cria a conta da pessoa no login central e manda por e-mail o endereço para ela criar a senha (vale 7 dias, só para conta nova) | Opcional; sem ela a pessoa é cadastrada, nenhum e-mail sai e a tela diz que o convite não foi enviado |
 | `ERP_TWILIO_ACCOUNT_SID`, `ERP_TWILIO_AUTH_TOKEN`, `ERP_TWILIO_FROM` | Conta do Twilio que envia por SMS o segundo código da assinatura do contrato (remetente em `ERP_TWILIO_FROM`, no formato `+5511…` ou o identificador do serviço) | Opcionais; sem as três o segundo código não existe, e a opção em Parâmetros → Contrato avisa que o serviço não está configurado |
 | `ERP_ROTINAS` | `0` desliga a rotina de fundo (lembretes automáticos, passos das cadências e reenvio de avisos), que roda a cada 5 minutos dentro do próprio servidor do ERP | Opcional; ligada por padrão em produção, nunca roda em desenvolvimento |
+| `ERP_ANTHROPIC_API_KEY`, `ERP_AI_MODEL` | Chave do serviço de inteligência artificial que o Assistente usa, e o modelo (padrão `claude-sonnet-5-5`) | Opcionais; sem a chave o Assistente não aparece no funil, e a tela de Parâmetros avisa que o serviço não foi ligado. A chave só é lida em `src/lib/ai/client.ts` e nunca vai a log |
 | `ERP_LOCAL_LOGIN` | `1` liga o login local de teste (`/dev/login`) | Ignorada: o login local não existe em produção |
 | `ERP_TEST_DATABASE_URL` | Banco dos testes; o nome tem de terminar em `_test` | Não se usa |
 
@@ -261,3 +262,12 @@ Se a migração falhar, a versão antiga continua no ar.
 - **O que é guardado**: só a mensagem cujo remetente é o e-mail de contato de uma oportunidade (a em andamento primeiro; senão a mais recente), em `opportunity_inbox`, sem o trecho citado. O resto da caixa é lido e descartado. Resposta automática, devolução e lista não entram.
 - **Efeito**: a cadência da oportunidade para ("O cliente respondeu.") e o vendedor recebe a tarefa de responder. As respostas aparecem na aba Mensagens.
 - **Falha**: o motivo fica em `mail_settings.imap_problem` e aparece na tela; a leitura tenta de novo na rodada seguinte.
+
+## Assistente (inteligência artificial)
+
+- **Onde**: Parâmetros → Assistente liga e desliga por empresa (desligado por padrão) e define o limite de pedidos por mês (200 por padrão, tabela `ai_settings`). No funil, cada oportunidade ganha o atalho Assistente (`/funil/<id>/assistente`) quando o servidor tem a chave e a empresa ligou.
+- **O que faz**: "Resumir a venda" devolve o resumo, o próximo passo sugerido e uma nota de 0 a 100 com o motivo; "Criar tarefa" transforma o próximo passo em tarefa; "Rascunhar resposta" (quando há e-mail do cliente) abre o formulário de e-mail já preenchido, para a pessoa ler, mudar e enviar.
+- **O que é enviado ao serviço**: só o texto daquela oportunidade (título, cliente e contato, etapa, origem, valor estimado, observações, até 20 atividades, 4 e-mails enviados, 4 recebidos, 5 reuniões). Custo, margem, tabela de preços, pedidos e alçada de desconto nunca entram: `src/lib/db/assist.ts` não consulta essas tabelas, e um teste trava isso.
+- **O que ele não faz**: não envia e-mail, não muda etapa, não fecha pedido. O texto dos e-mails do cliente vai marcado como dado, com a instrução de ignorar pedidos escritos nele.
+- **Registro e custo**: cada pedido fica em `opportunity_assists` com o que foi devolvido, o modelo e os tokens; é essa tabela que conta o limite do mês. Excluir a oportunidade mantém o uso contado.
+
