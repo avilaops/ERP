@@ -1,6 +1,6 @@
 import { noteCall } from "@/lib/db/mcp";
 import { mcpAccess } from "@/lib/mcp/access";
-import { json, OPEN, preflight, resourceMetadataUrl, resourceUrl } from "@/lib/mcp/http";
+import { issuer, json, OPEN, preflight, resourceMetadataUrl } from "@/lib/mcp/http";
 import { handleMcp } from "@/lib/mcp/server";
 
 /**
@@ -40,20 +40,10 @@ export async function POST(request: Request): Promise<Response> {
   return reply.body === null ? new Response(null, { status: reply.status, headers: OPEN }) : json(reply.body, reply.status);
 }
 
-/** A person who opens the address in a browser is told what it is for, instead of facing an error page. */
-const HELP = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><title>ERP · conexão com assistentes</title>
-<style>body{font-family:system-ui,sans-serif;max-width:36rem;margin:3rem auto;padding:0 1rem;line-height:1.5;color:#0f172a;background:#f8fafc}code{background:#e2e8f0;padding:.1rem .3rem;border-radius:.25rem}@media(prefers-color-scheme:dark){body{background:#0f172a;color:#e2e8f0}code{background:#334155}}</style></head>
-<body><h1>Este endereço é para o assistente, não para o navegador</h1>
-<p>Ele liga um assistente de inteligência artificial (o Claude, por exemplo) ao ERP.</p>
-<ol><li>No ERP, alguém da diretoria liga a conexão em <strong>Parâmetros → Assistente → Conexão (MCP)</strong>.</li>
-<li>No assistente, adicione um <strong>conector personalizado</strong> e cole este endereço: <code>ENDERECO</code></li>
-<li>O assistente abre o login do ERP e pergunta se você permite. Depois disso ele enxerga só o que as suas telas permitem.</li></ol></body></html>`;
-
 /** No stream is offered: an assistant that asks for one is told so. A browser gets the explanation. */
 export function GET(request: Request): Response {
-  if ((request.headers.get("accept") ?? "").includes("text/html")) {
-    return new Response(HELP.replace("ENDERECO", resourceUrl()), { status: 200, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "X-Robots-Tag": "noindex" } });
-  }
+  // A person who opens the address in a browser is taken to the screen that explains how to connect.
+  if ((request.headers.get("accept") ?? "").includes("text/html")) return Response.redirect(`${issuer()}/conectar`, 302);
   return new Response(null, { status: 405, headers: { ...OPEN, Allow: "POST, OPTIONS" } });
 }
 

@@ -83,6 +83,9 @@ export async function Sidebar({ session }: { session: Session }) {
 
       <div className="mt-auto flex flex-col gap-2 text-sm">
         <ThemeChoice />
+        <Link href="/conectar" className="text-slate-600 underline">
+          Conectar assistente (IA)
+        </Link>
         {session.companies > 1 && (
           <Link href="/empresa" className="text-slate-600 underline">
             Trocar de empresa

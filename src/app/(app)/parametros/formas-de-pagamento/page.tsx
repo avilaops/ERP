@@ -36,7 +36,7 @@ export default async function FormasDePagamentoPage() {
           Adicionar forma
         </h2>
         <ActionForm action={createPaymentMethodAction} className="mt-3 flex flex-wrap items-end gap-3">
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 basis-full sm:basis-48 sm:flex-1">
             <label htmlFor="new-label" className="block text-sm font-medium">
               Nome
             </label>
@@ -72,7 +72,7 @@ export default async function FormasDePagamentoPage() {
                     className={`${INPUT} mt-1 w-16 text-right`}
                   />
                 </div>
-                <div className="min-w-0 flex-1">
+                <div className="min-w-0 basis-full sm:basis-48 sm:flex-1">
                   <label htmlFor={`label-${method.id}`} className="block text-xs font-medium text-slate-600">
                     Nome
                   </label>

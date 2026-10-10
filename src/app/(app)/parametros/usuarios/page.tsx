@@ -41,13 +41,13 @@ export default async function UsuariosPage() {
           Adicionar pessoa
         </h2>
         <ActionForm action={createUserAction} className="mt-3 flex flex-wrap items-end gap-3">
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 basis-full sm:basis-48 sm:flex-1">
             <label htmlFor="new-name" className="block text-sm font-medium">
               Nome
             </label>
             <input id="new-name" name="name" type="text" autoComplete="off" className={`${INPUT} mt-1 w-full`} />
           </div>
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 basis-full sm:basis-48 sm:flex-1">
             <label htmlFor="new-email" className="block text-sm font-medium">
               E-mail
             </label>
@@ -89,7 +89,7 @@ export default async function UsuariosPage() {
               <li key={user.id} className="border-t border-slate-200 px-5 py-4 first:border-t-0">
                 <ActionForm action={updateUserAction} className="flex flex-wrap items-end gap-3">
                   <input type="hidden" name="id" value={user.id} />
-                  <div className="min-w-0 flex-1">
+                  <div className="min-w-0 basis-full sm:basis-48 sm:flex-1">
                     <label htmlFor={`name-${user.id}`} className="block text-xs font-medium text-slate-600">
                       Nome
                     </label>

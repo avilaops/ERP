@@ -37,7 +37,7 @@ export default async function LinhasPage() {
           Adicionar linha
         </h2>
         <ActionForm action={createLineAction} className="mt-3 flex flex-wrap items-end gap-3">
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 basis-full sm:basis-48 sm:flex-1">
             <label htmlFor="new-name" className="block text-sm font-medium">
               Nome
             </label>
@@ -72,7 +72,7 @@ export default async function LinhasPage() {
               <li key={line.id} className="border-t border-slate-200 px-5 py-3 first:border-t-0">
                 <ActionForm action={renameLineAction} className="flex flex-wrap items-end gap-3">
                   <input type="hidden" name="id" value={line.id} />
-                  <div className="min-w-0 flex-1">
+                  <div className="min-w-0 basis-full sm:basis-48 sm:flex-1">
                     <label htmlFor={`name-${line.id}`} className="block text-xs font-medium text-slate-600">
                       Nome
                     </label>

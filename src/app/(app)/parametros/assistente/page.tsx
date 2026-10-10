@@ -67,7 +67,13 @@ export default async function AssistenteParametrosPage({ searchParams }: { searc
             </ul>
             {mcp && (
               <>
-                <p className={`${LABEL} mt-3`}>Endereço para cadastrar no assistente (conector personalizado)</p>
+                <p className="mt-3">
+                  <Link href="/conectar" className={PRIMARY}>
+                    Conectar um assistente
+                  </Link>
+                </p>
+                <p className="mt-2 text-sm text-slate-600">Cada pessoa da equipe abre essa mesma tela (menu → Conectar assistente) e segue os passos do assistente que usa.</p>
+                <p className={`${LABEL} mt-3`}>Endereço do ERP para o assistente</p>
                 <div className="mt-1 flex flex-wrap items-center gap-2">
                   <code className="min-w-0 flex-1 break-all text-sm">{address}</code>
                   <CopyButton text={address} label="Copiar" className={SECONDARY} />

@@ -11,6 +11,7 @@ import { exchangeCode, grantCode, grantOfAccess, listConnections, mcpEnabled, no
 import { authorizationServer, protectedResource } from "@/lib/mcp/http";
 import { clientOf, hashSecret, isRedirectUri, newSecret, pkceMatches, registerClient, tenantOfSecret } from "@/lib/mcp/oauth";
 import { resolveClient } from "@/lib/mcp/client";
+import { connectClients } from "@/lib/mcp/clients";
 import { handleMcp } from "@/lib/mcp/server";
 import { callTool, ToolError, TOOLS, toolsOf } from "@/lib/mcp/tools";
 import { openTestDb, SKIP_WITHOUT_DB } from "./db-helpers.ts";
@@ -94,6 +95,24 @@ test("aplicativo que se apresenta por endereço: só https público, sem seguir 
   const signed = registerClient({ name: "Claude", redirectUris: ["https://claude.ai/api/mcp/auth_callback"] }, SECRET);
   assert.deepEqual(await resolveClient(signed.clientId, SECRET, 1, serving(500, {}), publicHost), signed);
   assert.equal(asked.length, before);
+});
+
+test("conectar um assistente: cada um recebe o seu caminho, sempre com o endereço do ERP e nunca com segredo", () => {
+  const url = "https://erp.exemplo.test/mcp";
+  const clients = connectClients(url);
+  assert.deepEqual(clients.map((client) => client.id), ["claude-ai", "chatgpt", "claude-code", "codex", "gemini-cli", "cursor", "vscode"]);
+  const by = Object.fromEntries(clients.map((client) => [client.id, client]));
+  assert.equal(by["claude-code"].command, "claude mcp add --transport http erp https://erp.exemplo.test/mcp");
+  assert.deepEqual([by.codex.command, by.codex.loginCommand], ['codex mcp add erp --url "https://erp.exemplo.test/mcp"', "codex mcp login erp"]);
+  assert.equal(by["gemini-cli"].command, "gemini mcp add --transport http erp https://erp.exemplo.test/mcp");
+  assert.deepEqual(JSON.parse(Buffer.from(new URL(by.cursor.installLink!).searchParams.get("config")!, "base64").toString("utf8")), { url });
+  assert.deepEqual(JSON.parse(decodeURIComponent(by.vscode.installLink!.replace("vscode:mcp/install?", ""))), { name: "erp", type: "http", url });
+  assert.ok(by["claude-ai"].openUrl!.startsWith("https://claude.ai/") && by.chatgpt.openUrl!.startsWith("https://chatgpt.com/"));
+  // Todo caminho termina com a pessoa permitindo no ERP, e nenhum leva chave: quem dá o acesso é o login.
+  for (const client of clients) {
+    assert.match(client.steps.at(-1)!, /Clique em Permitir/);
+    assert.doesNotMatch(JSON.stringify(client), /erpmcp_|Bearer|token|secret/i, client.id);
+  }
 });
 
 test("ferramentas por cargo: cada perfil recebe só as das suas telas, e perfil da empresa com menos telas recebe menos", () => {
@@ -246,6 +265,10 @@ test("MCP no código: nada de custo nas leituras, a chave confere empresa, conex
   const sources = readdirSync(SRC, { recursive: true, encoding: "utf8" }).filter((file) => /\.tsx?$/.test(file));
   // Só a porta do MCP e a rota das chaves abrem a empresa por um segredo.
   assert.deepEqual(sources.filter((file) => /openMcpTenant\(|mcpAccess\(/.test(read(file)) && file !== "lib/mcp/access.ts").sort(), ["app/mcp/route.ts", "app/oauth/token/route.ts"]);
+  // A tela de conectar é de quem está logado, e cada um só desconecta o que é seu.
+  assert.match(read("app/conectar/page.tsx"), /const session = await requireSession\("\/conectar"\);/);
+  const mineOnly = read("app/conectar/actions.ts");
+  assert.ok(mineOnly.includes('const session = await requireSession("/conectar");') && mineOnly.includes("revokeConnection(id, session.email, session.email, conn)"));
   for (const file of ["app/mcp/route.ts", "app/oauth/token/route.ts", "app/oauth/register/route.ts", "app/.well-known/oauth-authorization-server/route.ts", "app/.well-known/oauth-protected-resource/[[...resource]]/route.ts"]) {
     assert.doesNotMatch(read(file), /tenantDb|getSession|cookies\(|console\./, file);
   }
