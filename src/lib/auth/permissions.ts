@@ -12,6 +12,7 @@ const MENU = [
   { key: "aprovacoes", label: "Aprovações", href: "/aprovacoes", roles: ["DIRETORIA", "GERENTE_COMERCIAL"] },
   { key: "funil", label: "Funil", href: "/funil", roles: ["DIRETORIA", "GERENTE_COMERCIAL", "VENDEDOR"] },
   { key: "pedidos", label: "Pedidos", href: "/pedidos", roles: ["DIRETORIA", "GERENTE_COMERCIAL", "VENDEDOR"] },
+  { key: "producao", label: "Produção", href: "/producao", roles: ["DIRETORIA"] },
   { key: "clientes", label: "Clientes", href: "/clientes", roles: ["DIRETORIA", "GERENTE_COMERCIAL", "VENDEDOR"] },
   { key: "recebimentos", label: "Recebimentos", href: "/recebimentos", roles: ["DIRETORIA", "FINANCEIRO"] },
   { key: "contas-pagar", label: "Contas a pagar", href: "/contas-pagar", roles: ["DIRETORIA", "FINANCEIRO"] },

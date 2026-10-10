@@ -705,7 +705,8 @@ export async function deleteOrder(number: string, scope: OrderScope, conn: Query
                 OR EXISTS (SELECT 1 FROM refunds f WHERE f.order_id = o.id)
                 OR EXISTS (SELECT 1 FROM payables b WHERE b.order_id = o.id)
                 OR EXISTS (SELECT 1 FROM fiscal_invoices i WHERE i.order_id = o.id)
-                OR EXISTS (SELECT 1 FROM order_contracts k WHERE k.order_id = o.id AND k.status = 'assinado') AS is_bound
+                OR EXISTS (SELECT 1 FROM order_contracts k WHERE k.order_id = o.id AND k.status = 'assinado')
+                OR EXISTS (SELECT 1 FROM production_orders w WHERE w.order_id = o.id) AS is_bound
          FROM orders o
         WHERE o.number = $1 AND o.status = 'em_negociacao' AND ($2::text IS NULL OR o.seller_email = $2)
      ), free AS (

@@ -13,6 +13,7 @@ const MATRIX: [MenuItemKey, string, string, [boolean, boolean, boolean, boolean]
   ["aprovacoes", "Aprovações", "/aprovacoes", [true, true, false, false]],
   ["funil", "Funil", "/funil", [true, true, true, false]],
   ["pedidos", "Pedidos", "/pedidos", [true, true, true, false]],
+  ["producao", "Produção", "/producao", [true, false, false, false]],
   ["clientes", "Clientes", "/clientes", [true, true, true, false]],
   ["recebimentos", "Recebimentos", "/recebimentos", [true, false, false, true]],
   ["contas-pagar", "Contas a pagar", "/contas-pagar", [true, false, false, true]],
@@ -37,8 +38,8 @@ test("os perfis são exatamente os quatro, com os rótulos de tela", () => {
   });
 });
 
-test("o menu tem os 15 itens, os do manual mais o funil, na ordem do manual", () => {
-  assert.equal(MENU_ITEMS.length, 15);
+test("o menu tem os 16 itens, os do manual mais o funil e a produção, na ordem do manual", () => {
+  assert.equal(MENU_ITEMS.length, 16);
   assert.deepEqual(
     MENU_ITEMS.map((item) => [item.key, item.label, item.href]),
     MATRIX.map(([key, label, href]) => [key, label, href]),
@@ -53,7 +54,7 @@ test("o menu tem os 15 itens, os do manual mais o funil, na ordem do manual", ()
   assert.deepEqual(MENU_ITEMS.map((item) => item.label), labels);
 });
 
-test("matriz de permissão: 15 itens × 4 perfis", () => {
+test("matriz de permissão: 16 itens × 4 perfis", () => {
   let checked = 0;
   for (const [key, , , row] of MATRIX) {
     COLUMNS.forEach((role, column) => {
@@ -61,7 +62,7 @@ test("matriz de permissão: 15 itens × 4 perfis", () => {
       checked += 1;
     });
   }
-  assert.equal(checked, 60);
+  assert.equal(checked, 64);
 });
 
 test("menuFor devolve só os itens do perfil, na ordem do manual", () => {

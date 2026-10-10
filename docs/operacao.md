@@ -280,3 +280,11 @@ Se a migração falhar, a versão antiga continua no ar.
 - **Entrada**: a mensagem do cliente entra uma vez (`whatsapp_messages`), para a cadência da oportunidade e deixa uma tarefa de responder (uma só enquanto estiver aberta). Imagem, áudio e documento entram como aviso; o arquivo não é trazido.
 - **Lista**: Funil → Conversas. O vendedor vê as das próprias oportunidades; gerência e diretoria veem todas e os números que ainda não são de ninguém, com atalho para criar a oportunidade com aquele telefone.
 - **Custo**: a Meta cobra da conta da empresa as conversas iniciadas por modelo.
+
+## Produção
+
+- **Onde**: item Produção do menu (por padrão só a diretoria; para o chão de fábrica, crie em Equipe e acessos um perfil só com Produção). As etapas ficam em Parâmetros → Etapas da produção: a empresa cria, renomeia, reordena e remove; a de pronto sempre existe.
+- **Fluxo**: o pedido fechado aparece em "A enviar". "Mandar para a produção" cria uma ordem por equipamento do pedido (`production_orders`, número `<pedido>/<n>`), na primeira etapa, com prazo igual ao fechamento mais o tempo de fabricação do pedido. Cada ordem anda de etapa em etapa; chegar em pronto grava quando terminou.
+- **Histórico**: cada passo fica em `production_moves`, com quem moveu e o nome da etapa na hora.
+- **O que não entra**: preço, custo e margem. A ordem só tem o equipamento, a quantidade, o cliente, o prazo e as observações.
+- **Trava**: pedido com ordem de produção não pode ser excluído. "Tirar da produção" remove a ordem e o histórico; o pedido volta a esperar.

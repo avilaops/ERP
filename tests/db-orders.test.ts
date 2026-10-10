@@ -2048,3 +2048,76 @@ test("histórico do cliente: junta pedidos, contratos, notas e funil do mais nov
   assert.deepEqual(await customerTimeline(999_999, { sellerEmail: null, receipts: true }, db.pool), []);
   await deleteOpportunity(opportunity, { ownerEmail: null }, db.pool);
 });
+
+test("produção: pedido fechado vira uma ordem por equipamento, anda por etapas com histórico, e não leva preço nem custo", { skip }, async () => {
+  const production = await import("@/lib/db/production");
+  const { ProductionError } = production;
+  const BOSS_MAIL = "diretoria@teste.local";
+  // As etapas que vêm prontas, com a de pronto no fim; a empresa muda.
+  let stages = await production.listProductionStages(db.pool);
+  assert.deepEqual(stages.map((stage) => [stage.name, stage.kind]), [["A produzir", "andamento"], ["Corte", "andamento"], ["Solda", "andamento"], ["Pintura", "andamento"], ["Montagem", "andamento"], ["Pronto", "pronta"]]);
+  await assert.rejects(() => production.createProductionStage("x", BOSS_MAIL, db.pool), /de 2 a 40 letras/);
+  await production.createProductionStage(" Estofaria ", BOSS_MAIL, db.pool);
+  await assert.rejects(() => production.createProductionStage("estofaria", BOSS_MAIL, db.pool), /Já existe uma etapa/);
+  stages = await production.listProductionStages(db.pool);
+  const upholstery = stages.find((stage) => stage.name === "Estofaria")!;
+  const done = stages.find((stage) => stage.kind === "pronta")!;
+  assert.equal(stages.indexOf(upholstery), stages.length - 2);
+  await production.moveProductionStage(upholstery.id, "antes", BOSS_MAIL, db.pool);
+  assert.deepEqual((await production.listProductionStages(db.pool)).map((stage) => stage.name).slice(-3), ["Estofaria", "Montagem", "Pronto"]);
+  await assert.rejects(() => production.moveProductionStage(done.id, "antes", BOSS_MAIL, db.pool), /não pode ser movida/);
+  await assert.rejects(() => production.deleteProductionStage(done.id, db.pool), /não pode ser removida/);
+  await production.renameProductionStage(upholstery.id, "Estofamento", BOSS_MAIL, db.pool);
+
+  // Só pedido fechado espera a produção, e só ele pode ser mandado.
+  const waiting = await production.listOrdersToProduce(db.pool);
+  const closed = await db.pool.query("SELECT o.number FROM orders o JOIN order_closings k ON k.order_id = o.id AND k.reopened_at IS NULL WHERE o.status = 'fechado' ORDER BY k.closed_at, o.id");
+  assert.ok(closed.rows.length > 0);
+  assert.deepEqual(waiting.map((order) => order.number), closed.rows.map((row) => String(row.number)));
+  const open = await db.pool.query("SELECT number FROM orders WHERE status = 'em_negociacao' LIMIT 1");
+  if (open.rows[0]) await assert.rejects(() => production.sendToProduction(String(open.rows[0].number), BOSS_MAIL, db.pool), (error: unknown) => error instanceof ProductionError && /Só pedido fechado/.test(error.message));
+  await assert.rejects(() => production.sendToProduction("000000-XXXX", BOSS_MAIL, db.pool), /Só pedido fechado/);
+
+  const number = waiting[0].number;
+  const items = await db.pool.query("SELECT i.product_id, i.quantity FROM order_items i JOIN orders o ON o.id = i.order_id WHERE o.number = $1", [number]);
+  assert.equal(await production.sendToProduction(number, BOSS_MAIL, db.pool), items.rows.length);
+  await assert.rejects(() => production.sendToProduction(number, BOSS_MAIL, db.pool), /já está na produção/);
+  assert.ok(!(await production.listOrdersToProduce(db.pool)).some((order) => order.number === number));
+  const first = (await production.listProductionStages(db.pool))[0];
+  const made = (await production.listProductionOrders(first.id, db.pool)).filter((order) => order.orderNumber === number);
+  assert.deepEqual(made.map((order) => order.number).sort(), items.rows.map((_row, index) => `${number}/${index + 1}`));
+  assert.deepEqual(made.map((order) => order.quantity).sort(), items.rows.map((row) => Number(row.quantity)).sort());
+  // O prazo vem do pedido: fechamento mais o tempo de fabricação.
+  const promised = await db.pool.query("SELECT production_days FROM orders WHERE number = $1", [number]);
+  assert.equal(made[0].dueOn === null, promised.rows[0].production_days === null);
+  // Nada de preço nem de custo na ordem de produção.
+  assert.deepEqual(Object.keys(made[0]).sort(), ["createdAt", "customer", "dueOn", "finishedAt", "id", "notes", "number", "orderNumber", "productCode", "productName", "quantity", "stageId", "stageKind", "stageName"]);
+
+  // Anda, fica pronta, volta: o histórico guarda cada passo com o nome da etapa na hora.
+  const order = made[0];
+  const cut = (await production.listProductionStages(db.pool))[1];
+  await production.moveProductionOrder(order.id, cut.id, "fabrica@teste.local", db.pool);
+  await production.moveProductionOrder(order.id, cut.id, "fabrica@teste.local", db.pool);
+  await production.moveProductionOrder(order.id, done.id, "fabrica@teste.local", db.pool);
+  const finished = (await production.getProductionOrder(order.id, db.pool))!;
+  assert.deepEqual([finished.stageKind, finished.finishedAt !== null], ["pronta", true]);
+  await production.moveProductionOrder(order.id, cut.id, "fabrica@teste.local", db.pool);
+  assert.equal((await production.getProductionOrder(order.id, db.pool))!.finishedAt, null);
+  assert.deepEqual((await production.listProductionMoves(order.id, db.pool)).map((move) => [move.stageName, move.movedBy]), [["A produzir", BOSS_MAIL], ["Corte", "fabrica@teste.local"], ["Pronto", "fabrica@teste.local"], ["Corte", "fabrica@teste.local"]]);
+  await assert.rejects(() => production.moveProductionOrder(order.id, 999_999, BOSS_MAIL, db.pool), /Etapa não encontrada/);
+  await assert.rejects(() => production.moveProductionOrder(999_999, cut.id, BOSS_MAIL, db.pool), /Ordem de produção não encontrada/);
+  // Etapa com ordem não sai; a vazia sai, e o histórico continua com o nome.
+  await assert.rejects(() => production.deleteProductionStage(cut.id, db.pool), /Há ordens nesta etapa/);
+  await production.deleteProductionStage(upholstery.id, db.pool);
+
+  await assert.rejects(() => production.saveProductionOrder(order.id, { dueOn: "31/12", notes: "x".repeat(2001) }, BOSS_MAIL, db.pool), /Data inválida.*até 2\.000/);
+  await production.saveProductionOrder(order.id, { dueOn: "2026-12-01", notes: " Cor preta fosca \r\n" }, BOSS_MAIL, db.pool);
+  const saved = (await production.getProductionOrder(order.id, db.pool))!;
+  assert.deepEqual([saved.dueOn, saved.notes], ["2026-12-01", "Cor preta fosca"]);
+
+  // Tirar da produção leva o histórico; com todas fora, o pedido volta a esperar.
+  for (const row of made) await production.deleteProductionOrder(row.id, db.pool);
+  await assert.rejects(() => production.deleteProductionOrder(order.id, db.pool), /não encontrada/);
+  assert.ok((await production.listOrdersToProduce(db.pool)).some((waitingOrder) => waitingOrder.number === number));
+  assert.equal((await db.pool.query("SELECT count(*) FROM production_moves")).rows[0].count, "0");
+});

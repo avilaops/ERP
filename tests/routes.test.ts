@@ -340,8 +340,9 @@ test("não existe página no grupo protegido sem requirePermission", () => {
   // and, of one opportunity, the screen that writes down a call and the one that schedules a meeting;
   // and the history of one customer;
   // and the assistant: its screen on one opportunity and its switch in the parameters;
-  // and WhatsApp: the conversation of one opportunity, the list of conversations and the company's account.
-  assert.equal(all.length, MENU_ITEMS.length + 42);
+  // and WhatsApp: the conversation of one opportunity, the list of conversations and the company's account;
+  // and production: one production order and the stages of the floor.
+  assert.equal(all.length, MENU_ITEMS.length + 44);
   for (const route of all) {
     assert.match(source(route), /await requirePermission\(/, route);
   }
