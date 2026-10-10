@@ -8,6 +8,7 @@ import { controlDb, provisionedCompanies } from "@/lib/db/control";
 import { receiveMail } from "@/lib/db/inbox";
 import { deliverPending } from "@/lib/db/integrations";
 import { tenantDb } from "@/lib/db/pool";
+import { runProspectLoad } from "@/lib/db/prospect-load";
 import { vaultKey } from "@/lib/fiscal/certificate";
 import { isoDate } from "@/lib/format";
 import { fetchNewMail } from "@/lib/mail/imap";
@@ -20,7 +21,8 @@ import { sendMail } from "@/lib/mail/smtp";
  * on their way and the notices to other systems that are still to be delivered. One company at a
  * time, each in its own database; a company that fails does not stop the others.
  */
-export async function runBackground(env: Record<string, string | undefined>, now: Date): Promise<void> {
+/** Every company of this ERP: the ones of the configuration and, with the sign-up on, the ones that signed up. */
+async function companies(env: Record<string, string | undefined>): Promise<Tenant[]> {
   let tenants: Tenant[] = parseTenants(env.ERP_TENANTS);
   if (signupEnabled(env)) {
     try {
@@ -30,6 +32,26 @@ export async function runBackground(env: Record<string, string | undefined>, now
       console.error("[rotinas] cadastro de empresas não pôde ser lido:", error instanceof Error ? error.message : error);
     }
   }
+  return tenants;
+}
+
+/**
+ * The work that takes hours and so runs apart from the rest: the load of
+ * prospects from the open data of the Receita Federal, for the company that
+ * asked for one. One company at a time; the quick routines never wait for it.
+ */
+export async function runLongJobs(env: Record<string, string | undefined>): Promise<void> {
+  for (const tenant of await companies(env)) {
+    try {
+      await runProspectLoad(tenantDb(tenant.slug));
+    } catch (error) {
+      console.error(`[rotinas] carga de prospecção de ${tenant.slug} falhou:`, error instanceof Error ? error.message : error);
+    }
+  }
+}
+
+export async function runBackground(env: Record<string, string | undefined>, now: Date): Promise<void> {
+  const tenants = await companies(env);
   const key = () => vaultKey(env.ERP_CERT_KEY);
   for (const tenant of tenants) {
     const conn = tenantDb(tenant.slug);
@@ -79,4 +101,18 @@ export function startBackground(env: Record<string, string | undefined>): void {
   setTimeout(run, 60_000).unref();
   globalThis.__ERP_BACKGROUND__ = setInterval(run, EVERY_MINUTES * 60_000);
   globalThis.__ERP_BACKGROUND__.unref();
+  // The long work has a pace and a turn of its own.
+  let loading = false;
+  const load = async () => {
+    if (loading) return;
+    loading = true;
+    try {
+      await runLongJobs(env);
+    } catch (error) {
+      console.error("[rotinas] falha no trabalho longo:", error instanceof Error ? error.message : error);
+    } finally {
+      loading = false;
+    }
+  };
+  setInterval(load, 2 * 60_000).unref();
 }

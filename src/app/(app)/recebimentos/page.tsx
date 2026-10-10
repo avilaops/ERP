@@ -1,5 +1,8 @@
 import { monthLabel } from "@/lib/commissions-view";
+import { cookies } from "next/headers";
 import Link from "next/link";
+import { Pager, pageOf } from "@/components/ui";
+import { ROWS_COOKIE, rowsPerPage } from "@/lib/rows";
 import { requirePermission } from "@/lib/auth";
 import { confirmsRefunds, menuItem } from "@/lib/auth/permissions";
 import { listPaymentMethods } from "@/lib/db/orders";
@@ -37,6 +40,9 @@ export default async function RecebimentosPage({ searchParams }: { searchParams:
   const TABS = [["aberto", `Em aberto (${open.length})`], ...(refunds.length > 0 ? ([["estornos", `Estornos (${refunds.length})`]] as [string, string][]) : []), ["recebidos", "Recebidos"]] as [string, string][];
   const asked = (await searchParams).ver;
   const tab = TABS.find(([key]) => key === (Array.isArray(asked) ? asked[0] : asked))?.[0] ?? "aberto";
+  // Each open amount is a form of its own: a few at a time, the ones due first.
+  const askedPage = (await searchParams).pagina;
+  const slice = pageOf(open, Array.isArray(askedPage) ? askedPage[0] : askedPage, Math.min(5, rowsPerPage((await cookies()).get(ROWS_COOKIE)?.value)));
 
   const cards = [
     ["A receber", showMoney(summary.open.total), count(summary.open.count), ""],
@@ -81,8 +87,9 @@ export default async function RecebimentosPage({ searchParams }: { searchParams:
         {open.length === 0 ? (
           <p className="p-5 text-sm text-slate-600">Nada a receber. Os valores aparecem aqui quando um pedido é fechado.</p>
         ) : (
+          <>
           <ul>
-            {open.map((item) => {
+            {slice.rows.map((item) => {
               const late = isOverdue(item, today);
               return (
                 <li key={item.id} className="border-t border-slate-200 px-5 py-4 first:border-t-0">
@@ -157,6 +164,10 @@ export default async function RecebimentosPage({ searchParams }: { searchParams:
               );
             })}
           </ul>
+          <div className="border-t border-slate-200 px-4 pb-3">
+            <Pager {...slice} noun={["valor", "valores"]} hrefFor={(page) => `${HERE}${page > 1 ? `?pagina=${page}` : ""}`} />
+          </div>
+          </>
         )}
       </section>
         </>

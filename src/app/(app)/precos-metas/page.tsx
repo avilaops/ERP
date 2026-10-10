@@ -299,7 +299,7 @@ export default async function PrecosMetasPage({ searchParams }: { searchParams: 
             <p className="mt-3 text-sm text-slate-600">Nenhuma publicação ainda.</p>
           ) : (
             <div className="relative mt-3 overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="stack-sm w-full text-sm">
                 <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                   <tr>
                     {["Versão", "Publicada em", "Por", ...(director ? ["Markup"] : []), "Equipamentos", "Ticket médio"].map((column) => (

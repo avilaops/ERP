@@ -3,14 +3,17 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { CARD, INPUT, LABEL, Pager, PageHeader, pageOf, Pill, PRIMARY, QUIET_LINK, SECONDARY } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
-import { menuItem } from "@/lib/auth/permissions";
+import { menuItem, seesAllOrders } from "@/lib/auth/permissions";
 import { formatDocument, formatPhone } from "@/lib/customer";
 import { tenantDb } from "@/lib/db/pool";
+import { listProspectLoads, loadProspectFilters, MAX_CNAES } from "@/lib/db/prospect-load";
 import { IMPORT_LIMIT, listProspects, prospectTotals } from "@/lib/db/prospects";
+import { showDateTime } from "@/lib/format";
+import { UFS } from "@/lib/pricing/states";
 import { ROWS_COOKIE, rowsPerPage } from "@/lib/rows";
 import { ActionForm } from "../../pedidos/ActionForm";
 import { ConfirmButton } from "../../pedidos/ConfirmButton";
-import { importProspectsAction, prospectAction } from "../actions";
+import { importProspectsAction, prospectAction, prospectBaseAction } from "../actions";
 
 export const metadata = { title: "Prospecção · ERP" };
 export const dynamic = "force-dynamic";
@@ -24,7 +27,9 @@ export default async function ProspeccaoPage({ searchParams }: { searchParams: P
   const conn = tenantDb(session.tenant.slug);
   const query = await searchParams;
   const totals = await prospectTotals(conn);
-  const TABS = [["novo", `A trabalhar · ${totals.novo}`], ["virou", `Viraram oportunidade · ${totals.virou}`], ["descartado", `Descartadas · ${totals.descartado}`], ["importar", "+ Trazer empresas"]] as const;
+  // The load of the Receita's base brings thousands of companies at once: it is of who answers for the team.
+  const lead = seesAllOrders(session);
+  const TABS = [["novo", `A trabalhar · ${totals.novo}`], ["virou", `Viraram oportunidade · ${totals.virou}`], ["descartado", `Descartadas · ${totals.descartado}`], ["importar", "+ Por CNPJ"], ...(lead ? ([["base", "Base da Receita"]] as const) : [])] as const;
   // An empty list opens on the way to fill it, at its own address: the answer of the import stays on the screen after the list changes.
   if (first(query.ver) === "" && totals.novo + totals.virou + totals.descartado === 0) redirect(`${HERE}?ver=importar`);
   const tab = TABS.find(([key]) => key === first(query.ver))?.[0] ?? "novo";
@@ -53,7 +58,7 @@ export default async function ProspeccaoPage({ searchParams }: { searchParams: P
           </Link>
         ))}
       </nav>
-      {tab === "importar" ? <Import /> : <List />}
+      {tab === "importar" ? <Import /> : tab === "base" ? <Base /> : <List />}
     </div>
   );
 
@@ -71,6 +76,70 @@ export default async function ProspeccaoPage({ searchParams }: { searchParams: P
           Buscar na Receita e guardar
         </button>
       </ActionForm>
+    );
+  }
+
+  async function Base() {
+    const filters = await loadProspectFilters(conn);
+    const loads = await listProspectLoads(conn);
+    const running = loads.find((load) => load.status === "pedida" || load.status === "rodando") ?? null;
+    const STATUS = { pedida: "na fila", rodando: "em andamento", concluida: "concluída", falhou: "parou" } as const;
+    return (
+      <>
+        <ActionForm action={prospectBaseAction} className={`${CARD} mt-3 p-3`}>
+          <label htmlFor="cnaes" className={LABEL}>
+            Atividades que interessam (CNAE principal, até {MAX_CNAES}), uma por linha
+          </label>
+          <textarea id="cnaes" name="cnaes" rows={3} defaultValue={filters.cnaes.join("\n")} key={filters.cnaes.join(",")} placeholder={"9313-1/00\n8650-0/04"} className={`${INPUT} py-2 font-mono`} />
+          <p className="mt-1 text-xs text-slate-600">
+            O código de cada atividade está no cartão CNPJ de qualquer empresa do ramo, ou na busca do IBGE (CONCLA). Ex.: 9313-1/00 é academia; 8650-0/04, fisioterapia.
+          </p>
+          <fieldset className="mt-3">
+            <legend className={LABEL}>Estados (nenhum marcado é o Brasil todo)</legend>
+            <div className="mt-1 grid grid-cols-6 gap-1 sm:grid-cols-9">
+              {UFS.map((uf) => (
+                <label key={uf} className="flex min-h-9 cursor-pointer items-center justify-center gap-1 rounded border border-slate-300 bg-white text-sm has-[:checked]:border-brand has-[:checked]:font-semibold has-[:checked]:text-brand">
+                  <input type="checkbox" name="ufs" value={uf} defaultChecked={filters.ufs.includes(uf)} className="sr-only" />
+                  {uf}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+          <p className="mt-3 text-sm text-slate-600">
+            Só entram empresas ativas, com os dados públicos do cadastro: nome, atividade, endereço, telefone e e-mail da empresa. Nenhum sócio. A carga lê a base inteira da Receita pela internet e guarda só o recorte; leva algumas horas e pode ser repetida todo mês.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button type="submit" name="what" value="salvar" className={SECONDARY}>
+              Salvar recorte
+            </button>
+            {!running && (
+              <button type="submit" name="what" value="trazer" className={PRIMARY}>
+                Salvar e trazer da Receita
+              </button>
+            )}
+          </div>
+        </ActionForm>
+        {loads.length > 0 && (
+          <ul className="mt-3 flex flex-col gap-2" aria-label="Cargas">
+            {loads.map((load) => (
+              <li key={load.id} className={`${CARD} flex flex-wrap items-center gap-2 px-3 py-2`}>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium">
+                    {showDateTime(load.requestedAt)} · {load.cnaes.length} {load.cnaes.length === 1 ? "atividade" : "atividades"} · {load.ufs.length === 0 ? "Brasil todo" : load.ufs.join(", ")}
+                  </span>
+                  <span className="block text-sm text-slate-600">{load.detail ?? "Esperando a vez."}</span>
+                </span>
+                <Pill tone={load.status === "concluida" ? "good" : load.status === "falhou" ? "bad" : "warn"}>{STATUS[load.status]}</Pill>
+                {(load.status === "pedida" || load.status === "rodando") && (
+                  <ActionForm action={prospectBaseAction}>
+                    <ConfirmButton label="Cancelar" confirmLabel="Confirmar: cancelar a carga" className={DANGER} />
+                  </ActionForm>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </>
     );
   }
 

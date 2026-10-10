@@ -90,7 +90,7 @@ Telas que ainda não obedecem à regra e o caminho previsto para cada uma:
 | Tela | Situação | Caminho |
 |---|---|---|
 | Produtos e custos | Catálogo paginado desde 10/10/2026 (1 a 1,7 tela, por causa do cabeçalho com as ferramentas) | Enxugar o cabeçalho; edição em tela própria também no computador |
-| Parâmetros | Em abas desde 10/10/2026: índice por assunto, Regra de preço, Empresa e Aprovação. A Regra de preço mostra uma parte por vez (política, impostos, canal, provisões, despesas, ICMS por estado), gravadas juntas: 1,2 tela no computador, 2,5 a 3,3 no celular por causa do quadro Resultado | No celular, pôr o quadro Resultado numa parte própria |
+| Parâmetros | Em abas desde 10/10/2026: índice por assunto, Regra de preço, Empresa e Aprovação. A Regra de preço mostra uma parte por vez (política, impostos, canal, provisões, despesas, ICMS por estado), gravadas juntas: 1,2 tela no computador, no celular o quadro Resultado é uma aba própria e a regra fica em 1,7 a 2,2 telas | Dividir as partes mais longas (ICMS por estado) |
 | Dashboard | Em abas desde 10/10/2026 (Resumo, Vendas, Em aberto, Dinheiro): 1 tela no computador, até 1,7 no celular (2,3 na aba Dinheiro em 360×640) | Trocar as tabelas da aba Dinheiro por linhas compactas |
 | Preços e metas | Em abas desde 10/10/2026 (Resumo, Metas, Tabela): 1 tela, salvo a aba Tabela no celular (2 a 2,6) | Paginar as publicações e o quadro por destino no celular |
 | Fornecedores | Lista paginada e cadastro separado desde 10/10/2026; o formulário de novo fornecedor passa de uma tela no celular | Formulário em etapas, se incomodar |

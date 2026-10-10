@@ -13,6 +13,7 @@ import { CadenceError, startCadence, stopCadence } from "@/lib/db/cadences";
 import { cancelMeeting, deleteMeeting, logCall, MeetingError, saveMeeting } from "@/lib/db/meetings";
 import { MessageError, sendOpportunityMail } from "@/lib/db/messages";
 import { tenantDb } from "@/lib/db/pool";
+import { cancelProspectLoad, ProspectLoadError, requestProspectLoad, saveProspectFilters } from "@/lib/db/prospect-load";
 import { convertProspect, deleteProspect, importProspects, ProspectError, setProspectDiscarded } from "@/lib/db/prospects";
 import { lookupCnpj } from "@/lib/cnpj";
 import { callOpportunity } from "@/lib/db/voice";
@@ -37,7 +38,7 @@ const reader = (formData: FormData) => (key: string) => {
 const whole = (value: string) => (/^[1-9]\d{0,8}$/.test(value.trim()) ? Number(value.trim()) : null);
 
 function problem(error: unknown): ActionState {
-  if (error instanceof FunnelError || error instanceof MessageError || error instanceof CadenceError || error instanceof MeetingError || error instanceof AssistError || error instanceof WhatsappError || error instanceof ProspectError || error instanceof VoiceError || error instanceof MailError) return { error: error.message };
+  if (error instanceof FunnelError || error instanceof MessageError || error instanceof CadenceError || error instanceof MeetingError || error instanceof AssistError || error instanceof WhatsappError || error instanceof ProspectError || error instanceof ProspectLoadError || error instanceof VoiceError || error instanceof MailError) return { error: error.message };
   console.error("[funil] falha ao gravar:", error instanceof Error ? error.message : error);
   return { error: FAILED };
 }
@@ -412,4 +413,36 @@ export async function systemCallAction(_previous: ActionState, formData: FormDat
   }
   revalidatePath(`${HERE}/${id}`);
   return { error: null, notice: "O seu telefone vai tocar. Ao atender, o sistema conecta com o cliente." };
+}
+
+/**
+ * The base of the Receita, for who follows the whole team: "Salvar recorte"
+ * (the activities and states to bring), "Trazer da Receita" (asks for a load,
+ * which runs by itself for hours) and "Cancelar a carga".
+ */
+export async function prospectBaseAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
+  const session = await requirePermission("funil");
+  if (!seesAllOrders(session)) return { error: "A carga da base da Receita é de quem acompanha a equipe toda (gerência e diretoria)." };
+  const conn = tenantDb(session.tenant.slug);
+  const read = reader(formData);
+  const what = read("what") || "cancelar";
+  let notice: string;
+  try {
+    if (what === "salvar" || what === "trazer") {
+      const saved = await saveProspectFilters({ cnaes: read("cnaes"), ufs: formData.getAll("ufs").filter((value): value is string => typeof value === "string") }, session.email, conn);
+      notice = `Recorte gravado: ${saved.cnaes.length} ${saved.cnaes.length === 1 ? "atividade" : "atividades"}, ${saved.ufs.length === 0 ? "Brasil todo" : saved.ufs.join(", ")}.`;
+      if (what === "trazer") {
+        await requestProspectLoad(session.email, conn);
+        console.info(`[prospecção] ${session.email} pediu a carga da Receita em ${session.tenant.slug}`);
+        notice = "Carga pedida. Ela começa em até 2 minutos e leva algumas horas; as empresas vão aparecendo na lista.";
+      }
+    } else {
+      await cancelProspectLoad(session.name, conn);
+      notice = "Carga cancelada. O que já veio fica na lista.";
+    }
+  } catch (error) {
+    return problem(error);
+  }
+  revalidatePath(`${HERE}/prospeccao`);
+  return { error: null, notice };
 }
