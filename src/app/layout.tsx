@@ -1,13 +1,18 @@
 import type { Metadata, Viewport } from "next";
-import { Barlow_Condensed, IBM_Plex_Sans } from "next/font/google";
+import localFont from "next/font/local";
 import { APP_DESCRIPTION, APP_NAME, APP_SHORT_NAME, THEME_COLOR } from "@/lib/app-identity";
 import { cookies } from "next/headers";
 import { parseTheme, THEME_COOKIE } from "@/lib/theme";
 import "./globals.css";
 
-// The two families of the prototype. Served by the application itself: nothing is fetched from Google at run time.
-const display = Barlow_Condensed({ subsets: ["latin"], weight: ["500", "600", "700"], variable: "--font-barlow-condensed" });
-const body = IBM_Plex_Sans({ subsets: ["latin"], weight: ["400", "500", "600"], variable: "--font-plex-sans" });
+// The two families of the prototype, kept in the project (src/app/fonts): nothing is fetched from the internet, at build or at run time.
+const display = localFont({
+  src: [{ path: "./fonts/barlow-500.woff2", weight: "500" }, { path: "./fonts/barlow-600.woff2", weight: "600" }, { path: "./fonts/barlow-700.woff2", weight: "700" }],
+  variable: "--font-barlow-condensed",
+  display: "swap",
+});
+// One file with every weight (a variable font).
+const body = localFont({ src: "./fonts/plex.woff2", weight: "400 600", variable: "--font-plex-sans", display: "swap" });
 
 export const metadata: Metadata = {
   title: APP_NAME,

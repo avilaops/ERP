@@ -20,13 +20,29 @@ import { ParamsForm } from "./ParamsForm";
 export const metadata = { title: `${menuItem("parametros").label} · ERP` };
 export const dynamic = "force-dynamic";
 
+const TABS = [["inicio", "Cadastros"], ["precos", "Regra de preço"], ["empresa", "Empresa"], ["aprovacao", "Aprovação"]] as const;
+
+/** Every register of the company, by subject. Each opens a screen of its own. */
+const GROUPS: [title: string, links: [href: string, label: string, hint: string][]][] = [
+  ["Vendas", [["/parametros/linhas", "Linhas de produto", "Grupos de equipamento, cada um com a sua regra de preço"], ["/parametros/formas-de-pagamento", "Formas de pagamento", "Pix, boleto, cartão e as taxas de cada uma"], ["/parametros/transportadoras", "Transportadoras", "Quem entrega, para a nota fiscal"], ["/parametros/contrato", "Contrato", "O modelo, a assinatura e a segurança"]]],
+  ["Funil e clientes", [["/parametros/funil", "Etapas do funil", "Por onde a venda passa antes do pedido"], ["/parametros/mensagens", "Modelos de mensagem", "Textos prontos de e-mail"], ["/parametros/cadencias", "Cadências", "Sequências de e-mails e tarefas"], ["/parametros/automacoes", "Lembretes automáticos", "Orçamento parado, parcela vencendo"]]],
+  ["Comunicação", [["/parametros/email", "E-mail", "Caixa de saída, texto da nota e respostas dos clientes"], ["/parametros/whatsapp", "WhatsApp", "A conta oficial da empresa na Meta"], ["/parametros/telefonia", "Telefonia", "Ligação pelo sistema"], ["/parametros/assistente", "Assistente", "Conexão com o Claude e inteligência artificial"]]],
+  ["Financeiro e fiscal", [["/parametros/fiscal", "Fiscal e certificado", "Quem emite a nota e o certificado digital"], ["/parametros/categorias-de-contas", "Categorias de contas", "Como as contas a pagar são agrupadas"], ["/parametros/despesas-fixas", "Despesas fixas", "O que a empresa paga todo mês"]]],
+  ["Equipe e sistemas", [["/parametros/usuarios", "Usuários e perfis", "Quem entra e o que cada um vê"], ["/parametros/producao", "Etapas da produção", "Por onde cada ordem passa na fábrica"], ["/parametros/integracoes", "Integrações", "Chaves e avisos para outros sistemas"]]],
+];
+
 export default async function ParametrosPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const session = await requirePermission("parametros");
   const conn = tenantDb(session.tenant.slug);
 
+  // One part at a time: the way to every register of the company, the price rule, the company's own data, the approval rules.
+  const query = await searchParams;
+  const asked = Array.isArray(query.ver) ? query.ver[0] : query.ver;
+  // A link that names a line is a link to the price rule of that line.
+  const tab = TABS.find(([key]) => key === asked)?.[0] ?? (query[LINE_PARAM] !== undefined ? "precos" : "inicio");
   // Each product line has its own parameters: the screen shows and saves one line at a time.
   const lines = await listLines(conn);
-  const line = pickLine(lines, (await searchParams)[LINE_PARAM]);
+  const line = pickLine(lines, query[LINE_PARAM]);
   const [params, costs, logoVersion] = await Promise.all([loadParams(conn, line.id), listProductCosts(conn, line.id), loadLogoVersion(conn)]);
   const commissionDay = await loadCommissionDay(conn);
   const proposal = await loadProposalSettings(conn);
@@ -53,84 +69,88 @@ export default async function ParametrosPage({ searchParams }: { searchParams: P
     <>
       <h1 className="text-2xl font-semibold">{menuItem("parametros").label}</h1>
       <p className="mt-1 text-slate-600">Impostos, canal e política. Tudo que muda aqui recalcula a tabela inteira.</p>
-      <p className="mt-2 text-sm">
-        <Link href="/parametros/linhas" className="font-medium text-brand underline">
-          Linhas de produto
-        </Link>
-        {" · "}
-        <Link href="/parametros/usuarios" className="font-medium text-brand underline">
-          Usuários e perfis da equipe
-        </Link>
-        {" · "}
-        <Link href="/parametros/formas-de-pagamento" className="font-medium text-brand underline">
-          Formas de pagamento
-        </Link>
-        {" · "}
-        <Link href="/parametros/categorias-de-contas" className="font-medium text-brand underline">
-          Categorias de contas a pagar
-        </Link>
-        {" · "}
-        <Link href="/parametros/despesas-fixas" className="font-medium text-brand underline">
-          Despesas fixas
-        </Link>
-        {" · "}
-        <Link href="/parametros/transportadoras" className="font-medium text-brand underline">
-          Transportadoras
-        </Link>
-        {" · "}
-        <Link href="/parametros/email" className="font-medium text-brand underline">
-          E-mail das notas
-        </Link>
-        {" · "}
-        <Link href="/parametros/funil" className="font-medium text-brand underline">
-          Etapas do funil
-        </Link>
-        {" · "}
-        <Link href="/parametros/mensagens" className="font-medium text-brand underline">
-          Modelos de mensagem
-        </Link>
-        {" · "}
-        <Link href="/parametros/cadencias" className="font-medium text-brand underline">
-          Cadências
-        </Link>
-        {" · "}
-        <Link href="/parametros/integracoes" className="font-medium text-brand underline">
-          Integrações
-        </Link>
-        {" · "}
-        <Link href="/parametros/assistente" className="font-medium text-brand underline">
-          Assistente
-        </Link>
-        {" · "}
-        <Link href="/parametros/whatsapp" className="font-medium text-brand underline">
-          WhatsApp
-        </Link>
-        {" · "}
-        <Link href="/parametros/producao" className="font-medium text-brand underline">
-          Etapas da produção
-        </Link>
-        {" · "}
-        <Link href="/parametros/telefonia" className="font-medium text-brand underline">
-          Telefonia
-        </Link>
-        {" · "}
-        <Link href="/parametros/automacoes" className="font-medium text-brand underline">
-          Lembretes automáticos
-        </Link>
-        {" · "}
-        <Link href="/parametros/contrato" className="font-medium text-brand underline">
-          Contrato
-        </Link>
-        {" · "}
-        <Link href="/parametros/fiscal" className="font-medium text-brand underline">
-          Fiscal e certificado digital
-        </Link>
-      </p>
+      <nav aria-label="Partes dos parâmetros" className="mt-2 flex flex-wrap gap-x-1 border-b border-slate-200">
+        {TABS.map(([key, label]) => (
+          <Link
+            key={key}
+            href={`/parametros?ver=${key}`}
+            aria-current={key === tab ? "page" : undefined}
+            className={`inline-flex min-h-[var(--control)] items-center border-b-2 px-3 text-sm font-medium ${key === tab ? "border-brand text-brand" : "border-transparent text-slate-600 hover:text-slate-900"}`}
+          >
+            {label}
+          </Link>
+        ))}
+      </nav>
+      {tab === "inicio" && (
+        <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {GROUPS.map(([title, links]) => (
+            <section key={title} className="rounded-lg border border-slate-200 bg-white p-3" aria-label={title}>
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-600">{title}</h2>
+              <ul className="mt-1 grid grid-cols-2 gap-x-2 md:grid-cols-1">
+                {links.map(([href, label, hint]) => (
+                  <li key={href}>
+                    <Link href={href} className="flex min-h-[var(--control)] flex-col justify-center rounded px-1 py-1 hover:bg-slate-50">
+                      <span className="font-medium text-brand">{label}</span>
+                      <span className="text-xs text-slate-600 max-md:hidden">{hint}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))}
+        </div>
+      )}
+      {tab === "precos" && (
+        <>
       <LineTabs lines={lines} current={line.id} path="/parametros" />
       {lines.length > 1 && <p className="mt-2 text-sm text-slate-600">Parâmetros da linha <strong>{line.name}</strong>. Logo, dia da comissão e regras de aprovação valem para a empresa toda.</p>}
-
-      <div className="mt-6 grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
-        <div className="flex min-w-0 flex-col gap-6">
+          <div className="mt-3 grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
+            <div className="min-w-0">
+            <ParamsForm key={line.id} lineId={line.id} imported={line.imported} saved={form} action={saveParamsAction} />
+            </div>
+            <aside className="rounded-lg border border-slate-200 bg-white" aria-labelledby="resultado">
+              <h2 id="resultado" className="border-b border-slate-200 px-5 py-3 text-sm font-semibold uppercase tracking-wide">
+                Resultado
+              </h2>
+              <div className="p-5">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Preço de tabela</p>
+                <p className="mt-1 text-3xl font-bold">custo × {showMultiplier(result.tableMultiplier)}</p>
+                <p className="text-sm text-slate-600">markup de {showPercent(result.markup)}</p>
+    
+                <dl className="mt-4 grid grid-cols-[1fr_auto] gap-x-4 gap-y-2 text-sm">
+                  {rows.map(([label, value]) => (
+                    <div key={label} className="contents">
+                      <dt className="text-slate-600">{label}</dt>
+                      <dd className="text-right font-medium">{value}</dd>
+                    </div>
+                  ))}
+                  <div className="contents">
+                    <dt className="text-slate-600">Entrada mínima sugerida</dt>
+                    <dd className="flex items-center justify-end gap-2 font-medium">
+                      {suggestion ? showPercent(suggestion.rate, 0) : "—"}
+                      {suggestion && (
+                        <form action={adoptSuggestedDownPaymentAction}>
+                          <input type="hidden" name="lineId" value={line.id} />
+                          <button type="submit" className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50">
+                            usar
+                          </button>
+                        </form>
+                      )}
+                    </dd>
+                  </div>
+                </dl>
+    
+                <p className="mt-4 text-xs text-slate-500">
+                  A conta: venda com desconto = custo ÷ (1 − impostos e taxas − lucro antes do IR). Tabela = isso ÷ (1 −
+                  desconto livre). Mudou algo? A equipe só vê depois de publicar.
+                </p>
+              </div>
+            </aside>
+          </div>
+        </>
+      )}
+      {tab === "empresa" && (
+        <div className="mt-3 flex max-w-3xl flex-col gap-4">
           <LogoForm
             company={session.tenant.name}
             logo={logoVersion ? `/empresa/logo?v=${logoVersion.getTime()}` : null}
@@ -189,7 +209,10 @@ export default async function ParametrosPage({ searchParams }: { searchParams: P
               </div>
             </ActionForm>
           </section>
-
+        </div>
+      )}
+      {tab === "aprovacao" && (
+        <div className="mt-3 max-w-3xl">
           <section className="rounded-lg border border-slate-200 bg-white p-5" aria-labelledby="regras-aprovacao">
             <h2 id="regras-aprovacao" className="text-sm font-semibold uppercase tracking-wide">
               Regras de aprovação
@@ -239,48 +262,8 @@ export default async function ParametrosPage({ searchParams }: { searchParams: P
               </div>
             </ActionForm>
           </section>
-          <ParamsForm key={line.id} lineId={line.id} imported={line.imported} saved={form} action={saveParamsAction} />
         </div>
-
-        <aside className="rounded-lg border border-slate-200 bg-white" aria-labelledby="resultado">
-          <h2 id="resultado" className="border-b border-slate-200 px-5 py-3 text-sm font-semibold uppercase tracking-wide">
-            Resultado
-          </h2>
-          <div className="p-5">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Preço de tabela</p>
-            <p className="mt-1 text-3xl font-bold">custo × {showMultiplier(result.tableMultiplier)}</p>
-            <p className="text-sm text-slate-600">markup de {showPercent(result.markup)}</p>
-
-            <dl className="mt-4 grid grid-cols-[1fr_auto] gap-x-4 gap-y-2 text-sm">
-              {rows.map(([label, value]) => (
-                <div key={label} className="contents">
-                  <dt className="text-slate-600">{label}</dt>
-                  <dd className="text-right font-medium">{value}</dd>
-                </div>
-              ))}
-              <div className="contents">
-                <dt className="text-slate-600">Entrada mínima sugerida</dt>
-                <dd className="flex items-center justify-end gap-2 font-medium">
-                  {suggestion ? showPercent(suggestion.rate, 0) : "—"}
-                  {suggestion && (
-                    <form action={adoptSuggestedDownPaymentAction}>
-                      <input type="hidden" name="lineId" value={line.id} />
-                      <button type="submit" className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50">
-                        usar
-                      </button>
-                    </form>
-                  )}
-                </dd>
-              </div>
-            </dl>
-
-            <p className="mt-4 text-xs text-slate-500">
-              A conta: venda com desconto = custo ÷ (1 − impostos e taxas − lucro antes do IR). Tabela = isso ÷ (1 −
-              desconto livre). Mudou algo? A equipe só vê depois de publicar.
-            </p>
-          </div>
-        </aside>
-      </div>
+      )}
     </>
   );
 }

@@ -2,7 +2,10 @@ import { LineTabs } from "@/components/LineTabs";
 import { lineWords } from "@/lib/line-words";
 import { listLines } from "@/lib/db/product-lines";
 import { LINE_PARAM, pickLine } from "@/lib/lines-view";
+import { cookies } from "next/headers";
 import Link from "next/link";
+import { Pager, pageOf } from "@/components/ui";
+import { ROWS_COOKIE, rowsPerPage } from "@/lib/rows";
 import { requirePermission } from "@/lib/auth";
 import { tenantDb } from "@/lib/db/pool";
 import { menuItem } from "@/lib/auth/permissions";
@@ -99,6 +102,12 @@ export default async function ProdutosPage({
   const draft = draftPriceTable(params, products);
   const notice = publishNotice(draft, latest, pendingChanges(draft, published), nextNumber);
   const rows = viewProducts(products, { tab, search }).map((product) => toRow(product, params));
+  // A long catalogue is never drawn whole: one slice at a time, with the way to the next.
+  const slice = pageOf(rows, first(query.pagina), rowsPerPage((await cookies()).get(ROWS_COOKIE)?.value));
+  const pageHref = (page: number) => {
+    const base = listHref(ITEM.href, tab, search, several ? line.id : null);
+    return page > 1 ? `${base}${base.includes("?") ? "&" : "?"}pagina=${page}` : base;
+  };
 
   const words = lineWords(line.imported);
   return (
@@ -167,7 +176,7 @@ export default async function ProdutosPage({
           <>
             {/* On a phone each equipment is a card that opens its own screen; the table is for wider screens. */}
             <ul className="border-t border-slate-200 md:hidden">
-              {rows.map((row) => (
+              {slice.rows.map((row) => (
                 <li key={row.id} className="border-t border-slate-200 first:border-t-0">
                   <Link href={`${ITEM.href}/${row.id}`} className="flex items-center justify-between gap-3 px-4 py-3 active:bg-slate-50">
                     <span className="min-w-0">
@@ -201,7 +210,7 @@ export default async function ProdutosPage({
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row) => (
+                {slice.rows.map((row) => (
                   <ProductRow
                     key={row.id}
                     row={row}
@@ -213,6 +222,9 @@ export default async function ProdutosPage({
                 ))}
               </tbody>
             </table>
+          </div>
+          <div className="border-t border-slate-200 px-4 pb-3">
+            <Pager {...slice} noun={["equipamento", "equipamentos"]} hrefFor={pageHref} />
           </div>
           </>
         )}

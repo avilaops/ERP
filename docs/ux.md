@@ -89,11 +89,11 @@ Telas que ainda não obedecem à regra e o caminho previsto para cada uma:
 
 | Tela | Situação | Caminho |
 |---|---|---|
-| Produtos e custos | Catálogo inteiro numa página (10 a 21 telas) | Paginar com `pageOf`/`Pager`/`FitRows`, edição em tela própria |
-| Parâmetros | Todos os grupos numa página (4 a 10 telas) | Uma seção por vez, com as abas que já existem como links |
+| Produtos e custos | Catálogo paginado desde 10/10/2026 (1 a 1,7 tela, por causa do cabeçalho com as ferramentas) | Enxugar o cabeçalho; edição em tela própria também no computador |
+| Parâmetros | Em abas desde 10/10/2026: índice por assunto, Regra de preço, Empresa e Aprovação. A Regra de preço ainda é um formulário de 2 a 8 telas | Separar o formulário da regra de preço em partes (impostos por estado, canal, política) |
 | Dashboard | 2 a 5 telas | Indicadores na primeira dobra; gráficos em "Ver evolução" |
 | Preços e metas | 1,6 a 4 telas | Separar quadro de alçada, metas e versões |
-| Fornecedores | 1,2 a 2,7 telas | Cadastro em tela própria, lista paginada |
+| Fornecedores | Lista paginada e cadastro separado desde 10/10/2026; o formulário de novo fornecedor passa de uma tela no celular | Formulário em etapas, se incomodar |
 | Pedido (um pedido) | Longa, com abas de âncora | Partes do pedido como etapas reais |
 | Tabela de preços e Simulador em 360×640 | 1,05 a 1,25 tela | Rever o cabeçalho de página para telas muito baixas |
 | Clientes, Comissões, Recebimentos, Aprovações, Equipe, Dashboard, Preços e metas | Tabela com rolagem lateral dentro do cartão, no celular | Trocar a tabela por linhas compactas com detalhe, como na Tabela de preços |
