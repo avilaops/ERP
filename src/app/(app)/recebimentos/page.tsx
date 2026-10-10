@@ -110,6 +110,9 @@ export default async function RecebimentosPage({ searchParams }: { searchParams:
                       </p>
                     </div>
                   </div>
+                  {/* The form of the write-off opens on request: closed, each amount is one line, and several fit a screen. */}
+                  <details className="group mt-2" open={slice.rows.length === 1}>
+                    <summary className="inline-flex min-h-[var(--control)] cursor-pointer items-center rounded-lg border border-slate-300 bg-white px-4 text-sm font-medium hover:bg-slate-50 group-open:hidden">Dar baixa</summary>
                   <ActionForm action={recordReceiptAction} className="mt-3 flex flex-wrap items-end gap-3">
                     <input type="hidden" name="id" value={item.id} />
                     <div>
@@ -160,6 +163,7 @@ export default async function RecebimentosPage({ searchParams }: { searchParams:
                       Dar baixa
                     </button>
                   </ActionForm>
+                  </details>
                 </li>
               );
             })}

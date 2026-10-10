@@ -91,7 +91,7 @@ export default async function ProspeccaoPage({ searchParams }: { searchParams: P
             Atividades que interessam (CNAE principal, até {MAX_CNAES}), uma por linha
           </label>
           <textarea id="cnaes" name="cnaes" rows={3} defaultValue={filters.cnaes.join("\n")} key={filters.cnaes.join(",")} placeholder={"9313-1/00\n8650-0/04"} className={`${INPUT} py-2 font-mono`} />
-          <p className="mt-1 text-xs text-slate-600">
+          <p className="mt-1 text-xs text-slate-600 max-sm:hidden">
             O código de cada atividade está no cartão CNPJ de qualquer empresa do ramo, ou na busca do IBGE (CONCLA). Ex.: 9313-1/00 é academia; 8650-0/04, fisioterapia.
           </p>
           <fieldset className="mt-3">
@@ -105,9 +105,12 @@ export default async function ProspeccaoPage({ searchParams }: { searchParams: P
               ))}
             </div>
           </fieldset>
-          <p className="mt-3 text-sm text-slate-600">
+          <details className="mt-3 text-sm text-slate-600">
+            <summary className="cursor-pointer font-medium text-slate-700">O que a carga traz e quanto demora</summary>
+          <p className="mt-1">
             Só entram empresas ativas, com os dados públicos do cadastro: nome, atividade, endereço, telefone e e-mail da empresa. Nenhum sócio. A carga lê a base inteira da Receita pela internet e guarda só o recorte; leva algumas horas e pode ser repetida todo mês.
           </p>
+          </details>
           <div className="mt-3 flex flex-wrap gap-2">
             <button type="submit" name="what" value="salvar" className={SECONDARY}>
               Salvar recorte

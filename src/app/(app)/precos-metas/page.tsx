@@ -310,7 +310,7 @@ export default async function PrecosMetasPage({ searchParams }: { searchParams: 
                   </tr>
                 </thead>
                 <tbody>
-                  {versions.slice(0, 12).map((version) => (
+                  {versions.slice(0, 6).map((version) => (
                     <tr key={version.version} className="border-t border-slate-200">
                       <td className="px-4 py-2 font-medium">
                         <Link href={`${menuItem("tabela-precos").href}?versao=${version.version}`} className="text-brand underline-offset-2 hover:underline">
