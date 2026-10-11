@@ -18,13 +18,13 @@ Sem erro de console nem resposta HTTP >= 400 em nenhuma das 54 telas.
 | Overflow horizontal no celular | `/parametros/linhas`: o `<select>` "De onde vem" (opções longas) estoura os 390 px | `scrollWidth` > `clientWidth` |
 | Controles abaixo de 44 px (`docs/ux.md`) | Menu lateral do desktop: 40 px por item, em todas as telas | 23+ itens por tela |
 | | Celular: `/parametros/fiscal` (62), `/parametros/categorias-de-contas` (78), `/parametros/formas-de-pagamento` (57), `/equipe/nova` (24), `/equipe/perfis` (15), `/contas-pagar` (12), `/fornecedores` (14) | botões "Salvar"/"Adicionar", selects e checkboxes |
-| Menu lateral não cabe em 1366×768 e 1440×900 | Rodapé do menu (seletor de tema) fica cortado; `aside` com `overflow: visible` e `scrollHeight == clientHeight` | contradiz "menu lateral com rolagem própria" |
+| Menu lateral maior que a janela | Em 1440×900 o menu tem 985 px de conteúdo em 864 px de área; "Equipe e acessos" e o seletor de tema só aparecem rolando o menu (a rolagem própria funciona, `overflow-y: auto`) | 985/864 |
 | Telas de parâmetros longas no celular | `/parametros/fiscal` 6468 px, `/parametros/categorias-de-contas` 4197 px, `/parametros/contrato` 2894 px, `/parametros/formas-de-pagamento` 2739 px | 3 a 7 telas de rolagem; fere "uma tela, uma tarefa" |
 
 ## O que melhorar visualmente
 
 1. **`/parametros/linhas` no celular**: `select` com `w-full min-w-0` e opção curta ("Importada") com a explicação em texto abaixo.
-2. **Menu lateral**: item com `min-h-[var(--control)]` (44 px) ou, se a densidade for intencional, registrar a exceção em `docs/ux.md`; garantir `overflow-y-auto` no `aside` para o seletor de tema nunca sumir.
+2. **Menu lateral**: item com `min-h-[var(--control)]` (44 px) ou, se a densidade for intencional, registrar a exceção em `docs/ux.md`; fixar o seletor de tema fora da área rolável e agrupar itens pouco usados (Simulador, Equipe e acessos) para o menu caber em 900 px.
 3. **Parâmetros longos** (fiscal, categorias, formas de pagamento, contrato): virar etapas (`?etapa=`) ou lista com `<details>` por item, como o próprio `docs/ux.md` manda.
 4. **Linhas de edição em lista** (categorias, formas de pagamento): "Ordem", "Nome", "Em uso", "Salvar", "Remover" empilham em 5 linhas por item no celular; uma linha por item com "Editar" que abre o detalhe.
 5. **Desktop com coluna estreita**: telas do funil (`nova`, `campanhas/nova`, `captura`, `conversas`, `tarefas`) usam ~700 px de 1440 e deixam o resto vazio; `Dashboard` usa a largura toda. Padronizar a largura máxima por tipo de tela.
