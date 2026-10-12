@@ -38,7 +38,7 @@ const MORE_ICON = "M5 12h.01M12 12h.01M19 12h.01";
 const GROUPS: [title: string, keys: string[]][] = [
   ["Vendas", ["dashboard", "funil", "pedidos", "clientes", "aprovacoes", "tabela-precos", "simulador"]],
   ["Financeiro", ["recebimentos", "contas-pagar", "comissoes", "fornecedores"]],
-  ["Produtos", ["produtos", "producao", "precos-metas"]],
+  ["Produtos", ["produtos", "estoque", "compras", "producao", "precos-metas"]],
   ["Gestão", ["relatorios", "parametros", "equipe"]],
 ];
 

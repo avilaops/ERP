@@ -7,6 +7,10 @@ import { ROLES } from "@/lib/auth/roles";
 import type { Role } from "@/lib/auth/roles";
 import { APP_URL, LUDUS, redirectOf, SECRET, setCookies, ssoToken, TENANTS, withEnv } from "./helpers.ts";
 
+// The session reads which modules the company turned off. With a database of the developer in the
+// environment the answer would be whatever is in it: these tests are about the sign-in, with no database.
+delete process.env.DATABASE_URL;
+
 const EMAILS: Record<Role, string> = {
   DIRETORIA: "dir@teste.local",
   GERENTE_COMERCIAL: "ger@teste.local",

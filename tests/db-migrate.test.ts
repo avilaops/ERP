@@ -92,6 +92,8 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "0058_modulo_de_producao_por_empresa.sql",
     "0059_cnpj_alfanumerico_do_emitente.sql",
     "0060_icms_fora_da_base_do_pis_e_da_cofins.sql",
+    "0061_estoque_e_compras.sql",
+    "0062_cobranca_por_pix.sql",
   ]);
 
   const second = await withClient((client) => migrate(client, MIGRATIONS_DIR));
@@ -176,6 +178,9 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "prospect_filters",
     "prospect_loads",
     "prospects",
+    "purchase_costs",
+    "purchase_items",
+    "purchases",
     "receipts",
     "receivables",
     "refund_requests",
@@ -183,6 +188,7 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "sales_goals",
     "schema_migrations",
     "state_tax_rates",
+    "stock_moves",
     "supplier_items",
     "suppliers",
     "users",

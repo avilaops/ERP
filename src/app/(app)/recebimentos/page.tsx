@@ -100,6 +100,9 @@ export default async function RecebimentosPage({ searchParams }: { searchParams:
                       <p className="text-xs text-slate-500">
                         #{item.orderNumber} · {item.label} · vendedor: {item.sellerName}
                       </p>
+                      <Link href={`${menuItem("recebimentos").href}/${item.id}/pix`} className="text-sm font-medium text-brand underline">
+                        Cobrar por PIX
+                      </Link>
                     </div>
                     <div className="text-right">
                       <p className="text-lg font-bold">{showMoney(item.open)}</p>
