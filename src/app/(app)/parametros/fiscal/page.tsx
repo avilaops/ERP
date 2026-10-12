@@ -303,7 +303,7 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
                       {method.label}
                       {!method.active && <span className="ml-2 text-xs font-normal text-slate-500">desligada</span>}
                     </span>
-                    <select key={method.code ?? ""} name="code" defaultValue={method.code ?? ""} aria-label={`Forma na nota de ${method.label}`} className="min-h-[var(--control)] rounded border border-slate-300 bg-white px-3">
+                    <select key={method.code ?? ""} name="code" defaultValue={method.code ?? ""} aria-label={`Forma na nota de ${method.label}`} className="min-h-[var(--control)] w-full min-w-0 rounded border border-slate-300 bg-white px-3 sm:w-auto">
                       <option value="">— escolher —</option>
                       {PAYMENT_CODES.map(([code, label]) => (
                         <option key={code} value={code}>
