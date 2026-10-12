@@ -23,6 +23,8 @@ export type FiscalRules = {
   cofinsRate: number;
   finalConsumer: boolean;
   ipiInIcmsBase: boolean;
+  /** The ICMS of the operation leaves the base of PIS and COFINS (Lei 14.592/2023). */
+  icmsOutOfContributions: boolean;
   additionalInfo: string | null;
   /** CST of IBS/CBS (three digits) and its tax classification (`cClassTrib`, six). Blank: the invoice has no IBSCBS group. */
   ibsCbsCst: string | null;
@@ -47,6 +49,7 @@ export const EMPTY_FISCAL_RULES: FiscalRules = {
   cofinsRate: 0,
   finalConsumer: true,
   ipiInIcmsBase: true,
+  icmsOutOfContributions: true,
   additionalInfo: null,
   ibsCbsCst: null,
   ibsCbsClass: null,
@@ -63,7 +66,7 @@ const blank = (value: string | null) => (value?.trim() ? value.trim() : null);
 export async function loadFiscalRules(lineId: number, conn: Queryable): Promise<FiscalRules> {
   const { rows } = await conn.query(
     `SELECT operation_nature, cfop_internal, cfop_interstate, cfop_interstate_non_taxpayer, icms_code, ipi_cst, ipi_frame_code,
-            pis_cst, pis_rate, cofins_cst, cofins_rate, final_consumer, ipi_in_icms_base, additional_info,
+            pis_cst, pis_rate, cofins_cst, cofins_rate, final_consumer, ipi_in_icms_base, icms_out_of_pis_cofins, additional_info,
             ibscbs_cst, ibscbs_class, ibs_state_rate, ibs_city_rate, cbs_rate
        FROM fiscal_rules WHERE line_id = $1`,
     [lineId],
@@ -84,6 +87,7 @@ export async function loadFiscalRules(lineId: number, conn: Queryable): Promise<
     cofinsRate: Number(row.cofins_rate),
     finalConsumer: row.final_consumer === true,
     ipiInIcmsBase: row.ipi_in_icms_base === true,
+    icmsOutOfContributions: row.icms_out_of_pis_cofins === true,
     additionalInfo: text(row.additional_info),
     ibsCbsCst: text(row.ibscbs_cst),
     ibsCbsClass: text(row.ibscbs_class),
@@ -146,13 +150,14 @@ export async function saveFiscalRules(lineId: number, input: FiscalRules, update
     fraction(input.ibsStateRate, "Alíquota do IBS estadual"),
     fraction(input.ibsCityRate, "Alíquota do IBS municipal"),
     fraction(input.cbsRate, "Alíquota da CBS"),
+    input.icmsOutOfContributions === true,
   ];
   const { rows } = await conn.query(
     `INSERT INTO fiscal_rules
        (line_id, operation_nature, cfop_internal, cfop_interstate, cfop_interstate_non_taxpayer, icms_code, ipi_cst, ipi_frame_code,
         pis_cst, pis_rate, cofins_cst, cofins_rate, final_consumer, ipi_in_icms_base, additional_info, updated_by,
-        ibscbs_cst, ibscbs_class, ibs_state_rate, ibs_city_rate, cbs_rate)
-     SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21
+        ibscbs_cst, ibscbs_class, ibs_state_rate, ibs_city_rate, cbs_rate, icms_out_of_pis_cofins)
+     SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22
       WHERE EXISTS (SELECT 1 FROM product_lines WHERE id = $1)
      ON CONFLICT (line_id) DO UPDATE SET
        operation_nature = EXCLUDED.operation_nature, cfop_internal = EXCLUDED.cfop_internal, cfop_interstate = EXCLUDED.cfop_interstate,
@@ -161,6 +166,7 @@ export async function saveFiscalRules(lineId: number, input: FiscalRules, update
        cofins_rate = EXCLUDED.cofins_rate, final_consumer = EXCLUDED.final_consumer, ipi_in_icms_base = EXCLUDED.ipi_in_icms_base,
        additional_info = EXCLUDED.additional_info, ibscbs_cst = EXCLUDED.ibscbs_cst, ibscbs_class = EXCLUDED.ibscbs_class,
        ibs_state_rate = EXCLUDED.ibs_state_rate, ibs_city_rate = EXCLUDED.ibs_city_rate, cbs_rate = EXCLUDED.cbs_rate,
+       icms_out_of_pis_cofins = EXCLUDED.icms_out_of_pis_cofins,
        updated_at = now(), updated_by = EXCLUDED.updated_by
      RETURNING line_id`,
     values,

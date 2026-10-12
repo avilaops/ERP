@@ -242,6 +242,10 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
             <input type="checkbox" name="ipiInIcmsBase" value="sim" defaultChecked={rules.ipiInIcmsBase} className="mt-1" />
             <span>Na venda para consumidor final, o IPI entra na base de cálculo do ICMS.</span>
           </label>
+          <label className="flex items-start gap-2 text-sm sm:col-span-2">
+            <input type="checkbox" name="icmsOutOfContributions" value="sim" defaultChecked={rules.icmsOutOfContributions} className="mt-1" />
+            <span>O ICMS destacado na nota sai da base de cálculo do PIS e da COFINS (Lei 14.592/2023). Desmarque só se o contador pedir.</span>
+          </label>
           <div className="sm:col-span-2">
             <label htmlFor="additionalInfo" className={LABEL}>
               Informações complementares (texto fixo da nota)

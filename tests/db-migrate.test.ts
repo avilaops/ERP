@@ -91,6 +91,7 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "0057_base_da_receita.sql",
     "0058_modulo_de_producao_por_empresa.sql",
     "0059_cnpj_alfanumerico_do_emitente.sql",
+    "0060_icms_fora_da_base_do_pis_e_da_cofins.sql",
   ]);
 
   const second = await withClient((client) => migrate(client, MIGRATIONS_DIR));

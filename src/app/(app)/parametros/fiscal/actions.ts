@@ -166,6 +166,7 @@ export async function saveFiscalRulesAction(_previous: ActionState, formData: Fo
         cofinsRate: percent("cofinsRate", "Alíquota da COFINS"),
         finalConsumer: text("finalConsumer") !== "",
         ipiInIcmsBase: text("ipiInIcmsBase") !== "",
+        icmsOutOfContributions: text("icmsOutOfContributions") !== "",
         additionalInfo: text("additionalInfo") || null,
         ibsCbsCst: text("ibsCbsCst") || null,
         ibsCbsClass: text("ibsCbsClass") || null,

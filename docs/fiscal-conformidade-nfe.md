@@ -101,7 +101,7 @@ inutilização). São os de `src/lib/fiscal/sefaz.ts` e `src/lib/fiscal/events.t
 | EC 87/2015, LC 190/2022, Anexo I NA01-20 e NA01-30 | Grupo `ICMSUFDest` só em venda interestadual a não contribuinte consumidor final, 100% ao destino, base única | `figuresOf`, `itemXml` | `tests/nfe.test.ts`, `tests/nfe-conformidade.test.ts` | confere |
 | Anexo I, NA09-10 a NA09-30 (rejeições 697 e 698); Resolução do Senado 13/2012 | `pICMSInter`: 4% para origem importada (1, 2, 3, 8); senão 7% do Sul e Sudeste (menos ES) para os demais estados e 12% nos outros casos | `interstateRate`, `nfeProblems` | `tests/nfe-conformidade.test.ts` (regras de negócio) | corrigido: a nota com DIFAL saía com a alíquota do parâmetro sem conferir a origem do item; agora a divergência é dita antes de enviar. **Pendente**: para contribuinte (sem grupo de DIFAL) a alíquota do parâmetro não é conferida com a origem |
 | Anexo I, NA13-10 | FCP do destino em campo próprio (`pFCPUFDest`, `vFCPUFDest`) | `destination.fcp` | idem (cenário RJ) | confere no XML. **Pendente nos dados**: a tabela semeada traz FCP 0% em todos os estados e 22% no RJ (20% + 2% de FCP numa alíquota só) |
-| Lei 14.592/2023 (RE 574.706) | ICMS fora da base do PIS e da COFINS | base = valor do produto | — | **pendente** (muda valor de imposto): a base informada inclui o ICMS |
+| Lei 14.592/2023 (RE 574.706) | ICMS fora da base do PIS e da COFINS | `figuresOf`: base = produto menos o ICMS destacado, quando a regra fiscal da linha manda (ligada por padrão desde a migração 0060) | `tests/nfe.test.ts` (ICMS fora da base) | corrigido em 12/10/2026. O DIFAL não sai da base; quem decide desligar a regra é o contador, em Parâmetros → Fiscal |
 | Lei 12.741/2012 | Valor aproximado dos tributos (`vTotTrib`) na venda a consumidor | não é escrito | — | **pendente**: falta a tabela de carga média (IBPT) |
 | LC 123/2006 | Simples: sem destaque de ICMS, sem DIFAL (ADI 5464) | `figuresOf` (`taxed`) | `tests/nfe.test.ts` | confere |
 | Tabelas | CST do ICMS aceitos: 00, 40, 41, 50; CSOSN: 102, 103, 300, 400. Redução de base (20), ST (10, 30, 60, 70), diferimento (51) e CSOSN 101, 201, 202, 500, 900 | `nfeProblems` | idem | não emite |
@@ -195,9 +195,8 @@ IBS/CBS nos dados adicionais (leiaute atual) e tem o leiaute da NT 2026.010, que
 Não foram corrigidas porque mudam valor de imposto, dependem de dado que o sistema não tem ou são
 operações que ele não faz.
 
-1. **Base do PIS e da COFINS com o ICMS dentro** (Lei 14.592/2023). A nota informa base e valor
-   maiores que os devidos no regime normal. Corrigir muda o valor das contribuições de toda nota e
-   a base do IBS/CBS; decisão do contador antes do código.
+1. ~~Base do PIS e da COFINS com o ICMS dentro~~: corrigido em 12/10/2026 (regra fiscal da linha, ligada
+   por padrão).
 2. **Sem contingência** (MOC, Anexo III). SEFAZ-SP parada, nenhuma nota sai. Falta SVC-AN (os
    endereços, `tpEmis` 6, `dhCont` e `xJust`) ou EPEC.
 3. **`vTotTrib` ausente** (Lei 12.741/2012), exigido na venda a consumidor final. Precisa da tabela

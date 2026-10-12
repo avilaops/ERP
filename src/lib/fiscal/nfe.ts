@@ -81,6 +81,8 @@ export type NfeRules = {
   finalConsumer: boolean;
   /** Whether the IPI is part of the ICMS base in a sale to a final consumer. */
   ipiInIcmsBase: boolean;
+  /** The ICMS of the operation leaves the base of PIS and COFINS (Lei 14.592/2023). */
+  icmsOutOfContributions: boolean;
   additionalInfo: string | null;
   /**
    * IBS and CBS of the tax reform (NT 2025.002): the classification the
@@ -355,7 +357,7 @@ export function nfeProblems(input: NfeInput): string[] {
   return problems;
 }
 
-type ItemFigures = { product: number; ipi: number; icmsBase: number; icms: number; pis: number; cofins: number; difalBase: number; difal: number; fcp: number; reformBase: number; ibsState: number; ibsCity: number; cbs: number };
+type ItemFigures = { product: number; contributionBase: number; ipi: number; icmsBase: number; icms: number; pis: number; cofins: number; difalBase: number; difal: number; fcp: number; reformBase: number; ibsState: number; ibsCity: number; cbs: number };
 
 /** The account of one item. The ICMS base takes the IPI only in a sale to a final consumer, when the rules say so. */
 function figuresOf(item: NfeItem, input: NfeInput): ItemFigures {
@@ -368,14 +370,17 @@ function figuresOf(item: NfeItem, input: NfeInput): ItemFigures {
   const owesDifal = taxed && interstate && !recipient.taxpayer && rules.finalConsumer;
   const icms = roundCents(icmsBase * input.icmsRate);
   // A CST without figures (04 to 09) writes no value in the item: counting one would leave the total different from the sum of the items (rules W13-10 and W14-10).
-  const pis = CONTRIBUTION_UNTAXED_CSTS.includes(rules.pisCst) ? 0 : roundCents(product * rules.pisRate);
-  const cofins = CONTRIBUTION_UNTAXED_CSTS.includes(rules.cofinsCst) ? 0 : roundCents(product * rules.cofinsRate);
+  // Only the ICMS of the operation itself leaves the base; the DIFAL belongs to the state of destination and stays out of this account.
+  const contributionBase = rules.icmsOutOfContributions ? roundCents(product - icms) : product;
+  const pis = CONTRIBUTION_UNTAXED_CSTS.includes(rules.pisCst) ? 0 : roundCents(contributionBase * rules.pisRate);
+  const cofins = CONTRIBUTION_UNTAXED_CSTS.includes(rules.cofinsCst) ? 0 : roundCents(contributionBase * rules.cofinsRate);
   const difal = owesDifal ? roundCents(icmsBase * Math.max(0, input.destination.internalIcms - input.icmsRate)) : 0;
   const fcp = owesDifal ? roundCents(icmsBase * input.destination.fcp) : 0;
   // Base of IBS and CBS (rule UB16-10): the product less the taxes it carries inside.
   const reformBase = rules.ibsCbs ? roundCents(product - pis - cofins - icms - difal - fcp) : 0;
   return {
     product,
+    contributionBase,
     ipi,
     icmsBase,
     icms,
@@ -492,8 +497,8 @@ function itemXml(item: NfeItem, index: number, input: NfeInput): string {
     "imposto",
     group("ICMS", icms) +
       ipi +
-      contribution("PIS", rules.pisCst, figures.product, rules.pisRate, figures.pis) +
-      contribution("COFINS", rules.cofinsCst, figures.product, rules.cofinsRate, figures.cofins) +
+      contribution("PIS", rules.pisCst, figures.contributionBase, rules.pisRate, figures.pis) +
+      contribution("COFINS", rules.cofinsCst, figures.contributionBase, rules.cofinsRate, figures.cofins) +
       difal +
       (rules.ibsCbs
         ? group(

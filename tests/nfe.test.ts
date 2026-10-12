@@ -21,7 +21,7 @@ const INPUT: NfeInput = {
   rules: {
     operationNature: "Venda de mercadoria", cfopInternal: "5102", cfopInterstate: "6102", cfopInterstateNonTaxpayer: "6108",
     icmsCode: "00", ipiCst: null, ipiFrameCode: "999", pisCst: "01", pisRate: 0.0065, cofinsCst: "01", cofinsRate: 0.03,
-    finalConsumer: true, ipiInIcmsBase: true, additionalInfo: "Pedido 261008-W9LG", ibsCbs: { cst: "000", classCode: "000001", ibsStateRate: 0.001, ibsCityRate: 0, cbsRate: 0.009 } },
+    finalConsumer: true, ipiInIcmsBase: true, icmsOutOfContributions: false, additionalInfo: "Pedido 261008-W9LG", ibsCbs: { cst: "000", classCode: "000001", ibsStateRate: 0.001, ibsCityRate: 0, cbsRate: 0.009 } },
   items: [
     { code: "LD-WH037", name: "Leg Press 45° Com Suporte Para Anilhas", ncm: "95069100", cest: null, origin: 0, unit: "UN", quantity: 2, unitPrice: 10344.12, ipiRate: 0 },
     { code: "LD-WH011", name: "Banco Regulável de 0 a 90°", ncm: "95069100", cest: null, origin: 0, unit: "UN", quantity: 1, unitPrice: 1798.98, ipiRate: 0 },
@@ -196,4 +196,31 @@ test("esquema oficial da NF-e 4.00 (XSD): o XML passa inteiro; só falta a assin
     assert.equal(errors.length, 1, `nota ${index}: ${errors.join(" | ")}`);
     assert.match(errors[0], /Element '\{http:\/\/www\.portalfiscal\.inf\.br\/nfe\}NFe': Missing child element\(s\)\. Expected is one of .*Signature/);
   }
+});
+
+test("ICMS fora da base do PIS e da COFINS: a base é o produto menos o ICMS destacado, no item e no total", () => {
+  const sale: NfeInput = {
+    ...INPUT,
+    recipient: { ...INPUT.recipient, uf: "SP", cityCode: "3550308", city: "São Paulo" },
+    icmsRate: 0.18,
+    items: [{ ...INPUT.items[0], quantity: 1, unitPrice: 1000, ipiRate: 0 }],
+    payments: [{ code: "17", description: null, amount: 1000 }],
+  };
+  // Como era: PIS e COFINS sobre o valor inteiro do produto.
+  const before = buildNfeXml(sale);
+  assert.deepEqual([before.totals.icms, before.totals.pis, before.totals.cofins], [180, 6.5, 30]);
+  assert.ok(before.xml.includes("<PISAliq><CST>01</CST><vBC>1000.00</vBC>"));
+
+  const after = buildNfeXml({ ...sale, rules: { ...sale.rules, icmsOutOfContributions: true } });
+  assert.deepEqual([after.totals.icms, after.totals.pis, after.totals.cofins, after.totals.invoice], [180, 5.33, 24.6, 1000]);
+  // A base do IBS e da CBS acompanha: produto menos o que ele carrega por dentro.
+  assert.equal(after.totals.reformBase, 790.07);
+  assert.ok(after.xml.includes("<PISAliq><CST>01</CST><vBC>820.00</vBC><pPIS>0.6500</pPIS><vPIS>5.33</vPIS></PISAliq>"));
+  assert.ok(after.xml.includes("<COFINSAliq><CST>01</CST><vBC>820.00</vBC><pCOFINS>3.0000</pCOFINS><vCOFINS>24.60</vCOFINS></COFINSAliq>"));
+  assert.ok(after.xml.includes("<vPIS>5.33</vPIS><vCOFINS>24.60</vCOFINS>"));
+  assert.deepEqual(nfeProblems({ ...sale, rules: { ...sale.rules, icmsOutOfContributions: true } }), []);
+
+  // Simples Nacional não destaca ICMS: não há o que tirar da base.
+  const simples = nfeTotals({ ...sale, issuer: { ...sale.issuer, taxRegime: 1 }, rules: { ...sale.rules, icmsCode: "102", icmsOutOfContributions: true } });
+  assert.deepEqual([simples.icms, simples.pis], [0, 6.5]);
 });
