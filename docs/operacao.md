@@ -294,6 +294,12 @@ Se a migração falhar, a versão antiga continua no ar.
 - **Nota de entrada**: a compra guarda o número e a chave da nota, emitida por quem for. O ERP ainda não emite a nota de entrada da importação.
 - **Código**: `src/lib/db/stock.ts`, `src/lib/db/purchases.ts`, telas em `src/app/(app)/estoque/` e `src/app/(app)/compras/`, migração `0061`.
 
+## Cobrança por PIX
+
+- **Onde**: a chave fica em Parâmetros → Cobrança por PIX (chave, nome de quem recebe e cidade, que saem sem acento e cortados em 25 e 15 letras, como o código exige). Em Recebimentos, cada valor em aberto tem "Cobrar por PIX": o QR e o PIX copia e cola com o que falta receber.
+- **O que é**: o BR Code estático do Banco Central, montado no próprio ERP (`src/lib/pix.ts`), sem banco no meio e sem custo. O identificador é o número do pedido mais o da parcela.
+- **O que não faz**: não confere se a chave existe no banco (teste com um PIX de valor baixo) e não fica sabendo do pagamento: a baixa continua manual em Recebimentos. Boleto e baixa automática dependem de contratar a cobrança de um banco e ainda não existem.
+
 ## Relatórios
 
 - **Onde**: item Relatórios do menu, para os quatro tipos de perfil. Cada relatório pede também a tela de onde vêm os números (Vendas pede Pedidos; Notas fiscais pede Parâmetros; Contas a pagar pede Contas a pagar), então cada pessoa vê só os que pode.
