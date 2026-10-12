@@ -25,7 +25,10 @@ echo "=== ERP → $SERVIDOR ($COMMIT) ==="
 
 ssh "$SERVIDOR" "mkdir -p $PASTA && [ -f $PASTA/.env ] || { echo '! falta $PASTA/.env (copie .env.example e preencha)'; exit 1; }"
 if [ "$BUILD_HOST" = "local" ]; then
-  PACOTE="$(mktemp -d)/standalone.tgz"
+  # A pasta temporária sai no fim, com sucesso ou não: cada publicação deixava 14 MB em /tmp.
+  TEMPORARIA="$(mktemp -d)"
+  trap 'rm -rf "$TEMPORARIA"' EXIT
+  PACOTE="$TEMPORARIA/standalone.tgz"
   bash deploy/empacotar.sh "$PACOTE"
   echo "▸ enviando"
   ssh "$SERVIDOR" "cat > $PASTA/standalone.tgz" < "$PACOTE"
