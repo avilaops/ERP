@@ -112,7 +112,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           <label htmlFor="vendedor" className="text-slate-600">
             Vendedor
           </label>
-          <select id="vendedor" name="vendedor" defaultValue={seller ?? ""} className="rounded border border-slate-300 bg-white px-3 py-1.5">
+          <select id="vendedor" name="vendedor" defaultValue={seller ?? ""} className="min-h-[var(--control)] rounded border border-slate-300 bg-white px-3">
             <option value="">Toda a equipe</option>
             {sellers.map(([email, name]) => (
               <option key={email} value={email}>

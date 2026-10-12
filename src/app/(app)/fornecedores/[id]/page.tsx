@@ -36,7 +36,7 @@ export default async function FornecedorPage({ params }: { params: Promise<{ id:
           <input type="hidden" name="id" value={supplier.id} />
           <input type="hidden" name="hasActive" value="1" />
           <SupplierFields saved={supplier} />
-          <label className="flex items-center gap-2 text-sm sm:col-span-2">
+          <label className="flex min-h-[var(--control)] items-center gap-2 text-sm sm:col-span-2">
             <input type="checkbox" name="active" value="sim" defaultChecked={supplier.active} /> Em uso (desmarcado, sai das listas de lançamento)
           </label>
           <div className="sm:col-span-2 sticky bottom-[var(--tabbar)] z-10 -mx-4 border-t border-slate-200 bg-white px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:static md:mx-0 md:border-0 md:bg-transparent md:p-0">

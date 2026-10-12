@@ -722,7 +722,7 @@ export default async function PedidoPage({
           <a
             key={anchor}
             href={`#${anchor}`}
-            className={`whitespace-nowrap rounded-full border px-3 py-1.5 font-medium ${filled ? "border-emerald-300 bg-emerald-50 text-emerald-900" : "border-amber-300 bg-amber-50 text-amber-900"}`}
+            className={`inline-flex min-h-[var(--control)] items-center whitespace-nowrap rounded-full border px-3 font-medium ${filled ? "border-emerald-300 bg-emerald-50 text-emerald-900" : "border-amber-300 bg-amber-50 text-amber-900"}`}
           >
             {filled ? "✓" : "•"} {label}
           </a>
@@ -1033,10 +1033,10 @@ export default async function PedidoPage({
                 <fieldset>
                   <legend className="block text-sm font-medium">Cliente contribuinte do ICMS (tem IE)?</legend>
                   <div key={String(order.taxpayer)} className="mt-2 flex gap-4 text-sm">
-                    <label className="flex items-center gap-2">
+                    <label className="flex min-h-[var(--control)] items-center gap-2">
                       <input type="radio" name="taxpayer" value="nao" defaultChecked={!order.taxpayer} /> Não
                     </label>
-                    <label className="flex items-center gap-2">
+                    <label className="flex min-h-[var(--control)] items-center gap-2">
                       <input type="radio" name="taxpayer" value="sim" defaultChecked={order.taxpayer} disabled={!canBeTaxpayer} /> Sim
                     </label>
                   </div>

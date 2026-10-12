@@ -80,9 +80,22 @@ na página, troque pela peça.
 
 ## Como conferir
 
-`~/.agents/claude/scratch/shots/ux.cjs` mede, nos cinco tamanhos, quantas telas de altura cada
-página ocupa, se há sobra lateral e se alguma área precisa de rolagem horizontal. Meta: 1,0 em
-todos. O que passar disso entra na lista de pendências do `docs/ux.md` abaixo, com o motivo.
+`npm run test:telas` (Playwright, `tests/visual/telas.spec.ts`) entra com o login local como
+Diretoria, percorre todas as telas que o menu alcança (uma de cada tipo) e mede cada uma nos
+cinco tamanhos. Falha quando a tela rola para o lado, quando algo que se toca tem menos de 44 px
+ou quando a página dá erro. Quantas telas de altura cada página ocupa vai para `telas.json`, sem
+falhar: meta de 1,0 em todos, e o que passar disso entra na lista de pendências abaixo, com o
+motivo. Os prints de cada tela em 390 e 1440 ficam em `test-results/telas/`.
+
+Para rodar na própria máquina, num banco com nome terminado em `_demo` e com `ERP_LOCAL_LOGIN=1`:
+
+```bash
+npm run db:migrate
+npm run db:seed-demo -- --empresa ludus   # clientes, pedidos, funil e contas fictícios
+npm run test:telas
+```
+
+O CI roda o mesmo em todo pull request (job "Telas nos cinco tamanhos") e guarda os prints.
 
 ## Pendências conhecidas (09/10/2026)
 

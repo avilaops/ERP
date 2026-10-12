@@ -59,3 +59,59 @@ jobs:
           grep -qE "^(ℹ|#) skipped 0$" test.log
 
       - run: npm run build
+
+  telas:
+    name: Telas nos cinco tamanhos
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: erp
+          POSTGRES_PASSWORD: erp-ci
+          # Os dados de demonstração só entram em banco com nome terminado em _demo.
+          POSTGRES_DB: erp_demo
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U erp -d erp_demo"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    # O sistema em desenvolvimento, com o login local (/dev/login) e os dados de demonstração.
+    env:
+      DATABASE_URL: postgresql://erp:erp-ci@127.0.0.1:5432/erp_demo
+      ERP_TENANTS: "ludus:Ludus Equipamentos"
+      ERP_LOCAL_LOGIN: "1"
+      SSO_JWT_SECRET: segredo-so-do-teste-das-telas-com-mais-de-32-caracteres
+      APP_URL: http://127.0.0.1:3020
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - run: npx playwright install --with-deps chromium
+
+      - run: npm run db:migrate
+
+      - run: npm run db:seed-demo -- --empresa ludus
+
+      # Falha com rolagem lateral, controle abaixo de 44 px ou erro na página (docs/ux.md).
+      - run: npm run test:telas
+
+      # Os prints de cada tela e a altura de cada uma (telas.json), para conferir sem rodar nada.
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: telas
+          path: test-results/
+          retention-days: 14

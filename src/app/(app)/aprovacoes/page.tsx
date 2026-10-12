@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CARD, DANGER_OUTLINE, PRIMARY } from "@/components/ui";
+import { CARD, DANGER_OUTLINE, INPUT, PRIMARY } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { approvesAtLoss, menuItem } from "@/lib/auth/permissions";
 import { listPastDecisions, listPendingApprovals } from "@/lib/db/approvals";
@@ -87,7 +87,7 @@ export default async function AprovacoesPage() {
                     id={`comment-${row.number}`}
                     name="comment"
                     type="text"
-                    className="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-brand"
+                    className={INPUT}
                   />
                 </div>
                 {!blocked && (

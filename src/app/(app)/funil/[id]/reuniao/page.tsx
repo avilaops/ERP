@@ -84,7 +84,7 @@ export default async function ReuniaoPage({ params, searchParams }: { params: Pr
         {saved?.invited ? (
           <p className="col-span-2 text-sm text-slate-700">{saved.invited} já foi convidado e recebe a mudança por e-mail.</p>
         ) : (
-          <label className="col-span-2 flex items-start gap-2 text-sm text-slate-700">
+          <label className="col-span-2 flex min-h-[var(--control)] items-center gap-2 text-sm text-slate-700">
             <input type="checkbox" name="invite" value="sim" defaultChecked={item.email !== null} className="mt-0.5 h-5 w-5 shrink-0" />
             <span>{item.email ? `Enviar o convite para ${item.email}, com o arquivo que põe a reunião na agenda.` : "Enviar o convite por e-mail ao contato (preencha o e-mail em Dados)."}</span>
           </label>

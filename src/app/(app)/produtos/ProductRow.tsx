@@ -28,7 +28,7 @@ export type ProductRowData = {
 type RowAction = (state: RowState, formData: FormData) => Promise<RowState>;
 
 const INPUT = "min-h-[var(--control)] w-full min-w-0 rounded border bg-white px-2 outline-none focus:ring-2 focus:ring-brand";
-const LINK = "rounded px-2 py-1 text-sm hover:bg-slate-100 disabled:opacity-60";
+const LINK = "inline-flex min-h-[var(--control)] items-center rounded-lg px-2 text-sm hover:bg-slate-100 disabled:opacity-60";
 
 /**
  * Only reads and shows text. The fields sit in different cells, so they point

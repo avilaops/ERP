@@ -98,7 +98,7 @@ export default async function OportunidadePage({ params, searchParams }: { param
         </button>
       </ActionForm>
 
-      <nav aria-label="Partes da oportunidade" className="mt-4 flex gap-2 border-b border-slate-200">
+      <nav aria-label="Partes da oportunidade" className="mt-4 flex gap-1 border-b border-slate-200">
         {TABS.map(([key, label]) => (
           <Link
             key={key}

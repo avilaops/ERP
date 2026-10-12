@@ -86,7 +86,7 @@ export default async function PerfisPage({ searchParams }: { searchParams: Promi
               key={role}
               href={`${HERE}?tipo=${role}`}
               aria-current={role === base ? "page" : undefined}
-              className={`rounded-full border px-3 py-1.5 text-sm font-medium ${role === base ? "border-brand bg-brand text-white" : "border-slate-300 bg-white hover:bg-slate-50"}`}
+              className={`inline-flex min-h-[var(--control)] items-center rounded-full border px-3 text-sm font-medium ${role === base ? "border-brand bg-brand text-white" : "border-slate-300 bg-white hover:bg-slate-50"}`}
             >
               {ROLE_LABELS[role]}
             </Link>
