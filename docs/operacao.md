@@ -283,6 +283,17 @@ Se a migração falhar, a versão antiga continua no ar.
 - **Lista**: Funil → Conversas. O vendedor vê as das próprias oportunidades; gerência e diretoria veem todas e os números que ainda não são de ninguém, com atalho para criar a oportunidade com aquele telefone.
 - **Custo**: a Meta cobra da conta da empresa as conversas iniciadas por modelo.
 
+## Estoque e compras
+
+- **Onde**: itens Estoque e Compras do menu, só para a diretoria por padrão (para o galpão, crie em Equipe e acessos um perfil só com Estoque). Compras mostra preço de compra, por isso conta como tela de custo.
+- **Compra**: fornecedor, tipo (importação ou no Brasil), moeda e câmbio, equipamentos com quantidade e preço na moeda do fornecedor, e os custos da compra em reais (frete, seguro, impostos da importação, despachante). O sistema divide os custos entre os equipamentos pelo valor de cada um e mostra o custo de cada peça posta no estoque. Esse custo é informação: não muda sozinho o custo usado na tabela de preços.
+- **Andamento**: pedido feito → em trânsito → recebida. "Receber" dá a entrada no estoque de todos os itens de uma vez; "Desfazer recebimento" tira. Compra que nunca entrou no estoque pode ser removida; as outras ficam no histórico.
+- **Saldo**: no estoque (todos os movimentos somados), em pedidos (pedidos fechados que ainda não saíram), disponível (um menos o outro) e a chegar (compras a caminho). Disponível negativo aparece em "Em falta".
+- **Saída**: Estoque → A expedir lista os pedidos fechados; "Dar saída" tira as peças, uma vez por pedido, e pode ser desfeita em Expedidos. O sistema deixa o saldo ficar negativo e avisa antes: é assim que uma contagem que faltou aparece.
+- **Contagem**: na tela do equipamento, a pessoa informa quantos há e o sistema grava só a diferença. A primeira contagem dá o saldo inicial.
+- **Nota de entrada**: a compra guarda o número e a chave da nota, emitida por quem for. O ERP ainda não emite a nota de entrada da importação.
+- **Código**: `src/lib/db/stock.ts`, `src/lib/db/purchases.ts`, telas em `src/app/(app)/estoque/` e `src/app/(app)/compras/`, migração `0061`.
+
 ## Relatórios
 
 - **Onde**: item Relatórios do menu, para os quatro tipos de perfil. Cada relatório pede também a tela de onde vêm os números (Vendas pede Pedidos; Notas fiscais pede Parâmetros; Contas a pagar pede Contas a pagar), então cada pessoa vê só os que pode.
