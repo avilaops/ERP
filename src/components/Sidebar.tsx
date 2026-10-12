@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { PRIMARY } from "@/components/ui";
+import { PRIMARY, SECTION_TITLE } from "@/components/ui";
 import { MobileMenu } from "@/components/MobileMenu";
 import type { MenuTab } from "@/components/MobileMenu";
 import { ThemeChoice } from "@/components/ThemeChoice";
@@ -31,6 +31,17 @@ const TAB_ORDER: [key: string, label: string, icon: string][] = [
 ];
 const MORE_ICON = "M5 12h.01M12 12h.01M19 12h.01";
 
+/**
+ * The menu in four groups, so a long menu is read by subject instead of one
+ * column of seventeen names. A screen not listed here goes to the last group.
+ */
+const GROUPS: [title: string, keys: string[]][] = [
+  ["Vendas", ["dashboard", "funil", "pedidos", "clientes", "aprovacoes", "tabela-precos", "simulador"]],
+  ["Financeiro", ["recebimentos", "contas-pagar", "comissoes", "fornecedores"]],
+  ["Produtos", ["produtos", "producao", "precos-metas"]],
+  ["Gestão", ["relatorios", "parametros", "equipe"]],
+];
+
 const Icon = ({ path }: { path: string }) => (
   <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d={path} />
@@ -54,12 +65,16 @@ export async function Sidebar({ session }: { session: Session }) {
     const item = items.find((entry) => entry.key === key);
     return item ? [{ href: item.href, label, icon: <Icon path={icon} /> }] : [];
   }).slice(0, 4);
+  const grouped = new Set(GROUPS.flatMap(([, keys]) => keys));
+  const groups = GROUPS.map(([title, keys], index) => {
+    const entries = items.filter((item) => keys.includes(item.key) || (index === GROUPS.length - 1 && !grouped.has(item.key)));
+    return [title, entries] as const;
+  }).filter(([, entries]) => entries.length > 0);
 
   return (
     <MobileMenu brand={brand} tabs={tabs} more={<Icon path={MORE_ICON} />}>
-      <section className="rounded border border-slate-200 bg-slate-50 p-3" aria-label="Seu acesso">
-        <p className="text-xs uppercase tracking-wide text-slate-500">Seu acesso</p>
-        <p className="truncate font-display text-lg font-semibold uppercase leading-tight">{session.name}</p>
+      <section className="rounded border border-slate-200 bg-slate-50 px-3 py-2" aria-label="Seu acesso">
+        <p className="truncate font-semibold leading-tight">{session.name}</p>
         <p className="text-sm text-slate-600">
           {session.profile ?? ROLE_LABELS[session.role]} · {session.tenant.name}
         </p>
@@ -74,11 +89,16 @@ export async function Sidebar({ session }: { session: Session }) {
         </Link>
       )}
 
-      <nav aria-label="Menu principal" className="flex flex-col">
-        {items.map((item) => (
-          <Link key={item.key} href={item.href} className="rounded-lg px-3 py-2.5 font-medium text-slate-700 hover:bg-slate-100 hover:text-slate-900 md:py-2">
-            {item.label}
-          </Link>
+      <nav aria-label="Menu principal" className="flex flex-col gap-3">
+        {groups.map(([title, entries]) => (
+          <div key={title}>
+            <p className={`px-3 ${SECTION_TITLE}`}>{title}</p>
+            {entries.map((item) => (
+              <Link key={item.key} href={item.href} className="flex min-h-[var(--control)] items-center rounded-lg px-3 font-medium text-slate-700 hover:bg-slate-100 hover:text-slate-900">
+                {item.label}
+              </Link>
+            ))}
+          </div>
         ))}
       </nav>
 

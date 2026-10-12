@@ -162,7 +162,7 @@ export default async function ProdutosPage({
                 defaultValue={search}
                 placeholder="Buscar nome, código ou fornecedor"
                 aria-label="Buscar nome, código ou fornecedor"
-                className="min-w-0 flex-1 rounded border border-slate-300 px-3 py-2 text-sm sm:w-72 sm:flex-none outline-none focus:ring-2 focus:ring-brand"
+                className="min-h-[var(--control)] min-w-0 flex-1 rounded border border-slate-300 px-3 text-sm sm:w-72 sm:flex-none outline-none focus:ring-2 focus:ring-brand"
               />
               <button type="submit" className={SECONDARY}>
                 Buscar

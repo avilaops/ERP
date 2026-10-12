@@ -70,7 +70,7 @@ export default async function CatalogoFornecedorPage({ searchParams }: { searchP
             defaultValue={search}
             placeholder="Nome, código do fornecedor ou da empresa"
             aria-label="Buscar no catálogo do fornecedor"
-            className="min-w-0 flex-1 rounded border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand sm:w-80 sm:flex-none"
+            className="min-h-[var(--control)] min-w-0 flex-1 rounded border border-slate-300 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-brand sm:w-80 sm:flex-none"
           />
           <button type="submit" className={SECONDARY}>
             Buscar

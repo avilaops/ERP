@@ -71,7 +71,7 @@ export function LogoForm({
                 accept="image/png,image/jpeg,image/webp"
                 required
                 aria-describedby="logo-ajuda"
-                className="mt-1 block text-sm file:mr-3 file:rounded file:border file:border-slate-300 file:bg-white file:px-3 file:py-2 file:text-sm file:font-medium"
+                className="mt-1 block text-sm file:mr-3 file:min-h-[var(--control)] file:rounded file:border file:border-slate-300 file:bg-white file:px-3 file:text-sm file:font-medium"
               />
               <p id="logo-ajuda" className="mt-1 text-xs text-slate-500">
                 PNG, JPEG ou WebP, até 512 KB. Fundo transparente fica melhor no menu.

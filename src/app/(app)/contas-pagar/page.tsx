@@ -339,7 +339,7 @@ export default async function ContasPagarPage({ searchParams }: { searchParams: 
                   ) : (
                     <ActionForm action={unpayPayableAction} className="mt-2">
                       <input type="hidden" name="id" value={payable.id} />
-                      <ConfirmButton label="Desfazer pagamento" confirmLabel="Confirmar: voltar para a pagar" className="rounded px-2 py-1 text-sm text-slate-700 underline hover:bg-slate-100" />
+                      <ConfirmButton label="Desfazer pagamento" confirmLabel="Confirmar: voltar para a pagar" className="inline-flex min-h-[var(--control)] items-center rounded-lg px-2 text-sm text-slate-700 underline hover:bg-slate-100" />
                     </ActionForm>
                   )}
                 </li>

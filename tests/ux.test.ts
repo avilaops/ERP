@@ -64,6 +64,12 @@ test("botões: todos com a altura de um dedo (--control), nunca a altura tirada 
       const shortPadding = /(?:^|\s)(?:md:)?py-(0\.5|1|1\.5|2)(?:\s|$)/.test(className);
       assert.ok(!/\brounded\b/.test(className) || !shortPadding || className.includes("min-h-"), `${file}: ${className}`);
     }
+    // Campo e lista de opções também: a altura vem de --control (ou da peça INPUT), não do py.
+    for (const [, literal, template] of source.matchAll(/<(?:input|select)\b(?:=>|[^>])*?className=(?:"([^"]*)"|\{`([^`]*)`\})/g)) {
+      const className = literal ?? template;
+      const shortPadding = /(?:^|\s)py-(1|1\.5|2)(?:\s|$)/.test(className);
+      assert.ok(!shortPadding || className.includes("min-h-") || className.includes("${INPUT}"), `${file}: ${className}`);
+    }
     // A peça compartilhada não é copiada para dentro da página.
     assert.doesNotMatch(source, /^const (CARD|PRIMARY|SECONDARY|DANGER) = /m, file);
     // Filtro, aba e etiqueta que se toca também têm 44 px: nada de 36 px (min-h-9).

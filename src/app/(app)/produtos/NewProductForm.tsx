@@ -77,7 +77,7 @@ export function NewProductForm({ action, onClose, lineId, imported }: { action: 
                   defaultValue={values[key]}
                   aria-invalid={invalid || undefined}
                   aria-describedby={HELP[key] ? `${id}-ajuda` : undefined}
-                  className={`mt-1 w-full min-w-0 rounded border bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-brand ${
+                  className={`mt-1 min-h-[var(--control)] w-full min-w-0 rounded border bg-white px-3 outline-none focus:ring-2 focus:ring-brand ${
                     numeric ? "text-right" : ""
                   } ${invalid ? "border-red-500" : "border-slate-300"}`}
                 />

@@ -171,12 +171,25 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
       {tab === "resumo" && (
         <>
-      <section className={`${CARD} p-5 mt-6`} aria-labelledby="por-mes">
+      <section className={`${CARD} mt-6 p-5`} aria-labelledby="por-mes">
         <h2 id="por-mes" className={TITLE}>
           Vendas fechadas por mês
         </h2>
         <p className="mb-4 text-xs text-slate-600">últimos 12 meses · com IPI · total {showMoney(view.byMonth.reduce((sum, bar) => sum + bar.value, 0))}</p>
-        <Columns bars={view.byMonth} format={showMoney} />
+        <Columns
+          bars={view.byMonth}
+          format={showMoney}
+          empty={
+            <>
+              Nenhuma venda fechada nos últimos 12 meses.{" "}
+              {allows(session, "pedidos") && (
+                <Link href="/pedidos/novo" className="font-medium text-brand underline">
+                  Criar um pedido
+                </Link>
+              )}
+            </>
+          }
+        />
       </section>
 
         </>
@@ -230,7 +243,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       )}
       {tab === "aberto" && (
         <>
-      <section className={`${CARD} p-5 mt-6`} aria-labelledby="em-aberto">
+      <section className={`${CARD} mt-6 p-5`} aria-labelledby="em-aberto">
         <div className="flex items-baseline justify-between gap-3">
           <h2 id="em-aberto" className={TITLE}>
             Orçamentos em aberto por idade
@@ -304,7 +317,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                 Lucro líquido por mês
               </h2>
               <p className="mb-4 text-xs text-slate-600">só a diretoria vê · dos pedidos fechados em cada mês, depois de impostos, custo e IR</p>
-              <Columns bars={profitByMonth.map((bar) => ({ ...bar, value: Math.max(0, bar.value) }))} format={showMoney} />
+              <Columns bars={profitByMonth.map((bar) => ({ ...bar, value: Math.max(0, bar.value) }))} format={showMoney} empty="Nenhum pedido fechado com lucro nos últimos 12 meses." />
               {profitByMonth.some((bar) => bar.value < 0) && (
                 <p className="mt-2 text-xs text-red-700">
                   Meses com prejuízo: {profitByMonth.filter((bar) => bar.value < 0).map((bar) => `${bar.label} (${showMoney(bar.value)})`).join(", ")}.

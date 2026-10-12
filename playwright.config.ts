@@ -9,7 +9,7 @@ import { defineConfig, devices } from "@playwright/test";
 export default defineConfig({
   testDir: "tests/visual",
   outputDir: "test-results/telas",
-  timeout: 20 * 60_000,
+  timeout: 40 * 60_000,
   reporter: [["list"], ["html", { outputFolder: "test-results/telas-relatorio", open: "never" }]],
   use: {
     baseURL: "http://127.0.0.1:3020",

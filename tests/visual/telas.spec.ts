@@ -20,7 +20,20 @@ const SIZES: [number, number][] = [
 /** Screens that are not of the logged-in system, files and the doors of other services. */
 const OUTSIDE = /^\/(api|oauth|dev|mcp|descadastro|conectar|captura|contrato|whatsapp|telefonia)(\/|$)|\.(png|pdf|csv|xml|jpg|zip)$/;
 /** One screen of each kind is enough: /pedidos/260930-ABCD and /pedidos/260930-WXYZ are the same screen. */
-const kindOf = (path: string) => path.replace(/\/\d[^/]*/g, "/:id");
+const kindOf = (path: string) => path.replace(/\/\d[^/?]*/g, "/:id");
+/** What makes another screen at the same address: its tab or its step. Searches, filters and pages do not. */
+const PARTS = ["ver", "aba", "etapa"];
+
+/** The address of a link as a screen: the path and, of the query, only the part of the screen. */
+function screenOf(href: string): string {
+  const url = new URL(href, "http://erp");
+  const parts = new URLSearchParams();
+  for (const key of PARTS) {
+    const value = url.searchParams.get(key);
+    if (value) parts.set(key, value);
+  }
+  return parts.size > 0 ? `${url.pathname}?${parts}` : url.pathname;
+}
 const CONTROL = 43.5;
 
 type Measure = { overflowX: number; screens: number; small: string[] };
@@ -43,8 +56,8 @@ async function discover(page: Page): Promise<string[]> {
     kinds.add(kindOf(path));
     found.push(path);
     await page.goto(path, { waitUntil: "networkidle" });
-    const links = await page.$$eval("a[href^='/']", (anchors) => anchors.map((anchor) => anchor.getAttribute("href")!.split(/[?#]/)[0]));
-    for (const link of links) if (!OUTSIDE.test(link) && !seen.has(link)) queue.push(link);
+    const links = await page.$$eval("a[href^='/']", (anchors) => anchors.map((anchor) => anchor.getAttribute("href")!));
+    for (const link of links.map(screenOf)) if (!OUTSIDE.test(link.split("?")[0]) && !seen.has(link)) queue.push(link);
   }
   return found;
 }
@@ -102,7 +115,7 @@ test("telas: cabem na largura, controles com 44 px e nenhum erro, nos cinco tama
       expect.soft(result.overflowX, `${current}: rolagem lateral`).toBeLessThanOrEqual(0);
       expect.soft(result.small, `${current}: controles abaixo de 44 px`).toEqual([]);
       if (width === 390 || width === 1440) {
-        await page.screenshot({ path: testInfo.outputPath(`${path.slice(1).replace(/\//g, "_") || "inicio"}.${width}.png`), fullPage: true });
+        await page.screenshot({ path: testInfo.outputPath(`${path.slice(1).replace(/[/?=&]/g, "_") || "inicio"}.${width}.png`), fullPage: true });
       }
     }
   }

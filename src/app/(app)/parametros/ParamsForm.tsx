@@ -105,7 +105,7 @@ export function ParamsForm({ saved, action, lineId, imported }: { saved: ParamsF
                       defaultValue={values[field.key]}
                       aria-invalid={invalid || undefined}
                       aria-describedby={field.help ? `${field.key}-ajuda` : undefined}
-                      className="w-full min-w-0 bg-transparent px-3 py-2 text-right outline-none"
+                      className="min-h-[var(--control)] w-full min-w-0 bg-transparent px-3 text-right outline-none"
                     />
                     {field.kind !== "money" && <span className="pr-3 text-sm text-slate-500">{UNIT[field.kind]}</span>}
                   </div>
@@ -171,7 +171,7 @@ export function ParamsForm({ saved, action, lineId, imported }: { saved: ParamsF
                               defaultValue={values[key]}
                               aria-label={`${label} de ${uf}`}
                               aria-invalid={invalid || undefined}
-                              className={`w-full min-w-0 rounded border bg-white px-2 py-1 text-right text-slate-900 outline-none focus:ring-2 focus:ring-brand ${
+                              className={`min-h-[var(--control)] w-full min-w-0 rounded border bg-white px-2 text-right text-slate-900 outline-none focus:ring-2 focus:ring-brand ${
                                 invalid ? "border-red-500" : "border-slate-300"
                               }`}
                             />
