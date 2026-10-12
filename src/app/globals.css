@@ -151,6 +151,18 @@ input[type="date"]::-webkit-date-and-time-value {
   text-align: left;
 }
 
+/* The order on a phone: one part at a time (OrderParts). What is not of the part chosen stays in the page, out of sight. */
+@media (max-width: 47.99rem) {
+  [data-order-part="resumo"] [data-part]:not([data-part~="resumo"]),
+  [data-order-part="itens"] [data-part]:not([data-part~="itens"]),
+  [data-order-part="cliente"] [data-part]:not([data-part~="cliente"]),
+  [data-order-part="entrega"] [data-part]:not([data-part~="entrega"]),
+  [data-order-part="pagamento"] [data-part]:not([data-part~="pagamento"]),
+  [data-order-part="documentos"] [data-part]:not([data-part~="documentos"]) {
+    display: none;
+  }
+}
+
 /* A section reached by its link stops below the bars fixed at the top of a phone. */
 h2[id] {
   scroll-margin-top: calc(var(--topbar) + 4rem);

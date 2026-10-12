@@ -308,6 +308,13 @@ Cada item do pedido tem a cor da estrutura e a cor do braço articulado, escolhi
 fornecedor). As cores não são obrigatórias para fechar e saem junto do nome na proposta, no contrato e na
 expedição. O item guarda o nome da cor: tirar uma cor da lista não muda pedido já feito.
 
+## Tela do pedido no celular
+
+No celular o pedido aparece uma parte por vez, escolhida na barra do topo: Resumo, Itens, Cliente, Entrega,
+Pagamento e, quando houver, Contrato e nota. O pedido em negociação abre na primeira parte que falta
+preencher; o fechado, no Resumo. Trocar de parte não sai da página: o que foi digitado continua lá. Em tela
+larga tudo aparece junto, como antes.
+
 ## Documento do pedido fechado
 
 O PDF de um pedido fechado se chama "Pedido #…" e não traz validade; em negociação continua "Orçamento #…".

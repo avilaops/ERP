@@ -41,6 +41,8 @@ import { FREIGHT_MODES } from "@/lib/fiscal/nfe";
 import { cancelContractAction, resendContractAction, sendContractAction, sendUploadedContractAction, signContractAction } from "../contract-actions";
 import { issueNfeAction, registerNfeEventAction, saveDeliveryAction, saveTransportAction, sendNfeMailAction } from "../nfe-actions";
 import { CustomerForm } from "../../clientes/CustomerForm";
+import { OrderParts } from "../OrderParts";
+import type { OrderPart } from "../OrderParts";
 import { ActionForm } from "../ActionForm";
 import {
   addItemAction,
@@ -265,6 +267,22 @@ export default async function PedidoPage({
   const here = `/pedidos/${order.number}`;
   const canBeTaxpayer = linked !== null && taxpayerFromRegistration(linked.kind, linked.stateRegistration);
 
+  // The parts of the page on a phone, each saying whether it is filled in.
+  const hasDocuments = contracts.length > 0 || contractDraft !== null || invoice !== null;
+  const parts: OrderPart[] = [
+    { key: "resumo", label: "Resumo", filled: null },
+    { key: "itens", label: "Itens", filled: order.items.length > 0 && !order.items.some((item) => item.plateLoaded && !item.plates) },
+    { key: "cliente", label: "Cliente", filled: linked !== null && isComplete(linked) },
+    { key: "entrega", label: "Entrega", filled: order.deliveryUf !== null && order.productionDays !== null },
+    { key: "pagamento", label: "Pagamento", filled: plan.balance === 0 || (order.installmentCount !== null && order.balanceMethod !== null) },
+    ...(hasDocuments ? [{ key: "documentos", label: "Contrato e nota", filled: null }] : []),
+  ];
+  // It opens where the work is: the first part still to fill in while the order is open, the summary after.
+  const asksPart = first(query.ver);
+  const initialPart =
+    parts.find((part) => part.key === asksPart)?.key ??
+    (first(query.doc) !== undefined || asked !== undefined ? "cliente" : editable ? (parts.find((part) => part.filled === false)?.key ?? "resumo") : "resumo");
+
   return (
     <>
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -295,8 +313,10 @@ export default async function PedidoPage({
           <strong>Aprovação recusada</strong> por {decision.decidedBy} em {showDateTime(decision.decidedAt)}: {decision.comment}
         </p>
       )}
+      {/* On a phone the page is one part at a time; on a wider screen everything is drawn. */}
+      <OrderParts parts={parts} initial={initialPart}>
       {order.status === "aguardando_aprovacao" && allows(session, "aprovacoes") && (
-        <section className="mt-3 rounded-lg border border-brand bg-white p-4" aria-labelledby="sua-decisao">
+        <section data-part="resumo" className="mt-3 rounded-lg border border-brand bg-white p-4" aria-labelledby="sua-decisao">
           <h2 id="sua-decisao" className="text-sm font-semibold uppercase tracking-wide">
             Sua decisão
           </h2>
@@ -329,7 +349,7 @@ export default async function PedidoPage({
         </section>
       )}
       {(contracts.length > 0 || contractDraft !== null) && (
-        <section className="mt-3 rounded-lg border border-slate-200 bg-white p-4 text-sm" aria-labelledby="contrato">
+        <section data-part="documentos" className="mt-3 rounded-lg border border-slate-200 bg-white p-4 text-sm" aria-labelledby="contrato">
           <h2 id="contrato" className="text-sm font-semibold uppercase tracking-wide">
             Contrato
           </h2>
@@ -475,7 +495,7 @@ export default async function PedidoPage({
         </section>
       )}
       {invoice && (
-        <section className="mt-3 rounded-lg border border-slate-200 bg-white p-4 text-sm" aria-labelledby="nota-fiscal">
+        <section data-part="documentos" className="mt-3 rounded-lg border border-slate-200 bg-white p-4 text-sm" aria-labelledby="nota-fiscal">
           <h2 id="nota-fiscal" className="text-sm font-semibold uppercase tracking-wide">
             Nota fiscal
           </h2>
@@ -733,7 +753,7 @@ export default async function PedidoPage({
         </section>
       )}
       {!editable && (
-        <div className="mt-3 rounded border border-slate-300 bg-slate-100 px-4 py-3 text-sm text-slate-700">
+        <div data-part="resumo" className="mt-3 rounded border border-slate-300 bg-slate-100 px-4 py-3 text-sm text-slate-700">
           <p>
             {order.status === "aguardando_aprovacao"
               ? `Aguardando aprovação${reasons.length > 0 ? `: ${reasons.map((reason) => REASON_TEXT[reason]).join("; ")}` : ""}. Somente leitura.`
@@ -751,28 +771,8 @@ export default async function PedidoPage({
         </div>
       )}
 
-      {/* On a phone the page is long: the parts stay one touch away, each saying whether it is filled in. */}
-      <nav aria-label="Partes do pedido" className="sticky top-[var(--topbar)] z-10 -mx-4 mt-4 flex gap-2 overflow-x-auto border-b border-slate-200 bg-[#edefeb] px-4 py-2 text-sm md:hidden">
-        {(
-          [
-            ["equipamentos", "Itens", order.items.length > 0],
-            ["cliente", "Cliente", linked !== null && isComplete(linked)],
-            ["entrega", "Entrega", order.deliveryUf !== null && order.productionDays !== null],
-            ["pagamento", "Pagamento", plan.balance === 0 || (order.installmentCount !== null && order.balanceMethod !== null)],
-          ] as const
-        ).map(([anchor, label, filled]) => (
-          <a
-            key={anchor}
-            href={`#${anchor}`}
-            className={`whitespace-nowrap rounded-full border px-3 py-1.5 font-medium ${filled ? "border-emerald-300 bg-emerald-50 text-emerald-900" : "border-amber-300 bg-amber-50 text-amber-900"}`}
-          >
-            {filled ? "✓" : "•"} {label}
-          </a>
-        ))}
-      </nav>
-
       <fieldset disabled={!editable} className="mt-6 flex min-w-0 flex-col gap-6">
-        <section className={CARD} aria-labelledby="equipamentos">
+        <section data-part="itens" className={CARD} aria-labelledby="equipamentos">
           <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3">
             <h2 id="equipamentos" className={TITLE}>
               Equipamentos
@@ -961,7 +961,7 @@ export default async function PedidoPage({
 
         <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
           <div className="flex min-w-0 flex-col gap-6">
-            <section className={CARD} aria-labelledby="cliente">
+            <section data-part="cliente" className={CARD} aria-labelledby="cliente">
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-5 py-3">
                 <h2 id="cliente" className={TITLE}>
                   Cliente
@@ -1048,7 +1048,7 @@ export default async function PedidoPage({
               </div>
             </section>
 
-            <section className={CARD} aria-labelledby="entrega">
+            <section data-part="entrega" className={CARD} aria-labelledby="entrega">
               <h2 id="entrega" className={`${TITLE} border-b border-slate-200 px-5 py-3`}>
                 Entrega e condições
               </h2>
@@ -1149,7 +1149,7 @@ export default async function PedidoPage({
               </ActionForm>
             </section>
 
-            <section className={CARD} aria-labelledby="pagamento">
+            <section data-part="pagamento" className={CARD} aria-labelledby="pagamento">
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-5 py-3">
                 <h2 id="pagamento" className={TITLE}>
                   Forma de pagamento
@@ -1378,7 +1378,7 @@ export default async function PedidoPage({
           </div>
 
           <div className="flex min-w-0 flex-col gap-6">
-            <section className={`${CARD} p-5`} aria-labelledby="desconto">
+            <section data-part="entrega" className={`${CARD} p-5`} aria-labelledby="desconto">
               <div className="flex items-center justify-between">
                 <h2 id="desconto" className={TITLE}>
                   Desconto
@@ -1427,7 +1427,7 @@ export default async function PedidoPage({
               )}
             </section>
 
-            <section className={`${CARD} p-5`} aria-label="Resumo">
+            <section data-part="resumo" className={`${CARD} p-5`} aria-label="Resumo">
               <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-2 text-sm">
                 {(
                   [
@@ -1461,14 +1461,16 @@ export default async function PedidoPage({
             </section>
 
             {board && (
+              <div data-part="resumo">
               <DirectorBoard
                 board={board}
                 imported={lineImported}
                 note={assumedUf ? `Calculado para entrega em ${UF_NAMES[assumedUf]}: o pedido ainda não tem o estado de entrega gravado.` : null}
               />
+              </div>
             )}
             {board && shortOfRequired > 0 && (
-              <p className="rounded-lg border border-dashed border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              <p data-part="resumo" className="rounded-lg border border-dashed border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                 Faltam <strong>{showMoney(shortOfRequired)}</strong> de entrada para cobrir {lineWords(lineImported).payShort}, o lucro da meta e a comissão.
               </p>
             )}
@@ -1492,7 +1494,7 @@ export default async function PedidoPage({
       </div>
 
       {editable && (
-        <section className={`${CARD} mt-6 scroll-mt-20 p-5`} aria-labelledby="fechar">
+        <section data-part="resumo" className={`${CARD} mt-6 scroll-mt-20 p-5`} aria-labelledby="fechar">
           <h2 id="fechar" className={`${TITLE} scroll-mt-24`}>
             Fechar pedido
           </h2>
@@ -1527,6 +1529,7 @@ export default async function PedidoPage({
           </div>
         </section>
       )}
+      </OrderParts>
     </>
   );
 }
