@@ -95,6 +95,7 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "0061_estoque_e_compras.sql",
     "0062_cobranca_por_pix.sql",
     "0063_anilheiro_olimpico_ou_standard.sql",
+    "0064_cores_do_equipamento_no_pedido.sql",
   ]);
 
   const second = await withClient((client) => migrate(client, MIGRATIONS_DIR));
@@ -124,6 +125,7 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "company_settings",
     "contract_settings",
     "customers",
+    "equipment_colors",
     "fiscal_certificates",
     "fiscal_invoice_events",
     "fiscal_invoice_mails",

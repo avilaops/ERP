@@ -20,9 +20,12 @@ import { productPrices } from "@/lib/pricing/table";
 import { draftPriceTable, pendingChanges, publishNotice } from "@/lib/price-table";
 import { productToRow } from "@/lib/product-form";
 import { counterText, hasCost, listHref, parseTab, PRODUCT_TABS, supplierLine, viewProducts } from "@/lib/products-view";
+import { ActionForm } from "../pedidos/ActionForm";
+import { ConfirmButton } from "../pedidos/ConfirmButton";
 import {
   createProductAction,
   deleteProductAction,
+  deleteProductsWithoutCodeAction,
   pasteAdvisoryCostsAction,
   publishPriceTableAction,
   setProductActiveAction,
@@ -171,6 +174,17 @@ export default async function ProdutosPage({
           </div>
           <p className="text-xs text-slate-600">{counterText(rows.length, params.safetyMargin)}</p>
         </div>
+        {tab === "sem-codigo" && search === "" && rows.length > 0 && (
+          <ActionForm action={deleteProductsWithoutCodeAction} className="border-t border-slate-200 px-4 py-3">
+            <input type="hidden" name="lineId" value={line.id} />
+            <ConfirmButton
+              label={`Excluir os ${rows.length} sem código`}
+              confirmLabel={`Confirmar: excluir os ${rows.length}`}
+              className="rounded border border-red-300 bg-white px-3 py-2 text-sm font-medium text-red-700"
+            />
+            <p className="mt-1 text-xs text-slate-600">Saem do cadastro e da tabela publicada. O que já estiver em pedido, compra ou estoque fica.</p>
+          </ActionForm>
+        )}
 
         {rows.length === 0 ? (
           <p className="border-t border-slate-200 p-6 text-slate-600">

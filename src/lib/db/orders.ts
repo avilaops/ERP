@@ -62,8 +62,8 @@ export type Order = {
   /** `updated_at` exactly as the database holds it: what "nobody changed it since I read it" is checked against. */
   revision: string;
   closedAt: Date | null;
-  /** `plateLoaded` comes from the equipment; `plates` is what this order chose for it, `null` while nobody did. An order that is only simulated has neither. */
-  items: { productId: number; quantity: number; plateLoaded?: boolean; plates?: Plates | null }[];
+  /** `plateLoaded` comes from the equipment; `plates` is what this order chose for it, as are the colours of the frame and of the swing arm; `null` while nobody did. An order that is only simulated has neither. */
+  items: { productId: number; quantity: number; plateLoaded?: boolean; plates?: Plates | null; frameColor?: string | null; armColor?: string | null }[];
 };
 
 /** Whose orders a session reaches. `null` is everyone's; a seller gets only their own. */
@@ -149,7 +149,7 @@ export async function getOrder(number: string, scope: OrderScope, conn: Queryabl
   if (!row) return null;
 
   const items = await conn.query(
-    "SELECT i.product_id, i.quantity, i.plates, p.plate_loaded FROM order_items i JOIN products p ON p.id = i.product_id WHERE i.order_id = $1 ORDER BY i.product_id",
+    "SELECT i.product_id, i.quantity, i.plates, i.frame_color, i.arm_color, p.plate_loaded FROM order_items i JOIN products p ON p.id = i.product_id WHERE i.order_id = $1 ORDER BY i.product_id",
     [row.id],
   );
   const agreed = await conn.query("SELECT number, to_char(due_date, 'YYYY-MM-DD') AS due_date, amount, method FROM order_installments WHERE order_id = $1 ORDER BY number", [row.id]);
@@ -186,6 +186,8 @@ export async function getOrder(number: string, scope: OrderScope, conn: Queryabl
       quantity: Number(item.quantity),
       plateLoaded: item.plate_loaded === true,
       plates: isPlates(item.plates) ? item.plates : null,
+      frameColor: textOrNull(item.frame_color),
+      armColor: textOrNull(item.arm_color),
     })),
   };
 }
@@ -249,33 +251,50 @@ export async function setOrderItemQuantity(
   if (rows[0].changed === 0) throw new OrderError("Este equipamento não está no pedido.");
 }
 
-/** Olympic or standard pegs for one item. Only a plate-loaded equipment takes the choice; `null` undoes it. */
-export async function setOrderItemPlates(
+/**
+ * What the customer chose for one item: the pegs (only a plate-loaded equipment
+ * takes them) and the colours of frame and swing arm, each from the company's
+ * list. `null` undoes a choice. A colour the item already has stays valid after
+ * leaving the list.
+ */
+export async function setOrderItemOptions(
   number: string,
   productId: number,
-  plates: Plates | null,
+  options: { plates: Plates | null; frameColor: string | null; armColor: string | null },
   who: string,
   scope: OrderScope,
   conn: Queryable,
 ): Promise<void> {
   assertWho(who);
+  const { plates, frameColor, armColor } = options;
   if (plates !== null && !isPlates(plates)) throw new OrderError("Escolha Olímpico ou Standard.");
   const { rows } = await conn.query(
     `WITH target AS (
        UPDATE orders SET updated_at = now(), updated_by = $4
         WHERE number = $1 AND status = 'em_negociacao' AND ($5::text IS NULL OR seller_email = $5)
        RETURNING id
+     ), item AS (
+       SELECT i.order_id, i.product_id,
+              ($3::text IS NULL OR p.plate_loaded) AS plates_fit,
+              ($6::text IS NULL OR i.frame_color IS NOT DISTINCT FROM $6 OR EXISTS (SELECT 1 FROM equipment_colors c WHERE c.part = 'estrutura' AND c.name = $6)) AS frame_fits,
+              ($7::text IS NULL OR i.arm_color IS NOT DISTINCT FROM $7 OR EXISTS (SELECT 1 FROM equipment_colors c WHERE c.part = 'braco' AND c.name = $7)) AS arm_fits
+         FROM order_items i JOIN target ON target.id = i.order_id JOIN products p ON p.id = i.product_id
+        WHERE i.product_id = $2
      ), changed AS (
-       UPDATE order_items SET plates = $3 FROM target
-        WHERE order_id = target.id AND product_id = $2
-          AND ($3::text IS NULL OR (SELECT plate_loaded FROM products WHERE id = $2))
+       UPDATE order_items SET plates = $3, frame_color = $6, arm_color = $7 FROM item
+        WHERE order_items.order_id = item.order_id AND order_items.product_id = item.product_id
+          AND item.plates_fit AND item.frame_fits AND item.arm_fits
        RETURNING 1
      )
-     SELECT (SELECT count(*) FROM target)::int AS found, (SELECT count(*) FROM changed)::int AS changed`,
-    [number, productId, plates, who, scope.sellerEmail],
+     SELECT (SELECT count(*) FROM target)::int AS found, (SELECT count(*) FROM changed)::int AS changed,
+            (SELECT plates_fit FROM item) AS plates_fit, (SELECT frame_fits AND arm_fits FROM item) AS colors_fit`,
+    [number, productId, plates, who, scope.sellerEmail, frameColor, armColor],
   );
   if (rows[0].found === 0) throw new OrderError(NOT_EDITABLE);
-  if (rows[0].changed === 0) throw new OrderError("Este equipamento não está no pedido ou não tem anilheiro.");
+  if (rows[0].changed === 1) return;
+  if (rows[0].plates_fit === false) throw new OrderError("Este equipamento não tem anilheiro.");
+  if (rows[0].colors_fit === false) throw new OrderError("Esta cor não está mais na lista. Recarregue a página e escolha outra.");
+  throw new OrderError("Este equipamento não está no pedido.");
 }
 
 /** Takes an item out. The last one stays: an order needs at least one product. */

@@ -181,7 +181,7 @@ export async function renderQuotePdf(document: QuoteDocument, { logo, photos }: 
   }
   write(document.title, right, y - 15, { size: 15, bold: true, align: "right" });
   write(`Emissão: ${document.issuedOn}`, right, y - 30, { color: MUTED, align: "right" });
-  write(`Validade: ${document.validUntil}`, right, y - 42, { color: MUTED, align: "right" });
+  if (document.validUntil) write(`Validade: ${document.validUntil}`, right, y - 42, { color: MUTED, align: "right" });
   y -= LOGO_BOX.height + 10;
   rule(y);
   y -= 14;
@@ -204,7 +204,8 @@ export async function renderQuotePdf(document: QuoteDocument, { logo, photos }: 
     return at;
   };
   const { customer, seller } = document;
-  const afterSeller = block("Vendedor", [seller.name, seller.email], MARGIN);
+  // Only the name: the address a seller signs in with is their own and is not the customer's business.
+  const afterSeller = block("Vendedor", [seller.name], MARGIN);
   const afterCustomer = customer
     ? block(
         "Cliente",
@@ -214,7 +215,7 @@ export async function renderQuotePdf(document: QuoteDocument, { logo, photos }: 
           customer.document,
           customer.contactName && `Contato: ${customer.contactName}`,
           [customer.phone, customer.email].filter(Boolean).join(" · "),
-          customer.cityUf,
+          customer.address ?? customer.cityUf,
         ],
         MARGIN + half,
       )
@@ -369,7 +370,7 @@ export async function renderQuotePdf(document: QuoteDocument, { logo, photos }: 
   pages.forEach((sheet, index) => {
     page = sheet;
     rule(MARGIN + 14);
-    write(`Valores válidos até ${document.validUntil}.`, MARGIN, MARGIN + 2, { size: 8, color: MUTED });
+    if (document.validUntil) write(`Valores válidos até ${document.validUntil}.`, MARGIN, MARGIN + 2, { size: 8, color: MUTED });
     write(`Página ${index + 1} de ${pages.length}`, right, MARGIN + 2, { size: 8, color: MUTED, align: "right" });
   });
 

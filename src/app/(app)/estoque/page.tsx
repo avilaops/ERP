@@ -1,4 +1,4 @@
-import { withPlates } from "@/lib/plates";
+import { withOptions } from "@/lib/plates";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { CARD, INPUT, Pager, pageOf, PageHeader, Pill, PRIMARY, SECONDARY } from "@/components/ui";
@@ -63,7 +63,7 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
                           #{order.number}
                         </Link>{" "}
                         · {order.customer ?? "sem cliente"} · fechado em {showIsoDate(order.closedOn)}
-                        <span className="block text-slate-600">{order.items.map((item) => `${item.quantity} × ${withPlates(item.name, item.plates)}`).join(" · ")}</span>
+                        <span className="block text-slate-600">{order.items.map((item) => `${item.quantity} × ${withOptions(item.name, item)}`).join(" · ")}</span>
                         {!shipped && short && <span className="mt-1 block text-amber-900">Não há peças bastantes no estoque para este pedido: a saída deixa o saldo negativo.</span>}
                       </p>
                       <ActionForm action={shipOrderAction} className="flex flex-wrap items-center gap-2">

@@ -133,12 +133,21 @@ test("cabeçalho, datas, entrega e prazo saem do pedido e do dia informado", () 
   assert.deepEqual([bare.delivery, bare.production, bare.notes], [null, null, null]);
 });
 
-test("anilheiro: a escolha do pedido sai junto do nome do equipamento", () => {
+test("anilheiro e cores: as escolhas do pedido saem junto do nome do equipamento", () => {
   const [first, ...rest] = ORDER.items;
-  const document = build({ ...ORDER, items: [{ ...first, plateLoaded: true, plates: "olimpico" }, ...rest] });
-  const named = document.items.filter((item) => item.name.endsWith("(anilheiro olímpico)"));
+  const document = build({ ...ORDER, items: [{ ...first, plateLoaded: true, plates: "olimpico", frameColor: "Piano Black", armColor: "Ocean Blue" }, ...rest] });
+  const named = document.items.filter((item) => item.name.endsWith("(anilheiro olímpico, estrutura Piano Black, braço Ocean Blue)"));
   assert.equal(named.length, 1);
   assert.equal(named[0].productId, first.productId);
+});
+
+test("pedido fechado: o documento se chama Pedido e não tem validade; em negociação continua Orçamento", () => {
+  const open = build();
+  assert.match(open.title, /^Orçamento #/);
+  assert.ok(open.validUntil);
+  const closed = build({ ...ORDER, status: "fechado" });
+  assert.equal(closed.title, `Pedido #${ORDER.number}`);
+  assert.equal(closed.validUntil, null);
 });
 
 test("sem desconto: some a linha do desconto e a coluna dos itens", () => {
@@ -158,6 +167,7 @@ test("cliente: null sem cliente; PJ com CNPJ formatado e Cidade/UF", () => {
     phone: "(98) 99123-4567",
     email: "compras@forcatotal.example",
     cityUf: "São Luís/MA",
+    address: "Rua Grande, 100 - Centro, São Luís/MA, CEP 65000-000",
   });
   assert.equal(build({ ...ORDER, customer: { ...COMPANY, city: null } }).customer?.cityUf, "MA");
   assert.equal(build({ ...ORDER, customer: { ...COMPANY, city: null, uf: null, phone: null } }).customer?.cityUf, null);

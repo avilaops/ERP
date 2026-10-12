@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { after, before, test } from "node:test";
 import { decideApproval, lastDecision, listPastDecisions, listPendingApprovals } from "@/lib/db/approvals";
 import { createCustomer, deleteCustomer } from "@/lib/db/customers";
+import { createEquipmentColor, deleteEquipmentColor, listEquipmentColors, updateEquipmentColor } from "@/lib/db/equipment-colors";
 import { listDashboardOrders, ordersProfit } from "@/lib/db/dashboard";
 import {
   addOrderItem,
@@ -18,7 +19,7 @@ import {
   reopenOrder,
   saveOrderTerms,
   savePayment,
-  setOrderItemPlates,
+  setOrderItemOptions,
   setOrderItemQuantity,
   simulationBand,
 } from "@/lib/db/orders";
@@ -177,7 +178,7 @@ test("criar: o pedido nasce em negociação, na versão pedida, com o primeiro i
       downPayment: 0,
       downPaymentDate: null,
       closedAt: null,
-      items: [{ productId: ID["LD-B001"], quantity: 1, plateLoaded: false, plates: null }],
+      items: [{ productId: ID["LD-B001"], quantity: 1, plateLoaded: false, plates: null, frameColor: null, armColor: null }],
     },
   );
   assert.ok(created.updatedAt instanceof Date);
@@ -213,23 +214,43 @@ test("itens: adicionar soma no que já está, alterar quantidade, e o último n�
   await addOrderItem(N, ID["LD-B002"], 1, SELLER.email, MINE, db.pool);
   await addOrderItem(N, ID["LD-B001"], 2, SELLER.email, MINE, db.pool);
   assert.deepEqual((await order(N)).items, [
-    { productId: ID["LD-B001"], quantity: 3, plateLoaded: false, plates: null },
-    { productId: ID["LD-B002"], quantity: 1, plateLoaded: false, plates: null },
+    { productId: ID["LD-B001"], quantity: 3, plateLoaded: false, plates: null, frameColor: null, armColor: null },
+    { productId: ID["LD-B002"], quantity: 1, plateLoaded: false, plates: null, frameColor: null, armColor: null },
   ]);
 
   // Anilheiro: só o equipamento que tem aceita a escolha; ela fica no item e pode ser desfeita.
-  await assert.rejects(() => setOrderItemPlates(N, ID["LD-B001"], "olimpico", SELLER.email, MINE, db.pool), /não tem anilheiro/);
+  const NONE = { plates: null, frameColor: null, armColor: null };
+  const closing = async () => closingProblems(await order(N), saleOf(await order(N), (await loadPublishedTable(1, db.pool))!)).filter((text) => text.includes("anilheiro"));
+  await assert.rejects(() => setOrderItemOptions(N, ID["LD-B001"], { ...NONE, plates: "olimpico" }, SELLER.email, MINE, db.pool), /não tem anilheiro/);
   await setProductPlateLoaded(ID["LD-B001"], true, DIRECTOR, db.pool);
-  assert.deepEqual(closingProblems(await order(N), saleOf(await order(N), (await loadPublishedTable(1, db.pool))!)).filter((text) => text.includes("anilheiro")), [
-    "Escolha anilheiro Olímpico ou Standard em cada equipamento de peso livre.",
-  ]);
-  await setOrderItemPlates(N, ID["LD-B001"], "standard", SELLER.email, MINE, db.pool);
-  assert.deepEqual((await order(N)).items[0], { productId: ID["LD-B001"], quantity: 3, plateLoaded: true, plates: "standard" });
-  assert.deepEqual(closingProblems(await order(N), saleOf(await order(N), (await loadPublishedTable(1, db.pool))!)).filter((text) => text.includes("anilheiro")), []);
-  await assert.rejects(() => setOrderItemPlates(N, ID["LD-B001"], "grande" as "olimpico", SELLER.email, MINE, db.pool), /Olímpico ou Standard/);
-  await assert.rejects(() => setOrderItemPlates(N, ID["LD-B001"], "olimpico", OTHER_SELLER.email, THEIRS, db.pool), /./);
-  await setOrderItemPlates(N, ID["LD-B001"], null, SELLER.email, MINE, db.pool);
-  assert.equal((await order(N)).items[0].plates, null);
+  assert.deepEqual(await closing(), ["Escolha anilheiro Olímpico ou Standard em cada equipamento de peso livre."]);
+  await setOrderItemOptions(N, ID["LD-B001"], { ...NONE, plates: "standard" }, SELLER.email, MINE, db.pool);
+  assert.deepEqual((await order(N)).items[0], { productId: ID["LD-B001"], quantity: 3, plateLoaded: true, plates: "standard", frameColor: null, armColor: null });
+  assert.deepEqual(await closing(), []);
+  await assert.rejects(() => setOrderItemOptions(N, ID["LD-B001"], { ...NONE, plates: "grande" as "olimpico" }, SELLER.email, MINE, db.pool), /Olímpico ou Standard/);
+  await assert.rejects(() => setOrderItemOptions(N, ID["LD-B001"], { ...NONE, plates: "olimpico" }, OTHER_SELLER.email, THEIRS, db.pool), /./);
+  await assert.rejects(() => setOrderItemOptions(N, ID["LD-B003"], NONE, SELLER.email, MINE, db.pool), /não está no pedido/);
+
+  // Cores: só as da lista da empresa, cada uma na sua parte; a escolhida fica no item mesmo depois de sair da lista.
+  await assert.rejects(() => setOrderItemOptions(N, ID["LD-B001"], { ...NONE, frameColor: "Roxo" }, SELLER.email, MINE, db.pool), /não está mais na lista/);
+  await assert.rejects(() => setOrderItemOptions(N, ID["LD-B001"], { ...NONE, frameColor: "Ocean Blue" }, SELLER.email, MINE, db.pool), /não está mais na lista/);
+  await setOrderItemOptions(N, ID["LD-B001"], { plates: "standard", frameColor: "Piano Black", armColor: "Ocean Blue" }, SELLER.email, MINE, db.pool);
+  assert.deepEqual((await order(N)).items[0], { productId: ID["LD-B001"], quantity: 3, plateLoaded: true, plates: "standard", frameColor: "Piano Black", armColor: "Ocean Blue" });
+  const blue = (await listEquipmentColors(db.pool)).find((color) => color.part === "braco" && color.name === "Ocean Blue");
+  assert.ok(blue);
+  await deleteEquipmentColor(blue.id, db.pool);
+  await setOrderItemOptions(N, ID["LD-B001"], { plates: "standard", frameColor: "Light Grey", armColor: "Ocean Blue" }, SELLER.email, MINE, db.pool);
+  assert.equal((await order(N)).items[0].armColor, "Ocean Blue");
+  await assert.rejects(() => setOrderItemOptions(N, ID["LD-B002"], { ...NONE, armColor: "Ocean Blue" }, SELLER.email, MINE, db.pool), /não está mais na lista/);
+  await createEquipmentColor("braco", "Ocean Blue", DIRECTOR, db.pool);
+  await assert.rejects(() => createEquipmentColor("braco", "Ocean Blue", DIRECTOR, db.pool), /já está na lista/);
+  await assert.rejects(() => createEquipmentColor("teto", "Azul", DIRECTOR, db.pool), /estrutura ou do braço/);
+  const renamed = await updateEquipmentColor((await listEquipmentColors(db.pool)).find((color) => color.part === "braco" && color.name === "Ocean Blue")!.id, { name: "Azul Oceano", position: 3 }, DIRECTOR, db.pool);
+  assert.deepEqual([renamed.name, renamed.position, renamed.part], ["Azul Oceano", 3, "braco"]);
+  await updateEquipmentColor(renamed.id, { name: "Ocean Blue", position: 7 }, DIRECTOR, db.pool);
+
+  await setOrderItemOptions(N, ID["LD-B001"], NONE, SELLER.email, MINE, db.pool);
+  assert.deepEqual((await order(N)).items[0], { productId: ID["LD-B001"], quantity: 3, plateLoaded: true, plates: null, frameColor: null, armColor: null });
   await setProductPlateLoaded(ID["LD-B001"], false, DIRECTOR, db.pool);
 
   await setOrderItemQuantity(N, ID["LD-B001"], 1, SELLER.email, MINE, db.pool);

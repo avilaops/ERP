@@ -23,6 +23,7 @@ import type { ActionState } from "@/lib/order-form";
 import { latestVersion, loadPublishedSnapshot, nextVersionNumber, PriceTableError, publishPriceTable } from "@/lib/db/price-table";
 import { draftPriceTable, NOTHING_TO_PUBLISH, pendingChanges } from "@/lib/price-table";
 import type { PublishState } from "@/lib/price-table";
+import { viewProducts } from "@/lib/products-view";
 import { NEW_PRODUCT_FIELDS, parseProductForm, rawProductValues, ROW_FIELDS } from "@/lib/product-form";
 import type { NewProductState, ProductFieldKey, ProductScreenResult, RowState } from "@/lib/product-form";
 
@@ -304,4 +305,33 @@ export async function setProductPlateLoadedAction(_previous: ActionState, formDa
   }
   revalidatePath(`/produtos/${id}`);
   return { error: null, notice: on ? "Gravado: o pedido passa a pedir Olímpico ou Standard neste equipamento." : "Gravado: o pedido não pede mais anilheiro neste equipamento." };
+}
+
+/** "Excluir todos" of the tab Sem código: each equipment of the line without a code goes, except the ones something already uses. */
+export async function deleteProductsWithoutCodeAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
+  const session = await requirePermission("produtos");
+  const conn = tenantDb(session.tenant.slug);
+  const lineId = Number(formData.get("lineId"));
+  let removed = 0;
+  let kept = 0;
+  try {
+    // The same list the tab shows.
+    const products = viewProducts(await listProducts({ lineId }, conn), { tab: "sem-codigo", search: "" });
+    for (const product of products) {
+      try {
+        await deleteProduct(product.id, conn);
+        removed += 1;
+      } catch (error) {
+        if (!(error instanceof ProductError)) throw error;
+        kept += 1;
+      }
+    }
+  } catch (error) {
+    console.error("[produtos] falha ao excluir os sem código:", error instanceof Error ? error.message : error);
+    revalidate();
+    return { error: `Parou no meio: ${removed} excluído(s). Tente de novo para os que ficaram.` };
+  }
+  console.info(`[produtos] excluídos em lote: ${removed} sem código, ${kept} mantidos, por ${session.email}`);
+  revalidate();
+  return { error: null, notice: `${removed} excluído(s).${kept > 0 ? ` ${kept} ficaram porque já estão em pedido, compra, estoque ou produção: desative-os.` : ""}` };
 }

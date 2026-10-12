@@ -27,7 +27,8 @@ import { latestVersion, loadDiscountLimits, loadPublishedSnapshot, loadPublished
 import { formatMoney, formatPercent, isoDate, showDateTime, showIsoDate, showMoney, showPercent } from "@/lib/format";
 import { BAND_TEXT, REASON_TEXT, STATUS_LABELS, UF_NAMES } from "@/lib/order-form";
 import { ORDER_NUMBER } from "@/lib/order-number";
-import { PLATES, platesLabel, withPlates } from "@/lib/plates";
+import { listEquipmentColors } from "@/lib/db/equipment-colors";
+import { optionsText, PLATES, withOptions } from "@/lib/plates";
 import { closingProblems, directorOf, dueDates, paymentOf, productionText, saleOf } from "@/lib/order-quote";
 import { ORIGIN_UF, UFS } from "@/lib/pricing/states";
 import { compareByCode } from "@/lib/products-view";
@@ -51,7 +52,7 @@ import {
   saveInstallmentsAction,
   savePaymentAction,
   saveTermsAction,
-  setItemPlatesAction,
+  setItemOptionsAction,
   setItemQuantityAction,
 } from "../actions";
 import { ConfirmButton } from "../ConfirmButton";
@@ -159,25 +160,37 @@ export default async function PedidoPage({
   const hasIpi = table.ipi > 0;
 
   const products = new Map(table.items.map((item) => [item.productId, item]));
-  // Olympic or standard pegs, for the items that have them: a choice while the order is open, a line of text after.
-  const platesOf = (item: (typeof order.items)[number], className: string) => {
-    if (!item.plateLoaded && !item.plates) return null;
-    if (!editable) return <span className="mt-1 block text-xs text-slate-600">Anilheiro: {item.plates ? platesLabel(item.plates) : "não escolhido"}</span>;
+  // What the customer chooses for each item: pegs (when the equipment has them) and the colours of frame and
+  // swing arm. A form while the order is open, a line of text after.
+  const colors = await listEquipmentColors(conn);
+  const optionsOf = (item: (typeof order.items)[number], className: string) => {
+    if (!editable) {
+      const chosen = optionsText(item);
+      const pending = item.plateLoaded && !item.plates ? "anilheiro não escolhido" : "";
+      return chosen || pending ? <span className="mt-1 block text-xs text-slate-600">{[chosen, pending].filter(Boolean).join(", ")}</span> : null;
+    }
+    const choice = (name: string, label: string, current: string | null | undefined, options: (readonly [string, string])[]) => (
+      <label className="flex items-center gap-2 text-sm text-slate-600">
+        {label}
+        <select key={current ?? ""} name={name} defaultValue={current ?? ""} className={`${INPUT} py-1.5 text-slate-900`}>
+          <option value="">Escolher…</option>
+          {/* A colour the item has and the list no longer does stays as an option of this item. */}
+          {(current && !options.some(([key]) => key === current) ? [...options, [current, current] as const] : options).map(([key, text]) => (
+            <option key={key} value={key}>
+              {text}
+            </option>
+          ))}
+        </select>
+      </label>
+    );
+    const ofPart = (part: string) => colors.filter((color) => color.part === part).map((color) => [color.name, color.name] as const);
     return (
-      <ActionForm action={setItemPlatesAction} className={className}>
+      <ActionForm action={setItemOptionsAction} className={className}>
         <input type="hidden" name="number" value={order.number} />
         <input type="hidden" name="productId" value={item.productId} />
-        <label className="flex items-center gap-2 text-sm text-slate-600">
-          Anilheiro
-          <select key={item.plates ?? ""} name="plates" defaultValue={item.plates ?? ""} className={`${INPUT} py-1.5 text-slate-900`}>
-            <option value="">Escolher…</option>
-            {PLATES.map(([key, label]) => (
-              <option key={key} value={key}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
+        {item.plateLoaded || item.plates ? choice("plates", "Anilheiro", item.plates, [...PLATES]) : null}
+        {choice("frameColor", "Cor da estrutura", item.frameColor, ofPart("estrutura"))}
+        {choice("armColor", "Cor do braço", item.armColor, ofPart("braco"))}
         <button type="submit" className="rounded border border-slate-300 px-3 py-1.5 text-sm font-medium text-brand">
           Gravar
         </button>
@@ -228,7 +241,7 @@ export default async function PedidoPage({
     delivery: order.deliveryUf ? UF_NAMES[order.deliveryUf] : null,
     items: sale.lines.map((line, index) => {
       const product = products.get(order.items[index].productId);
-      return { quantity: order.items[index].quantity, name: withPlates(product?.name ?? "", order.items[index].plates), code: product?.code ?? null, unit: line.unitWithIpi };
+      return { quantity: order.items[index].quantity, name: withOptions(product?.name ?? "", order.items[index]), code: product?.code ?? null, unit: line.unitWithIpi };
     }),
     tableTotal: sale.tableTotal,
     discount: sale.discount,
@@ -782,7 +795,7 @@ export default async function PedidoPage({
                     </span>
                     <span className="shrink-0 font-semibold">{showMoney(line.totalWithIpi)}</span>
                   </div>
-                  {platesOf(item, "mt-2 flex items-center gap-2")}
+                  {optionsOf(item, "mt-2 flex flex-wrap items-center gap-x-4 gap-y-2")}
                   <div className="mt-2 flex items-center justify-between gap-3">
                     <ActionForm action={setItemQuantityAction} className="flex flex-wrap items-center gap-2">
                       <input type="hidden" name="number" value={order.number} />
@@ -858,7 +871,7 @@ export default async function PedidoPage({
                       <td className="px-4 py-3">
                         <span className="font-medium">{product?.name}</span>
                         <span className="block text-xs text-slate-500">{product?.code ?? "sem código"}</span>
-                        {platesOf(item, "mt-2 flex items-center gap-2")}
+                        {optionsOf(item, "mt-2 flex flex-wrap items-center gap-x-4 gap-y-2")}
                       </td>
                       <td className="px-4 py-3">
                         <ActionForm action={setItemQuantityAction} className="flex flex-wrap items-center gap-2">

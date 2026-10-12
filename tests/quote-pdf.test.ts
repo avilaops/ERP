@@ -39,6 +39,7 @@ const DOCUMENT: QuoteDocument = {
     phone: "(98) 99123-4567",
     email: "compras@forcatotal.example",
     cityUf: "São Luís/MA",
+    address: "Rua do Sol, 100 - Centro, São Luís/MA, CEP 65000-000",
   },
   delivery: "Maranhão",
   production: "90 dias corridos, contados do pagamento da entrada",

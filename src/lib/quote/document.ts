@@ -1,4 +1,5 @@
-import { withPlates } from "@/lib/plates";
+import { addressLine } from "@/lib/contract/text";
+import { withOptions } from "@/lib/plates";
 import { formatDocument, formatPhone } from "@/lib/customer";
 import type { Order } from "@/lib/db/orders";
 import type { PublishedTable } from "@/lib/db/price-table";
@@ -24,6 +25,8 @@ export type QuoteCustomer = {
   email: string | null;
   /** `Cidade/UF`, or only what there is. */
   cityUf: string | null;
+  /** The address of the register in one line, with what there is of it. */
+  address: string | null;
 };
 
 export type QuoteItem = {
@@ -48,11 +51,12 @@ export type QuoteTotal = { label: string; value: string; strong: boolean };
 export type QuoteDocument = {
   /** The company that sells: the one of the session. */
   company: string;
-  /** `Orçamento #260930-BBMN`. */
+  /** `Orçamento #260930-BBMN`, or `Pedido #260930-BBMN` once the order is closed. */
   title: string;
   /** `DD/MM/AAAA`. */
   issuedOn: string;
-  validUntil: string;
+  /** `null` for a closed order: nothing in it expires. */
+  validUntil: string | null;
   seller: { name: string; email: string };
   /** The commercial manager of the company and where the proposal is issued, when the company registered them. */
   manager: string | null;
@@ -80,7 +84,7 @@ export type QuoteDocument = {
 type QuoteInput = {
   /** Name of the company of the session. */
   company: string;
-  order: Pick<Order, "number" | "sellerName" | "sellerEmail" | "customer" | "deliveryUf" | "productionDays" | "notes" | "items"> & Partial<Pick<Order, "productionUnit">>;
+  order: Pick<Order, "number" | "sellerName" | "sellerEmail" | "customer" | "deliveryUf" | "productionDays" | "notes" | "items"> & Partial<Pick<Order, "productionUnit" | "status">>;
   table: Pick<PublishedTable, "version" | "ipi" | "items">;
   /** The team's account of this order (`saleOf`): one line per item, in the order of `order.items`. */
   sale: SaleQuote;
@@ -146,19 +150,20 @@ export function quoteDocument({ company, order, table, sale, dates, products, to
 
   const hasDiscount = sale.discount > 0;
   const hasIpi = table.ipi > 0;
+  const closed = order.status === "fechado";
   const published = new Map(table.items.map((item) => [item.productId, item]));
   const items = order.items
-    .map(({ productId, quantity, plates }, index) => {
+    .map(({ productId, quantity, ...options }, index) => {
       const product = published.get(productId);
       if (!product) throw new Error(`Equipamento ${productId} não está na tabela v${table.version}.`);
-      return { productId, quantity, plates, product, line: sale.lines[index] };
+      return { productId, quantity, options, product, line: sale.lines[index] };
     })
     .sort((a, b) => compareByCode(a.product, b.product) || a.productId - b.productId)
-    .map(({ productId, quantity, plates, product, line }) => ({
+    .map(({ productId, quantity, options, product, line }) => ({
       productId,
       code: product.code ?? "",
-      // The choice of pegs goes with the name: proposal and contract say what will be delivered.
-      name: withPlates(product.name, plates),
+      // Pegs and colours go with the name: proposal and contract say what will be delivered.
+      name: withOptions(product.name, options),
       description: blankToNull(products.get(productId)?.description),
       quantity,
       unitPrice: showMoney(line.unitPrice),
@@ -179,9 +184,10 @@ export function quoteDocument({ company, order, table, sale, dates, products, to
 
   return {
     company,
-    title: `Orçamento #${order.number}`,
+    // A closed order is no longer a quotation: the customer agreed, and the prices no longer expire.
+    title: `${closed ? "Pedido" : "Orçamento"} #${order.number}`,
     issuedOn: showIsoDate(today),
-    validUntil: showIsoDate(dates.proposalValidUntil),
+    validUntil: closed ? null : showIsoDate(dates.proposalValidUntil),
     seller: { name: order.sellerName, email: order.sellerEmail },
     manager: blankToNull(manager),
     place: blankToNull(place),
@@ -195,6 +201,7 @@ export function quoteDocument({ company, order, table, sale, dates, products, to
       phone: customer.phone === null ? null : formatPhone(customer.phone),
       email: customer.email,
       cityUf: [customer.city, customer.uf].filter(Boolean).join("/") || null,
+      address: addressLine(customer) || null,
     },
     delivery: order.deliveryUf === null ? null : UF_NAMES[order.deliveryUf],
     production: order.productionDays === null ? null : `${productionText(order.productionDays, order.productionUnit)}, contados do pagamento da entrada`,

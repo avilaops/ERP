@@ -301,7 +301,23 @@ equipamento (Produtos e custos → abrir), o bloco **Anilheiro** diz se ele tem.
 mostra a escolha; sem ela o pedido não fecha. A escolha sai junto do nome na proposta, no contrato e na
 lista de expedição do Estoque. Não muda preço nem a descrição da nota fiscal.
 
+## Cores do equipamento no pedido
+
+Cada item do pedido tem a cor da estrutura e a cor do braço articulado, escolhidas de uma lista da empresa
+(Parâmetros → Cores dos equipamentos, com adicionar, editar e remover; começa com as do catálogo do
+fornecedor). As cores não são obrigatórias para fechar e saem junto do nome na proposta, no contrato e na
+expedição. O item guarda o nome da cor: tirar uma cor da lista não muda pedido já feito.
+
+## Documento do pedido fechado
+
+O PDF de um pedido fechado se chama "Pedido #…" e não traz validade; em negociação continua "Orçamento #…".
+O cliente sai com o endereço completo do cadastro. Do vendedor sai só o nome, nunca o e-mail.
+
 ## Excluir equipamento
+
+Na aba **Sem código** de Produtos e custos, o botão "Excluir os N sem código" tira todos de uma vez; os que
+já estiverem em pedido, compra, estoque ou produção ficam, e a tela diz quantos.
+
 
 Um equipamento sai do cadastro, e das tabelas de preço publicadas em que estava, enquanto nenhum pedido,
 compra, movimento de estoque ou ordem de produção o usar. Depois disso só dá para desativar.

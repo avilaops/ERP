@@ -26,7 +26,7 @@ import {
   saveOrderInstallments,
   saveOrderTerms,
   savePayment,
-  setOrderItemPlates,
+  setOrderItemOptions,
   setOrderItemQuantity,
 } from "@/lib/db/orders";
 import type { OrderScope } from "@/lib/db/orders";
@@ -127,7 +127,7 @@ export async function setItemQuantityAction(_previous: ActionState, formData: Fo
   return OK;
 }
 
-export async function setItemPlatesAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
+export async function setItemOptionsAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
   const session = await requirePermission("pedidos");
   const conn = tenantDb(session.tenant.slug);
 
@@ -135,10 +135,11 @@ export async function setItemPlatesAction(_previous: ActionState, formData: Form
   const number = read("number") ?? "";
   const plates = read("plates") ?? "";
   if (plates !== "" && !isPlates(plates)) return { error: "Escolha Olímpico ou Standard." };
+  const options = { plates: plates === "" ? null : plates, frameColor: read("frameColor") || null, armColor: read("armColor") || null };
   try {
-    await setOrderItemPlates(number, Number(read("productId")), plates === "" ? null : plates, session.email, scopeOf(session), conn);
+    await setOrderItemOptions(number, Number(read("productId")), options, session.email, scopeOf(session), conn);
   } catch (error) {
-    return { error: problem("gravar o anilheiro", error) };
+    return { error: problem("gravar as opções do equipamento", error) };
   }
   revalidatePath(`${ORDERS}/${number}`);
   return OK;

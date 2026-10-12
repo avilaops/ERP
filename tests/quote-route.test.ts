@@ -188,10 +188,11 @@ test("vendedor dono, gerente e diretoria recebem o PDF do pedido", { skip }, asy
       "Cliente: a informar",
       // O vendedor é o do pedido, quem quer que gere o arquivo.
       "Vera Vendedora",
-      SELLER.email,
     ]) {
       assert.ok(text.includes(expected), `${role}: falta "${expected}"`);
     }
+    // O e-mail com que o vendedor entra é dele: não vai para o cliente.
+    assert.ok(!text.includes(SELLER.email), `${role}: o e-mail do vendedor não sai no PDF`);
     // Nem para a Diretoria o orçamento do cliente leva custo ou lucro.
     assert.doesNotMatch(text, /custo|lucro|comiss|DIFAL|8\.146|8\.738/i, role);
     // Uma foto cadastrada (a do supino) e nenhuma logo.
