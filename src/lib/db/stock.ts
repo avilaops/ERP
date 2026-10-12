@@ -1,3 +1,4 @@
+import type { Plates } from "@/lib/plates";
 import type { Queryable } from "@/lib/db/pool";
 
 /** A refusal the user can act on. The message goes to the screen as it is. */
@@ -81,11 +82,11 @@ export async function countStock(productId: number, counted: number, note: strin
   return { difference: Number(rows[0].difference) };
 }
 
-export type OrderToShip = { number: string; customer: string | null; closedOn: string; shipped: boolean; items: { name: string; code: string | null; quantity: number; physical: number }[] };
+export type OrderToShip = { number: string; customer: string | null; closedOn: string; shipped: boolean; items: { name: string; code: string | null; quantity: number; physical: number; plates: Plates | null }[] };
 
 const ORDERS = `
   SELECT o.number, c.name AS customer, to_char(o.closed_at AT TIME ZONE 'America/Sao_Paulo', 'YYYY-MM-DD') AS closed_on, o.id IN ${SHIPPED} AS shipped,
-         (SELECT json_agg(json_build_object('name', p.name, 'code', p.code, 'quantity', i.quantity,
+         (SELECT json_agg(json_build_object('name', p.name, 'code', p.code, 'quantity', i.quantity, 'plates', i.plates,
                  'physical', COALESCE((SELECT sum(m.quantity) FROM stock_moves m WHERE m.product_id = p.id), 0)) ORDER BY p.name)
             FROM order_items i JOIN products p ON p.id = i.product_id WHERE i.order_id = o.id) AS items
     FROM orders o LEFT JOIN customers c ON c.id = o.customer_id

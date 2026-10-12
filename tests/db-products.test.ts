@@ -176,7 +176,7 @@ test("excluir: produto que outra tabela referencia é recusado, com a saída de 
   await db.pool.query("CREATE TABLE product_refs (product_id integer NOT NULL REFERENCES products (id))");
   await db.pool.query("INSERT INTO product_refs VALUES ($1)", [created.id]);
 
-  await assert.rejects(() => deleteProduct(created.id, db.pool), /já tem histórico e não pode ser excluído\. Desative-o\./);
+  await assert.rejects(() => deleteProduct(created.id, db.pool), /já está em pedido, compra, estoque ou produção e não pode ser excluído\. Desative-o\./);
   assert.ok((await listProducts({}, db.pool)).some((product) => product.id === created.id));
 });
 

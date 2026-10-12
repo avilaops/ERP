@@ -7,6 +7,8 @@ import { pgErrorCode } from "@/lib/db/pool";
 import type { Queryable } from "@/lib/db/pool";
 import { loadPublishedSnapshot, loadPublishedTable } from "@/lib/db/price-table";
 import { isoDate } from "@/lib/format";
+import { isPlates } from "@/lib/plates";
+import type { Plates } from "@/lib/plates";
 import { closingProblems, engineOrder, paymentOf, receivableColumns, saleOf, simulatedOrder } from "@/lib/order-quote";
 import type { Simulation } from "@/lib/order-quote";
 import { ORDER_NUMBER } from "@/lib/order-number";
@@ -60,7 +62,8 @@ export type Order = {
   /** `updated_at` exactly as the database holds it: what "nobody changed it since I read it" is checked against. */
   revision: string;
   closedAt: Date | null;
-  items: { productId: number; quantity: number }[];
+  /** `plateLoaded` comes from the equipment; `plates` is what this order chose for it, `null` while nobody did. An order that is only simulated has neither. */
+  items: { productId: number; quantity: number; plateLoaded?: boolean; plates?: Plates | null }[];
 };
 
 /** Whose orders a session reaches. `null` is everyone's; a seller gets only their own. */
@@ -145,9 +148,10 @@ export async function getOrder(number: string, scope: OrderScope, conn: Queryabl
   const row = rows[0];
   if (!row) return null;
 
-  const items = await conn.query("SELECT product_id, quantity FROM order_items WHERE order_id = $1 ORDER BY product_id", [
-    row.id,
-  ]);
+  const items = await conn.query(
+    "SELECT i.product_id, i.quantity, i.plates, p.plate_loaded FROM order_items i JOIN products p ON p.id = i.product_id WHERE i.order_id = $1 ORDER BY i.product_id",
+    [row.id],
+  );
   const agreed = await conn.query("SELECT number, to_char(due_date, 'YYYY-MM-DD') AS due_date, amount, method FROM order_installments WHERE order_id = $1 ORDER BY number", [row.id]);
   return {
     customInstallments: agreed.rows.map((part) => ({ number: Number(part.number), dueDate: String(part.due_date), amount: Number(part.amount), method: part.method === null ? null : String(part.method) })),
@@ -177,7 +181,12 @@ export async function getOrder(number: string, scope: OrderScope, conn: Queryabl
     updatedAt: row.updated_at as Date,
     revision: String(row.revision),
     closedAt: row.closed_at as Date | null,
-    items: items.rows.map((item) => ({ productId: Number(item.product_id), quantity: Number(item.quantity) })),
+    items: items.rows.map((item) => ({
+      productId: Number(item.product_id),
+      quantity: Number(item.quantity),
+      plateLoaded: item.plate_loaded === true,
+      plates: isPlates(item.plates) ? item.plates : null,
+    })),
   };
 }
 
@@ -238,6 +247,35 @@ export async function setOrderItemQuantity(
   );
   if (rows[0].found === 0) throw new OrderError(NOT_EDITABLE);
   if (rows[0].changed === 0) throw new OrderError("Este equipamento não está no pedido.");
+}
+
+/** Olympic or standard pegs for one item. Only a plate-loaded equipment takes the choice; `null` undoes it. */
+export async function setOrderItemPlates(
+  number: string,
+  productId: number,
+  plates: Plates | null,
+  who: string,
+  scope: OrderScope,
+  conn: Queryable,
+): Promise<void> {
+  assertWho(who);
+  if (plates !== null && !isPlates(plates)) throw new OrderError("Escolha Olímpico ou Standard.");
+  const { rows } = await conn.query(
+    `WITH target AS (
+       UPDATE orders SET updated_at = now(), updated_by = $4
+        WHERE number = $1 AND status = 'em_negociacao' AND ($5::text IS NULL OR seller_email = $5)
+       RETURNING id
+     ), changed AS (
+       UPDATE order_items SET plates = $3 FROM target
+        WHERE order_id = target.id AND product_id = $2
+          AND ($3::text IS NULL OR (SELECT plate_loaded FROM products WHERE id = $2))
+       RETURNING 1
+     )
+     SELECT (SELECT count(*) FROM target)::int AS found, (SELECT count(*) FROM changed)::int AS changed`,
+    [number, productId, plates, who, scope.sellerEmail],
+  );
+  if (rows[0].found === 0) throw new OrderError(NOT_EDITABLE);
+  if (rows[0].changed === 0) throw new OrderError("Este equipamento não está no pedido ou não tem anilheiro.");
 }
 
 /** Takes an item out. The last one stays: an order needs at least one product. */

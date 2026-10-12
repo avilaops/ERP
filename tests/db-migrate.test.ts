@@ -94,6 +94,7 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "0060_icms_fora_da_base_do_pis_e_da_cofins.sql",
     "0061_estoque_e_compras.sql",
     "0062_cobranca_por_pix.sql",
+    "0063_anilheiro_olimpico_ou_standard.sql",
   ]);
 
   const second = await withClient((client) => migrate(client, MIGRATIONS_DIR));

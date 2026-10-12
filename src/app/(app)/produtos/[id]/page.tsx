@@ -10,7 +10,7 @@ import { listProducts, loadProductMeasures } from "@/lib/db/products";
 import { productToForm } from "@/lib/product-form";
 import { saveProductFiscalAction } from "../../parametros/fiscal/actions";
 import { ActionForm } from "../../pedidos/ActionForm";
-import { deleteProductAction, saveProductMeasuresAction, saveProductScreenAction, setProductActiveAction } from "../actions";
+import { deleteProductAction, saveProductMeasuresAction, saveProductScreenAction, setProductActiveAction, setProductPlateLoadedAction } from "../actions";
 import { ProductScreen } from "../ProductScreen";
 
 export const metadata = { title: "Equipamento · ERP" };
@@ -88,6 +88,22 @@ export default async function EquipamentoPage({ params }: { params: Promise<{ id
           </ul>
         </section>
       )}
+
+      <section className="mx-auto mt-6 max-w-xl rounded-lg border border-slate-200 bg-white p-4" aria-label="Anilheiro">
+        <h2 className="font-medium">Anilheiro</h2>
+        <p className="mt-1 text-sm text-slate-600">
+          {product.plateLoaded
+            ? "Este equipamento tem anilheiro: o pedido pede Olímpico ou Standard antes de fechar."
+            : "Sem anilheiro: o pedido não pergunta nada sobre este equipamento."}
+        </p>
+        <ActionForm action={setProductPlateLoadedAction} className="mt-3">
+          <input type="hidden" name="id" value={product.id} />
+          <input type="hidden" name="plateLoaded" value={product.plateLoaded ? "0" : "1"} />
+          <button type="submit" className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 font-medium hover:bg-slate-50">
+            {product.plateLoaded ? "Não tem anilheiro" : "Tem anilheiro"}
+          </button>
+        </ActionForm>
+      </section>
 
       {measures && (
         <details className="mx-auto mt-6 max-w-xl rounded-lg border border-slate-200 bg-white" open={Object.values(measures).every((value) => value === null)}>

@@ -294,6 +294,18 @@ Se a migração falhar, a versão antiga continua no ar.
 - **Nota de entrada**: a compra guarda o número e a chave da nota, emitida por quem for. O ERP ainda não emite a nota de entrada da importação.
 - **Código**: `src/lib/db/stock.ts`, `src/lib/db/purchases.ts`, telas em `src/app/(app)/estoque/` e `src/app/(app)/compras/`, migração `0061`.
 
+## Anilheiro olímpico ou standard
+
+Equipamento de peso livre sai com anilheiro olímpico ou standard, e quem decide é o pedido. Na tela do
+equipamento (Produtos e custos → abrir), o bloco **Anilheiro** diz se ele tem. No pedido, cada item que tem
+mostra a escolha; sem ela o pedido não fecha. A escolha sai junto do nome na proposta, no contrato e na
+lista de expedição do Estoque. Não muda preço nem a descrição da nota fiscal.
+
+## Excluir equipamento
+
+Um equipamento sai do cadastro, e das tabelas de preço publicadas em que estava, enquanto nenhum pedido,
+compra, movimento de estoque ou ordem de produção o usar. Depois disso só dá para desativar.
+
 ## Cobrança por PIX
 
 - **Onde**: a chave fica em Parâmetros → Cobrança por PIX (chave, nome de quem recebe e cidade, que saem sem acento e cortados em 25 e 15 letras, como o código exige). Em Recebimentos, cada valor em aberto tem "Cobrar por PIX": o QR e o PIX copia e cola com o que falta receber.

@@ -1,3 +1,4 @@
+import { withPlates } from "@/lib/plates";
 import { formatDocument, formatPhone } from "@/lib/customer";
 import type { Order } from "@/lib/db/orders";
 import type { PublishedTable } from "@/lib/db/price-table";
@@ -147,16 +148,17 @@ export function quoteDocument({ company, order, table, sale, dates, products, to
   const hasIpi = table.ipi > 0;
   const published = new Map(table.items.map((item) => [item.productId, item]));
   const items = order.items
-    .map(({ productId, quantity }, index) => {
+    .map(({ productId, quantity, plates }, index) => {
       const product = published.get(productId);
       if (!product) throw new Error(`Equipamento ${productId} não está na tabela v${table.version}.`);
-      return { productId, quantity, product, line: sale.lines[index] };
+      return { productId, quantity, plates, product, line: sale.lines[index] };
     })
     .sort((a, b) => compareByCode(a.product, b.product) || a.productId - b.productId)
-    .map(({ productId, quantity, product, line }) => ({
+    .map(({ productId, quantity, plates, product, line }) => ({
       productId,
       code: product.code ?? "",
-      name: product.name,
+      // The choice of pegs goes with the name: proposal and contract say what will be delivered.
+      name: withPlates(product.name, plates),
       description: blankToNull(products.get(productId)?.description),
       quantity,
       unitPrice: showMoney(line.unitPrice),

@@ -25,7 +25,7 @@ const product = (change: Partial<Product>): Product => ({
   taxCredit: 0,
   packaging: 0,
   active: true,
-  hasPhoto: false, ncm: null, lineId: 1,
+  hasPhoto: false, ncm: null, plateLoaded: false, lineId: 1,
   ...change,
 });
 

@@ -18,6 +18,7 @@ import {
   reopenOrder,
   saveOrderTerms,
   savePayment,
+  setOrderItemPlates,
   setOrderItemQuantity,
   simulationBand,
 } from "@/lib/db/orders";
@@ -28,7 +29,7 @@ import { listCarriedBalances, listCommissionMonths, listCommissions, payCommissi
 import { loadApprovalPolicy, loadCommissionDay, saveApprovalPolicy, saveCommissionDay } from "@/lib/db/company";
 import { decideRefund, listOpenReceivables, listPendingRefunds, listReceipts, recordReceipt, requestRefund } from "@/lib/db/receivables";
 import { latestVersion, loadPublishedSnapshot, loadPublishedTable, publishPriceTable } from "@/lib/db/price-table";
-import { createProduct, listProducts, updateProduct } from "@/lib/db/products";
+import { createProduct, listProducts, setProductPlateLoaded, updateProduct } from "@/lib/db/products";
 import { closingProblems, directorOf, dueDates, paymentOf, saleOf } from "@/lib/order-quote";
 import { draftPriceTable } from "@/lib/price-table";
 import { openTestDb, SKIP_WITHOUT_DB } from "./db-helpers.ts";
@@ -176,7 +177,7 @@ test("criar: o pedido nasce em negociação, na versão pedida, com o primeiro i
       downPayment: 0,
       downPaymentDate: null,
       closedAt: null,
-      items: [{ productId: ID["LD-B001"], quantity: 1 }],
+      items: [{ productId: ID["LD-B001"], quantity: 1, plateLoaded: false, plates: null }],
     },
   );
   assert.ok(created.updatedAt instanceof Date);
@@ -212,9 +213,24 @@ test("itens: adicionar soma no que já está, alterar quantidade, e o último n�
   await addOrderItem(N, ID["LD-B002"], 1, SELLER.email, MINE, db.pool);
   await addOrderItem(N, ID["LD-B001"], 2, SELLER.email, MINE, db.pool);
   assert.deepEqual((await order(N)).items, [
-    { productId: ID["LD-B001"], quantity: 3 },
-    { productId: ID["LD-B002"], quantity: 1 },
+    { productId: ID["LD-B001"], quantity: 3, plateLoaded: false, plates: null },
+    { productId: ID["LD-B002"], quantity: 1, plateLoaded: false, plates: null },
   ]);
+
+  // Anilheiro: só o equipamento que tem aceita a escolha; ela fica no item e pode ser desfeita.
+  await assert.rejects(() => setOrderItemPlates(N, ID["LD-B001"], "olimpico", SELLER.email, MINE, db.pool), /não tem anilheiro/);
+  await setProductPlateLoaded(ID["LD-B001"], true, DIRECTOR, db.pool);
+  assert.deepEqual(closingProblems(await order(N), saleOf(await order(N), (await loadPublishedTable(1, db.pool))!)).filter((text) => text.includes("anilheiro")), [
+    "Escolha anilheiro Olímpico ou Standard em cada equipamento de peso livre.",
+  ]);
+  await setOrderItemPlates(N, ID["LD-B001"], "standard", SELLER.email, MINE, db.pool);
+  assert.deepEqual((await order(N)).items[0], { productId: ID["LD-B001"], quantity: 3, plateLoaded: true, plates: "standard" });
+  assert.deepEqual(closingProblems(await order(N), saleOf(await order(N), (await loadPublishedTable(1, db.pool))!)).filter((text) => text.includes("anilheiro")), []);
+  await assert.rejects(() => setOrderItemPlates(N, ID["LD-B001"], "grande" as "olimpico", SELLER.email, MINE, db.pool), /Olímpico ou Standard/);
+  await assert.rejects(() => setOrderItemPlates(N, ID["LD-B001"], "olimpico", OTHER_SELLER.email, THEIRS, db.pool), /./);
+  await setOrderItemPlates(N, ID["LD-B001"], null, SELLER.email, MINE, db.pool);
+  assert.equal((await order(N)).items[0].plates, null);
+  await setProductPlateLoaded(ID["LD-B001"], false, DIRECTOR, db.pool);
 
   await setOrderItemQuantity(N, ID["LD-B001"], 1, SELLER.email, MINE, db.pool);
   assert.equal((await order(N)).items[0].quantity, 1);

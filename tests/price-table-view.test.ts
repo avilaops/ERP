@@ -18,7 +18,7 @@ const product = (id: number, name: string, code: string | null, advisoryCost: nu
   taxCredit,
   packaging: 0,
   active: true,
-  hasPhoto: false, ncm: null, lineId: 1,
+  hasPhoto: false, ncm: null, plateLoaded: false, lineId: 1,
 });
 
 const PUBLISHED_AT = new Date("2026-10-05T12:00:00Z");

@@ -27,7 +27,7 @@ const PRODUCT: Product = {
   taxCredit: 0.2811565,
   packaging: 0,
   active: true,
-  hasPhoto: false, ncm: null, lineId: 1,
+  hasPhoto: false, ncm: null, plateLoaded: false, lineId: 1,
 };
 
 test("linha: o que o banco guarda vai para os campos e volta igual, com o crédito em precisão cheia", () => {

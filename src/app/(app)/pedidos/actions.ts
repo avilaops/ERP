@@ -8,6 +8,7 @@ import { requirePermission } from "@/lib/auth";
 import { tenantDb } from "@/lib/db/pool";
 import type { Session } from "@/lib/auth";
 import { approvesAtLoss, menuItem, seesAllOrders } from "@/lib/auth/permissions";
+import { isPlates } from "@/lib/plates";
 import { parseCustomerForm, rawCustomerValues } from "@/lib/customer-form";
 import type { CustomerFieldKey, CustomerFormState } from "@/lib/customer-form";
 import { createCustomer, CustomerError, findCustomerByDocument, getCustomer, updateCustomer } from "@/lib/db/customers";
@@ -25,6 +26,7 @@ import {
   saveOrderInstallments,
   saveOrderTerms,
   savePayment,
+  setOrderItemPlates,
   setOrderItemQuantity,
 } from "@/lib/db/orders";
 import type { OrderScope } from "@/lib/db/orders";
@@ -120,6 +122,23 @@ export async function setItemQuantityAction(_previous: ActionState, formData: Fo
     await setOrderItemQuantity(number, Number(read("productId")), quantity, session.email, scopeOf(session), conn);
   } catch (error) {
     return { error: problem("alterar a quantidade", error) };
+  }
+  revalidatePath(`${ORDERS}/${number}`);
+  return OK;
+}
+
+export async function setItemPlatesAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
+  const session = await requirePermission("pedidos");
+  const conn = tenantDb(session.tenant.slug);
+
+  const read = reader(formData);
+  const number = read("number") ?? "";
+  const plates = read("plates") ?? "";
+  if (plates !== "" && !isPlates(plates)) return { error: "Escolha Olímpico ou Standard." };
+  try {
+    await setOrderItemPlates(number, Number(read("productId")), plates === "" ? null : plates, session.email, scopeOf(session), conn);
+  } catch (error) {
+    return { error: problem("gravar o anilheiro", error) };
   }
   revalidatePath(`${ORDERS}/${number}`);
   return OK;

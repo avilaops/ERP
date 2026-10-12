@@ -25,6 +25,8 @@ export type Product = {
   hasPhoto: boolean;
   /** NCM of the invoice, eight digits, or `null` while nobody filled it in. Edited on the screen of the equipment. */
   ncm: string | null;
+  /** Plate-loaded: an order asks, for this equipment, whether the pegs are Olympic or standard. */
+  plateLoaded: boolean;
 };
 
 export type ProductInput = {
@@ -49,7 +51,7 @@ export type ProductPatch = Partial<ProductInput>;
 export class ProductError extends Error {}
 
 const COLUMNS =
-  "id, name, code, description, supplier_name, supplier_model, supplier_price_usd, advisory_cost, tax_credit, packaging, active, line_id, ncm, " +
+  "id, name, code, description, supplier_name, supplier_model, supplier_price_usd, advisory_cost, tax_credit, packaging, active, line_id, ncm, plate_loaded, " +
   "EXISTS (SELECT 1 FROM product_photos WHERE product_photos.product_id = products.id) AS has_photo";
 
 const numberOrNull = (value: unknown) => (value === null ? null : Number(value));
@@ -73,6 +75,7 @@ function toProduct(row: Record<string, unknown>): Product {
     lineId: Number(row.line_id),
     hasPhoto: row.has_photo === true,
     ncm: textOrNull(row.ncm),
+    plateLoaded: row.plate_loaded === true,
   };
 }
 
@@ -261,7 +264,10 @@ export async function deleteProduct(id: number, conn: Queryable): Promise<Produc
   if (!isId(id)) throw new ProductError("Produto não encontrado.");
   try {
     const { rows } = await conn.query(
-      `WITH photo AS (DELETE FROM product_photos WHERE product_id = $1)
+      // The rows of the published tables go with it. A table an order was made from keeps them: the
+      // order points at the row, the statement fails as a whole and nothing is removed.
+      `WITH photo AS (DELETE FROM product_photos WHERE product_id = $1),
+            listed AS (DELETE FROM price_table_items WHERE product_id = $1)
        DELETE FROM products WHERE id = $1 RETURNING ${COLUMNS}`,
       [id],
     );
@@ -269,7 +275,7 @@ export async function deleteProduct(id: number, conn: Queryable): Promise<Produc
     return toProduct(rows[0]);
   } catch (error) {
     if (pgErrorCode(error) === FOREIGN_KEY_VIOLATION) {
-      throw new ProductError("Este equipamento já tem histórico e não pode ser excluído. Desative-o.");
+      throw new ProductError("Este equipamento já está em pedido, compra, estoque ou produção e não pode ser excluído. Desative-o.");
     }
     throw error;
   }
@@ -361,5 +367,12 @@ export async function saveProductMeasures(productId: number, measures: ProductMe
     "UPDATE products SET length_mm = $2, width_mm = $3, height_mm = $4, weight_kg = $5, updated_at = now(), updated_by = $6 WHERE id = $1 RETURNING id",
     [productId, measures.lengthMm, measures.widthMm, measures.heightMm, measures.weightKg, updatedBy],
   );
+  if (!rows[0]) throw new ProductError("Produto não encontrado.");
+}
+
+/** Says whether the equipment is plate-loaded. Orders already made keep the choice they have. */
+export async function setProductPlateLoaded(productId: number, plateLoaded: boolean, updatedBy: string, conn: Queryable): Promise<void> {
+  if (updatedBy.trim() === "") throw new Error("Falta dizer quem está alterando o equipamento.");
+  const { rows } = await conn.query("UPDATE products SET plate_loaded = $2, updated_at = now(), updated_by = $3 WHERE id = $1 RETURNING id", [productId, plateLoaded, updatedBy]);
   if (!rows[0]) throw new ProductError("Produto não encontrado.");
 }

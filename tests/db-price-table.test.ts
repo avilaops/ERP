@@ -174,18 +174,37 @@ test("rascunho inválido dá erro antes de chegar ao banco", { skip }, async () 
   assert.deepEqual(await counts(), before);
 });
 
-test("excluir depois de publicar: quem já saiu numa versão só pode ser desativado", { skip }, async () => {
+test("excluir depois de publicar: sai também das tabelas publicadas, desde que nenhum pedido o use", { skip }, async () => {
   const products = await listProducts({}, db.pool);
   const publishedOne = products.find((product) => product.code === "LD-B004");
   const neverPublished = products.find((product) => product.code === "LD-X2");
   assert.ok(publishedOne && neverPublished);
 
-  await assert.rejects(
-    () => deleteProduct(publishedOne.id, db.pool),
-    /Este equipamento já tem histórico e não pode ser excluído\. Desative-o\./,
+  // Um pedido feito da tabela segura o equipamento: só desativar.
+  const version = Number((await db.pool.query("SELECT max(version) AS version FROM price_table_items WHERE product_id = $1", [publishedOne.id])).rows[0].version);
+  const order = await db.pool.query(
+    "INSERT INTO orders (number, seller_email, seller_name, price_table_version, updated_by) VALUES ('261012-EXCL', 'v@ludus.test', 'V', $1, 'v@ludus.test') RETURNING id",
+    [version],
   );
+  await db.pool.query("INSERT INTO order_items (order_id, price_table_version, product_id, quantity) VALUES ($1, $2, $3, 1)", [order.rows[0].id, version, publishedOne.id]);
+  await assert.rejects(() => deleteProduct(publishedOne.id, db.pool), /já está em pedido, compra, estoque ou produção e não pode ser excluído\. Desative-o\./);
   assert.ok((await listProducts({}, db.pool)).some((product) => product.id === publishedOne.id));
   assert.equal((await updateProduct(publishedOne.id, { active: false }, WHO, db.pool)).active, false);
+
+  await db.pool.query("DELETE FROM order_items WHERE order_id = $1", [order.rows[0].id]);
+  await db.pool.query("DELETE FROM orders WHERE id = $1", [order.rows[0].id]);
+  assert.equal((await updateProduct(publishedOne.id, { active: true }, WHO, db.pool)).active, true);
+
+  // Publicado e sem pedido: sai do cadastro e das versões em que estava.
+  const loose = await createProduct({ name: "Publicado sem pedido", code: "LD-X3" }, WHO, db.pool);
+  await db.pool.query(
+    `INSERT INTO price_table_items (version, product_id, code, name, advisory_cost, tax_credit, packaging, table_price, table_price_with_ipi)
+     SELECT version, $2, 'LD-X3', 'Publicado sem pedido', advisory_cost, tax_credit, packaging, table_price, table_price_with_ipi
+       FROM price_table_items WHERE product_id = $1`,
+    [publishedOne.id, loose.id],
+  );
+  await deleteProduct(loose.id, db.pool);
+  assert.equal(Number((await db.pool.query("SELECT count(*) AS n FROM price_table_items WHERE product_id = $1", [loose.id])).rows[0].n), 0);
 
   await deleteProduct(neverPublished.id, db.pool);
   assert.ok((await listProducts({}, db.pool)).every((product) => product.id !== neverPublished.id));

@@ -133,6 +133,14 @@ test("cabeçalho, datas, entrega e prazo saem do pedido e do dia informado", () 
   assert.deepEqual([bare.delivery, bare.production, bare.notes], [null, null, null]);
 });
 
+test("anilheiro: a escolha do pedido sai junto do nome do equipamento", () => {
+  const [first, ...rest] = ORDER.items;
+  const document = build({ ...ORDER, items: [{ ...first, plateLoaded: true, plates: "olimpico" }, ...rest] });
+  const named = document.items.filter((item) => item.name.endsWith("(anilheiro olímpico)"));
+  assert.equal(named.length, 1);
+  assert.equal(named[0].productId, first.productId);
+});
+
 test("sem desconto: some a linha do desconto e a coluna dos itens", () => {
   const document = build({ ...ORDER, discount: 0 });
   assert.equal(document.hasDiscount, false);

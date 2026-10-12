@@ -240,10 +240,12 @@ export function receivableColumns(plan: PaymentPlan): ReceivableColumns {
 
 /** What is missing for the order to be closed, in the words of the screen. Empty when it can go on to the policy. */
 export function closingProblems(
-  order: Pick<Order, "customer" | "deliveryUf" | "productionDays" | "downPayment" | "downPaymentMethod" | "balanceMethod" | "installmentCount">,
+  order: Pick<Order, "customer" | "deliveryUf" | "productionDays" | "downPayment" | "downPaymentMethod" | "balanceMethod" | "installmentCount"> & Partial<Pick<Order, "items">>,
   sale: SaleQuote,
 ): string[] {
   const problems: string[] = [];
+  // What leaves the warehouse has to be known before the order is closed.
+  if (order.items?.some((item) => item.plateLoaded && !item.plates)) problems.push("Escolha anilheiro Olímpico ou Standard em cada equipamento de peso livre.");
   if (!order.customer) problems.push("Informe o cliente.");
   else if (!isComplete(order.customer)) {
     problems.push(`${completenessText(order.customer)} no cadastro do cliente: ${missingFields(order.customer).join(", ")}.`);

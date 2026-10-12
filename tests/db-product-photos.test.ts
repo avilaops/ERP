@@ -89,7 +89,7 @@ test("foto: equipamento com histórico não é excluído, e a foto dele fica", {
   await db.pool.query("CREATE TABLE photo_test_refs (product_id integer NOT NULL REFERENCES products (id))");
   await db.pool.query("INSERT INTO photo_test_refs VALUES ($1)", [product.id]);
 
-  await assert.rejects(() => deleteProduct(product.id, db.pool), /já tem histórico e não pode ser excluído\. Desative-o\./);
+  await assert.rejects(() => deleteProduct(product.id, db.pool), /já está em pedido, compra, estoque ou produção e não pode ser excluído\. Desative-o\./);
   assert.equal((await loadProductPhoto(product.id, db.pool))?.sha256, sha256);
   await db.pool.query("DROP TABLE photo_test_refs");
 });

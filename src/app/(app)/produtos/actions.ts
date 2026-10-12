@@ -15,6 +15,7 @@ import {
   listProducts,
   ProductError,
   saveProductMeasures,
+  setProductPlateLoaded,
   updateProduct,
 } from "@/lib/db/products";
 import { loadParams } from "@/lib/db/params";
@@ -287,4 +288,20 @@ export async function saveProductMeasuresAction(_previous: ActionState, formData
   }
   revalidatePath(`/produtos/${id}`);
   return { error: null, notice: "Medidas gravadas: já saem na próxima proposta." };
+}
+
+export async function setProductPlateLoadedAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
+  const session = await requirePermission("produtos");
+  const conn = tenantDb(session.tenant.slug);
+  const id = String(formData.get("id") ?? "");
+  const on = formData.get("plateLoaded") === "1";
+  try {
+    await setProductPlateLoaded(Number(id), on, session.email, conn);
+  } catch (error) {
+    if (error instanceof ProductError) return { error: error.message };
+    console.error("[produtos] falha ao gravar o anilheiro:", error instanceof Error ? error.message : error);
+    return { error: "Não foi possível gravar agora. Nada foi alterado; tente de novo." };
+  }
+  revalidatePath(`/produtos/${id}`);
+  return { error: null, notice: on ? "Gravado: o pedido passa a pedir Olímpico ou Standard neste equipamento." : "Gravado: o pedido não pede mais anilheiro neste equipamento." };
 }
