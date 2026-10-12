@@ -60,7 +60,7 @@ export async function issueNfeAction(_previous: ActionState, formData: FormData)
 
   let notice: string | null = null;
   try {
-    const result = await issueOrderNfe(number, session.email, new Date(), vaultKey(process.env.ERP_CERT_KEY), send, conn, layoutCheck({ ERP_FISCAL_URL: process.env.ERP_FISCAL_URL }));
+    const result = await issueOrderNfe(number, session.email, new Date(), vaultKey(process.env.ERP_CERT_KEY), send, conn, layoutCheck({ ERP_FISCAL_URL: process.env.ERP_FISCAL_URL, ERP_FISCAL_TOKEN: process.env.ERP_FISCAL_TOKEN }));
     console.info(`[nfe] pedido ${number}: nota ${result.invoice.number} ${result.invoice.status} (${result.invoice.statusCode ?? "-"}), por ${session.email}`);
     if (result.invoice.status === "autorizada") notice = await mailAfter("nota", result.invoice.id, session.email, conn);
   } catch (error) {

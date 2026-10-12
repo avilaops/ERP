@@ -1,7 +1,9 @@
 /**
  * The conference of the invoice against the official layout before it goes to
  * SEFAZ, by the fiscal service of the house (`validar_xml_fiscal`, the XSD of
- * the current package). It saves a rejection for a field out of the layout.
+ * the current package). The service has no address of its own: it is reached
+ * through the single MCP of the company (`https://mcp.avilaops.com/mcp`), where
+ * its tools carry the `fiscal_` prefix, with a service token that opens only them. It saves a rejection for a field out of the layout.
  * It is a help, never a lock: with the service off, slow or answering nonsense
  * the invoice goes on to SEFAZ, which has the last word anyway.
  */
@@ -29,21 +31,24 @@ export function layoutProblems(result: unknown): string[] {
 }
 
 /**
- * The check, or `null` when no address of the fiscal service was configured
- * (`ERP_FISCAL_URL`, https only: the invoice carries the customer's data).
+ * The check, or `null` when the address of the company MCP or the service token
+ * of the ERP is missing (`ERP_FISCAL_URL`, https only: the invoice carries the
+ * customer's data; `ERP_FISCAL_TOKEN`, sent as `Authorization: Bearer`).
  */
-export function layoutCheck(env: { ERP_FISCAL_URL?: string }, fetcher: Fetcher = fetch): LayoutCheck | null {
+export function layoutCheck(env: { ERP_FISCAL_URL?: string; ERP_FISCAL_TOKEN?: string }, fetcher: Fetcher = fetch): LayoutCheck | null {
   const url = env.ERP_FISCAL_URL?.trim();
-  if (!url || !url.startsWith("https://")) return null;
+  const token = env.ERP_FISCAL_TOKEN?.trim();
+  if (!url || !url.startsWith("https://") || !token) return null;
+  const headers = { ...HEADERS, Authorization: `Bearer ${token}` };
   const post = (body: unknown, session: string | null) =>
-    fetcher(url, { method: "POST", headers: session ? { ...HEADERS, "mcp-session-id": session } : HEADERS, body: JSON.stringify(body), signal: AbortSignal.timeout(8_000) });
+    fetcher(url, { method: "POST", headers: session ? { ...headers, "mcp-session-id": session } : headers, body: JSON.stringify(body), signal: AbortSignal.timeout(8_000) });
 
   return async (signedXml) => {
     try {
       const opened = await post({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-03-26", capabilities: {}, clientInfo: { name: "erp-avila-ops", version: "1" } } }, null);
       const session = opened.headers.get("mcp-session-id");
       if (opened.status !== 200 || !session) throw new Error(`o serviço respondeu ${opened.status} à abertura`);
-      const answered = await post({ jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "validar_xml_fiscal", arguments: { xml_content: signedXml, tipo: "nfe" } } }, session);
+      const answered = await post({ jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "fiscal_validar_xml_fiscal", arguments: { xml_content: signedXml, tipo: "nfe" } } }, session);
       if (answered.status !== 200) throw new Error(`o serviço respondeu ${answered.status} à conferência`);
       const message = messageOf(await answered.text()) as { result?: { isError?: boolean; content?: { text?: string }[] } };
       const text = message.result?.content?.[0]?.text;
