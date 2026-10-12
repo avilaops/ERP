@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CARD, DANGER_OUTLINE, PRIMARY } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { approvesAtLoss, menuItem } from "@/lib/auth/permissions";
 import { listPastDecisions, listPendingApprovals } from "@/lib/db/approvals";
@@ -13,7 +14,6 @@ export const metadata = { title: `${menuItem("aprovacoes").label} · ERP` };
 export const dynamic = "force-dynamic";
 
 const ORDERS = menuItem("pedidos").href;
-const CARD = "rounded-lg border border-slate-200 bg-white";
 const BAND_COLORS = {
   "na-meta": "bg-emerald-100 text-emerald-900",
   "abaixo-da-meta": "bg-amber-100 text-amber-900",
@@ -91,7 +91,7 @@ export default async function AprovacoesPage() {
                   />
                 </div>
                 {!blocked && (
-                  <button type="submit" name="decision" value="aprovar" className="rounded bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark">
+                  <button type="submit" name="decision" value="aprovar" className={PRIMARY}>
                     Aprovar e fechar
                   </button>
                 )}
@@ -99,7 +99,7 @@ export default async function AprovacoesPage() {
                   type="submit"
                   name="decision"
                   value="recusar"
-                  className="rounded border border-red-300 bg-white px-4 py-2 font-medium text-red-700 hover:bg-red-50"
+                  className={DANGER_OUTLINE}
                 >
                   Recusar
                 </button>

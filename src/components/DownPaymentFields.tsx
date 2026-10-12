@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { sharePercentFromValue, valueFromSharePercent } from "@/lib/discount-entry";
 
-const INPUT = "mt-1 block w-full min-w-0 rounded border border-slate-300 bg-white px-3 py-2 text-right outline-none focus:ring-2 focus:ring-brand disabled:bg-slate-100";
+const INPUT = "mt-1 block min-h-[var(--control)] w-full min-w-0 rounded border border-slate-300 bg-white px-3 text-right outline-none focus:ring-2 focus:ring-brand disabled:bg-slate-100";
 
 /**
  * The down payment, in reais and in % of the total of the order: typing one

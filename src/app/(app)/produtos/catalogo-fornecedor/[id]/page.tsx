@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { DANGER } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { tenantDb } from "@/lib/db/pool";
 import { listProducts } from "@/lib/db/products";
@@ -26,7 +27,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
   return (
     <div className="mx-auto max-w-xl">
       <div className="flex items-center gap-3">
-        <Link href="/produtos/catalogo-fornecedor" aria-label="Voltar para o catálogo do fornecedor" className="shrink-0 rounded-lg bg-brand-soft px-3 py-1.5 text-xl text-brand">
+        <Link href="/produtos/catalogo-fornecedor" aria-label="Voltar para o catálogo do fornecedor" className="inline-flex min-h-[var(--control)] shrink-0 items-center rounded-lg bg-brand-soft px-3 text-xl text-brand">
           ←
         </Link>
         <h1 className="min-w-0 truncate text-2xl font-semibold">{item.code} · {item.name}</h1>
@@ -42,7 +43,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
       </ActionForm>
       <ActionForm action={deleteSupplierItemAction} className="mt-4">
         <input type="hidden" name="id" value={item.id} />
-        <ConfirmButton label="Remover item" confirmLabel="Confirmar: remover" className="rounded px-2 py-1 text-sm text-red-700 hover:bg-red-50" />
+        <ConfirmButton label="Remover item" confirmLabel="Confirmar: remover" className={DANGER} />
       </ActionForm>
     </div>
   );

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { CARD, DANGER, DANGER_OUTLINE, PRIMARY, SECONDARY } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { listOnDeliveryMethods } from "@/lib/db/payment-methods";
 import { tenantDb } from "@/lib/db/pool";
@@ -61,11 +62,8 @@ export const dynamic = "force-dynamic";
 
 const NONE = "—";
 const TERMS = "condicoes";
-const CARD = "rounded-lg border border-slate-200 bg-white";
 const TITLE = "text-sm font-semibold uppercase tracking-wide";
-const INPUT = "rounded border border-slate-300 bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-brand";
-const BUTTON = "rounded border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50";
-const PRIMARY = "rounded bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark";
+const INPUT = "min-h-[var(--control)] rounded-lg border border-slate-300 bg-white px-3 text-base outline-none focus:ring-2 focus:ring-brand";
 const HELP = "mt-1 text-xs text-slate-500";
 
 const BAND_COLORS = {
@@ -238,11 +236,11 @@ export default async function PedidoPage({
           <span className="rounded-full bg-slate-200 px-3 py-1 font-medium">{STATUS_LABELS[order.status]}</span>
           <span className="rounded-full border border-slate-300 px-3 py-1">Tabela v{table.version}</span>
           {order.items.length > 0 && (
-            <a href={`/api/pedidos/${order.number}/orcamento`} target="_blank" rel="noopener" className={BUTTON}>
+            <a href={`/api/pedidos/${order.number}/orcamento`} target="_blank" rel="noopener" className={SECONDARY}>
               Salvar PDF
             </a>
           )}
-          {order.items.length > 0 && <CopyButton text={proposal} label="Copiar proposta" className={BUTTON} />}
+          {order.items.length > 0 && <CopyButton text={proposal} label="Copiar proposta" className={SECONDARY} />}
         </div>
       </div>
       {latest && latest.version !== table.version && (
@@ -279,10 +277,10 @@ export default async function PedidoPage({
               </label>
               <input id="decision-comment" name="comment" type="text" placeholder="Ex.: fechar com entrada de 50%" className={`${INPUT} mt-1 w-full`} />
             </div>
-            <button type="submit" name="decision" value="aprovar" className="rounded bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark">
+            <button type="submit" name="decision" value="aprovar" className={PRIMARY}>
               Aprovar {showPercent(order.discount)}
             </button>
-            <button type="submit" name="decision" value="recusar" className="rounded border border-red-300 bg-white px-4 py-2 font-medium text-red-700 hover:bg-red-50">
+            <button type="submit" name="decision" value="recusar" className={DANGER_OUTLINE}>
               Recusar
             </button>
           </ActionForm>
@@ -331,7 +329,7 @@ export default async function PedidoPage({
                         <ActionForm action={signContractAction}>
                           <input type="hidden" name="number" value={order.number} />
                           <input type="hidden" name="contractId" value={contract.id} />
-                          <ConfirmButton label="Assinar pela empresa" confirmLabel={`Confirmar: assinar como ${session.name}`} className="rounded border border-slate-300 bg-white px-3 py-1 font-medium hover:bg-slate-50" />
+                          <ConfirmButton label="Assinar pela empresa" confirmLabel={`Confirmar: assinar como ${session.name}`} className={SECONDARY} />
                         </ActionForm>
                       )}
                       {contract.status === "enviado" && (
@@ -339,7 +337,7 @@ export default async function PedidoPage({
                           <ActionForm action={resendContractAction}>
                             <input type="hidden" name="number" value={order.number} />
                             <input type="hidden" name="contractId" value={contract.id} />
-                            <ConfirmButton label="Enviar o link de novo" confirmLabel="Confirmar: o link anterior deixa de valer" className="rounded border border-slate-300 bg-white px-3 py-1 font-medium hover:bg-slate-50" />
+                            <ConfirmButton label="Enviar o link de novo" confirmLabel="Confirmar: o link anterior deixa de valer" className={SECONDARY} />
                           </ActionForm>
                           <ActionForm action={cancelContractAction}>
                             <input type="hidden" name="number" value={order.number} />
@@ -390,7 +388,7 @@ export default async function PedidoPage({
                     <input id="fileRecipientPhone" name="recipientPhone" type="tel" inputMode="tel" defaultValue={order.customer?.phone ?? ""} placeholder="(17) 99999-8888" autoComplete="off" className={`${INPUT} w-full`} />
                   </div>
                 )}
-                <button type="submit" className="rounded border border-slate-300 bg-white px-4 py-2 font-semibold hover:bg-slate-50">
+                <button type="submit" className={SECONDARY}>
                   Enviar este PDF para assinatura
                 </button>
               </ActionForm>
@@ -427,7 +425,7 @@ export default async function PedidoPage({
               <a href={`/api/pedidos/${order.number}/contrato-previa`} target="_blank" rel="noopener" className="py-2 font-medium text-brand underline">
                 Conferir o contrato (PDF)
               </a>
-              <button type="submit" className="rounded bg-brand px-4 py-2 font-semibold text-white hover:opacity-90">
+              <button type="submit" className={PRIMARY}>
                 {contracts.length > 0 ? "Enviar novo contrato para assinatura" : "Enviar contrato para assinatura"}
               </button>
             </ActionForm>
@@ -490,7 +488,7 @@ export default async function PedidoPage({
                         </label>
                         <input key={order.customer?.email ?? ""} id={`email-${item.id}`} name="to" type="email" defaultValue={order.customer?.email ?? ""} autoComplete="off" className={`${INPUT} mt-1 w-72 max-w-full`} />
                       </div>
-                      <button type="submit" className="rounded border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50">
+                      <button type="submit" className={SECONDARY}>
                         Enviar por e-mail
                       </button>
                     </ActionForm>
@@ -504,7 +502,7 @@ export default async function PedidoPage({
                         <label htmlFor={`correcao-${item.id}`} className="text-xs font-medium">
                           Carta de correção (não corrige valor, imposto, quantidade, cliente nem data)
                         </label>
-                        <textarea id={`correcao-${item.id}`} name="text" rows={2} placeholder="Ex.: Onde se lê Rua A, 10, leia-se Rua B, 20." className={`${INPUT} w-full text-slate-900`} />
+                        <textarea id={`correcao-${item.id}`} name="text" rows={2} placeholder="Ex.: Onde se lê Rua A, 10, leia-se Rua B, 20." className={`${INPUT} py-2 w-full text-slate-900`} />
                         <ConfirmButton label="Registrar carta de correção" confirmLabel="Confirmar: enviar à SEFAZ" className="self-start rounded border border-slate-300 bg-white px-3 py-1.5 font-medium text-slate-900 hover:bg-slate-50" />
                       </ActionForm>
                       <ActionForm action={registerNfeEventAction} className="mt-3 flex flex-col gap-2">
@@ -568,7 +566,7 @@ export default async function PedidoPage({
               </div>
             ))}
             <div className="sm:col-span-4">
-              <button type="submit" className={BUTTON}>
+              <button type="submit" className={SECONDARY}>
                 Salvar transporte
               </button>
             </div>
@@ -628,11 +626,11 @@ export default async function PedidoPage({
                 </div>
               ))}
               <div className="flex flex-wrap gap-2 sm:col-span-4">
-                <button type="submit" className={BUTTON}>
+                <button type="submit" className={SECONDARY}>
                   Salvar local de entrega
                 </button>
                 {delivery ? (
-                  <button type="submit" name="clear" value="1" className="rounded border border-slate-300 px-3 py-1.5 text-sm font-medium hover:bg-slate-50">
+                  <button type="submit" name="clear" value="1" className={SECONDARY}>
                     Usar o endereço do cadastro
                   </button>
                 ) : null}
@@ -684,7 +682,7 @@ export default async function PedidoPage({
                   <ConfirmButton
                     label={invoices.some((item) => item.status === "assinada") ? "Reenviar a nota à SEFAZ" : "Emitir nota fiscal"}
                     confirmLabel="Confirmar: assinar e enviar à SEFAZ"
-                    className="rounded bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark"
+                    className={PRIMARY}
                   />
                 </ActionForm>
               )}
@@ -704,7 +702,7 @@ export default async function PedidoPage({
           {(order.status === "fechado" || order.status === "aguardando_aprovacao") && (
             <ActionForm action={reopenOrderAction} className="mt-2">
               <input type="hidden" name="number" value={order.number} />
-              <ConfirmButton label="Reabrir para alterar" confirmLabel="Confirmar: voltar para negociação" className={BUTTON} />
+              <ConfirmButton label="Reabrir para alterar" confirmLabel="Confirmar: voltar para negociação" className={SECONDARY} />
               <span className="ml-3 text-xs text-slate-600">Os preços continuam os da tabela v{table.version}.</span>
             </ActionForm>
           )}
@@ -772,7 +770,7 @@ export default async function PedidoPage({
                         />
                       </label>
                       {editable && (
-                        <button type="submit" className="rounded border border-slate-300 px-3 py-1.5 text-sm font-medium text-brand">
+                        <button type="submit" className={`${SECONDARY} text-brand`}>
                           Alterar
                         </button>
                       )}
@@ -781,7 +779,7 @@ export default async function PedidoPage({
                       <ActionForm action={removeItemAction}>
                         <input type="hidden" name="number" value={order.number} />
                         <input type="hidden" name="productId" value={item.productId} />
-                        <button type="submit" className="rounded px-2 py-1.5 text-sm text-red-700">
+                        <button type="submit" className={DANGER}>
                           Remover
                         </button>
                       </ActionForm>
@@ -846,7 +844,7 @@ export default async function PedidoPage({
                             className={`${INPUT} w-16 py-1 text-right`}
                           />
                           {editable && (
-                            <button type="submit" className="rounded px-2 py-1 text-xs text-brand hover:bg-slate-100">
+                            <button type="submit" className="inline-flex min-h-[var(--control)] items-center rounded-lg px-2 text-xs text-brand hover:bg-slate-100">
                               Alterar
                             </button>
                           )}
@@ -867,7 +865,7 @@ export default async function PedidoPage({
                           <ActionForm action={removeItemAction}>
                             <input type="hidden" name="number" value={order.number} />
                             <input type="hidden" name="productId" value={item.productId} />
-                            <button type="submit" className="rounded px-2 py-1 text-sm text-red-700 hover:bg-slate-100">
+                            <button type="submit" className={DANGER}>
                               Remover
                             </button>
                           </ActionForm>
@@ -960,7 +958,7 @@ export default async function PedidoPage({
                           key={value}
                           href={`${here}?cliente=${slug}`}
                           aria-current={kind === value ? "page" : undefined}
-                          className={`rounded-md px-3 py-1.5 font-medium ${
+                          className={`inline-flex min-h-[var(--control)] items-center rounded-md px-3 font-medium ${
                             kind === value ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100"
                           }`}
                         >
@@ -978,7 +976,7 @@ export default async function PedidoPage({
                         aria-label={kind === "PJ" ? "Buscar cliente pelo CNPJ" : "Buscar cliente pelo CPF"}
                         className={`${INPUT} min-w-0 flex-1 text-sm sm:w-56 sm:flex-none`}
                       />
-                      <button type="submit" className={BUTTON}>
+                      <button type="submit" className={SECONDARY}>
                         Buscar
                       </button>
                     </form>
@@ -1291,7 +1289,7 @@ export default async function PedidoPage({
                       As parcelas têm de somar o saldo: <strong>{showMoney(plan.balance)}</strong>.
                     </p>
                     <div>
-                      <button type="submit" className="rounded border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50">
+                      <button type="submit" className={SECONDARY}>
                         Salvar parcelas
                       </button>
                     </div>
@@ -1358,7 +1356,7 @@ export default async function PedidoPage({
                   limit={authority}
                 />
                 {editable && (
-                  <button form={TERMS} type="submit" className={`${BUTTON} self-start`}>
+                  <button form={TERMS} type="submit" className={`${SECONDARY} self-start`}>
                     Aplicar
                   </button>
                 )}

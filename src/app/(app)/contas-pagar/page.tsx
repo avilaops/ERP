@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CARD, DANGER, INPUT, PRIMARY, SECONDARY } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { allows, menuItem } from "@/lib/auth/permissions";
 import { monthLabel } from "@/lib/commissions-view";
@@ -25,9 +26,7 @@ export const metadata = { title: `${menuItem("contas-pagar").label} · ERP` };
 export const dynamic = "force-dynamic";
 
 const HERE = menuItem("contas-pagar").href;
-const CARD = "rounded-lg border border-slate-200 bg-white";
-const INPUT = "mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-brand";
-const SMALL = "mt-1 rounded border border-slate-300 bg-white px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-brand";
+const SMALL = "mt-1 min-h-[var(--control)] rounded border border-slate-300 bg-white px-2 text-sm outline-none focus:ring-2 focus:ring-brand";
 const LABEL = "block text-sm font-medium";
 const count = (n: number) => `${n} ${n === 1 ? "conta" : "contas"}`;
 const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
@@ -63,11 +62,11 @@ export default async function ContasPagarPage({ searchParams }: { searchParams: 
         </div>
         <div className="flex flex-wrap items-start gap-2">
           <ActionForm action={launchFixedExpensesAction}>
-            <button type="submit" className="rounded border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50">
+            <button type="submit" className={SECONDARY}>
               Lançar despesas fixas do mês
             </button>
           </ActionForm>
-          <a href="/api/contas-pagar/exportar" className="rounded border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50">
+          <a href="/api/contas-pagar/exportar" className={SECONDARY}>
             Baixar planilha (CSV)
           </a>
         </div>
@@ -144,7 +143,7 @@ export default async function ContasPagarPage({ searchParams }: { searchParams: 
             </select>
           </div>
           <div className="sm:col-span-2 xl:col-span-3">
-            <button type="submit" className="rounded bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark">
+            <button type="submit" className={PRIMARY}>
               Lançar conta
             </button>
           </div>
@@ -157,7 +156,7 @@ export default async function ContasPagarPage({ searchParams }: { searchParams: 
             key={item.key}
             href={item.key === "abertas" ? HERE : `${HERE}?aba=${item.key}`}
             aria-current={item.key === tab ? "page" : undefined}
-            className={`rounded-md px-3 py-1.5 font-medium ${item.key === tab ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100"}`}
+            className={`inline-flex min-h-[var(--control)] items-center rounded-md px-3 font-medium ${item.key === tab ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100"}`}
           >
             {item.label} ({payables.filter((payable) => inPayableTab(payable, item.key)).length})
           </Link>
@@ -256,13 +255,13 @@ export default async function ContasPagarPage({ searchParams }: { searchParams: 
                             ))}
                           </select>
                         </div>
-                        <button type="submit" className="rounded bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark">
+                        <button type="submit" className={PRIMARY}>
                           Pagar
                         </button>
                       </ActionForm>
                       <ActionForm action={deletePayableAction}>
                         <input type="hidden" name="id" value={payable.id} />
-                        <ConfirmButton label="Excluir" confirmLabel="Confirmar exclusão" className="rounded px-2 py-1 text-sm text-red-700 hover:bg-red-50" />
+                        <ConfirmButton label="Excluir" confirmLabel="Confirmar exclusão" className={DANGER} />
                       </ActionForm>
                     </div>
                   ) : null}
@@ -331,7 +330,7 @@ export default async function ContasPagarPage({ searchParams }: { searchParams: 
                           </select>
                         </div>
                         <div className="sm:col-span-2 xl:col-span-3">
-                          <button type="submit" className="rounded border border-slate-300 bg-white px-3 py-2 font-medium hover:bg-slate-50">
+                          <button type="submit" className={SECONDARY}>
                             Salvar alterações
                           </button>
                         </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { DANGER, PRIMARY } from "@/components/ui";
 import type { LogoState } from "./actions";
 
 
@@ -79,7 +80,7 @@ export function LogoForm({
             <button
               type="submit"
               disabled={pending}
-              className="rounded bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark disabled:opacity-60"
+              className={PRIMARY}
             >
               {pending ? "Enviando…" : "Enviar logo"}
             </button>
@@ -87,7 +88,7 @@ export function LogoForm({
           {logo && (
             <form action={formAction}>
               <input type="hidden" name="intent" value="remove" />
-              <button type="submit" disabled={pending} className="rounded px-4 py-2 text-sm text-red-700 hover:bg-slate-100 disabled:opacity-60">
+              <button type="submit" disabled={pending} className={`${DANGER} disabled:opacity-60`}>
                 Remover logo
               </button>
             </form>

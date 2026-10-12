@@ -49,7 +49,7 @@ export function ItemFields({
           <label htmlFor="photo" className={LABEL}>
             {saved?.hasPhoto ? "Trocar foto" : "Foto"}
           </label>
-          <input id="photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp" className="mt-1 w-full text-sm" />
+          <input id="photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp" className="mt-1 w-full text-sm file:mr-3 file:min-h-[var(--control)] file:rounded-lg file:border file:border-slate-300 file:bg-white file:px-4 file:font-medium" />
         </div>
       </div>
 

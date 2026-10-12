@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CARD, INPUT, PRIMARY, SECONDARY } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { menuItem } from "@/lib/auth/permissions";
 import { CONTRACT_WORDS, DEFAULT_CONTRACT_BODY, DEFAULT_CONTRACT_TITLE } from "@/lib/contract/text";
@@ -15,10 +16,7 @@ import { importContractModelAction, saveContractSettingsAction } from "./actions
 export const metadata = { title: "Contrato · ERP" };
 export const dynamic = "force-dynamic";
 
-const CARD = "rounded-lg border border-slate-200 bg-white";
-const INPUT = "mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-brand";
 const LABEL = "block text-xs font-medium text-slate-600";
-const BUTTON = "rounded bg-brand px-4 py-2 text-sm font-semibold text-white hover:opacity-90";
 
 export default async function ContractSettingsPage() {
   const session = await requirePermission("parametros");
@@ -70,9 +68,9 @@ export default async function ContractSettingsPage() {
             <input id="file" name="file" type="file" accept=".docx,.txt,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain" className={INPUT} />
           </div>
           {settings.body ? (
-            <ConfirmButton label="Usar este arquivo como modelo" confirmLabel="Confirmar: trocar o texto atual" className="rounded border border-slate-300 bg-white px-4 py-2 text-sm font-semibold hover:bg-slate-50" />
+            <ConfirmButton label="Usar este arquivo como modelo" confirmLabel="Confirmar: trocar o texto atual" className={SECONDARY} />
           ) : (
-            <button type="submit" className="rounded border border-slate-300 bg-white px-4 py-2 text-sm font-semibold hover:bg-slate-50">
+            <button type="submit" className={SECONDARY}>
               Usar este arquivo como modelo
             </button>
           )}
@@ -100,7 +98,7 @@ export default async function ContractSettingsPage() {
               <label htmlFor="body" className={LABEL}>
                 Texto (linha começada por “# ” vira título de seção; por “- ”, item de lista)
               </label>
-              <textarea key={settings.body ?? ""} id="body" name="body" rows={22} defaultValue={settings.body ?? ""} placeholder={DEFAULT_CONTRACT_BODY} className={`${INPUT} font-mono text-sm`} />
+              <textarea key={settings.body ?? ""} id="body" name="body" rows={22} defaultValue={settings.body ?? ""} placeholder={DEFAULT_CONTRACT_BODY} className={`${INPUT} py-2 font-mono text-sm`} />
             </div>
           </div>
           <details className="mt-4 text-sm">
@@ -138,7 +136,7 @@ export default async function ContractSettingsPage() {
               <label htmlFor="mailBody" className={LABEL}>
                 Texto do e-mail: {"{empresa}"}, {"{cliente}"}, {"{pedido}"}, {"{validade}"} e {"{link}"} (obrigatório) são trocados pelos dados do contrato
               </label>
-              <textarea key={settings.mailBody ?? ""} id="mailBody" name="mailBody" rows={9} defaultValue={settings.mailBody ?? ""} placeholder={DEFAULT_CONTRACT_MAIL_BODY} className={INPUT} />
+              <textarea key={settings.mailBody ?? ""} id="mailBody" name="mailBody" rows={9} defaultValue={settings.mailBody ?? ""} placeholder={DEFAULT_CONTRACT_MAIL_BODY} className={`${INPUT} py-2`} />
             </div>
           </div>
         </section>
@@ -189,7 +187,7 @@ export default async function ContractSettingsPage() {
         </section>
 
         <div>
-          <button type="submit" className={BUTTON}>
+          <button type="submit" className={PRIMARY}>
             Salvar modelo
           </button>
         </div>

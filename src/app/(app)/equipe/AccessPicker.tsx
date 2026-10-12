@@ -39,7 +39,7 @@ export function AccessPicker({
           {options.map((option) => (
             <label
               key={option.role}
-              className="flex cursor-pointer items-center justify-center rounded-lg border border-slate-300 bg-white px-2 py-2.5 text-center text-sm font-semibold has-[:checked]:border-brand has-[:checked]:bg-brand has-[:checked]:text-white"
+              className="flex min-h-[var(--control)] cursor-pointer items-center justify-center rounded-lg border border-slate-300 bg-white px-2 text-center text-sm font-semibold has-[:checked]:border-brand has-[:checked]:bg-brand has-[:checked]:text-white"
             >
               <input
                 type="radio"
@@ -65,11 +65,11 @@ export function AccessPicker({
           <span>Telas liberadas</span>
           <span className="text-xs font-normal text-slate-500">{open} marcadas · cinza: fora deste tipo</span>
         </legend>
-        <div className="mt-2 grid grid-cols-2 gap-x-3 rounded-lg border border-slate-300 bg-white px-3 py-1.5">
+        <div className="mt-2 grid grid-cols-2 gap-x-3 rounded-lg border border-slate-300 bg-white px-3 py-1.5 md:grid-cols-3">
           {screens.map((screen) => {
             const possible = screen.roles.includes(role);
             return (
-              <label key={screen.key} className={`flex items-center gap-2 py-1.5 text-sm ${possible ? "" : "text-slate-400"}`}>
+              <label key={screen.key} className={`flex min-h-[var(--control)] items-center gap-2 text-sm ${possible ? "" : "text-slate-500"}`}>
                 <input
                   type="checkbox"
                   name="items"

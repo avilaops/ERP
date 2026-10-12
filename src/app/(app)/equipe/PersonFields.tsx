@@ -13,7 +13,7 @@ export const ROLE_NOTES: Record<Role, string> = {
   FINANCEIRO: "Dá baixa nos recebimentos, cuida das contas a pagar e dos fornecedores e marca as comissões como pagas.",
 };
 
-const INPUT = "mt-1 w-full rounded-lg border border-slate-300 bg-white px-4 py-2 text-base outline-none focus:ring-2 focus:ring-brand";
+const INPUT = "mt-1 min-h-[var(--control)] w-full rounded-lg border border-slate-300 bg-white px-4 text-base outline-none focus:ring-2 focus:ring-brand";
 
 /**
  * One person on one screen: name, e-mail, the type of access and every screen

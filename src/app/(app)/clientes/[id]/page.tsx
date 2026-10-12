@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { DANGER } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { tenantDb } from "@/lib/db/pool";
 import { allows, menuItem } from "@/lib/auth/permissions";
@@ -142,7 +143,7 @@ export default async function ClientePage({
         />
         <ActionForm action={deleteCustomerAction} className="mt-4">
           <input type="hidden" name="id" value={customer.id} />
-          <ConfirmButton label="Remover cliente" confirmLabel="Confirmar: remover" className="rounded px-2 py-1 text-sm text-red-700 hover:bg-red-50" />
+          <ConfirmButton label="Remover cliente" confirmLabel="Confirmar: remover" className={DANGER} />
         </ActionForm>
       </div>
     </>

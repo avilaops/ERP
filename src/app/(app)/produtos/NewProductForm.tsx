@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { PRIMARY } from "@/components/ui";
 import { EMPTY_NEW_PRODUCT, fieldLabel, IDLE_NEW_PRODUCT, NEW_PRODUCT_FIELDS } from "@/lib/product-form";
 import type { NewProductKey, NewProductState } from "@/lib/product-form";
 
@@ -94,11 +95,11 @@ export function NewProductForm({ action, onClose, lineId, imported }: { action: 
           <button
             type="submit"
             disabled={pending}
-            className="rounded bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark disabled:opacity-60"
+            className={PRIMARY}
           >
             {pending ? "Gravando…" : "Salvar equipamento"}
           </button>
-          <button type="button" onClick={onClose} className="rounded px-4 py-2 hover:bg-slate-100">
+          <button type="button" onClick={onClose} className="inline-flex min-h-[var(--control)] items-center rounded-lg px-4 hover:bg-slate-100">
             Fechar
           </button>
         </div>

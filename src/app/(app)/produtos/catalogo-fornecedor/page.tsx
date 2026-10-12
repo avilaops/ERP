@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SECONDARY } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { menuItem } from "@/lib/auth/permissions";
 import { tenantDb } from "@/lib/db/pool";
@@ -55,7 +56,7 @@ export default async function CatalogoFornecedorPage({ searchParams }: { searchP
               key={catalog}
               href={href(catalog)}
               aria-current={catalog === chosen ? "page" : undefined}
-              className={`rounded-md px-3 py-1.5 font-medium ${catalog === chosen ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100"}`}
+              className={`inline-flex min-h-[var(--control)] items-center rounded-md px-3 font-medium ${catalog === chosen ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100"}`}
             >
               {catalog === "" ? `Todos (${all.length})` : `${catalog} (${all.filter((item) => item.catalog === catalog).length})`}
             </Link>
@@ -71,7 +72,7 @@ export default async function CatalogoFornecedorPage({ searchParams }: { searchP
             aria-label="Buscar no catálogo do fornecedor"
             className="min-w-0 flex-1 rounded border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand sm:w-80 sm:flex-none"
           />
-          <button type="submit" className="rounded border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50">
+          <button type="submit" className={SECONDARY}>
             Buscar
           </button>
         </form>

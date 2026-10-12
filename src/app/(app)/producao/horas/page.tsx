@@ -37,7 +37,7 @@ export default async function HorasPage({ searchParams }: { searchParams: Promis
       <PageHeader title="Horas da produção" hint={`${showMinutes(report.total)} apontados nos últimos ${days} dias · ${report.open} ${report.open === 1 ? "pessoa trabalhando" : "pessoas trabalhando"} agora`} />
       <nav aria-label="Período" className="mt-2 flex flex-wrap gap-2">
         {PERIODS.map(([key, label]) => (
-          <Link key={key} href={`${HERE}?ver=${tab}&dias=${key}`} aria-current={key === days ? "page" : undefined} className={`inline-flex min-h-9 items-center rounded-full border px-4 text-sm font-medium ${key === days ? "border-brand bg-brand text-white" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100"}`}>
+          <Link key={key} href={`${HERE}?ver=${tab}&dias=${key}`} aria-current={key === days ? "page" : undefined} className={`inline-flex min-h-[var(--control)] items-center rounded-full border px-4 text-sm font-medium ${key === days ? "border-brand bg-brand text-white" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100"}`}>
             {label}
           </Link>
         ))}

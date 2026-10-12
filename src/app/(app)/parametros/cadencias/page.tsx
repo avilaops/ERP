@@ -62,7 +62,7 @@ export default async function CadenciasPage() {
                       </span>
                       <ActionForm action={changeCadenceStepAction}>
                         <input type="hidden" name="stepId" value={step.id} />
-                        <button type="submit" aria-label={`Remover o passo ${step.position}`} className="inline-flex min-h-9 items-center rounded-lg px-2 text-sm text-red-700 hover:bg-red-50">
+                        <button type="submit" aria-label={`Remover o passo ${step.position}`} className="inline-flex min-h-[var(--control)] items-center rounded-lg px-2 text-sm text-red-700 hover:bg-red-50">
                           Remover
                         </button>
                       </ActionForm>

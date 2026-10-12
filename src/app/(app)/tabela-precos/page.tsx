@@ -231,7 +231,7 @@ export default async function TabelaPrecosPage({
                       <button
                         type="submit"
                         aria-label={`Abrir pedido com ${row.name}`}
-                        className="mt-1.5 w-[5.5rem] whitespace-nowrap rounded-lg border border-slate-300 px-2 py-2 text-xs font-semibold hover:bg-slate-100"
+                        className="mt-1.5 inline-flex min-h-[var(--control)] w-[5.5rem] items-center justify-center whitespace-nowrap rounded-lg border border-slate-300 px-2 text-xs font-semibold hover:bg-slate-100"
                       >
                         + Pedido
                       </button>

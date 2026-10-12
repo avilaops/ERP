@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { CARD, INPUT, LABEL, Pager, PageHeader, pageOf, Pill, PRIMARY, QUIET_LINK, SECONDARY } from "@/components/ui";
+import { CARD, DANGER, INPUT, LABEL, PageHeader, pageOf, Pager, Pill, PRIMARY, QUIET_LINK, SECONDARY } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { menuItem, seesAllOrders } from "@/lib/auth/permissions";
 import { formatDocument, formatPhone } from "@/lib/customer";
@@ -20,7 +20,6 @@ export const dynamic = "force-dynamic";
 
 const HERE = "/funil/prospeccao";
 const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value) ?? "";
-const DANGER = "inline-flex min-h-[var(--control)] items-center rounded-lg px-2 text-sm text-red-700 hover:bg-red-50";
 
 export default async function ProspeccaoPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const session = await requirePermission("funil", HERE);
@@ -98,7 +97,7 @@ export default async function ProspeccaoPage({ searchParams }: { searchParams: P
             <legend className={LABEL}>Estados (nenhum marcado é o Brasil todo)</legend>
             <div className="mt-1 grid grid-cols-6 gap-1 sm:grid-cols-9">
               {UFS.map((uf) => (
-                <label key={uf} className="flex min-h-9 cursor-pointer items-center justify-center gap-1 rounded border border-slate-300 bg-white text-sm has-[:checked]:border-brand has-[:checked]:font-semibold has-[:checked]:text-brand">
+                <label key={uf} className="flex min-h-[var(--control)] cursor-pointer items-center justify-center gap-1 rounded border border-slate-300 bg-white text-sm has-[:checked]:border-brand has-[:checked]:font-semibold has-[:checked]:text-brand">
                   <input type="checkbox" name="ufs" value={uf} defaultChecked={filters.ufs.includes(uf)} className="sr-only" />
                   {uf}
                 </label>

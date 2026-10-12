@@ -30,7 +30,7 @@ export default async function EquipamentoPage({ params }: { params: Promise<{ id
   return (
     <>
       <div className="mx-auto max-w-xl">
-        <Link href={menuItem("produtos").href} aria-label="Voltar para Produtos e custos" className="inline-block rounded-lg bg-brand-soft px-4 py-2 text-xl text-brand">
+        <Link href={menuItem("produtos").href} aria-label="Voltar para Produtos e custos" className="inline-flex min-h-[var(--control)] items-center rounded-lg bg-brand-soft px-4 text-xl text-brand">
           ←
         </Link>
         <h1 className="mt-3 text-2xl font-semibold">{product.name}</h1>

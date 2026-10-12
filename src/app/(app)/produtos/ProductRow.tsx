@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { PRIMARY } from "@/components/ui";
 import { fieldLabel, IDLE_ROW } from "@/lib/product-form";
 import type { ProductFormValues, RowKey, RowState } from "@/lib/product-form";
 
@@ -26,7 +27,7 @@ export type ProductRowData = {
 
 type RowAction = (state: RowState, formData: FormData) => Promise<RowState>;
 
-const INPUT = "w-full min-w-0 rounded border bg-white px-2 py-1.5 outline-none focus:ring-2 focus:ring-brand";
+const INPUT = "min-h-[var(--control)] w-full min-w-0 rounded border bg-white px-2 outline-none focus:ring-2 focus:ring-brand";
 const LINK = "rounded px-2 py-1 text-sm hover:bg-slate-100 disabled:opacity-60";
 
 /**
@@ -138,7 +139,7 @@ export function ProductRow({
             name="intent"
             value="save"
             disabled={pending}
-            className="rounded bg-brand px-3 py-1 text-sm font-medium text-white hover:bg-brand-dark disabled:opacity-60"
+            className={PRIMARY}
           >
             {pending ? "Salvando…" : "Salvar"}
           </button>

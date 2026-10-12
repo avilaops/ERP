@@ -15,7 +15,7 @@ export function LineTabs({ lines, current, path }: { lines: ProductLine[]; curre
           key={line.id}
           href={lineHref(path, line.id)}
           aria-current={line.id === current ? "page" : undefined}
-          className={`inline-flex min-h-9 items-center rounded-full border px-4 text-sm font-medium ${
+          className={`inline-flex min-h-[var(--control)] items-center rounded-full border px-4 text-sm font-medium ${
             line.id === current ? "border-brand bg-brand text-white" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
           }`}
         >

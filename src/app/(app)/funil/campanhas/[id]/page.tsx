@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CARD, PageHeader, Pill, PRIMARY, QUIET_LINK, SECONDARY, SECTION_TITLE } from "@/components/ui";
+import { CARD, DANGER, PageHeader, Pill, PRIMARY, QUIET_LINK, SECONDARY, SECTION_TITLE } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { seesAllOrders } from "@/lib/auth/permissions";
 import { CAMPAIGN_AUDIENCES, CAMPAIGN_STATUS, countAudience, getCampaign, listCampaignFailures } from "@/lib/db/campaigns";
@@ -15,7 +15,6 @@ export const metadata = { title: "Campanha · ERP" };
 export const dynamic = "force-dynamic";
 
 const TONE = { rascunho: "neutral", enviando: "warn", concluida: "good", cancelada: "bad" } as const;
-const DANGER = "inline-flex min-h-[var(--control)] items-center rounded-lg px-2 text-sm text-red-700 hover:bg-red-50";
 
 export default async function CampanhaPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await requirePermission("funil", "/funil/campanhas");

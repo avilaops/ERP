@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { PRIMARY } from "@/components/ui";
 import { lineWords } from "@/lib/line-words";
 import { IDLE_FORM_STATE, PARAM_SECTIONS, STATE_RATE_COLUMNS } from "@/lib/params-form";
 import type { ParamField, ParamsFormState, ParamsFormValues, StateRateKey } from "@/lib/params-form";
@@ -66,7 +67,7 @@ export function ParamsForm({ saved, action, lineId, imported }: { saved: ParamsF
               role="tab"
               aria-selected={index === part}
               onClick={() => setPart(index)}
-              className={`inline-flex min-h-9 items-center rounded-full border px-4 text-sm font-medium ${index === part ? "border-brand bg-brand text-white" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100"}`}
+              className={`inline-flex min-h-[var(--control)] items-center rounded-full border px-4 text-sm font-medium ${index === part ? "border-brand bg-brand text-white" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100"}`}
             >
               {title}
             </button>
@@ -190,7 +191,7 @@ export function ParamsForm({ saved, action, lineId, imported }: { saved: ParamsF
         <button
           type="submit"
           disabled={pending}
-          className="rounded bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark disabled:opacity-60"
+          className={PRIMARY}
         >
           {pending ? "Gravando…" : "Salvar parâmetros"}
         </button>

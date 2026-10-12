@@ -147,7 +147,7 @@ export default async function IntegracoesPage({ searchParams }: { searchParams: 
             <legend className={LABEL}>Avisar quando</legend>
             <div className="mt-1 grid gap-x-4 gap-y-1 sm:grid-cols-2">
               {Object.entries(WEBHOOK_EVENTS).map(([event, label]) => (
-                <label key={event} className="flex min-h-9 items-center gap-2 text-sm">
+                <label key={event} className="flex min-h-[var(--control)] items-center gap-2 text-sm">
                   <input type="checkbox" name="events" value={event} className="h-5 w-5" />
                   {label}
                 </label>

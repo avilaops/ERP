@@ -3,6 +3,7 @@ import { lineWords } from "@/lib/line-words";
 import { listLines } from "@/lib/db/product-lines";
 import { LINE_PARAM, lineHref, pickLine } from "@/lib/lines-view";
 import Link from "next/link";
+import { CARD, SECONDARY } from "@/components/ui";
 import { Kpi } from "@/components/Charts";
 import { requirePermission } from "@/lib/auth";
 import { menuItem, seesCosts, setsGoals } from "@/lib/auth/permissions";
@@ -28,9 +29,8 @@ export const metadata = { title: `${menuItem("precos-metas").label} · ERP` };
 // Never reused between profiles: what is assembled for the directors has costs.
 export const dynamic = "force-dynamic";
 
-const CARD = "rounded-lg border border-slate-200 bg-white p-5";
 const TITLE = "text-sm font-semibold uppercase tracking-wide";
-const INPUT = "mt-1 rounded border border-slate-300 bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-brand";
+const INPUT = "mt-1 min-h-[var(--control)] rounded border border-slate-300 bg-white px-3 outline-none focus:ring-2 focus:ring-brand";
 const DAY_MS = 86_400_000;
 const STALE_DAYS = 45;
 
@@ -152,7 +152,7 @@ export default async function PrecosMetasPage({ searchParams }: { searchParams: 
 
       <div className="mt-4 grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-2">
         {tab === "metas" && (
-        <section className={CARD} aria-labelledby="metas">
+        <section className={`${CARD} p-5`} aria-labelledby="metas">
           <h2 id="metas" className={TITLE}>
             Metas de venda de {monthLabel(month)}
           </h2>
@@ -203,7 +203,7 @@ export default async function PrecosMetasPage({ searchParams }: { searchParams: 
                   className={`${INPUT} w-40 text-right`}
                 />
               </div>
-              <button type="submit" className="rounded border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50">
+              <button type="submit" className={SECONDARY}>
                 Salvar meta
               </button>
               <p className="basis-full text-xs text-slate-500">Zero ou vazio tira a meta. A meta vale para o mês corrente.</p>
@@ -212,7 +212,7 @@ export default async function PrecosMetasPage({ searchParams }: { searchParams: 
         </section>
         )}
         {tab === "resumo" && (
-        <section className={CARD} aria-labelledby="atencao">
+        <section className={`${CARD} p-5`} aria-labelledby="atencao">
           <h2 id="atencao" className={TITLE}>
             Atenção
           </h2>
@@ -235,7 +235,7 @@ export default async function PrecosMetasPage({ searchParams }: { searchParams: 
         {tab === "tabela" && (
           <>
         {director && (
-          <section className={CARD} aria-labelledby="equilibrio">
+          <section className={`${CARD} p-5`} aria-labelledby="equilibrio">
             <h2 id="equilibrio" className={TITLE}>
               Ponto de equilíbrio do mês
             </h2>
@@ -260,7 +260,7 @@ export default async function PrecosMetasPage({ searchParams }: { searchParams: 
         )}
 
         {director && (
-          <section className={CARD} aria-labelledby="por-destino">
+          <section className={`${CARD} p-5`} aria-labelledby="por-destino">
             <h2 id="por-destino" className={TITLE}>
               Desconto máximo na meta, por destino
             </h2>
@@ -291,7 +291,7 @@ export default async function PrecosMetasPage({ searchParams }: { searchParams: 
             <p className="mt-3 text-xs text-slate-600">É a alçada do gerente: ele aprova até aqui sem saber qual é a meta.</p>
           </section>
         )}
-        <section className={`${CARD} lg:col-span-2`} aria-labelledby="publicacoes">
+        <section className={`${CARD} p-5 lg:col-span-2`} aria-labelledby="publicacoes">
           <h2 id="publicacoes" className={TITLE}>
             Publicações da tabela
           </h2>

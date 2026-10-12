@@ -2,6 +2,7 @@ import { LineTabs } from "@/components/LineTabs";
 import { listLines } from "@/lib/db/product-lines";
 import { LINE_PARAM, pickLine } from "@/lib/lines-view";
 import Link from "next/link";
+import { PRIMARY, SECONDARY } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { tenantDb } from "@/lib/db/pool";
 import { menuItem } from "@/lib/auth/permissions";
@@ -90,7 +91,7 @@ export default async function ParametrosPage({ searchParams }: { searchParams: P
               {suggestion && (
                 <form action={adoptSuggestedDownPaymentAction}>
                   <input type="hidden" name="lineId" value={line.id} />
-                  <button type="submit" className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50">
+                  <button type="submit" className={SECONDARY}>
                     usar
                   </button>
                 </form>
@@ -192,7 +193,7 @@ export default async function ParametrosPage({ searchParams }: { searchParams: P
                   className="mt-1 w-20 rounded border border-slate-300 bg-white px-3 py-2 text-right outline-none focus:ring-2 focus:ring-brand"
                 />
               </div>
-              <button type="submit" className="rounded border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50">
+              <button type="submit" className={SECONDARY}>
                 Salvar dia
               </button>
               <p className="basis-full text-xs text-slate-500">
@@ -219,7 +220,7 @@ export default async function ParametrosPage({ searchParams }: { searchParams: P
                 <input key={proposal.place ?? ""} id="place" name="place" type="text" defaultValue={proposal.place ?? ""} placeholder="Ex.: Votuporanga/SP" autoComplete="off" className="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-brand" />
               </div>
               <div className="sm:col-span-2">
-                <button type="submit" className="rounded bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark">
+                <button type="submit" className={PRIMARY}>
                   Salvar dados da proposta
                 </button>
               </div>
@@ -272,7 +273,7 @@ export default async function ParametrosPage({ searchParams }: { searchParams: P
                 </select>
               </div>
               <div>
-                <button type="submit" className="rounded border border-slate-300 bg-white px-3 py-2 font-medium hover:bg-slate-50">
+                <button type="submit" className={SECONDARY}>
                   Salvar regras
                 </button>
               </div>

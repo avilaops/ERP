@@ -63,7 +63,7 @@ export default async function PainelDoFunilPage({ searchParams }: { searchParams
             key={key}
             href={hrefOf({ dias: key })}
             aria-current={key === days ? "page" : undefined}
-            className={`inline-flex min-h-9 items-center rounded-full border px-3 text-sm font-medium ${key === days ? "border-brand bg-brand text-white" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100"}`}
+            className={`inline-flex min-h-[var(--control)] items-center rounded-full border px-3 text-sm font-medium ${key === days ? "border-brand bg-brand text-white" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100"}`}
           >
             {label}
           </Link>

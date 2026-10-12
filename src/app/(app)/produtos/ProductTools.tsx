@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import type { ReactNode } from "react";
+import { PRIMARY, SECONDARY } from "@/components/ui";
 import type { PasteState } from "@/lib/advisory-paste";
 import type { NewProductState } from "@/lib/product-form";
 import { lineWords } from "@/lib/line-words";
@@ -48,16 +49,16 @@ export function ProductTools({
               aria-expanded={open === panel}
               aria-controls={controls}
               onClick={() => setOpen(open === panel ? null : panel)}
-              className={`rounded border border-slate-300 bg-white px-4 py-2 font-medium hover:bg-slate-50 ${panel === "new" ? "hidden md:block" : ""}`}
+              className={`${SECONDARY} ${panel === "new" ? "hidden md:inline-flex" : ""}`}
             >
               {label}
             </button>
           ))}
-          <Link href="/produtos/catalogo-fornecedor" className="rounded border border-slate-300 bg-white px-4 py-2 font-medium hover:bg-slate-50">
+          <Link href="/produtos/catalogo-fornecedor" className={SECONDARY}>
             Catálogo do fornecedor
           </Link>
           {/* On a phone a new equipment has a screen of its own. */}
-          <Link href={`/produtos/novo?linha=${lineId}`} className="rounded bg-brand px-4 py-2 font-medium text-white md:hidden">
+          <Link href={`/produtos/novo?linha=${lineId}`} className={`${PRIMARY} md:hidden`}>
             + Equipamento
           </Link>
         </div>

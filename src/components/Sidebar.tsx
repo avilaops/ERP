@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PRIMARY } from "@/components/ui";
 import { MobileMenu } from "@/components/MobileMenu";
 import type { MenuTab } from "@/components/MobileMenu";
 import { ThemeChoice } from "@/components/ThemeChoice";
@@ -67,7 +68,7 @@ export async function Sidebar({ session }: { session: Session }) {
       {allows(session, "pedidos") && (
         <Link
           href="/pedidos/novo"
-          className="rounded bg-brand px-3 py-2 text-center font-medium text-white hover:bg-brand-dark"
+          className={PRIMARY}
         >
           + Novo pedido
         </Link>

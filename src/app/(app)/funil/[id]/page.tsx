@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CARD, INPUT, LABEL, PageHeader, Pill, PRIMARY, QUIET_LINK, SECONDARY, SECTION_TITLE } from "@/components/ui";
+import { CARD, DANGER, INPUT, LABEL, PageHeader, Pill, PRIMARY, QUIET_LINK, SECONDARY, SECTION_TITLE } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { allows, menuItem, seesAllOrders } from "@/lib/auth/permissions";
 import { listCadences, listEnrollments } from "@/lib/db/cadences";
@@ -283,7 +283,7 @@ export default async function OportunidadePage({ params, searchParams }: { param
           <nav aria-label="Modelos" className="flex flex-wrap items-center gap-2 text-sm">
             <span className="text-slate-600">Começar de um modelo:</span>
             {templates.slice(0, 6).map((template) => (
-              <Link key={template.id} href={`${HERE}/${item!.id}?aba=mensagens&modelo=${template.id}`} aria-current={picked?.id === template.id ? "true" : undefined} className={`inline-flex min-h-9 items-center rounded-full border px-3 font-medium ${picked?.id === template.id ? "border-brand bg-brand text-white" : "border-slate-300 bg-white hover:bg-slate-100"}`}>
+              <Link key={template.id} href={`${HERE}/${item!.id}?aba=mensagens&modelo=${template.id}`} aria-current={picked?.id === template.id ? "true" : undefined} className={`inline-flex min-h-[var(--control)] items-center rounded-full border px-3 font-medium ${picked?.id === template.id ? "border-brand bg-brand text-white" : "border-slate-300 bg-white hover:bg-slate-100"}`}>
                 {template.name}
               </Link>
             ))}
@@ -412,7 +412,7 @@ export default async function OportunidadePage({ params, searchParams }: { param
         </p>
         <ActionForm action={deleteOpportunityAction} className="mt-3">
           {hidden}
-          <ConfirmButton label="Excluir oportunidade" confirmLabel="Confirmar: excluir com as atividades" className="rounded px-2 py-1 text-sm text-red-700 hover:bg-red-50" />
+          <ConfirmButton label="Excluir oportunidade" confirmLabel="Confirmar: excluir com as atividades" className={DANGER} />
         </ActionForm>
       </section>
     );

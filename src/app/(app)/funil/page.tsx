@@ -143,7 +143,7 @@ export default async function FunilPage({ searchParams }: { searchParams: Promis
       {/* The stages, as the way from one to the other: on a phone they are the navigation; on a wide screen, the way back from a list to the board. */}
       <nav aria-label="Etapas do funil" className={`mt-3 flex flex-wrap gap-2 ${listing ? "" : "md:hidden"}`}>
         {listing && (
-          <Link href={hrefOf({ q: search })} className="hidden min-h-9 items-center rounded-full border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-100 md:inline-flex">
+          <Link href={hrefOf({ q: search })} className="hidden min-h-[var(--control)] items-center rounded-full border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-100 md:inline-flex">
             ← Quadro
           </Link>
         )}
@@ -152,7 +152,7 @@ export default async function FunilPage({ searchParams }: { searchParams: Promis
             key={column.stage.id}
             href={hrefOf({ etapa: String(column.stage.id), q: search })}
             aria-current={column.stage.id === shown?.stage.id ? "page" : undefined}
-            className={`inline-flex min-h-9 items-center rounded-full border px-3 text-sm font-medium ${
+            className={`inline-flex min-h-[var(--control)] items-center rounded-full border px-3 text-sm font-medium ${
               column.stage.id === shown?.stage.id ? "border-brand bg-brand text-white" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
             }`}
           >

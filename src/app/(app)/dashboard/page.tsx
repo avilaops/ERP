@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CARD, SECONDARY } from "@/components/ui";
 import { Bars, Columns, Kpi } from "@/components/Charts";
 import { requirePermission } from "@/lib/auth";
 import { allows, menuItem, seesAllOrders, seesCosts } from "@/lib/auth/permissions";
@@ -17,7 +18,6 @@ export const metadata = { title: `${menuItem("dashboard").label} · ERP` };
 export const dynamic = "force-dynamic";
 
 const HERE = menuItem("dashboard").href;
-const CARD = "rounded-lg border border-slate-200 bg-white p-5";
 const TITLE = "text-sm font-semibold uppercase tracking-wide";
 const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
 const NONE = "—";
@@ -98,7 +98,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
               key={item.key}
               href={periodHref(item.key)}
               aria-current={item.key === period ? "page" : undefined}
-              className={`rounded-md px-3 py-1.5 font-medium ${item.key === period ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100"}`}
+              className={`inline-flex min-h-[var(--control)] items-center rounded-md px-3 font-medium ${item.key === period ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100"}`}
             >
               {item.label}
             </Link>
@@ -120,7 +120,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
               </option>
             ))}
           </select>
-          <button type="submit" className="rounded border border-slate-300 bg-white px-3 py-1.5 font-medium hover:bg-slate-50">
+          <button type="submit" className={SECONDARY}>
             Ver
           </button>
         </form>
@@ -171,7 +171,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
       {tab === "resumo" && (
         <>
-      <section className={`${CARD} mt-6`} aria-labelledby="por-mes">
+      <section className={`${CARD} p-5 mt-6`} aria-labelledby="por-mes">
         <h2 id="por-mes" className={TITLE}>
           Vendas fechadas por mês
         </h2>
@@ -184,7 +184,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       {tab === "vendas" && (
         <>
       <div className="mt-6 grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-2">
-        <section className={CARD} aria-labelledby="funil">
+        <section className={`${CARD} p-5`} aria-labelledby="funil">
           <h2 id="funil" className={TITLE}>
             Funil de orçamentos
           </h2>
@@ -202,7 +202,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           />
         </section>
         {everyone && (
-          <section className={CARD} aria-labelledby="ranking">
+          <section className={`${CARD} p-5`} aria-labelledby="ranking">
             <h2 id="ranking" className={TITLE}>
               Ranking de vendedores
             </h2>
@@ -210,14 +210,14 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             <Bars bars={view.bySeller} format={showMoney} empty="Nenhum pedido fechado no período." />
           </section>
         )}
-        <section className={CARD} aria-labelledby="equipamentos">
+        <section className={`${CARD} p-5`} aria-labelledby="equipamentos">
           <h2 id="equipamentos" className={TITLE}>
             Equipamentos mais vendidos
           </h2>
           <p className="mb-4 text-xs text-slate-600">os 8 primeiros · valor sem IPI</p>
           <Bars bars={view.byProduct} format={showMoney} empty="Nenhum equipamento vendido no período." />
         </section>
-        <section className={CARD} aria-labelledby="estados">
+        <section className={`${CARD} p-5`} aria-labelledby="estados">
           <h2 id="estados" className={TITLE}>
             Vendas por estado
           </h2>
@@ -230,7 +230,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       )}
       {tab === "aberto" && (
         <>
-      <section className={`${CARD} mt-6`} aria-labelledby="em-aberto">
+      <section className={`${CARD} p-5 mt-6`} aria-labelledby="em-aberto">
         <div className="flex items-baseline justify-between gap-3">
           <h2 id="em-aberto" className={TITLE}>
             Orçamentos em aberto por idade
@@ -267,7 +267,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       {(cash || profitByMonth) && (
         <div className="mt-6 grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-2">
           {cash && (
-            <section className={CARD} aria-labelledby="caixa-previsto">
+            <section className={`${CARD} p-5`} aria-labelledby="caixa-previsto">
               <h2 id="caixa-previsto" className={TITLE}>
                 Caixa previsto
               </h2>
@@ -299,7 +299,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             </section>
           )}
           {profitByMonth && (
-            <section className={CARD} aria-labelledby="lucro-por-mes">
+            <section className={`${CARD} p-5`} aria-labelledby="lucro-por-mes">
               <h2 id="lucro-por-mes" className={TITLE}>
                 Lucro líquido por mês
               </h2>
@@ -318,7 +318,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       {(receivables || payables) && (
         <div className="mt-6 grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-2">
           {receivables && (
-            <section className={CARD} aria-labelledby="a-receber">
+            <section className={`${CARD} p-5`} aria-labelledby="a-receber">
               <div className="flex items-baseline justify-between gap-3">
                 <h2 id="a-receber" className={TITLE}>
                   A receber
@@ -348,7 +348,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             </section>
           )}
           {payables && (
-            <section className={CARD} aria-labelledby="a-pagar">
+            <section className={`${CARD} p-5`} aria-labelledby="a-pagar">
               <div className="flex items-baseline justify-between gap-3">
                 <h2 id="a-pagar" className={TITLE}>
                   A pagar

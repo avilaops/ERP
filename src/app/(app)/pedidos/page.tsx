@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CARD, PRIMARY, SECONDARY } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { menuItem, seesAllOrders } from "@/lib/auth/permissions";
 import { listOrders } from "@/lib/db/orders";
@@ -10,7 +11,6 @@ export const metadata = { title: `${menuItem("pedidos").label} · ERP` };
 export const dynamic = "force-dynamic";
 
 const HERE = menuItem("pedidos").href;
-const CARD = "rounded-lg border border-slate-200 bg-white";
 
 const STATUS_COLORS = {
   em_negociacao: "bg-slate-200 text-slate-800",
@@ -56,7 +56,7 @@ export default async function PedidosPage({ searchParams }: { searchParams: Prom
           <h1 className="text-2xl font-semibold">{menuItem("pedidos").label}</h1>
           <p className="mt-1 text-sm text-slate-600">{everyone ? "Pedidos de toda a equipe." : "Os seus pedidos."}</p>
         </div>
-        <Link href={`${HERE}/novo`} className="rounded bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark">
+        <Link href={`${HERE}/novo`} className={PRIMARY}>
           + Novo pedido
         </Link>
       </div>
@@ -78,7 +78,7 @@ export default async function PedidosPage({ searchParams }: { searchParams: Prom
               key={item.key}
               href={address(item.key)}
               aria-current={item.key === tab ? "page" : undefined}
-              className={`rounded-md px-3 py-1.5 font-medium ${item.key === tab ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100"}`}
+              className={`inline-flex min-h-[var(--control)] items-center rounded-md px-3 font-medium ${item.key === tab ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100"}`}
             >
               {item.label} ({counts[item.key]})
             </Link>
@@ -94,7 +94,7 @@ export default async function PedidosPage({ searchParams }: { searchParams: Prom
             aria-label="Buscar pedido por cliente, CNPJ/CPF ou número"
             className="min-w-0 flex-1 rounded border border-slate-300 bg-white px-3 py-2 text-sm sm:w-64 sm:flex-none outline-none focus:ring-2 focus:ring-brand"
           />
-          <button type="submit" className="rounded border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50">
+          <button type="submit" className={SECONDARY}>
             Buscar
           </button>
         </form>

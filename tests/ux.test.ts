@@ -47,6 +47,32 @@ test("moldura: o que gruda numa borda respeita as barras do celular", () => {
   assert.ok(read("src/components/Sidebar.tsx").includes(".slice(0, 4)"));
 });
 
+test("botões: todos com a altura de um dedo (--control), nunca a altura tirada só do espaçamento", () => {
+  const ui = read("src/components/ui.tsx");
+  for (const piece of ["PRIMARY", "SECONDARY", "DANGER", "DANGER_OUTLINE"]) assert.match(ui, new RegExp(`export const ${piece} = "inline-flex min-h-\\[var\\(--control\\)\\]`), piece);
+  const sources = readdirSync(ROOT + "src", { recursive: true, encoding: "utf8" }).filter((file) => /\.tsx$/.test(file) && file !== "components/ui.tsx");
+  for (const file of sources) {
+    const source = read(`src/${file}`);
+    // Botão ou link com cara de botão (fundo da marca, borda ou texto vermelho) e altura de py-0.5 a py-2: fica abaixo de 44 px.
+    for (const [, className] of source.matchAll(/<(?:button|Link)\b(?:=>|[^>])*?className="([^"]*)"/g)) {
+      const looksLikeButton = /(?:^|\s)(bg-brand|border-slate-300|border-red-300|text-red-700)(?:\s|$)/.test(className);
+      const shortPadding = /(?:^|\s)py-(0\.5|1|1\.5|2)(?:\s|$)/.test(className);
+      assert.ok(!looksLikeButton || !shortPadding || className.includes("min-h-"), `${file}: ${className}`);
+    }
+    // Qualquer botão de cantos arredondados com py curto, mesmo sem cor (Fechar, cancelar): também abaixo de 44 px.
+    for (const [, className] of source.matchAll(/<button\b(?:=>|[^>])*?className="([^"]*)"/g)) {
+      const shortPadding = /(?:^|\s)(?:md:)?py-(0\.5|1|1\.5|2)(?:\s|$)/.test(className);
+      assert.ok(!/\brounded\b/.test(className) || !shortPadding || className.includes("min-h-"), `${file}: ${className}`);
+    }
+    // A peça compartilhada não é copiada para dentro da página.
+    assert.doesNotMatch(source, /^const (CARD|PRIMARY|SECONDARY|DANGER) = /m, file);
+    // Filtro, aba e etiqueta que se toca também têm 44 px: nada de 36 px (min-h-9).
+    assert.doesNotMatch(source, /\bmin-h-9\b/, file);
+  }
+  // O campo de data do iPhone tem regra própria em globals.css, e ela usa a mesma altura.
+  assert.match(read("src/app/globals.css"), /input\[type="date"\] \{[^}]*min-height: var\(--control\);/);
+});
+
 test("tabela de preços: consulta paginada, sem rolagem lateral e sem cortar nome ou preço", () => {
   const page = read(`${APP}tabela-precos/page.tsx`);
   // O catálogo nunca é desenhado inteiro: só a fatia.

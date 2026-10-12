@@ -5,6 +5,7 @@ import { listNumberVoids } from "@/lib/db/invoices";
 import { listLines } from "@/lib/db/product-lines";
 import { LINE_PARAM, pickLine } from "@/lib/lines-view";
 import Link from "next/link";
+import { CARD, DANGER, DANGER_OUTLINE, INPUT, PRIMARY, SECONDARY } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { menuItem } from "@/lib/auth/permissions";
 import { formatDocument } from "@/lib/customer";
@@ -21,8 +22,6 @@ import { removeCertificateAction, saveCertificateAction, saveDanfeReformDateActi
 export const metadata = { title: "Fiscal · ERP" };
 export const dynamic = "force-dynamic";
 
-const CARD = "rounded-lg border border-slate-200 bg-white";
-const INPUT = "mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-brand";
 const LABEL = "block text-sm font-medium";
 const DAY_MS = 86_400_000;
 
@@ -117,7 +116,7 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
               Arquivo (.pfx ou .p12)
             </label>
             {/* No `accept`: on an iPhone a file whose kind the phone does not recognise (a .pfx saved from WhatsApp or e-mail) shows greyed out and cannot be chosen. What is sent is checked on the server. */}
-            <input id="certificate" name="certificate" type="file" className="mt-1 w-full text-sm" />
+            <input id="certificate" name="certificate" type="file" className="mt-1 w-full text-sm file:mr-3 file:min-h-[var(--control)] file:rounded-lg file:border file:border-slate-300 file:bg-white file:px-4 file:font-medium" />
           </div>
           <div>
             <label htmlFor="password" className={LABEL}>
@@ -125,13 +124,13 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
             </label>
             <PasswordField id="password" name="password" className={INPUT} />
           </div>
-          <button type="submit" className="rounded bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark">
+          <button type="submit" className={PRIMARY}>
             {certificate ? "Trocar certificado" : "Enviar certificado"}
           </button>
         </ActionForm>
         {certificate && (
           <ActionForm action={removeCertificateAction} className="mt-3">
-            <ConfirmButton label="Remover certificado" confirmLabel="Confirmar: remover" className="rounded px-2 py-1 text-sm text-red-700 hover:bg-red-50" />
+            <ConfirmButton label="Remover certificado" confirmLabel="Confirmar: remover" className={DANGER} />
           </ActionForm>
         )}
       </section>
@@ -200,7 +199,7 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
             </select>
           </div>
           <div className="sm:col-span-2">
-            <button type="submit" className="rounded bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark">
+            <button type="submit" className={PRIMARY}>
               Salvar dados fiscais
             </button>
           </div>
@@ -231,18 +230,18 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
               <input id={key} name={key} type="text" defaultValue={value ?? ""} placeholder={placeholder} autoComplete="off" className={INPUT} />
             </div>
           ))}
-          <label className="flex items-start gap-2 text-sm sm:col-span-2">
+          <label className="flex min-h-[var(--control)] items-start gap-2 py-2.5 text-sm sm:col-span-2">
             <input type="checkbox" name="finalConsumer" value="sim" defaultChecked={rules.finalConsumer} className="mt-1" />
             <span>
               O cliente é consumidor final (usa o equipamento, não revende). É o que leva o DIFAL para a nota quando ele não é contribuinte e
               está em outro estado.
             </span>
           </label>
-          <label className="flex items-start gap-2 text-sm sm:col-span-2">
+          <label className="flex min-h-[var(--control)] items-start gap-2 py-2.5 text-sm sm:col-span-2">
             <input type="checkbox" name="ipiInIcmsBase" value="sim" defaultChecked={rules.ipiInIcmsBase} className="mt-1" />
             <span>Na venda para consumidor final, o IPI entra na base de cálculo do ICMS.</span>
           </label>
-          <label className="flex items-start gap-2 text-sm sm:col-span-2">
+          <label className="flex min-h-[var(--control)] items-start gap-2 py-2.5 text-sm sm:col-span-2">
             <input type="checkbox" name="icmsOutOfContributions" value="sim" defaultChecked={rules.icmsOutOfContributions} className="mt-1" />
             <span>O ICMS destacado na nota sai da base de cálculo do PIS e da COFINS (Lei 14.592/2023). Desmarque só se o contador pedir.</span>
           </label>
@@ -250,10 +249,10 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
             <label htmlFor="additionalInfo" className={LABEL}>
               Informações complementares (texto fixo da nota)
             </label>
-            <textarea id="additionalInfo" name="additionalInfo" rows={3} defaultValue={rules.additionalInfo ?? ""} className={INPUT} />
+            <textarea id="additionalInfo" name="additionalInfo" rows={3} defaultValue={rules.additionalInfo ?? ""} className={`${INPUT} py-2`} />
           </div>
           <div className="sm:col-span-2">
-            <button type="submit" className="rounded bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark">
+            <button type="submit" className={PRIMARY}>
               Salvar regras fiscais
             </button>
           </div>
@@ -276,7 +275,7 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
             </label>
             <input key={reformFrom} id="reformFrom" name="reformFrom" type="date" defaultValue={reformFrom} className={INPUT} />
           </div>
-          <button type="submit" className="rounded bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark">
+          <button type="submit" className={PRIMARY}>
             Salvar data
           </button>
         </ActionForm>
@@ -312,7 +311,7 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
             <input id="void-reason" name="reason" type="text" autoComplete="off" placeholder="Ex.: Numeração pulada por falha na emissão." className={INPUT} />
           </div>
           <div className="sm:col-span-3">
-            <ConfirmButton label="Inutilizar numeração" confirmLabel="Confirmar: inutilizar na SEFAZ" className="rounded border border-red-300 bg-white px-4 py-2 font-medium text-red-700 hover:bg-red-50" />
+            <ConfirmButton label="Inutilizar numeração" confirmLabel="Confirmar: inutilizar na SEFAZ" className={DANGER_OUTLINE} />
           </div>
         </ActionForm>
         {voids.length > 0 && (
@@ -343,7 +342,7 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
                   {method.label}
                   {!method.active && <span className="ml-2 text-xs font-normal text-slate-500">desligada</span>}
                 </span>
-                <select key={method.code ?? ""} name="code" defaultValue={method.code ?? ""} aria-label={`Forma na nota de ${method.label}`} className="rounded border border-slate-300 bg-white px-3 py-2">
+                <select key={method.code ?? ""} name="code" defaultValue={method.code ?? ""} aria-label={`Forma na nota de ${method.label}`} className="min-h-[var(--control)] rounded border border-slate-300 bg-white px-3">
                   <option value="">— escolher —</option>
                   {PAYMENT_CODES.map(([code, label]) => (
                     <option key={code} value={code}>
@@ -351,7 +350,7 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
                     </option>
                   ))}
                 </select>
-                <button type="submit" className="rounded border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50">
+                <button type="submit" className={SECONDARY}>
                   Salvar
                 </button>
               </ActionForm>

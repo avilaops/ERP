@@ -53,6 +53,7 @@ teclado aberto a tela pode rolar: o que não pode é um campo ou uma ação fica
 | `CARD`, `SECTION_TITLE` | Cartão só quando separa de verdade; agrupamento simples usa só o título pequeno |
 | `LABEL`, `INPUT` | Todo campo com rótulo permanente acima e 44 px de altura (`--control`) |
 | `PRIMARY`, `SECONDARY` | Uma ação principal por etapa; as demais são secundárias |
+| `DANGER`, `DANGER_OUTLINE` | Remover, desfazer, cancelar: texto vermelho; com borda quando é a ação da etapa (cancelar o pedido) |
 | `Pill` | Estado em duas ou três palavras, com texto e cor (`good`, `warn`, `bad`, `neutral`) |
 | `pageOf` + `Pager` | Fatia de uma lista e o rodapé "1–8 de 133 · ‹ 1 de 17 ›" |
 | `FitRows` (`src/components/FitRows.tsx`) | Mede quantas linhas cabem na tela de quem olha e guarda no cookie `erp_linhas` |
