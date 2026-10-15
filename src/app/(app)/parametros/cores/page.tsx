@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CARD, INPUT, PRIMARY, SECONDARY, DANGER_OUTLINE } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { menuItem } from "@/lib/auth/permissions";
 import { listEquipmentColors } from "@/lib/db/equipment-colors";
@@ -10,9 +11,6 @@ import { createColorAction, deleteColorAction, updateColorAction } from "./actio
 
 export const metadata = { title: "Cores dos equipamentos · ERP" };
 export const dynamic = "force-dynamic";
-
-const CARD = "rounded-lg border border-slate-200 bg-white";
-const INPUT = "rounded border border-slate-300 bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-brand";
 
 export default async function CoresPage() {
   const session = await requirePermission("parametros");
@@ -55,7 +53,7 @@ export default async function CoresPage() {
             </label>
             <input id="new-name" name="name" type="text" maxLength={60} autoComplete="off" className={`${INPUT} mt-1 w-full`} />
           </div>
-          <button type="submit" className="rounded bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark">
+          <button type="submit" className={PRIMARY}>
             Adicionar
           </button>
         </ActionForm>
@@ -86,13 +84,13 @@ export default async function CoresPage() {
                       </label>
                       <input key={color.name} id={`name-${color.id}`} name="name" type="text" maxLength={60} defaultValue={color.name} className={`${INPUT} mt-1 w-full`} />
                     </div>
-                    <button type="submit" className="rounded border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50">
+                    <button type="submit" className={SECONDARY}>
                       Salvar
                     </button>
                   </ActionForm>
                   <ActionForm action={deleteColorAction} className="mt-1">
                     <input type="hidden" name="id" value={color.id} />
-                    <ConfirmButton label="Remover" confirmLabel="Confirmar: remover" className="rounded px-2 py-1 text-sm text-red-700 hover:bg-red-50" />
+                    <ConfirmButton label="Remover" confirmLabel="Confirmar: remover" className={DANGER_OUTLINE} />
                   </ActionForm>
                 </li>
               ))}

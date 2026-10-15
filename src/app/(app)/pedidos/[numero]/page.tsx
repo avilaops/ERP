@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CARD, INPUT, PRIMARY, SECONDARY, DANGER_OUTLINE } from "@/components/ui";
 import { notFound } from "next/navigation";
 import { requirePermission } from "@/lib/auth";
 import { listOnDeliveryMethods } from "@/lib/db/payment-methods";
@@ -66,11 +67,8 @@ export const dynamic = "force-dynamic";
 
 const NONE = "—";
 const TERMS = "condicoes";
-const CARD = "rounded-lg border border-slate-200 bg-white";
 const TITLE = "text-sm font-semibold uppercase tracking-wide";
-const INPUT = "rounded border border-slate-300 bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-brand";
 const BUTTON = "rounded border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50";
-const PRIMARY = "rounded bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark";
 const HELP = "mt-1 text-xs text-slate-500";
 
 const BAND_COLORS = {
@@ -193,7 +191,7 @@ export default async function PedidoPage({
         {item.plateLoaded || item.plates ? choice("plates", "Anilheiro", item.plates, [...PLATES]) : null}
         {choice("frameColor", "Cor da estrutura", item.frameColor, ofPart("estrutura"))}
         {choice("armColor", "Cor do braço", item.armColor, ofPart("braco"))}
-        <button type="submit" className="rounded border border-slate-300 px-3 py-1.5 text-sm font-medium text-brand">
+        <button type="submit" className={SECONDARY}>
           Gravar
         </button>
       </ActionForm>
@@ -339,10 +337,10 @@ export default async function PedidoPage({
               </label>
               <input id="decision-comment" name="comment" type="text" placeholder="Ex.: fechar com entrada de 50%" className={`${INPUT} mt-1 w-full`} />
             </div>
-            <button type="submit" name="decision" value="aprovar" className="rounded bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark">
+            <button type="submit" name="decision" value="aprovar" className={PRIMARY}>
               Aprovar {showPercent(order.discount)}
             </button>
-            <button type="submit" name="decision" value="recusar" className="rounded border border-red-300 bg-white px-4 py-2 font-medium text-red-700 hover:bg-red-50">
+            <button type="submit" name="decision" value="recusar" className={DANGER_OUTLINE}>
               Recusar
             </button>
           </ActionForm>
@@ -391,7 +389,7 @@ export default async function PedidoPage({
                         <ActionForm action={signContractAction}>
                           <input type="hidden" name="number" value={order.number} />
                           <input type="hidden" name="contractId" value={contract.id} />
-                          <ConfirmButton label="Assinar pela empresa" confirmLabel={`Confirmar: assinar como ${session.name}`} className="rounded border border-slate-300 bg-white px-3 py-1 font-medium hover:bg-slate-50" />
+                          <ConfirmButton label="Assinar pela empresa" confirmLabel={`Confirmar: assinar como ${session.name}`} className={SECONDARY} />
                         </ActionForm>
                       )}
                       {contract.status === "enviado" && (
@@ -399,12 +397,12 @@ export default async function PedidoPage({
                           <ActionForm action={resendContractAction}>
                             <input type="hidden" name="number" value={order.number} />
                             <input type="hidden" name="contractId" value={contract.id} />
-                            <ConfirmButton label="Enviar o link de novo" confirmLabel="Confirmar: o link anterior deixa de valer" className="rounded border border-slate-300 bg-white px-3 py-1 font-medium hover:bg-slate-50" />
+                            <ConfirmButton label="Enviar o link de novo" confirmLabel="Confirmar: o link anterior deixa de valer" className={SECONDARY} />
                           </ActionForm>
                           <ActionForm action={cancelContractAction}>
                             <input type="hidden" name="number" value={order.number} />
                             <input type="hidden" name="contractId" value={contract.id} />
-                            <ConfirmButton label="Cancelar contrato" confirmLabel="Confirmar: cancelar" className="rounded border border-red-300 bg-white px-3 py-1 font-medium text-red-700 hover:bg-red-50" />
+                            <ConfirmButton label="Cancelar contrato" confirmLabel="Confirmar: cancelar" className={DANGER_OUTLINE} />
                           </ActionForm>
                         </>
                       )}
@@ -450,7 +448,7 @@ export default async function PedidoPage({
                     <input id="fileRecipientPhone" name="recipientPhone" type="tel" inputMode="tel" defaultValue={order.customer?.phone ?? ""} placeholder="(17) 99999-8888" autoComplete="off" className={`${INPUT} w-full`} />
                   </div>
                 )}
-                <button type="submit" className="rounded border border-slate-300 bg-white px-4 py-2 font-semibold hover:bg-slate-50">
+                <button type="submit" className={SECONDARY}>
                   Enviar este PDF para assinatura
                 </button>
               </ActionForm>
@@ -487,7 +485,7 @@ export default async function PedidoPage({
               <a href={`/api/pedidos/${order.number}/contrato-previa`} target="_blank" rel="noopener" className="py-2 font-medium text-brand underline">
                 Conferir o contrato (PDF)
               </a>
-              <button type="submit" className="rounded bg-brand px-4 py-2 font-semibold text-white hover:opacity-90">
+              <button type="submit" className={PRIMARY}>
                 {contracts.length > 0 ? "Enviar novo contrato para assinatura" : "Enviar contrato para assinatura"}
               </button>
             </ActionForm>
@@ -550,7 +548,7 @@ export default async function PedidoPage({
                         </label>
                         <input key={order.customer?.email ?? ""} id={`email-${item.id}`} name="to" type="email" defaultValue={order.customer?.email ?? ""} autoComplete="off" className={`${INPUT} mt-1 w-72 max-w-full`} />
                       </div>
-                      <button type="submit" className="rounded border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50">
+                      <button type="submit" className={SECONDARY}>
                         Enviar por e-mail
                       </button>
                     </ActionForm>
@@ -565,7 +563,7 @@ export default async function PedidoPage({
                           Carta de correção (não corrige valor, imposto, quantidade, cliente nem data)
                         </label>
                         <textarea id={`correcao-${item.id}`} name="text" rows={2} placeholder="Ex.: Onde se lê Rua A, 10, leia-se Rua B, 20." className={`${INPUT} w-full text-slate-900`} />
-                        <ConfirmButton label="Registrar carta de correção" confirmLabel="Confirmar: enviar à SEFAZ" className="self-start rounded border border-slate-300 bg-white px-3 py-1.5 font-medium text-slate-900 hover:bg-slate-50" />
+                        <ConfirmButton label="Registrar carta de correção" confirmLabel="Confirmar: enviar à SEFAZ" className={SECONDARY} />
                       </ActionForm>
                       <ActionForm action={registerNfeEventAction} className="mt-3 flex flex-col gap-2">
                         <input type="hidden" name="number" value={order.number} />
@@ -574,7 +572,7 @@ export default async function PedidoPage({
                           Cancelar a nota: motivo (a SEFAZ só aceita dentro do prazo legal, e não tem volta)
                         </label>
                         <input id={`cancelar-${item.id}`} name="text" type="text" placeholder="Ex.: Pedido cancelado pelo cliente antes da saída." className={`${INPUT} w-full text-slate-900`} />
-                        <ConfirmButton label="Cancelar nota fiscal" confirmLabel="Confirmar: cancelar na SEFAZ" className="self-start rounded border border-red-300 bg-white px-3 py-1.5 font-medium text-red-700 hover:bg-red-50" />
+                        <ConfirmButton label="Cancelar nota fiscal" confirmLabel="Confirmar: cancelar na SEFAZ" className={DANGER_OUTLINE} />
                       </ActionForm>
                     </details>
                   )}
@@ -692,7 +690,7 @@ export default async function PedidoPage({
                   Salvar local de entrega
                 </button>
                 {delivery ? (
-                  <button type="submit" name="clear" value="1" className="rounded border border-slate-300 px-3 py-1.5 text-sm font-medium hover:bg-slate-50">
+                  <button type="submit" name="clear" value="1" className={SECONDARY}>
                     Usar o endereço do cadastro
                   </button>
                 ) : null}
@@ -744,7 +742,7 @@ export default async function PedidoPage({
                   <ConfirmButton
                     label={invoices.some((item) => item.status === "assinada") ? "Reenviar a nota à SEFAZ" : "Emitir nota fiscal"}
                     confirmLabel="Confirmar: assinar e enviar à SEFAZ"
-                    className="rounded bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark"
+                    className={PRIMARY}
                   />
                 </ActionForm>
               )}
@@ -813,7 +811,7 @@ export default async function PedidoPage({
                         />
                       </label>
                       {editable && (
-                        <button type="submit" className="rounded border border-slate-300 px-3 py-1.5 text-sm font-medium text-brand">
+                        <button type="submit" className={SECONDARY}>
                           Alterar
                         </button>
                       )}
@@ -822,7 +820,7 @@ export default async function PedidoPage({
                       <ActionForm action={removeItemAction}>
                         <input type="hidden" name="number" value={order.number} />
                         <input type="hidden" name="productId" value={item.productId} />
-                        <button type="submit" className="rounded px-2 py-1.5 text-sm text-red-700">
+                        <button type="submit" className={DANGER_OUTLINE}>
                           Remover
                         </button>
                       </ActionForm>
@@ -888,7 +886,7 @@ export default async function PedidoPage({
                             className={`${INPUT} w-16 py-1 text-right`}
                           />
                           {editable && (
-                            <button type="submit" className="rounded px-2 py-1 text-xs text-brand hover:bg-slate-100">
+                            <button type="submit" className={SECONDARY}>
                               Alterar
                             </button>
                           )}
@@ -909,7 +907,7 @@ export default async function PedidoPage({
                           <ActionForm action={removeItemAction}>
                             <input type="hidden" name="number" value={order.number} />
                             <input type="hidden" name="productId" value={item.productId} />
-                            <button type="submit" className="rounded px-2 py-1 text-sm text-red-700 hover:bg-slate-100">
+                            <button type="submit" className={DANGER_OUTLINE}>
                               Remover
                             </button>
                           </ActionForm>
@@ -1333,7 +1331,7 @@ export default async function PedidoPage({
                       As parcelas têm de somar o saldo: <strong>{showMoney(plan.balance)}</strong>.
                     </p>
                     <div>
-                      <button type="submit" className="rounded border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50">
+                      <button type="submit" className={SECONDARY}>
                         Salvar parcelas
                       </button>
                     </div>
@@ -1523,7 +1521,7 @@ export default async function PedidoPage({
               <ConfirmButton
                 label="Excluir pedido"
                 confirmLabel="Confirmar exclusão"
-                className="rounded border border-red-300 bg-white px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
+                className={DANGER_OUTLINE}
               />
             </ActionForm>
           </div>
