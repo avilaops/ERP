@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { EquipmentColorPicker } from "@/components/EquipmentColorPicker";
 import { CARD, INPUT, PRIMARY, SECONDARY, DANGER_OUTLINE } from "@/components/ui";
 import { notFound } from "next/navigation";
 import { requirePermission } from "@/lib/auth";
@@ -166,8 +167,9 @@ export default async function PedidoPage({
   const optionsOf = (item: (typeof order.items)[number], className: string) => {
     if (!editable) {
       const chosen = optionsText(item);
+      const missingColors = [!item.frameColor ? "estrutura: cor não escolhida" : null, !item.armColor ? "braço: cor não escolhida" : null].filter(Boolean).join(", ");
       const pending = item.plateLoaded && !item.plates ? "anilheiro não escolhido" : "";
-      return chosen || pending ? <span className="mt-1 block text-xs text-slate-600">{[chosen, pending].filter(Boolean).join(", ")}</span> : null;
+      return <span className="mt-1 block text-sm text-slate-600">{[chosen, pending, missingColors].filter(Boolean).join(", ")}</span>;
     }
     const choice = (name: string, label: string, current: string | null | undefined, options: (readonly [string, string])[]) => (
       <label className="flex items-center gap-2 text-sm text-slate-600">
@@ -189,8 +191,8 @@ export default async function PedidoPage({
         <input type="hidden" name="number" value={order.number} />
         <input type="hidden" name="productId" value={item.productId} />
         {item.plateLoaded || item.plates ? choice("plates", "Anilheiro", item.plates, [...PLATES]) : null}
-        {choice("frameColor", "Cor da estrutura", item.frameColor, ofPart("estrutura"))}
-        {choice("armColor", "Cor do braço", item.armColor, ofPart("braco"))}
+        <EquipmentColorPicker key={`frame-${item.frameColor ?? ""}`} name="frameColor" label="Cor da estrutura" current={item.frameColor} options={ofPart("estrutura").map(([name]) => name)} />
+        <EquipmentColorPicker key={`arm-${item.armColor ?? ""}`} name="armColor" label="Cor do braço articulado" current={item.armColor} options={ofPart("braco").map(([name]) => name)} />
         <button type="submit" className={SECONDARY}>
           Gravar
         </button>
