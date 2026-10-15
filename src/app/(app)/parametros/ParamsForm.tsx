@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { PRIMARY } from "@/components/ui";
 import { lineWords } from "@/lib/line-words";
 import { IDLE_FORM_STATE, PARAM_SECTIONS, STATE_RATE_COLUMNS } from "@/lib/params-form";
 import type { ParamField, ParamsFormState, ParamsFormValues, StateRateKey } from "@/lib/params-form";
@@ -66,7 +67,7 @@ export function ParamsForm({ saved, action, lineId, imported }: { saved: ParamsF
               role="tab"
               aria-selected={index === part}
               onClick={() => setPart(index)}
-              className={`inline-flex min-h-9 items-center rounded-full border px-4 text-sm font-medium ${index === part ? "border-brand bg-brand text-white" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100"}`}
+              className={`inline-flex min-h-[var(--control)] items-center rounded-full border px-4 text-sm font-medium ${index === part ? "border-brand bg-brand text-white" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100"}`}
             >
               {title}
             </button>
@@ -104,7 +105,7 @@ export function ParamsForm({ saved, action, lineId, imported }: { saved: ParamsF
                       defaultValue={values[field.key]}
                       aria-invalid={invalid || undefined}
                       aria-describedby={field.help ? `${field.key}-ajuda` : undefined}
-                      className="w-full min-w-0 bg-transparent px-3 py-2 text-right outline-none"
+                      className="min-h-[var(--control)] w-full min-w-0 bg-transparent px-3 text-right outline-none"
                     />
                     {field.kind !== "money" && <span className="pr-3 text-sm text-slate-500">{UNIT[field.kind]}</span>}
                   </div>
@@ -170,7 +171,7 @@ export function ParamsForm({ saved, action, lineId, imported }: { saved: ParamsF
                               defaultValue={values[key]}
                               aria-label={`${label} de ${uf}`}
                               aria-invalid={invalid || undefined}
-                              className={`w-full min-w-0 rounded border bg-white px-2 py-1 text-right text-slate-900 outline-none focus:ring-2 focus:ring-brand ${
+                              className={`min-h-[var(--control)] w-full min-w-0 rounded border bg-white px-2 text-right text-slate-900 outline-none focus:ring-2 focus:ring-brand ${
                                 invalid ? "border-red-500" : "border-slate-300"
                               }`}
                             />
@@ -190,7 +191,7 @@ export function ParamsForm({ saved, action, lineId, imported }: { saved: ParamsF
         <button
           type="submit"
           disabled={pending}
-          className="rounded bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark disabled:opacity-60"
+          className={PRIMARY}
         >
           {pending ? "Gravando…" : "Salvar parâmetros"}
         </button>

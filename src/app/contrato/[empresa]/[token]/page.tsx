@@ -22,7 +22,7 @@ type Props = { params: Promise<{ empresa: string; token: string }> };
 
 const INPUT = "mt-1 w-full rounded border border-slate-300 bg-white px-3 py-3 text-base outline-none focus:ring-2 focus:ring-brand";
 const LABEL = "block text-sm font-medium text-slate-700";
-const PRIMARY = "w-full rounded bg-brand px-4 py-3 text-base font-semibold text-white hover:opacity-90";
+const SUBMIT = "w-full rounded bg-brand px-4 py-3 text-base font-semibold text-white hover:opacity-90";
 
 /** The text of the contract as paragraphs, headings and items of a list: the same reading as the PDF. */
 function Body({ text }: { text: string }) {
@@ -95,7 +95,7 @@ export default async function SigningPage({ params }: Props) {
           </p>
         </div>
         {linkDelivers(contract, now, (await loadContractSettings(signing.conn)).downloadDays) ? (
-          <a href={pdf} target="_blank" rel="noopener" className={`${PRIMARY} text-center`}>
+          <a href={pdf} target="_blank" rel="noopener" className={`${SUBMIT} text-center`}>
             Baixar o contrato assinado (PDF)
           </a>
         ) : (
@@ -134,7 +134,7 @@ export default async function SigningPage({ params }: Props) {
           // The company sent the contract ready: the text is in the file, and the way to it is the first thing on the page.
           <>
             <p className="text-sm text-slate-800">O contrato está em arquivo PDF. Abra e leia o arquivo antes de assinar.</p>
-            <a href={pdf} target="_blank" rel="noopener" className={`${PRIMARY} mt-3 block text-center`}>
+            <a href={pdf} target="_blank" rel="noopener" className={`${SUBMIT} mt-3 block text-center`}>
               Abrir o contrato (PDF)
             </a>
           </>
@@ -177,7 +177,7 @@ export default async function SigningPage({ params }: Props) {
             <input type="checkbox" name="accepted" value="sim" className="mt-1 h-5 w-5" />
             <span>{contract.fileName ? "Abri e li o contrato em PDF e concordo com ele." : "Li o contrato acima e concordo com ele."} Aceito assiná-lo por meio eletrônico, com o código enviado ao meu e-mail.</span>
           </label>
-          <button type="submit" className={PRIMARY}>
+          <button type="submit" className={SUBMIT}>
             {contract.codePending ? (contract.recipientPhone ? "Enviar outros códigos" : "Enviar outro código") : contract.recipientPhone ? "Receber os códigos" : "Receber o código por e-mail"}
           </button>
         </PublicForm>
@@ -199,7 +199,7 @@ export default async function SigningPage({ params }: Props) {
                 <input id="phoneCode" name="phoneCode" type="text" inputMode="numeric" maxLength={6} autoComplete="off" className={`${INPUT} text-center text-2xl tracking-[0.4em]`} />
               </div>
             )}
-            <button type="submit" className={PRIMARY}>
+            <button type="submit" className={SUBMIT}>
               Assinar contrato
             </button>
           </PublicForm>

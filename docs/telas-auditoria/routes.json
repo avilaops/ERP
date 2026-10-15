@@ -1,0 +1,971 @@
+[
+ {
+  "p": "/",
+  "url": "/dashboard",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 900,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 1090,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/pedidos/novo",
+  "url": "/pedidos/novo",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 900,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 844,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/dashboard",
+  "url": "/dashboard",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 900,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 1090,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/relatorios",
+  "url": "/relatorios",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 900,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 844,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/precos-metas",
+  "url": "/precos-metas",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 900,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 844,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/aprovacoes",
+  "url": "/aprovacoes",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 900,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 844,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/funil",
+  "url": "/funil",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 900,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 844,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/pedidos",
+  "url": "/pedidos",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 900,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 844,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/clientes",
+  "url": "/clientes",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 900,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 844,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/recebimentos",
+  "url": "/recebimentos",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 900,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 844,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/contas-pagar",
+  "url": "/contas-pagar",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 900,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 844,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/fornecedores",
+  "url": "/fornecedores",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 951,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 1581,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/comissoes",
+  "url": "/comissoes",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 900,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 844,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/tabela-precos",
+  "url": "/tabela-precos",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 900,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 844,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/produtos",
+  "url": "/produtos",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 900,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 844,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/parametros",
+  "url": "/parametros",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 900,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 1077,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/simulador",
+  "url": "/simulador",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 900,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 844,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/equipe",
+  "url": "/equipe",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 900,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 844,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/conectar",
+  "url": "/conectar",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 900,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 844,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/relatorios/vendas",
+  "url": "/relatorios/vendas",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 900,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 844,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/relatorios/funil",
+  "url": "/relatorios/funil",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 900,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 844,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/relatorios/clientes",
+  "url": "/relatorios/clientes",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 900,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 844,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/relatorios/notas",
+  "url": "/relatorios/notas",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 900,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 844,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/relatorios/recebimentos",
+  "url": "/relatorios/recebimentos",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 900,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 844,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/relatorios/contas-pagar",
+  "url": "/relatorios/contas-pagar",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 900,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 844,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/relatorios/comissoes",
+  "url": "/relatorios/comissoes",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 900,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 844,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/relatorios/produtos",
+  "url": "/relatorios/produtos",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 900,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 844,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/funil/prospeccao",
+  "url": "/funil/prospeccao",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 900,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 844,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/funil/campanhas",
+  "url": "/funil/campanhas",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 900,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 844,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/funil/painel",
+  "url": "/funil/painel",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 900,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 844,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/funil/tarefas",
+  "url": "/funil/tarefas",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 900,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 844,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/funil/nova",
+  "url": "/funil/nova",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 900,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 890,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/clientes/novo",
+  "url": "/clientes/novo",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 1091,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 1855,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/produtos/catalogo-fornecedor",
+  "url": "/produtos/catalogo-fornecedor",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 900,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 844,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/produtos/novo",
+  "url": "/produtos/novo",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 900,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 983,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/parametros/linhas",
+  "url": "/parametros/linhas",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 900,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 421,
+   "cw": 390,
+   "sh": 929,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/parametros/formas-de-pagamento",
+  "url": "/parametros/formas-de-pagamento",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 1464,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 2739,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/parametros/transportadoras",
+  "url": "/parametros/transportadoras",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 900,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 1025,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/parametros/contrato",
+  "url": "/parametros/contrato",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 2157,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 2894,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/parametros/funil",
+  "url": "/parametros/funil",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 900,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 1209,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/parametros/mensagens",
+  "url": "/parametros/mensagens",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 900,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 844,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/parametros/cadencias",
+  "url": "/parametros/cadencias",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 900,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 844,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/parametros/automacoes",
+  "url": "/parametros/automacoes",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 900,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 844,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/parametros/email",
+  "url": "/parametros/email",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 900,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 844,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/parametros/whatsapp",
+  "url": "/parametros/whatsapp",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 900,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 844,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/parametros/telefonia",
+  "url": "/parametros/telefonia",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 900,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 844,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/parametros/assistente",
+  "url": "/parametros/assistente",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 900,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 844,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/parametros/fiscal",
+  "url": "/parametros/fiscal",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 3810,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 6468,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/parametros/categorias-de-contas",
+  "url": "/parametros/categorias-de-contas",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 2178,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 4197,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/parametros/despesas-fixas",
+  "url": "/parametros/despesas-fixas",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 900,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 844,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/parametros/usuarios",
+  "url": "/parametros/usuarios",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 900,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 844,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/parametros/producao",
+  "url": "/parametros/producao",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 900,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 844,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/parametros/integracoes",
+  "url": "/parametros/integracoes",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 900,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 844,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/equipe/nova",
+  "url": "/equipe/nova",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 922,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 983,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/funil/captura",
+  "url": "/funil/captura",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 900,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 844,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/funil/campanhas/nova",
+  "url": "/funil/campanhas/nova",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 900,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 928,
+   "ch": 844
+  }
+ },
+ {
+  "p": "/produtos/catalogo-fornecedor/novo",
+  "url": "/produtos/catalogo-fornecedor/novo",
+  "status": 200,
+  "desktop": {
+   "sw": 1440,
+   "cw": 1440,
+   "sh": 900,
+   "ch": 900
+  },
+  "mobile": {
+   "sw": 390,
+   "cw": 390,
+   "sh": 939,
+   "ch": 844
+  }
+ }
+]

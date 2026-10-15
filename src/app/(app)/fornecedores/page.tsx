@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import Link from "next/link";
-import { Pager, pageOf, PRIMARY } from "@/components/ui";
+import { CARD, pageOf, Pager, PRIMARY } from "@/components/ui";
 import { ROWS_COOKIE, rowsPerPage } from "@/lib/rows";
 import { requirePermission } from "@/lib/auth";
 import { menuItem } from "@/lib/auth/permissions";
@@ -15,7 +15,6 @@ export const metadata = { title: `${menuItem("fornecedores").label} · ERP` };
 export const dynamic = "force-dynamic";
 
 const HERE = menuItem("fornecedores").href;
-const CARD = "rounded-lg border border-slate-200 bg-white";
 
 export default async function FornecedoresPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const session = await requirePermission("fornecedores");
@@ -52,7 +51,7 @@ export default async function FornecedoresPage({ searchParams }: { searchParams:
         <ActionForm action={createSupplierAction} className="grid gap-4 border-t border-slate-200 p-5 sm:grid-cols-2">
           <SupplierFields saved={null} />
           <div className="sm:col-span-2 sticky bottom-[var(--tabbar)] z-10 -mx-4 border-t border-slate-200 bg-white px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:static md:mx-0 md:border-0 md:bg-transparent md:p-0">
-            <button type="submit" className="w-full rounded bg-brand px-4 py-3 font-medium text-white hover:bg-brand-dark md:w-auto md:py-2">
+            <button type="submit" className={`${PRIMARY} w-full md:w-auto`}>
               Salvar fornecedor
             </button>
           </div>

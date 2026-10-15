@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CARD, DANGER_OUTLINE, INPUT, PRIMARY, SECONDARY } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { menuItem } from "@/lib/auth/permissions";
 import { DEFAULT_NFE_BODY, DEFAULT_NFE_SUBJECT, defaultMailbox, loadInboxInfo, loadMailInfo } from "@/lib/db/mail";
@@ -11,10 +12,7 @@ import { removeInboxAction, removeOwnMailboxAction, saveInboxAction, saveMailTex
 export const metadata = { title: "E-mail das notas · ERP" };
 export const dynamic = "force-dynamic";
 
-const CARD = "rounded-lg border border-slate-200 bg-white";
-const INPUT = "mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-brand";
 const LABEL = "block text-xs font-medium text-slate-600";
-const BUTTON = "rounded bg-brand px-4 py-2 text-sm font-semibold text-white hover:opacity-90";
 
 const TABS = [["saida", "Por onde sai"], ["mensagem", "Mensagem"], ["caixa", "Caixa da empresa"], ["entrada", "Respostas"]] as const;
 
@@ -70,7 +68,7 @@ export default async function EmailPage({ searchParams }: { searchParams: Promis
         </p>
         {leavesBy ? (
           <ActionForm action={testMailAction} className="mt-3">
-            <button type="submit" className="rounded border border-slate-300 px-3 py-1.5 text-sm font-medium hover:bg-slate-50">
+            <button type="submit" className={SECONDARY}>
               Enviar mensagem de teste para {session.email}
             </button>
           </ActionForm>
@@ -98,7 +96,7 @@ export default async function EmailPage({ searchParams }: { searchParams: Promis
             <label htmlFor="body" className={LABEL}>
               Texto
             </label>
-            <textarea key={info.body ?? ""} id="body" name="body" rows={8} defaultValue={info.body ?? ""} placeholder={DEFAULT_NFE_BODY} className={INPUT} />
+            <textarea key={info.body ?? ""} id="body" name="body" rows={8} defaultValue={info.body ?? ""} placeholder={DEFAULT_NFE_BODY} className={`${INPUT} py-2`} />
           </div>
           <div>
             <label htmlFor="replyTo" className={LABEL}>
@@ -116,7 +114,7 @@ export default async function EmailPage({ searchParams }: { searchParams: Promis
             </select>
           </div>
           <div className="sm:col-span-2">
-            <button type="submit" className={BUTTON}>
+            <button type="submit" className={PRIMARY}>
               Salvar mensagem
             </button>
           </div>
@@ -171,14 +169,14 @@ export default async function EmailPage({ searchParams }: { searchParams: Promis
             <input id="password" name="password" type="password" autoComplete="new-password" className={INPUT} />
           </div>
           <div className="sm:col-span-4">
-            <button type="submit" className={BUTTON}>
+            <button type="submit" className={PRIMARY}>
               Testar e salvar caixa da empresa
             </button>
           </div>
         </ActionForm>
         {info.own ? (
           <ActionForm action={removeOwnMailboxAction} className="mt-3">
-            <ConfirmButton label="Remover caixa da empresa" confirmLabel="Confirmar: remover a caixa" className="rounded border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50" />
+            <ConfirmButton label="Remover caixa da empresa" confirmLabel="Confirmar: remover a caixa" className={DANGER_OUTLINE} />
           </ActionForm>
         ) : null}
       </section>
@@ -225,14 +223,14 @@ export default async function EmailPage({ searchParams }: { searchParams: Promis
             <input id="imapPassword" name="imapPassword" type="password" autoComplete="new-password" className={INPUT} />
           </div>
           <div className="sm:col-span-4">
-            <button type="submit" className={BUTTON}>
+            <button type="submit" className={PRIMARY}>
               Testar e salvar caixa de entrada
             </button>
           </div>
         </ActionForm>
         {inbox ? (
           <ActionForm action={removeInboxAction} className="mt-3">
-            <ConfirmButton label="Parar de ler as respostas" confirmLabel="Confirmar: parar de ler" className="rounded border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50" />
+            <ConfirmButton label="Parar de ler as respostas" confirmLabel="Confirmar: parar de ler" className={DANGER_OUTLINE} />
           </ActionForm>
         ) : null}
       </section>

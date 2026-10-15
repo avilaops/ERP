@@ -21,7 +21,7 @@ export default async function NovoItemPage() {
   return (
     <div className="mx-auto max-w-xl">
       <div className="flex items-center gap-3">
-        <Link href="/produtos/catalogo-fornecedor" aria-label="Voltar para o catálogo do fornecedor" className="shrink-0 rounded-lg bg-brand-soft px-3 py-1.5 text-xl text-brand">
+        <Link href="/produtos/catalogo-fornecedor" aria-label="Voltar para o catálogo do fornecedor" className="inline-flex min-h-[var(--control)] shrink-0 items-center rounded-lg bg-brand-soft px-3 text-xl text-brand">
           ←
         </Link>
         <h1 className="min-w-0 truncate text-2xl font-semibold">Novo item do fornecedor</h1>

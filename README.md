@@ -33,7 +33,9 @@ Para ver as telas na própria máquina sem depender disso, descomente `ERP_LOCAL
 | `npm run lint` | Confere o código com o ESLint. |
 | `npm run typecheck` | Confere os tipos do TypeScript. |
 | `npm test` | Roda os testes automatizados (os de banco usam `ERP_TEST_DATABASE_URL`, de `.env.test.local`). |
+| `npm run test:telas` | Abre o sistema no navegador e confere todas as telas nos cinco tamanhos do [`docs/ux.md`](docs/ux.md): sem rolagem lateral, controles com 44 px e sem erro. |
 | `npm run db:migrate` | Cria o esquema de cada empresa de `ERP_TENANTS` e aplica as migrações pendentes de `db/migrations/` em todos. Rodar de novo não muda nada. |
+| `npm run db:seed-demo -- --empresa <identificador>` | Carrega dados fictícios (equipamentos, clientes, pedidos, funil, contas) numa empresa vazia, para ver as telas cheias. Só roda em banco com nome terminado em `_demo`, `_dev` ou `_test`. |
 | `npm run db:import-products -- <pasta> --empresa <identificador> [--apply]` | Carrega em lote equipamentos, descrições e fotos numa empresa. Sem `--apply` só confere e mostra o que faria. |
 
 O login é feito pelo Auth central da Ávila Ops, e o perfil de cada pessoa (Diretoria, Gerente comercial, Vendedor ou Financeiro) é definido dentro do ERP. Em desenvolvimento, com `ERP_LOCAL_LOGIN=1` no `.env.local`, `/dev/login` entra com um usuário de teste por perfil. Detalhes e regras para quem mexe no código estão no [`AGENTS.md`](AGENTS.md).

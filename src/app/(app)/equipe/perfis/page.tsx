@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CARD, DANGER, INPUT, PRIMARY, SECONDARY } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { COST_SCREENS, menuFor, menuItem, powersOf } from "@/lib/auth/permissions";
 import { isRole, ROLE_LABELS, ROLES } from "@/lib/auth/roles";
@@ -13,10 +14,8 @@ export const metadata = { title: "Perfis da empresa · ERP" };
 export const dynamic = "force-dynamic";
 
 const HERE = `${menuItem("equipe").href}/perfis`;
-const CARD = "rounded-lg border border-slate-200 bg-white";
 const TITLE = "text-sm font-semibold uppercase tracking-wide";
-const INPUT = "mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-brand";
-const BOX = "flex items-center gap-2 py-1 text-sm";
+const BOX = "flex min-h-[var(--control)] items-center gap-2 text-sm";
 
 /** The boxes of one profile: every screen and every power of its type of origin, ticked when the profile has them. */
 function Choices({ role, items, denied, prefix }: { role: Role; items: readonly string[] | null; denied: readonly string[]; prefix: string }) {
@@ -87,7 +86,7 @@ export default async function PerfisPage({ searchParams }: { searchParams: Promi
               key={role}
               href={`${HERE}?tipo=${role}`}
               aria-current={role === base ? "page" : undefined}
-              className={`rounded-full border px-3 py-1.5 text-sm font-medium ${role === base ? "border-brand bg-brand text-white" : "border-slate-300 bg-white hover:bg-slate-50"}`}
+              className={`inline-flex min-h-[var(--control)] items-center rounded-full border px-3 text-sm font-medium ${role === base ? "border-brand bg-brand text-white" : "border-slate-300 bg-white hover:bg-slate-50"}`}
             >
               {ROLE_LABELS[role]}
             </Link>
@@ -103,7 +102,7 @@ export default async function PerfisPage({ searchParams }: { searchParams: Promi
           </div>
           <Choices role={base} items={null} denied={[]} prefix="novo" />
           <div className="sm:col-span-2">
-            <button type="submit" className="rounded bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark">
+            <button type="submit" className={PRIMARY}>
               Criar perfil
             </button>
           </div>
@@ -133,7 +132,7 @@ export default async function PerfisPage({ searchParams }: { searchParams: Promi
                   </div>
                   <Choices key={`${profile.items.join()}-${profile.denied.join()}`} role={profile.baseRole} items={profile.items} denied={profile.denied} prefix={`p${profile.id}`} />
                   <div className="sm:col-span-2">
-                    <button type="submit" className="rounded border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50">
+                    <button type="submit" className={SECONDARY}>
                       Salvar
                     </button>
                   </div>
@@ -141,7 +140,7 @@ export default async function PerfisPage({ searchParams }: { searchParams: Promi
                 {profile.people === 0 ? (
                   <ActionForm action={deleteProfileAction} className="mt-2">
                     <input type="hidden" name="id" value={profile.id} />
-                    <ConfirmButton label="Remover perfil" confirmLabel="Confirmar: remover" className="rounded px-2 py-1 text-sm text-red-700 hover:bg-red-50" />
+                    <ConfirmButton label="Remover perfil" confirmLabel="Confirmar: remover" className={DANGER} />
                   </ActionForm>
                 ) : (
                   <p className="mt-2 text-xs text-slate-500">Para remover, mude antes o acesso das pessoas que têm este perfil.</p>

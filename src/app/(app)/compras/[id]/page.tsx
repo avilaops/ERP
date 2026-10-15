@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CARD, INPUT, LABEL, PageHeader, Pill, PRIMARY, QUIET_LINK, SECONDARY } from "@/components/ui";
+import { CARD, DANGER, INPUT, LABEL, PageHeader, Pill, PRIMARY, QUIET_LINK, SECONDARY } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { menuItem } from "@/lib/auth/permissions";
 import { tenantDb } from "@/lib/db/pool";
@@ -19,7 +19,6 @@ export const dynamic = "force-dynamic";
 const HERE = menuItem("compras").href;
 const TABS = [["itens", "Equipamentos"], ["custos", "Custos"], ["dados", "Dados"], ["andamento", "Andamento"]] as const;
 const TAB = "inline-flex min-h-[var(--control)] items-center rounded-full border px-3 text-sm font-medium";
-const DANGER = "rounded px-2 py-1 text-sm text-red-700 hover:bg-red-50";
 const TONE = { pedido: "neutral", em_transito: "warn", recebida: "good", cancelada: "neutral" } as const;
 
 export default async function CompraPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }) {

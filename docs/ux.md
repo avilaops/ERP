@@ -53,6 +53,7 @@ teclado aberto a tela pode rolar: o que não pode é um campo ou uma ação fica
 | `CARD`, `SECTION_TITLE` | Cartão só quando separa de verdade; agrupamento simples usa só o título pequeno |
 | `LABEL`, `INPUT` | Todo campo com rótulo permanente acima e 44 px de altura (`--control`) |
 | `PRIMARY`, `SECONDARY` | Uma ação principal por etapa; as demais são secundárias |
+| `DANGER`, `DANGER_OUTLINE` | Remover, desfazer, cancelar: texto vermelho; com borda quando é a ação da etapa (cancelar o pedido) |
 | `Pill` | Estado em duas ou três palavras, com texto e cor (`good`, `warn`, `bad`, `neutral`) |
 | `pageOf` + `Pager` | Fatia de uma lista e o rodapé "1–8 de 133 · ‹ 1 de 17 ›" |
 | `FitRows` (`src/components/FitRows.tsx`) | Mede quantas linhas cabem na tela de quem olha e guarda no cookie `erp_linhas` |
@@ -79,9 +80,22 @@ na página, troque pela peça.
 
 ## Como conferir
 
-`~/.agents/claude/scratch/shots/ux.cjs` mede, nos cinco tamanhos, quantas telas de altura cada
-página ocupa, se há sobra lateral e se alguma área precisa de rolagem horizontal. Meta: 1,0 em
-todos. O que passar disso entra na lista de pendências do `docs/ux.md` abaixo, com o motivo.
+`npm run test:telas` (Playwright, `tests/visual/telas.spec.ts`) entra com o login local como
+Diretoria, percorre todas as telas que o menu alcança (uma de cada tipo) e mede cada uma nos
+cinco tamanhos. Falha quando a tela rola para o lado, quando algo que se toca tem menos de 44 px
+ou quando a página dá erro. Quantas telas de altura cada página ocupa vai para `telas.json`, sem
+falhar: meta de 1,0 em todos, e o que passar disso entra na lista de pendências abaixo, com o
+motivo. Os prints de cada tela em 390 e 1440 ficam em `test-results/telas/`.
+
+Para rodar na própria máquina, num banco com nome terminado em `_demo` e com `ERP_LOCAL_LOGIN=1`:
+
+```bash
+npm run db:migrate
+npm run db:seed-demo -- --empresa ludus   # clientes, pedidos, funil e contas fictícios
+npm run test:telas
+```
+
+O CI roda o mesmo em todo pull request (job "Telas nos cinco tamanhos") e guarda os prints.
 
 ## Pendências conhecidas (09/10/2026)
 

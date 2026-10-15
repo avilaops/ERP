@@ -4,7 +4,7 @@ import { listLines } from "@/lib/db/product-lines";
 import { LINE_PARAM, pickLine } from "@/lib/lines-view";
 import { cookies } from "next/headers";
 import Link from "next/link";
-import { Pager, pageOf } from "@/components/ui";
+import { pageOf, Pager, SECONDARY } from "@/components/ui";
 import { ROWS_COOKIE, rowsPerPage } from "@/lib/rows";
 import { requirePermission } from "@/lib/auth";
 import { tenantDb } from "@/lib/db/pool";
@@ -148,7 +148,7 @@ export default async function ProdutosPage({
                   key={key}
                   href={listHref(ITEM.href, key, search, several ? line.id : null)}
                   aria-current={key === tab ? "page" : undefined}
-                  className={`rounded-md px-3 py-1.5 font-medium ${
+                  className={`inline-flex min-h-[var(--control)] items-center rounded-md px-3 font-medium ${
                     key === tab ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100"
                   }`}
                 >
@@ -165,9 +165,9 @@ export default async function ProdutosPage({
                 defaultValue={search}
                 placeholder="Buscar nome, código ou fornecedor"
                 aria-label="Buscar nome, código ou fornecedor"
-                className="min-w-0 flex-1 rounded border border-slate-300 px-3 py-2 text-sm sm:w-72 sm:flex-none outline-none focus:ring-2 focus:ring-brand"
+                className="min-h-[var(--control)] min-w-0 flex-1 rounded border border-slate-300 px-3 text-sm sm:w-72 sm:flex-none outline-none focus:ring-2 focus:ring-brand"
               />
-              <button type="submit" className="rounded border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50">
+              <button type="submit" className={SECONDARY}>
                 Buscar
               </button>
             </form>

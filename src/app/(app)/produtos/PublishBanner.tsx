@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { PRIMARY } from "@/components/ui";
 import { IDLE_PUBLISH } from "@/lib/price-table";
 import type { PublishNotice, PublishState } from "@/lib/price-table";
 
@@ -40,11 +41,11 @@ export function PublishBanner({ notice, action, lineId }: { notice: PublishNotic
                   key="confirm"
                   type="submit"
                   disabled={pending}
-                  className="rounded bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark disabled:opacity-60"
+                  className={PRIMARY}
                 >
                   {pending ? "Publicando…" : "Confirmar"}
                 </button>
-                <button key="cancel" type="button" onClick={() => setConfirming(false)} className="rounded px-3 py-2 hover:bg-amber-100">
+                <button key="cancel" type="button" onClick={() => setConfirming(false)} className="inline-flex min-h-[var(--control)] items-center rounded-lg px-3 hover:bg-amber-100">
                   Cancelar
                 </button>
               </>
@@ -53,7 +54,7 @@ export function PublishBanner({ notice, action, lineId }: { notice: PublishNotic
                 key="publish"
                 type="button"
                 onClick={() => setConfirming(true)}
-                className="rounded bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark"
+                className={PRIMARY}
               >
                 Publicar v{notice.next}
               </button>

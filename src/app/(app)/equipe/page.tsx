@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CARD } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { MENU_ITEMS, menuItem } from "@/lib/auth/permissions";
 import { ROLE_LABELS, ROLES } from "@/lib/auth/roles";
@@ -12,7 +13,6 @@ import { ROLE_NOTES } from "./PersonFields";
 export const metadata = { title: `${menuItem("equipe").label} · ERP` };
 export const dynamic = "force-dynamic";
 
-const CARD = "rounded-lg border border-slate-200 bg-white";
 const TITLE = "text-sm font-semibold uppercase tracking-wide";
 
 export default async function EquipePage() {

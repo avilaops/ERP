@@ -2,6 +2,7 @@ import { LineTabs } from "@/components/LineTabs";
 import { listLines } from "@/lib/db/product-lines";
 import { LINE_PARAM, pickLine } from "@/lib/lines-view";
 import Link from "next/link";
+import { PRIMARY, SECONDARY } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { tenantDb } from "@/lib/db/pool";
 import { menuItem } from "@/lib/auth/permissions";
@@ -90,7 +91,7 @@ export default async function ParametrosPage({ searchParams }: { searchParams: P
               {suggestion && (
                 <form action={adoptSuggestedDownPaymentAction}>
                   <input type="hidden" name="lineId" value={line.id} />
-                  <button type="submit" className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50">
+                  <button type="submit" className={SECONDARY}>
                     usar
                   </button>
                 </form>
@@ -189,10 +190,10 @@ export default async function ParametrosPage({ searchParams }: { searchParams: P
                   type="text"
                   inputMode="numeric"
                   defaultValue={commissionDay}
-                  className="mt-1 w-20 rounded border border-slate-300 bg-white px-3 py-2 text-right outline-none focus:ring-2 focus:ring-brand"
+                  className="min-h-[var(--control)] mt-1 w-20 rounded border border-slate-300 bg-white px-3 text-right outline-none focus:ring-2 focus:ring-brand"
                 />
               </div>
-              <button type="submit" className="rounded border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50">
+              <button type="submit" className={SECONDARY}>
                 Salvar dia
               </button>
               <p className="basis-full text-xs text-slate-500">
@@ -210,16 +211,16 @@ export default async function ParametrosPage({ searchParams }: { searchParams: P
                 <label htmlFor="managerName" className="block text-sm font-medium">
                   Gerente comercial
                 </label>
-                <input key={proposal.managerName ?? ""} id="managerName" name="managerName" type="text" defaultValue={proposal.managerName ?? ""} autoComplete="off" className="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-brand" />
+                <input key={proposal.managerName ?? ""} id="managerName" name="managerName" type="text" defaultValue={proposal.managerName ?? ""} autoComplete="off" className="min-h-[var(--control)] mt-1 w-full rounded border border-slate-300 bg-white px-3 outline-none focus:ring-2 focus:ring-brand" />
               </div>
               <div>
                 <label htmlFor="place" className="block text-sm font-medium">
                   Local de emissão (cidade/UF)
                 </label>
-                <input key={proposal.place ?? ""} id="place" name="place" type="text" defaultValue={proposal.place ?? ""} placeholder="Ex.: Votuporanga/SP" autoComplete="off" className="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-brand" />
+                <input key={proposal.place ?? ""} id="place" name="place" type="text" defaultValue={proposal.place ?? ""} placeholder="Ex.: Votuporanga/SP" autoComplete="off" className="min-h-[var(--control)] mt-1 w-full rounded border border-slate-300 bg-white px-3 outline-none focus:ring-2 focus:ring-brand" />
               </div>
               <div className="sm:col-span-2">
-                <button type="submit" className="rounded bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark">
+                <button type="submit" className={PRIMARY}>
                   Salvar dados da proposta
                 </button>
               </div>
@@ -237,15 +238,15 @@ export default async function ParametrosPage({ searchParams }: { searchParams: P
               Desconto acima do livre, entrada abaixo da política e pedido com prejuízo sempre pedem aprovação. O resto é escolha da empresa.
             </p>
             <ActionForm action={saveApprovalPolicyAction} className="mt-3 flex flex-col gap-3 text-sm">
-              <label className="flex items-start gap-2">
+              <label className="flex min-h-[var(--control)] items-start gap-2 py-2.5">
                 <input key={String(policy.belowTarget)} type="checkbox" name="belowTarget" value="sim" defaultChecked={policy.belowTarget} className="mt-1" />
                 Pedido com lucro abaixo da meta precisa de aprovação
               </label>
-              <label className="flex items-start gap-2">
+              <label className="flex min-h-[var(--control)] items-start gap-2 py-2.5">
                 <input key={String(policy.freight)} type="checkbox" name="freight" value="sim" defaultChecked={policy.freight} className="mt-1" />
                 Pedido com frete por nossa conta precisa de aprovação
               </label>
-              <label className="flex items-start gap-2">
+              <label className="flex min-h-[var(--control)] items-start gap-2 py-2.5">
                 <input
                   key={String(policy.directorSelfApproves)}
                   type="checkbox"
@@ -265,14 +266,14 @@ export default async function ParametrosPage({ searchParams }: { searchParams: P
                   id="managerLimit"
                   name="managerLimit"
                   defaultValue={policy.managerLimit}
-                  className="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-brand sm:w-auto"
+                  className="min-h-[var(--control)] mt-1 w-full rounded border border-slate-300 bg-white px-3 outline-none focus:ring-2 focus:ring-brand sm:w-auto"
                 >
                   <option value="lucro">qualquer pedido que ainda dê lucro</option>
                   <option value="meta">só pedido com lucro na meta; o resto vai para a diretoria</option>
                 </select>
               </div>
               <div>
-                <button type="submit" className="rounded border border-slate-300 bg-white px-3 py-2 font-medium hover:bg-slate-50">
+                <button type="submit" className={SECONDARY}>
                   Salvar regras
                 </button>
               </div>

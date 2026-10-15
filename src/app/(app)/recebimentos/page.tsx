@@ -1,7 +1,7 @@
 import { monthLabel } from "@/lib/commissions-view";
 import { cookies } from "next/headers";
 import Link from "next/link";
-import { Pager, pageOf } from "@/components/ui";
+import { CARD, DANGER_OUTLINE, pageOf, Pager, PRIMARY, SECONDARY } from "@/components/ui";
 import { ROWS_COOKIE, rowsPerPage } from "@/lib/rows";
 import { requirePermission } from "@/lib/auth";
 import { confirmsRefunds, menuItem } from "@/lib/auth/permissions";
@@ -18,8 +18,7 @@ export const metadata = { title: `${menuItem("recebimentos").label} · ERP` };
 export const dynamic = "force-dynamic";
 
 const ORDERS = menuItem("pedidos").href;
-const CARD = "rounded-lg border border-slate-200 bg-white";
-const INPUT = "rounded border border-slate-300 bg-white px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-brand";
+const INPUT = "min-h-[var(--control)] rounded border border-slate-300 bg-white px-2 text-sm outline-none focus:ring-2 focus:ring-brand";
 const count = (n: number) => `${n} ${n === 1 ? "valor" : "valores"}`;
 
 const HERE = menuItem("recebimentos").href;
@@ -162,7 +161,7 @@ export default async function RecebimentosPage({ searchParams }: { searchParams:
                       </label>
                       <input id={`note-${item.id}`} name="note" type="text" className={`${INPUT} mt-1 w-full`} />
                     </div>
-                    <button type="submit" className="rounded bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark">
+                    <button type="submit" className={PRIMARY}>
                       Dar baixa
                     </button>
                   </ActionForm>
@@ -209,10 +208,10 @@ export default async function RecebimentosPage({ searchParams }: { searchParams:
                 {decides ? (
                   <ActionForm action={decideRefundAction} className="mt-3 flex flex-wrap gap-3">
                     <input type="hidden" name="id" value={refund.id} />
-                    <button type="submit" name="decision" value="confirmar" className="rounded bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark">
+                    <button type="submit" name="decision" value="confirmar" className={PRIMARY}>
                       Confirmar estorno
                     </button>
-                    <button type="submit" name="decision" value="recusar" className="rounded border border-slate-300 bg-white px-4 py-2 text-sm font-medium hover:bg-slate-50">
+                    <button type="submit" name="decision" value="recusar" className={SECONDARY}>
                       Recusar
                     </button>
                   </ActionForm>
@@ -284,7 +283,7 @@ export default async function RecebimentosPage({ searchParams }: { searchParams:
                             aria-label={`Motivo do estorno do pedido ${receipt.orderNumber}`}
                             className={`${INPUT} w-40`}
                           />
-                          <button type="submit" className="rounded border border-red-300 bg-white px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50">
+                          <button type="submit" className={DANGER_OUTLINE}>
                             Pedir estorno
                           </button>
                         </ActionForm>
