@@ -26,9 +26,13 @@ export function Bars({ bars, format, empty }: { bars: ChartBar[]; format: (value
   );
 }
 
-/** Vertical bars for a series in time. The value of each one is read by the title and by the list for screen readers. */
-export function Columns({ bars, format }: { bars: ChartBar[]; format: (value: number) => string }) {
+/**
+ * Vertical bars for a series in time. The value of each one is read by the title and by the list for screen readers.
+ * With nothing to draw, `empty` says so and what to do next, instead of an empty frame.
+ */
+export function Columns({ bars, format, empty }: { bars: ChartBar[]; format: (value: number) => string; empty: ReactNode }) {
   const top = Math.max(...bars.map((bar) => bar.value), 0);
+  if (top === 0) return <p className="text-sm text-slate-600">{empty}</p>;
   return (
     <div>
       <div className="flex h-40 items-end gap-1 sm:gap-2" aria-hidden="true">

@@ -25,7 +25,7 @@ export default function DevLoginPage() {
         {provider.tenants.length > 1 && (
           <label className="flex flex-col gap-1 text-sm font-medium">
             Empresa
-            <select name="tenant" className="rounded border border-slate-300 bg-white px-3 py-2 font-normal">
+            <select name="tenant" className="min-h-[var(--control)] rounded border border-slate-300 bg-white px-3 font-normal">
               {provider.tenants.map((tenant) => (
                 <option key={tenant.slug} value={tenant.slug}>
                   {tenant.name}

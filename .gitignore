@@ -23,3 +23,5 @@ standalone.tgz
 
 # Capturas da revisão visual (npm run shots)
 .shots/
+# Teste das telas (npm run test:telas)
+/test-results/

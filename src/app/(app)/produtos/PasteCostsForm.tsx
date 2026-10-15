@@ -2,6 +2,7 @@
 
 import { lineWords } from "@/lib/line-words";
 import { useActionState } from "react";
+import { PRIMARY, SECONDARY } from "@/components/ui";
 import { IDLE_PASTE } from "@/lib/advisory-paste";
 import type { Change, InvalidLine, PasteState } from "@/lib/advisory-paste";
 
@@ -149,7 +150,7 @@ export function PasteCostsForm({ action, onClose, imported }: { action: PasteAct
             name="intent"
             value="check"
             disabled={pending}
-            className="rounded border border-slate-300 bg-white px-4 py-2 font-medium hover:bg-slate-50 disabled:opacity-60"
+            className={`${SECONDARY} disabled:opacity-60`}
           >
             Conferir
           </button>
@@ -160,12 +161,12 @@ export function PasteCostsForm({ action, onClose, imported }: { action: PasteAct
               name="intent"
               value="apply"
               disabled={pending}
-              className="rounded bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark disabled:opacity-60"
+              className={PRIMARY}
             >
               {state.rows.length === 1 ? "Aplicar 1 custo" : `Aplicar ${state.rows.length} custos`}
             </button>
           )}
-          <button key="close" type="button" onClick={onClose} className="rounded px-4 py-2 hover:bg-slate-100">
+          <button key="close" type="button" onClick={onClose} className="inline-flex min-h-[var(--control)] items-center rounded-lg px-4 hover:bg-slate-100">
             Fechar
           </button>
         </div>

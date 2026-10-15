@@ -56,7 +56,7 @@ export function ThemeToggle({ initial }: { initial: Theme }) {
           aria-pressed={option === theme}
           title={THEME_LABELS[option]}
           onClick={() => choose(option)}
-          className={`flex items-center rounded-md px-3 py-1.5 ${option === theme ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100"}`}
+          className={`flex min-h-[var(--control)] items-center rounded-md px-3 ${option === theme ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100"}`}
         >
           {ICONS[option]}
           <span className="sr-only">{THEME_LABELS[option]}</span>

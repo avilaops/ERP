@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { CARD, DANGER } from "@/components/ui";
 import { PublicForm } from "@/app/contrato/[empresa]/[token]/PublicForm";
 import { requireSession } from "@/lib/auth";
 import { ROLE_LABELS } from "@/lib/auth/roles";
@@ -20,7 +21,6 @@ import { ClientPicker } from "./ClientPicker";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Conectar um assistente · ERP", robots: { index: false, follow: false } };
 
-const CARD = "rounded-lg border border-slate-200 bg-white p-4";
 
 export default async function ConectarPage() {
   const session = await requireSession("/conectar");
@@ -48,12 +48,12 @@ export default async function ConectarPage() {
       {!on ? (
         <p className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">A conexão com assistentes está desligada para esta empresa. Quem liga é a diretoria, em Parâmetros → Assistente.</p>
       ) : (
-        <section className={CARD} aria-label="Como conectar">
+        <section className={`${CARD} p-4`} aria-label="Como conectar">
           <ClientPicker clients={connectClients(serverUrl)} serverUrl={serverUrl} />
         </section>
       )}
 
-      <details className={CARD}>
+      <details className={`${CARD} p-4`}>
         <summary className="cursor-pointer font-medium">O que o assistente vai poder fazer ({tools.length})</summary>
         <ul className="mt-2 text-sm text-slate-800">
           {tools.map((tool) => (
@@ -68,7 +68,7 @@ export default async function ConectarPage() {
       </details>
 
       {mine.length > 0 && (
-        <section className={CARD} aria-label="Meus assistentes conectados">
+        <section className={`${CARD} p-4`} aria-label="Meus assistentes conectados">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Conectados por você</h2>
           <ul className="mt-2 divide-y divide-slate-200">
             {mine.map((connection) => (
@@ -81,7 +81,7 @@ export default async function ConectarPage() {
                 </span>
                 <PublicForm action={disconnectMineAction}>
                   <input type="hidden" name="id" value={connection.id} />
-                  <button type="submit" className="rounded px-2 py-2 text-sm text-red-700 hover:bg-red-50">
+                  <button type="submit" className={DANGER}>
                     Desconectar
                   </button>
                 </PublicForm>

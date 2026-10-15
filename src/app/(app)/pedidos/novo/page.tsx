@@ -2,6 +2,7 @@ import { LineTabs } from "@/components/LineTabs";
 import { listLines } from "@/lib/db/product-lines";
 import { LINE_PARAM, pickLine } from "@/lib/lines-view";
 import Link from "next/link";
+import { CARD } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { tenantDb } from "@/lib/db/pool";
 import { menuItem, seesCosts } from "@/lib/auth/permissions";
@@ -14,7 +15,6 @@ import { createOrderAction } from "../actions";
 export const metadata = { title: "Novo pedido · ERP" };
 export const dynamic = "force-dynamic";
 
-const CARD = "mt-6 rounded-lg border border-slate-200 bg-white";
 
 export default async function NovoPedidoPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const session = await requirePermission("pedidos", "/pedidos/novo");
@@ -41,7 +41,7 @@ export default async function NovoPedidoPage({ searchParams }: { searchParams: P
     return (
       <>
         {heading}
-        <p className={`${CARD} p-6 text-slate-600`}>
+        <p className={`${CARD} mt-6 p-6 text-slate-600`}>
           Nenhuma tabela publicada ainda. Sem ela não há preço para vender.
           {seesCosts(session) && (
             <>
@@ -61,7 +61,7 @@ export default async function NovoPedidoPage({ searchParams }: { searchParams: P
   return (
     <>
       {heading}
-      <section className={CARD} aria-labelledby="equipamentos">
+      <section className={`${CARD} mt-6`} aria-labelledby="equipamentos">
         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3">
           <h2 id="equipamentos" className="text-sm font-semibold uppercase tracking-wide">
             Equipamentos

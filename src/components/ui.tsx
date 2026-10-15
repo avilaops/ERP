@@ -18,6 +18,10 @@ export const INPUT = "mt-1 block min-h-[var(--control)] w-full min-w-0 rounded-l
 /** The one action the step exists for. One per step. */
 export const PRIMARY = "inline-flex min-h-[var(--control)] items-center justify-center rounded-lg bg-brand px-5 text-base font-semibold text-white hover:bg-brand-dark disabled:opacity-60";
 export const SECONDARY = "inline-flex min-h-[var(--control)] items-center justify-center rounded-lg border border-slate-300 bg-white px-4 text-sm font-medium hover:bg-slate-50";
+/** Remove, discard, cancel: red text, as tall as any other control. */
+export const DANGER = "inline-flex min-h-[var(--control)] items-center justify-center rounded-lg px-3 text-sm font-medium text-red-700 hover:bg-red-50";
+/** The destructive action a step exists for (cancel the order, revoke the access). */
+export const DANGER_OUTLINE = "inline-flex min-h-[var(--control)] items-center justify-center rounded-lg border border-red-300 bg-white px-4 text-sm font-medium text-red-700 hover:bg-red-50";
 export const QUIET_LINK = "font-medium text-brand underline";
 
 /**

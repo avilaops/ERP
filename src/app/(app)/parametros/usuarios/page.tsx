@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CARD, PRIMARY, SECONDARY } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { menuItem } from "@/lib/auth/permissions";
 import { ROLE_LABELS, ROLES } from "@/lib/auth/roles";
@@ -12,9 +13,7 @@ import { createUserAction, updateUserAction } from "./actions";
 export const metadata = { title: "Usuários · ERP" };
 export const dynamic = "force-dynamic";
 
-const CARD = "rounded-lg border border-slate-200 bg-white";
-const INPUT = "rounded border border-slate-300 bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-brand";
-const PRIMARY = "rounded bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark";
+const INPUT = "min-h-[var(--control)] rounded-lg border border-slate-300 bg-white px-3 text-base outline-none focus:ring-2 focus:ring-brand";
 
 export default async function UsuariosPage() {
   const session = await requirePermission("parametros");
@@ -129,10 +128,10 @@ export default async function UsuariosPage() {
                       ))}
                     </select>
                   </div>
-                  <label className="flex items-center gap-2 pb-2 text-sm">
+                  <label className="flex min-h-[var(--control)] items-center gap-2 text-sm">
                     <input key={String(user.active)} type="checkbox" name="active" value="sim" defaultChecked={user.active} /> Pode entrar
                   </label>
-                  <button type="submit" className="rounded border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50">
+                  <button type="submit" className={SECONDARY}>
                     Salvar
                   </button>
                 </ActionForm>

@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
+import { DANGER, DANGER_OUTLINE, SECONDARY } from "@/components/ui";
 import { fieldLabel, IDLE_ROW } from "@/lib/product-form";
 import type { NewProductKey, ProductFormValues, ProductScreenResult, RowState } from "@/lib/product-form";
 
@@ -205,7 +206,7 @@ export function ProductScreen({
             type="button"
             disabled={pending}
             onClick={() => act(setActive, { id: String(id), active: String(!active) }, () => router.push(LIST))}
-            className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 font-medium"
+            className={SECONDARY}
           >
             {active ? "Desativar" : "Reativar"}
           </button>
@@ -216,16 +217,16 @@ export function ProductScreen({
                 type="button"
                 disabled={pending}
                 onClick={() => act(remove, { id: String(id) }, () => router.push(LIST))}
-                className="rounded-lg border border-red-300 bg-white px-4 py-2.5 font-medium text-red-700"
+                className={DANGER_OUTLINE}
               >
                 Confirmar exclusão
               </button>
-              <button key="cancel" type="button" onClick={() => setRemoving(false)} className="px-2 py-2.5 text-slate-600">
+              <button key="cancel" type="button" onClick={() => setRemoving(false)} className="inline-flex min-h-[var(--control)] items-center px-2 text-slate-600">
                 Cancelar
               </button>
             </>
           ) : (
-            <button key="ask" type="button" onClick={() => setRemoving(true)} className="px-2 py-2.5 font-medium text-red-700">
+            <button key="ask" type="button" onClick={() => setRemoving(true)} className={DANGER}>
               Excluir
             </button>
           )}

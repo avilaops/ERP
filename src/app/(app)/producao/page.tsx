@@ -32,7 +32,7 @@ export default async function ProducaoPage({ searchParams }: { searchParams: Pro
   const size = rowsPerPage((await cookies()).get(ROWS_COOKIE)?.value);
   const today = isoDate(new Date());
   const inProgress = stages.filter((row) => row.kind === "andamento").reduce((sum, row) => sum + row.orders, 0);
-  const chip = (active: boolean) => `inline-flex min-h-9 items-center rounded-full border px-4 text-sm font-medium ${active ? "border-brand bg-brand text-white" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100"}`;
+  const chip = (active: boolean) => `inline-flex min-h-[var(--control)] items-center rounded-full border px-4 text-sm font-medium ${active ? "border-brand bg-brand text-white" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100"}`;
 
   return (
     <>

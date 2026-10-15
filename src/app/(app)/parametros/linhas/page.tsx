@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CARD, DANGER, PRIMARY, SECONDARY } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { menuItem } from "@/lib/auth/permissions";
 import { tenantDb } from "@/lib/db/pool";
@@ -11,8 +12,7 @@ import { createLineAction, deleteLineAction, renameLineAction } from "./actions"
 export const metadata = { title: "Linhas de produto · ERP" };
 export const dynamic = "force-dynamic";
 
-const CARD = "rounded-lg border border-slate-200 bg-white";
-const INPUT = "rounded border border-slate-300 bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-brand";
+const INPUT = "min-h-[var(--control)] rounded-lg border border-slate-300 bg-white px-3 text-base outline-none focus:ring-2 focus:ring-brand";
 
 export default async function LinhasPage() {
   const session = await requirePermission("parametros");
@@ -55,7 +55,7 @@ export default async function LinhasPage() {
               ))}
             </select>
           </div>
-          <button type="submit" className="rounded bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark">
+          <button type="submit" className={PRIMARY}>
             Adicionar
           </button>
         </ActionForm>
@@ -78,16 +78,16 @@ export default async function LinhasPage() {
                     </label>
                     <input key={line.name} id={`name-${line.id}`} name="name" type="text" maxLength={60} defaultValue={line.name} className={`${INPUT} mt-1 w-full`} />
                   </div>
-                  <div>
+                  <div className="min-w-0 basis-full sm:basis-auto">
                     <label htmlFor={`origin-${line.id}`} className="block text-xs font-medium text-slate-600">
                       De onde vem
                     </label>
-                    <select key={String(line.imported)} id={`origin-${line.id}`} name="origin" defaultValue={line.imported ? "importada" : "nacional"} className={`${INPUT} mt-1`}>
+                    <select key={String(line.imported)} id={`origin-${line.id}`} name="origin" defaultValue={line.imported ? "importada" : "nacional"} className={`${INPUT} mt-1 w-full`}>
                       <option value="importada">Importada (assessoria, pagamento no exterior)</option>
                       <option value="nacional">Nacional (fornecedor do país)</option>
                     </select>
                   </div>
-                  <button type="submit" className="rounded border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50">
+                  <button type="submit" className={SECONDARY}>
                     Salvar
                   </button>
                 </ActionForm>
@@ -106,7 +106,7 @@ export default async function LinhasPage() {
                 {free ? (
                   <ActionForm action={deleteLineAction} className="mt-1">
                     <input type="hidden" name="id" value={line.id} />
-                    <ConfirmButton label="Remover" confirmLabel="Confirmar: remover" className="rounded px-2 py-1 text-sm text-red-700 hover:bg-red-50" />
+                    <ConfirmButton label="Remover" confirmLabel="Confirmar: remover" className={DANGER} />
                   </ActionForm>
                 ) : (
                   <p className="mt-1 text-xs text-slate-500">

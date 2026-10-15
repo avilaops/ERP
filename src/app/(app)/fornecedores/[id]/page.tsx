@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { DANGER, PRIMARY } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { menuItem } from "@/lib/auth/permissions";
 import { tenantDb } from "@/lib/db/pool";
@@ -35,18 +36,18 @@ export default async function FornecedorPage({ params }: { params: Promise<{ id:
           <input type="hidden" name="id" value={supplier.id} />
           <input type="hidden" name="hasActive" value="1" />
           <SupplierFields saved={supplier} />
-          <label className="flex items-center gap-2 text-sm sm:col-span-2">
+          <label className="flex min-h-[var(--control)] items-center gap-2 text-sm sm:col-span-2">
             <input type="checkbox" name="active" value="sim" defaultChecked={supplier.active} /> Em uso (desmarcado, sai das listas de lançamento)
           </label>
           <div className="sm:col-span-2 sticky bottom-[var(--tabbar)] z-10 -mx-4 border-t border-slate-200 bg-white px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:static md:mx-0 md:border-0 md:bg-transparent md:p-0">
-            <button type="submit" className="w-full rounded bg-brand px-4 py-3 font-medium text-white hover:bg-brand-dark md:w-auto md:py-2">
+            <button type="submit" className={`${PRIMARY} w-full md:w-auto`}>
               Salvar alterações
             </button>
           </div>
         </ActionForm>
         <ActionForm action={deleteSupplierAction} className="border-t border-slate-200 px-5 py-3">
           <input type="hidden" name="id" value={supplier.id} />
-          <ConfirmButton label="Remover fornecedor" confirmLabel="Confirmar: remover" className="rounded px-2 py-1 text-sm text-red-700 hover:bg-red-50" />
+          <ConfirmButton label="Remover fornecedor" confirmLabel="Confirmar: remover" className={DANGER} />
         </ActionForm>
       </section>
     </>

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { percentFromTotal, percentFromValue, valueFromPercent } from "@/lib/discount-entry";
 import { parsePercent } from "@/lib/format";
 
-const INPUT = "block w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2 text-right text-base disabled:bg-slate-100";
+const INPUT = "block min-h-[var(--control)] w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 text-right text-base disabled:bg-slate-100";
 const LABEL = "block text-xs font-medium text-slate-600";
 /** The right end of the slider and of the bar, as in the prototype. */
 const SCALE = 0.6;

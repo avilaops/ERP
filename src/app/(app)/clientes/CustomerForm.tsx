@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { PRIMARY } from "@/components/ui";
 import type { CustomerKind } from "@/lib/customer";
 import { CUSTOMER_FIELDS, IDLE_CUSTOMER } from "@/lib/customer-form";
 import type { CustomerFieldKey, CustomerFormState, CustomerFormValues } from "@/lib/customer-form";
@@ -8,7 +9,7 @@ import { UFS } from "@/lib/pricing/states";
 
 type SaveAction = (state: CustomerFormState, formData: FormData) => Promise<CustomerFormState>;
 
-const INPUT = "mt-1 w-full min-w-0 rounded border bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-brand";
+const INPUT = "mt-1 min-h-[var(--control)] w-full min-w-0 rounded border bg-white px-3 outline-none focus:ring-2 focus:ring-brand";
 
 /**
  * The record of a customer. Only reads and shows text: what is required, the
@@ -135,7 +136,7 @@ export function CustomerForm({
         <button
           type="submit"
           disabled={pending}
-          className={`rounded bg-brand px-4 font-medium text-white hover:bg-brand-dark disabled:opacity-60 ${hidden === undefined ? "py-3 md:py-2" : "py-2"}`}
+          className={PRIMARY}
         >
           {pending ? "Gravando…" : "Salvar cliente"}
         </button>

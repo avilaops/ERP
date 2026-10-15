@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { DANGER } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { menuItem } from "@/lib/auth/permissions";
 import { tenantDb } from "@/lib/db/pool";
@@ -28,7 +29,7 @@ export default async function PessoaPage({ params }: { params: Promise<{ id: str
   return (
     <div className="mx-auto max-w-xl">
       <div className="flex items-center gap-3">
-        <Link href={menuItem("equipe").href} aria-label="Voltar para Equipe e acessos" className="shrink-0 rounded-lg bg-brand-soft px-3 py-1.5 text-xl text-brand">
+        <Link href={menuItem("equipe").href} aria-label="Voltar para Equipe e acessos" className="inline-flex min-h-[var(--control)] shrink-0 items-center rounded-lg bg-brand-soft px-3 text-xl text-brand">
           ←
         </Link>
         <h1 className="min-w-0 truncate text-2xl font-semibold">{user.name}</h1>
@@ -74,7 +75,7 @@ export default async function PessoaPage({ params }: { params: Promise<{ id: str
       {!self && (
         <ActionForm action={deleteUserAction} className="mt-4">
           <input type="hidden" name="id" value={user.id} />
-          <ConfirmButton label="Remover pessoa" confirmLabel="Confirmar: remover" className="rounded px-2 py-1 text-sm text-red-700 hover:bg-red-50" />
+          <ConfirmButton label="Remover pessoa" confirmLabel="Confirmar: remover" className={DANGER} />
         </ActionForm>
       )}
     </div>

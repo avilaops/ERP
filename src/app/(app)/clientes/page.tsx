@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SECONDARY } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { tenantDb } from "@/lib/db/pool";
 import { menuItem } from "@/lib/auth/permissions";
@@ -20,7 +21,6 @@ export const dynamic = "force-dynamic";
 
 const NONE = "—";
 const COLUMNS = ["Cliente", "CNPJ/CPF", "Cidade/UF", "Celular", "Contribuinte do ICMS", "Cadastro"];
-const BUTTON = "rounded border border-slate-300 bg-white px-4 py-2 font-medium hover:bg-slate-50";
 
 const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
 
@@ -44,10 +44,10 @@ export default async function ClientesPage({
           <p className="mt-1 text-slate-600">Um cadastro por CNPJ ou CPF, usado por toda a equipe nos pedidos.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link href={`${ITEM.href}/novo?tipo=pj`} className={BUTTON}>
+          <Link href={`${ITEM.href}/novo?tipo=pj`} className={SECONDARY}>
             Novo cliente PJ
           </Link>
-          <Link href={`${ITEM.href}/novo?tipo=pf`} className={BUTTON}>
+          <Link href={`${ITEM.href}/novo?tipo=pf`} className={SECONDARY}>
             Novo cliente PF
           </Link>
         </div>
@@ -62,9 +62,9 @@ export default async function ClientesPage({
               defaultValue={search}
               placeholder="Buscar nome, fantasia ou CNPJ/CPF"
               aria-label="Buscar nome, fantasia ou CNPJ/CPF"
-              className="min-w-0 flex-1 rounded border border-slate-300 px-3 py-2 text-sm sm:w-80 sm:flex-none outline-none focus:ring-2 focus:ring-brand"
+              className="min-h-[var(--control)] min-w-0 flex-1 rounded border border-slate-300 px-3 text-sm sm:w-80 sm:flex-none outline-none focus:ring-2 focus:ring-brand"
             />
-            <button type="submit" className="rounded border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50">
+            <button type="submit" className={SECONDARY}>
               Buscar
             </button>
           </form>

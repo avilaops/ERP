@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CARD, INPUT, LABEL, PageHeader, Pill, PRIMARY, QUIET_LINK, SECONDARY, SECTION_TITLE } from "@/components/ui";
+import { CARD, DANGER, INPUT, LABEL, PageHeader, Pill, PRIMARY, QUIET_LINK, SECONDARY, SECTION_TITLE } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { allows, menuItem } from "@/lib/auth/permissions";
 import { tenantDb } from "@/lib/db/pool";
@@ -141,7 +141,7 @@ export default async function OrdemDeProducaoPage({ params }: { params: Promise<
                     <ActionForm action={workAction}>
                       {hidden}
                       <input type="hidden" name="workId" value={period.id} />
-                      <button type="submit" name="what" value="remover" aria-label="Remover este período" className="rounded px-2 py-1 text-sm text-red-700 hover:bg-red-50">
+                      <button type="submit" name="what" value="remover" aria-label="Remover este período" className={DANGER}>
                         Remover
                       </button>
                     </ActionForm>

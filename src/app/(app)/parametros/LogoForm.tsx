@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { DANGER, PRIMARY } from "@/components/ui";
 import type { LogoState } from "./actions";
 
 
@@ -58,8 +59,8 @@ export function LogoForm({
         )}
 
         <div className="flex flex-wrap items-end gap-3">
-          <form action={formAction} className="flex flex-wrap items-end gap-3">
-            <div>
+          <form action={formAction} className="flex min-w-0 flex-wrap items-end gap-3">
+            <div className="min-w-0 max-w-full">
               <label htmlFor="logo" className="block text-sm font-medium">
                 Trocar a logo
               </label>
@@ -70,7 +71,7 @@ export function LogoForm({
                 accept="image/png,image/jpeg,image/webp"
                 required
                 aria-describedby="logo-ajuda"
-                className="mt-1 block text-sm file:mr-3 file:rounded file:border file:border-slate-300 file:bg-white file:px-3 file:py-2 file:text-sm file:font-medium"
+                className="mt-1 block w-full min-w-0 text-sm file:mr-3 file:min-h-[var(--control)] file:rounded file:border file:border-slate-300 file:bg-white file:px-3 file:text-sm file:font-medium"
               />
               <p id="logo-ajuda" className="mt-1 text-xs text-slate-500">
                 PNG, JPEG ou WebP, até 512 KB. Fundo transparente fica melhor no menu.
@@ -79,7 +80,7 @@ export function LogoForm({
             <button
               type="submit"
               disabled={pending}
-              className="rounded bg-brand px-4 py-2 font-medium text-white hover:bg-brand-dark disabled:opacity-60"
+              className={PRIMARY}
             >
               {pending ? "Enviando…" : "Enviar logo"}
             </button>
@@ -87,7 +88,7 @@ export function LogoForm({
           {logo && (
             <form action={formAction}>
               <input type="hidden" name="intent" value="remove" />
-              <button type="submit" disabled={pending} className="rounded px-4 py-2 text-sm text-red-700 hover:bg-slate-100 disabled:opacity-60">
+              <button type="submit" disabled={pending} className={`${DANGER} disabled:opacity-60`}>
                 Remover logo
               </button>
             </form>

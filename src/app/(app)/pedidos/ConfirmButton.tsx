@@ -21,7 +21,7 @@ export function ConfirmButton({ label, confirmLabel, className }: { label: strin
       <button key="confirm" type="submit" className={className}>
         {confirmLabel}
       </button>
-      <button key="cancel" type="button" onClick={() => setAsking(false)} className="rounded px-2 py-1 text-sm text-slate-600 hover:bg-slate-100">
+      <button key="cancel" type="button" onClick={() => setAsking(false)} className="inline-flex min-h-[var(--control)] items-center rounded-lg px-3 text-sm text-slate-600 hover:bg-slate-100">
         Cancelar
       </button>
     </span>
