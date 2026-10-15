@@ -106,7 +106,10 @@ jobs:
       - run: npm run db:seed-demo -- --empresa ludus
 
       # Falha com rolagem lateral, controle abaixo de 44 px ou erro na página (docs/ux.md).
-      - run: npm run test:telas
+      - name: Cores por equipamento nos cinco tamanhos
+        run: npm run test:telas -- cores-pedido.spec.ts
+
+      - run: npm run test:telas -- telas.spec.ts
 
       # Os prints de cada tela e a altura de cada uma (telas.json), para conferir sem rodar nada.
       - uses: actions/upload-artifact@v4
