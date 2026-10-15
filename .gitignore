@@ -20,3 +20,6 @@ tsconfig.tsbuildinfo
 *.pem
 npm-debug.log*
 standalone.tgz
+
+# Capturas da revisão visual (npm run shots)
+.shots/
