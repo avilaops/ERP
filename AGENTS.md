@@ -182,3 +182,10 @@ nome cortado ou `overflow: hidden`. Use as peças de `src/components/ui.tsx` (`P
 `Pill`, `Pager`, `INPUT`, `PRIMARY`…), `FitRows` e `EquipmentPicker` em vez de estilo repetido
 na página, e as variáveis `--topbar`/`--tabbar` para qualquer coisa que grude numa borda.
 Antes de entregar, responda às sete perguntas do `docs/ux.md` e meça a tela nos cinco tamanhos.
+
+## Controle da equipe
+
+Para coordenar demandas deste projeto, leia [.agents/equipe/README.md](.agents/equipe/README.md).
+O registro de responsaveis, tarefas, decisoes e integracoes fica em `.agents/equipe/controle.json`.
+A skill de coordenacao esta em `.agents/skills/avila-erp-equipe/SKILL.md`.
+Mantenha evidencias e estado atualizados; as regras especificas deste repositorio continuam valendo.

@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "application": "avila-erp",
+  "members": [],
+  "tasks": [
+    {
+      "id": "T-20261016-e2e-ui",
+      "title": "Testar pela UI o atendimento ao financeiro",
+      "owner": null,
+      "status": "em-revisao",
+      "acceptance": ["Executar cliente, oportunidade, orçamento, aprovação e financeiro pela UI", "Conferir recebimento parcial, estorno, comissão, quitação e exportação", "Registrar falhas e separar integrações externas não executadas"],
+      "evidence": ["https://linear.app/avilaops/issue/NIC-21", "Demo isolado erp_e2e_demo, fontes 612511c; cliente 9, oportunidade 8, pedido 261016-C4HQ", "Pedido fictício quitado; comissão líquida 323,18; estorno de 3000 e ajuste de comissão -53,10 conferidos pela UI", "Falhas NIC-24, NIC-25, NIC-26 e NIC-27 registradas; CSV anexado em NIC-26", "Seis telas medidas nos cinco tamanhos, sem rolagem lateral; controles curtos e rolagem vertical registrados", ".agents/equipe/evidencias/e2e-ui-20261016.md"],
+      "next": "Fluxo não aprovado: corrigir falhas financeiras/UX e repetir; envio, assinatura e NF-e externos ainda não validados. Nenhum lançamento real alterado."
+    },
+    {
+      "id": "T-20261016-fiscal-setup",
+      "title": "Automatizar preparação fiscal e corrigir prévia do IPI",
+      "owner": null,
+      "status": "em-revisao",
+      "acceptance": ["Consulta de CNPJ preenche apenas vazios e informa fonte e enquadramento disponível", "Operação de venda e códigos de pagamento configuráveis sem inventar tributação", "Prévia mantém IPI do pedido e bloqueia XML sem CST"],
+      "evidence": ["40 testes direcionados aprovados sem pulos, incluindo PostgreSQL, rollback, concorrência e XSD; lint, tipos e build aprovados", "https://github.com/avilaops/ERP/pull/14", "Produção /api/health: 612511c; consulta BrasilAPI aplicada pela UI; regime normal salvo e homologação, série 1 e próximo número 1 preservados", "Consulta e pagamentos com confirmação medidos nos cinco tamanhos; controles >=44 px e sem rolagem lateral; lista adaptável de 1 a 7 pagamentos", ".agents/equipe/evidencias/fiscal-20261016.md"],
+      "next": "Confirmar revenda ou produção própria, meio efetivo do saldo e CSTs/alíquotas com a contabilidade. PR #14 aberto; CI de código aprovado e varredura visual geral falhou em controles anteriores do editor de pedido (20 a 38 px), não alterados no PR. Não houve emissão nem envio de NF-e."
+    }
+  ],
+  "decisions": [
+    {
+      "id": "D-20261016-menu",
+      "subject": "Organização do menu do ERP",
+      "status": "publicado",
+      "decision": "Seis grupos recolhíveis, grupo atual aberto, destino ativo destacado e opções pessoais em Minha conta. Permissões e atalhos móveis preservados.",
+      "evidence": [
+        "https://github.com/avilaops/ERP/pull/13",
+        "17 testes locais de navegação, permissões e UX aprovados; typecheck e lint aprovados.",
+        "CI 38965769763: organização do menu nos cinco tamanhos, teclado e texto ampliado aprovados; lint, tipos, testes com banco e build aprovados.",
+        "PR #13 integrado em 78a2029; branch feat/menu-organizado excluída.",
+        "Produção responde /api/health com 78a2029-email-test-20261016; demais fontes da revisão de e-mail preservados por comparação de arquivos.",
+        "docs/menu-ux.md responde às sete perguntas de UX. A varredura geral das demais telas é independente e ainda estava em execução na publicação."
+      ],
+      "note": "Registro sem atribuição de tarefa: não há membros cadastrados. Alterações fiscais, e-mail e boletos do checkout principal preservadas."
+    }
+  ],
+  "integrations": []
+}
