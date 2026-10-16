@@ -11,13 +11,19 @@ import { formatMoney } from "@/lib/format";
  */
 export function OpportunityFields({ saved, customers }: { saved: Opportunity | null; customers: { id: number; name: string }[] }) {
   return (
-    <FormSteps label="Etapa da oportunidade" steps={[{ title: "Oportunidade", content: <div className="grid grid-cols-2 gap-3"><div className="col-span-2">
+    <FormSteps label="Etapa da oportunidade" steps={[{ title: "Oportunidade", content: <div key="oportunidade" className="grid grid-cols-2 gap-3"><div className="col-span-2">
         <label htmlFor="title" className={LABEL}>
           O que está sendo vendido
         </label>
         <input id="title" name="title" type="text" defaultValue={saved?.title ?? ""} placeholder="Ex.: Academia nova, 12 estações" autoComplete="off" className={INPUT} />
       </div>
-<div className="col-span-2 sm:col-span-1">
+<div>
+        <label htmlFor="estimatedValue" className={LABEL}>
+          Valor estimado (R$)
+        </label>
+        <input id="estimatedValue" name="estimatedValue" type="text" inputMode="decimal" defaultValue={saved?.estimatedValue == null ? "" : formatMoney(saved.estimatedValue)} placeholder="0,00" autoComplete="off" className={`${INPUT} text-right`} />
+      </div></div> },
+{ title: "Cliente", content: <div key="cliente" className="grid grid-cols-2 gap-3"><div className="col-span-2 sm:col-span-1">
         <label htmlFor="customerId" className={LABEL}>
           Cliente do cadastro
         </label>
@@ -36,7 +42,7 @@ export function OpportunityFields({ saved, customers }: { saved: Opportunity | n
         </label>
         <input id="company" name="company" type="text" defaultValue={saved?.company ?? ""} autoComplete="off" className={INPUT} />
       </div></div> },
-{ title: "Contato", content: <div className="grid grid-cols-2 gap-3"><div>
+{ title: "Contato", content: <div key="contato" className="grid grid-cols-2 gap-3"><div>
         <label htmlFor="contactName" className={LABEL}>
           Pessoa de contato
         </label>
@@ -54,13 +60,7 @@ export function OpportunityFields({ saved, customers }: { saved: Opportunity | n
         </label>
         <input id="email" name="email" type="email" defaultValue={saved?.email ?? ""} autoComplete="off" className={INPUT} />
       </div></div> },
-{ title: "Valor e origem", content: <div className="grid grid-cols-2 gap-3"><div>
-        <label htmlFor="estimatedValue" className={LABEL}>
-          Valor estimado (R$)
-        </label>
-        <input id="estimatedValue" name="estimatedValue" type="text" inputMode="decimal" defaultValue={saved?.estimatedValue == null ? "" : formatMoney(saved.estimatedValue)} placeholder="0,00" autoComplete="off" className={`${INPUT} text-right`} />
-      </div>
-<div className="col-span-2">
+{ title: "Origem e notas", content: <div key="origem" className="grid grid-cols-2 gap-3"><div className="col-span-2">
         <label htmlFor="source" className={LABEL}>
           De onde veio
         </label>

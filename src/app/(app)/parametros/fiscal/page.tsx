@@ -277,12 +277,11 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
             <h2 id="regras" className="text-sm font-semibold uppercase tracking-wide">
               Regras fiscais da nota{lines.length > 1 ? ` · linha ${line.name}` : ""}
             </h2>
-            <p className="mt-1 max-w-3xl text-sm text-slate-600">
-              O que o contador define para a venda desta linha. Os exemplos são só o formato: nenhum código vem preenchido pelo sistema. As
-              alíquotas de ICMS e o IPI vêm dos Parâmetros da linha.
-            </p>
+            <p className="mt-1 text-sm text-slate-600">Definições da contabilidade para esta linha.</p>
             <LineTabs lines={lines} current={line.id} path={HERE} others={{ ver: "regras" }} />
-            <ActionForm action={prepareSaleOperationAction} className="mt-3 flex flex-wrap items-end gap-3">
+            <details className="mt-3 rounded-lg border border-slate-200">
+            <summary className="disclosure-heading">Completar CFOPs por operação<span className="disclosure-marker" aria-hidden="true">+</span></summary>
+            <ActionForm action={prepareSaleOperationAction} className="flex flex-wrap items-end gap-3 border-t border-slate-200 p-3">
               <input type="hidden" name="lineId" value={line.id} />
               <div className="min-w-0 flex-1">
                 <label htmlFor="operation" className={LABEL}>Operação comum desta linha</label>
@@ -294,6 +293,7 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
               </div>
               <button type="submit" className={SECONDARY}>Completar CFOPs vazios</button>
             </ActionForm>
+            </details>
             {missingRules.length > 0 && (
               <details className="mt-3 rounded-lg border border-amber-300 bg-amber-50 text-sm text-amber-900">
                 <summary className="disclosure-heading">Pendências para emissão ({missingRules.length})<span className="disclosure-marker" aria-hidden="true">+</span></summary>
@@ -302,14 +302,14 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
             )}
             <ActionForm key={line.id} action={saveFiscalRulesAction} className="mt-4 grid gap-4 sm:grid-cols-2">
               <input type="hidden" name="lineId" value={line.id} />
-              <FormSteps steps={[...ruleGroups.map(([title, fields]) => ({ title, content: <div className="grid gap-3 sm:grid-cols-2">{fields.map(([key, label, value, placeholder, span]) => (
+              <FormSteps steps={[...ruleGroups.map(([title, fields]) => ({ title, content: <div key={title} className="grid gap-3 sm:grid-cols-2">{fields.map(([key, label, value, placeholder, span]) => (
                 <div key={key} className={span}>
                   <label htmlFor={key} className={LABEL}>
                     {label}
                   </label>
                   <input id={key} name={key} type="text" defaultValue={value ?? ""} placeholder={placeholder} autoComplete="off" className={INPUT} />
                 </div>
-              ))}</div> })), { title: "Condições da venda", content: <div className="grid gap-3">
+              ))}</div> })), { title: "Condições da venda", content: <div key="condicoes" className="grid gap-3">
               <label className="flex min-h-[var(--control)] items-start gap-2 py-2.5 text-sm sm:col-span-2">
                 <input type="checkbox" name="finalConsumer" value="sim" defaultChecked={rules.finalConsumer} className="mt-1" />
                 <span>

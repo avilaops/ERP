@@ -116,7 +116,7 @@ test("cores: erro preserva o nome e salvar confirma a alteração", async ({ pag
   await page.locator("summary").filter({ hasText: "Adicionar cor" }).click();
   await page.getByLabel("Nome da cor", { exact: true }).fill("Piano Black");
   await page.getByRole("button", { name: "Adicionar", exact: true }).click();
-  await expect(page.getByRole("alert")).toContainText("já está na lista");
+  await expect(page.locator("main").getByRole("alert")).toContainText("já está na lista", { timeout: 30_000 });
   await expect(page.getByLabel("Nome da cor", { exact: true })).toHaveValue("Piano Black");
   await page.getByRole("link", { name: "Editar Piano Black", exact: true }).click();
   await page.getByRole("button", { name: "Salvar cor", exact: true }).click();

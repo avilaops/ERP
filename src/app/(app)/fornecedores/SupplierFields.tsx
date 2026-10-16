@@ -28,7 +28,7 @@ export function SupplierFields({ saved }: { saved: Supplier | null }) {
   ));
   return (
     <FormSteps label="Etapa do fornecedor" steps={[
-      { title: "Identificação", content: <div className="grid gap-3 sm:grid-cols-2">
+      { title: "Identificação", content: <div key="identificacao" className="grid gap-3 sm:grid-cols-2">
       <div>
         <label htmlFor="kind" className={LABEL}>
           Tipo
@@ -42,9 +42,9 @@ export function SupplierFields({ saved }: { saved: Supplier | null }) {
         </select>
       </div>
       {fields(plain.filter(([key]) => ["name", "document"].includes(key)))}</div> },
-      { title: "Empresa", content: <div className="grid gap-3 sm:grid-cols-2">{fields(plain.filter(([key]) => ["tradeName", "country"].includes(key)))}</div> },
-      { title: "Contato", content: <div className="grid gap-3 sm:grid-cols-2">{fields(plain.filter(([key]) => ["contactName", "phone", "email"].includes(key)))}</div> },
-      ...Array.from({ length: Math.ceil(BANK_FIELDS.length / 3) }, (_, index) => ({ title: `Dados para pagamento ${index + 1}`, content: <div className="grid gap-3 sm:grid-cols-2">
+      { title: "Empresa", content: <div key="empresa" className="grid gap-3 sm:grid-cols-2">{fields(plain.filter(([key]) => ["tradeName", "country"].includes(key)))}</div> },
+      { title: "Contato", content: <div key="contato" className="grid gap-3 sm:grid-cols-2">{fields(plain.filter(([key]) => ["contactName", "phone", "email"].includes(key)))}</div> },
+      ...Array.from({ length: Math.ceil(BANK_FIELDS.length / 3) }, (_, index) => ({ title: `Dados para pagamento ${index + 1}`, content: <div key={`banco-${index}`} className="grid gap-3 sm:grid-cols-2">
           {BANK_FIELDS.slice(index * 3, index * 3 + 3).map(([key, label]) => (
             <div key={key}>
               <label htmlFor={key} className={LABEL}>
@@ -54,7 +54,7 @@ export function SupplierFields({ saved }: { saved: Supplier | null }) {
             </div>
           ))}
         </div> })),
-      { title: "Observações", content: <div>
+      { title: "Observações", content: <div key="observacoes">
         <label htmlFor="notes" className={LABEL}>
           Observações
         </label>
