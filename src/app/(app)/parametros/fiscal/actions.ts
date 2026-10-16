@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/auth";
 import { FiscalError, loadFiscalSettings, removeCertificate, saveCertificate, saveDanfeReformDate, saveFiscalSettings, saveProductFiscal } from "@/lib/db/fiscal";
-import { listPaymentCodes, loadFiscalRules, saveFiscalRules, savePaymentCode } from "@/lib/db/fiscal-rules";
+import { completeSaleOperation, listPaymentCodes, saveFiscalRules, savePaymentCode } from "@/lib/db/fiscal-rules";
 import { CnpjError, lookupCnpj } from "@/lib/cnpj";
 import { completeFiscalCompany, saleOperationCodes, standardPaymentCode } from "@/lib/fiscal/setup";
 import { IssueError, voidInvoiceNumbers } from "@/lib/db/issue-nfe";
@@ -77,15 +77,8 @@ export async function prepareSaleOperationAction(_previous: ActionState, formDat
   try {
     const line = exactLine(await listLines(conn), text("lineId"));
     if (!line) return { error: "Escolha uma linha de produto válida." };
-    const current = await loadFiscalRules(line.id, conn);
     const suggested = saleOperationCodes(text("operation") as "revenda" | "producao");
-    await saveFiscalRules(line.id, {
-      ...current,
-      operationNature: current.operationNature ?? suggested.operationNature,
-      cfopInternal: current.cfopInternal ?? suggested.cfopInternal,
-      cfopInterstate: current.cfopInterstate ?? suggested.cfopInterstate,
-      cfopInterstateNonTaxpayer: current.cfopInterstateNonTaxpayer ?? suggested.cfopInterstateNonTaxpayer,
-    }, session.email, conn);
+    await completeSaleOperation(line.id, suggested, session.email, conn);
     revalidatePath(HERE);
     revalidatePath("/pedidos", "layout");
     return { error: null, notice: "CFOPs comuns de venda completados. Regras existentes preservadas. Confira CST, alíquotas, benefícios e operações especiais com a contabilidade na aba Regras da nota." };

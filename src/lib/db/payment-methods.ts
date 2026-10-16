@@ -70,9 +70,10 @@ export async function updatePaymentMethod(
   check(change.label, change.position, who);
   try {
     const { rows } = await conn.query(
-      `UPDATE payment_methods SET label = $2, position = $3, active = $4, on_delivery = COALESCE($6, on_delivery), updated_at = now(), updated_by = $5
+      `UPDATE payment_methods SET nfe_code = CASE WHEN label = $2 THEN nfe_code ELSE $7 END,
+          label = $2, position = $3, active = $4, on_delivery = COALESCE($6, on_delivery), updated_at = now(), updated_by = $5
         WHERE id = $1 RETURNING id, label, position, active, on_delivery`,
-      [id, change.label.trim(), change.position, change.active, who, change.onDelivery ?? null],
+      [id, change.label.trim(), change.position, change.active, who, change.onDelivery ?? null, standardPaymentCode(change.label)],
     );
     if (rows.length === 0) throw new PaymentMethodError("Forma de pagamento não encontrada.");
     return method(rows[0]);

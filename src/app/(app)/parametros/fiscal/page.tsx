@@ -1,4 +1,7 @@
 import { LineTabs } from "@/components/LineTabs";
+import { FitRows } from "@/components/FitRows";
+import { cookies } from "next/headers";
+import { rowsPerPage } from "@/lib/rows";
 import { PasswordField } from "@/components/PasswordField";
 import { loadFiscalRules, listPaymentCodes, missingFiscalRules, PAYMENT_CODES } from "@/lib/db/fiscal-rules";
 import { listNumberVoids } from "@/lib/db/invoices";
@@ -24,6 +27,7 @@ export const dynamic = "force-dynamic";
 
 const DAY_MS = 86_400_000;
 const HERE = "/parametros/fiscal";
+const PAYMENT_ROWS_COOKIE = "erp_linhas_pagamentos_fiscais";
 
 export default async function FiscalPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const session = await requirePermission("parametros");
@@ -70,7 +74,8 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
   ] as const;
   const asked = query.ver;
   const tab = TABS.find(([key]) => key === (Array.isArray(asked) ? asked[0] : asked))?.[0] ?? TABS[0][0];
-  const paymentPage = pageOf(paymentCodes, typeof query.pagina === "string" ? query.pagina : undefined, 1);
+  const paymentSize = rowsPerPage((await cookies()).get(PAYMENT_ROWS_COOKIE)?.value ?? "1", 1);
+  const paymentPage = pageOf(paymentCodes, typeof query.pagina === "string" ? query.pagina : undefined, paymentSize);
   const today = isoDate(new Date());
   const daysLeft = certificate ? Math.round((parseDate(isoDate(certificate.validUntil)) - parseDate(today)) / DAY_MS) : null;
 
@@ -165,7 +170,6 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
       {tab === "consulta" && (
         <section className={`${CARD} mt-3 p-4`} aria-labelledby="consulta">
           <h2 id="consulta" className="text-sm font-semibold uppercase tracking-wide">Completar cadastro pelo CNPJ</h2>
-          <p className="mt-2 text-sm text-slate-600">Preenche campos vazios e preserva o que já foi cadastrado.</p>
           <ActionForm action={completeFiscalCompanyAction} className="mt-3 space-y-3">
             <div>
               <label htmlFor="lookupCnpj" className={LABEL}>CNPJ da empresa</label>
@@ -179,7 +183,7 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
           </ActionForm>
           <details className="mt-2 text-sm text-slate-600">
             <summary className="min-h-[var(--control)] cursor-pointer py-3 text-brand">Ver fonte e limites da consulta</summary>
-            <p>Consulta BrasilAPI e, se indisponível, CNPJ.ws, com dados públicos da Receita. Confirme sublimite do Simples com a contabilidade. MEI e o tratamento fiscal dos produtos não são definidos automaticamente.</p>
+            <p>Preenche apenas campos vazios e preserva os dados cadastrados. Consulta BrasilAPI e, se indisponível, CNPJ.ws, com dados públicos da Receita. Confirme sublimite do Simples com a contabilidade. MEI e o tratamento fiscal dos produtos não são definidos automaticamente.</p>
           </details>
         </section>
       )}
@@ -329,16 +333,15 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
 
       {tab === "pagamentos" && (
           <section className={`${CARD} mt-4`} aria-labelledby="pagamento-na-nota">
-            <h2 id="pagamento-na-nota" className="border-b border-slate-200 px-5 py-3 text-sm font-semibold uppercase tracking-wide">
+            <h2 id="pagamento-na-nota" className="border-b border-slate-200 px-5 py-2 text-sm font-semibold uppercase tracking-wide">
               Forma de pagamento na nota
             </h2>
-            <p className="px-5 pt-3 text-sm text-slate-600">Código fiscal de cada pagamento.</p>
             <ActionForm action={completePaymentCodesAction} className="px-5 pt-3">
               <button type="submit" className={PRIMARY}>Completar códigos conhecidos</button>
             </ActionForm>
-            <ul className="px-5 pb-3">
+            <ul id="pagamentos-fiscais" className="px-5 pb-3">
               {paymentPage.rows.map((method) => (
-                <li key={method.id} className="border-t border-slate-200 py-3 first:border-t-0">
+                <li key={method.id} data-row className="border-t border-slate-200 py-3 first:border-t-0">
                   <ActionForm action={savePaymentCodeAction} className="flex flex-wrap items-center gap-3">
                     <input type="hidden" name="id" value={method.id} />
                     <span className="min-w-0 flex-1 font-medium">
@@ -361,6 +364,7 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
               ))}
             </ul>
             <Pager {...paymentPage} noun={["forma", "formas"]} hrefFor={(page) => `${HERE}?ver=pagamentos&pagina=${page}`} />
+            <FitRows listId="pagamentos-fiscais" shown={paymentSize} minimum={1} cookieName={PAYMENT_ROWS_COOKIE} />
           </section>
       )}
 

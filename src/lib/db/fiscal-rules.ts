@@ -174,6 +174,35 @@ export async function saveFiscalRules(lineId: number, input: FiscalRules, update
   if (rows.length === 0) throw new FiscalError("Linha de produto não encontrada. Recarregue a página.");
 }
 
+/** Fill only the sale-operation blanks in one statement; never write taxes or stale snapshots. */
+export async function completeSaleOperation(
+  lineId: number,
+  input: Pick<FiscalRules, "operationNature" | "cfopInternal" | "cfopInterstate" | "cfopInterstateNonTaxpayer">,
+  updatedBy: string,
+  conn: Queryable,
+): Promise<void> {
+  if (!updatedBy.trim()) throw new Error("Falta dizer quem está alterando as regras fiscais.");
+  const nature = blank(input.operationNature);
+  if (nature !== null && nature.length > 60) throw new FiscalError("Natureza da operação: até 60 letras.");
+  const { rows } = await conn.query(
+    `INSERT INTO fiscal_rules (line_id, operation_nature, cfop_internal, cfop_interstate, cfop_interstate_non_taxpayer, updated_by)
+     SELECT $1, $2, $3, $4, $5, $6 WHERE EXISTS (SELECT 1 FROM product_lines WHERE id = $1)
+     ON CONFLICT (line_id) DO UPDATE SET
+       operation_nature = COALESCE(fiscal_rules.operation_nature, EXCLUDED.operation_nature),
+       cfop_internal = COALESCE(fiscal_rules.cfop_internal, EXCLUDED.cfop_internal),
+       cfop_interstate = COALESCE(fiscal_rules.cfop_interstate, EXCLUDED.cfop_interstate),
+       cfop_interstate_non_taxpayer = COALESCE(fiscal_rules.cfop_interstate_non_taxpayer, EXCLUDED.cfop_interstate_non_taxpayer),
+       updated_at = now(), updated_by = EXCLUDED.updated_by
+     RETURNING line_id`,
+    [lineId, nature,
+      code(input.cfopInternal, /^5\d{3}$/, "CFOP dentro do estado: quatro dígitos, começando por 5."),
+      code(input.cfopInterstate, /^6\d{3}$/, "CFOP para outro estado: quatro dígitos, começando por 6."),
+      code(input.cfopInterstateNonTaxpayer, /^6\d{3}$/, "CFOP para não contribuinte de outro estado: quatro dígitos, começando por 6."),
+      updatedBy],
+  );
+  if (rows.length === 0) throw new FiscalError("Linha de produto não encontrada. Recarregue a página.");
+}
+
 /** The forms of payment as the invoice names them (`tPag`). "Outros" (99) goes with the name of the form. */
 export const PAYMENT_CODES = [
   ["01", "Dinheiro"],

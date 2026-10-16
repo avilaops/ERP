@@ -10,7 +10,7 @@ import { MAX_ROWS, MIN_ROWS, ROWS_COOKIE } from "@/lib/rows";
  * and, when that is not the number the server used, leaves it in a cookie and asks for the page again. It knows nothing of
  * what the rows show.
  */
-export function FitRows({ listId, shown }: { listId: string; shown: number }) {
+export function FitRows({ listId, shown, minimum = MIN_ROWS, cookieName = ROWS_COOKIE }: { listId: string; shown: number; minimum?: number; cookieName?: string }) {
   const router = useRouter();
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -31,9 +31,9 @@ export function FitRows({ listId, shown }: { listId: string; shown: number }) {
       const end = last.getBoundingClientRect().bottom + window.scrollY + parseFloat(getComputedStyle(main).paddingBottom);
       const around = end - list.getBoundingClientRect().height;
       const room = window.innerHeight - around;
-      const fit = Math.min(MAX_ROWS, Math.max(MIN_ROWS, Math.floor(room / height)));
+      const fit = Math.min(MAX_ROWS, Math.max(minimum, Math.floor(room / height)));
       if (fit === shown) return;
-      document.cookie = `${ROWS_COOKIE}=${fit}; path=/; max-age=31536000; samesite=lax`;
+      document.cookie = `${cookieName}=${fit}; path=/; max-age=31536000; samesite=lax`;
       router.refresh();
     };
     measure();
@@ -41,11 +41,17 @@ export function FitRows({ listId, shown }: { listId: string; shown: number }) {
       clearTimeout(timer);
       timer = setTimeout(measure, 250);
     };
+    // A saved/error message can change the available room without resizing the window.
+    const main = document.getElementById(listId)?.closest("main");
+    const observer = new ResizeObserver(later);
+    if (main) observer.observe(main);
+    if (main?.lastElementChild) observer.observe(main.lastElementChild);
     window.addEventListener("resize", later);
     return () => {
       clearTimeout(timer);
+      observer.disconnect();
       window.removeEventListener("resize", later);
     };
-  }, [listId, shown, router]);
+  }, [listId, shown, minimum, cookieName, router]);
   return null;
 }

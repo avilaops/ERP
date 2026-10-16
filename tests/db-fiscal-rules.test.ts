@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { FiscalError } from "@/lib/db/fiscal";
-import { EMPTY_FISCAL_RULES, listPaymentCodes, loadFiscalRules, missingFiscalRules, saveFiscalRules, savePaymentCode } from "@/lib/db/fiscal-rules";
+import { completeSaleOperation, EMPTY_FISCAL_RULES, listPaymentCodes, loadFiscalRules, missingFiscalRules, saveFiscalRules, savePaymentCode } from "@/lib/db/fiscal-rules";
 import type { FiscalRules } from "@/lib/db/fiscal-rules";
 import { createLine, deleteLine } from "@/lib/db/product-lines";
-import { createPaymentMethod } from "@/lib/db/payment-methods";
+import { createPaymentMethod, updatePaymentMethod } from "@/lib/db/payment-methods";
+import { saleOperationCodes } from "@/lib/fiscal/setup";
 import { openTestDb, SKIP_WITHOUT_DB } from "./db-helpers.ts";
 import type { TestDb } from "./db-helpers.ts";
 
@@ -67,6 +68,27 @@ test("linha com regras fiscais e sem equipamento sai inteira; forma de pagamento
   const afterCreate = await listPaymentCodes(db.pool);
   assert.equal(afterCreate.find((method) => method.id === deposit.id)?.code, "16");
   assert.equal(afterCreate.find((method) => method.id === ambiguous.id)?.code, null);
+  await updatePaymentMethod(deposit.id, { ...deposit, label: "Permuta" }, WHO, db.pool);
+  assert.equal((await listPaymentCodes(db.pool)).find((method) => method.id === deposit.id)?.code, null);
+  const transfer = await updatePaymentMethod(deposit.id, { ...deposit, label: "Transferência bancária" }, WHO, db.pool);
+  assert.equal((await listPaymentCodes(db.pool)).find((method) => method.id === deposit.id)?.code, "18");
+  await savePaymentCode(transfer.id, "99", WHO, db.pool);
+  await updatePaymentMethod(transfer.id, { ...transfer, position: 99 }, WHO, db.pool);
+  assert.equal((await listPaymentCodes(db.pool)).find((method) => method.id === transfer.id)?.code, "99");
   await assert.rejects(() => savePaymentCode(financing.id, "77", WHO, db.pool), FiscalError);
   await assert.rejects(() => savePaymentCode(999999, "17", WHO, db.pool), /não encontrada/);
+});
+
+test("operação de venda: cria somente os CFOPs; completar vazios preserva impostos e escolhas atuais do contador", { skip }, async () => {
+  const line = await createLine("Operação automática", 1, WHO, db.pool);
+  await completeSaleOperation(line.id, saleOperationCodes("revenda"), WHO, db.pool);
+  assert.deepEqual(await loadFiscalRules(line.id, db.pool), { ...EMPTY_FISCAL_RULES, ...saleOperationCodes("revenda") });
+  await saveFiscalRules(line.id, { ...NATIONAL, operationNature: null, cfopInternal: null }, WHO, db.pool);
+  await db.pool.query("UPDATE fiscal_rules SET icms_code = '40', pis_rate = 0.0165, final_consumer = false WHERE line_id = $1", [line.id]);
+  const accountant = await loadFiscalRules(line.id, db.pool);
+  await completeSaleOperation(line.id, saleOperationCodes("producao"), WHO, db.pool);
+  const expected = { ...accountant, operationNature: saleOperationCodes("producao").operationNature, cfopInternal: "5101" };
+  assert.deepEqual(await loadFiscalRules(line.id, db.pool), expected);
+  await completeSaleOperation(line.id, saleOperationCodes("revenda"), WHO, db.pool);
+  assert.deepEqual(await loadFiscalRules(line.id, db.pool), expected);
 });
