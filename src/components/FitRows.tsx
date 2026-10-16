@@ -18,7 +18,7 @@ export function FitRows({ listId, shown, minimum = MIN_ROWS, cookieName = ROWS_C
       const list = document.getElementById(listId);
       const rows = list ? [...list.querySelectorAll<HTMLElement>("[data-row]")] : [];
       if (!list || rows.length === 0) return;
-      // The usual height of a closed row: a name on two lines here and there evens out over the list.
+      // Reserve room for the tallest visible closed row, including names on several lines.
       const closed = rows.filter((row) => !row.querySelector("details[open]")).map((row) => row.getBoundingClientRect().height).filter((height) => height > 0);
       const height = closed.length === 0 ? 0 : Math.max(...closed);
       if (height < 8) return;
@@ -41,6 +41,7 @@ export function FitRows({ listId, shown, minimum = MIN_ROWS, cookieName = ROWS_C
       clearTimeout(timer);
       timer = setTimeout(measure, 250);
     };
+    // A saved/error message can change the available room without resizing the window.
     const main = document.getElementById(listId)?.closest("main");
     const observer = new ResizeObserver(later);
     if (main) observer.observe(main);

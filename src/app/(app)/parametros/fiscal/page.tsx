@@ -1,4 +1,7 @@
 import { LineTabs } from "@/components/LineTabs";
+import { FitRows } from "@/components/FitRows";
+import { cookies } from "next/headers";
+import { rowsPerPage } from "@/lib/rows";
 import { PasswordField } from "@/components/PasswordField";
 import { FormSteps } from "@/components/FormSteps";
 import { loadFiscalRules, listPaymentCodes, missingFiscalRules, PAYMENT_CODES } from "@/lib/db/fiscal-rules";
@@ -6,7 +9,7 @@ import { listNumberVoids } from "@/lib/db/invoices";
 import { listLines } from "@/lib/db/product-lines";
 import { LINE_PARAM, pickLine } from "@/lib/lines-view";
 import Link from "next/link";
-import { CARD, DANGER, DANGER_OUTLINE, INPUT, PRIMARY, SECONDARY, PageHeader } from "@/components/ui";
+import { CARD, DANGER, DANGER_OUTLINE, INPUT, LABEL, PRIMARY, SECONDARY, PageHeader, Pager, pageOf } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { menuItem } from "@/lib/auth/permissions";
 import { formatDocument } from "@/lib/customer";
@@ -18,14 +21,14 @@ import { parseDate } from "@/lib/pricing/payment";
 import { UFS } from "@/lib/pricing/states";
 import { ActionForm } from "../../pedidos/ActionForm";
 import { ConfirmButton } from "../../pedidos/ConfirmButton";
-import { removeCertificateAction, saveCertificateAction, saveDanfeReformDateAction, saveFiscalRulesAction, saveFiscalSettingsAction, savePaymentCodeAction, voidNumbersAction } from "./actions";
+import { completeFiscalCompanyAction, completePaymentCodesAction, prepareSaleOperationAction, removeCertificateAction, saveCertificateAction, saveDanfeReformDateAction, saveFiscalRulesAction, saveFiscalSettingsAction, savePaymentCodeAction, voidNumbersAction } from "./actions";
 
 export const metadata = { title: "Fiscal · ERP" };
 export const dynamic = "force-dynamic";
 
-const LABEL = "block text-sm font-medium";
 const DAY_MS = 86_400_000;
 const HERE = "/parametros/fiscal";
+const PAYMENT_ROWS_COOKIE = "erp_linhas_pagamentos_fiscais";
 
 export default async function FiscalPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const session = await requirePermission("parametros");
@@ -49,7 +52,7 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
     ["cfopInterstate", "CFOP para contribuinte de outro estado", rules.cfopInterstate, "Ex.: 6102", ""],
     ["cfopInterstateNonTaxpayer", "CFOP para não contribuinte de outro estado", rules.cfopInterstateNonTaxpayer, "Ex.: 6108", ""],
     ["icmsCode", simples ? "CSOSN do ICMS (Simples Nacional)" : "CST do ICMS", rules.icmsCode, simples ? "Ex.: 102" : "Ex.: 00", ""],
-    ["ipiCst", "CST do IPI (em branco: nota sem IPI)", rules.ipiCst, "Ex.: 50", ""],
+    ["ipiCst", "CST do IPI (obrigatório quando há IPI no pedido)", rules.ipiCst, "Ex.: 50", ""],
     ["ipiFrameCode", "Código de enquadramento do IPI", rules.ipiFrameCode, "999", ""],
     ["pisCst", "CST do PIS", rules.pisCst, "Ex.: 01", ""],
     ["pisRate", "Alíquota do PIS (%)", formatPercent(rules.pisRate), "Ex.: 0,65", ""],
@@ -72,14 +75,17 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
   ];
   // One part at a time, preserving the fields and their existing server validation.
   const TABS = [
+    ["consulta", "Consultar CNPJ"],
     ["certificado", certificate ? "Certificado" : "Certificado · falta"],
     ["emitente", missing.length > 0 ? "Emitente · falta" : "Emitente"],
     ["regras", missingRules.length > 0 ? "Regras da nota · falta" : "Regras da nota"],
-    ["pagamentos", "Formas de pagamento"],
+    ["pagamentos", "Pagamentos"],
     ["numeracao", "Numeração"],
   ] as const;
   const asked = query.ver;
   const tab = TABS.find(([key]) => key === (Array.isArray(asked) ? asked[0] : asked))?.[0] ?? TABS[0][0];
+  const paymentSize = rowsPerPage((await cookies()).get(PAYMENT_ROWS_COOKIE)?.value ?? "1", 1);
+  const paymentPage = pageOf(paymentCodes, typeof query.pagina === "string" ? query.pagina : undefined, paymentSize);
   const today = isoDate(new Date());
   const daysLeft = certificate ? Math.round((parseDate(isoDate(certificate.validUntil)) - parseDate(today)) / DAY_MS) : null;
 
@@ -97,14 +103,17 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
 
   return (
     <>
-      <p className="text-sm">
-        <Link href={menuItem("parametros").href} className="text-brand underline">
-          ← {menuItem("parametros").label}
-        </Link>
-      </p>
-      <PageHeader title="Fiscal" hint="Emitente, certificado e regras da nota fiscal." />
+      <PageHeader title="Fiscal" hint="Preparação da nota." actions={
+        <Link href={menuItem("parametros").href} className={SECONDARY}>← {menuItem("parametros").label}</Link>
+      } />
 
-      <nav aria-label="Partes do fiscal" className="view-tabs">
+      <details key={tab} className="mt-3 sm:hidden">
+        <summary className="min-h-[var(--control)] cursor-pointer py-3 font-medium text-brand">{TABS.find(([key]) => key === tab)?.[1]} · trocar</summary>
+        <nav aria-label="Partes do fiscal no celular" className="grid grid-cols-2 gap-1">
+          {TABS.map(([key, label]) => <Link key={key} href={key === TABS[0][0] ? HERE : `${HERE}?ver=${key}`} aria-current={key === tab ? "page" : undefined} className={SECONDARY}>{label}</Link>)}
+        </nav>
+      </details>
+      <nav aria-label="Partes do fiscal" className="mt-4 hidden flex-wrap gap-x-1 border-b border-slate-200 sm:flex">
         {TABS.map(([key, label]) => (
           <Link
             key={key}
@@ -165,6 +174,27 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
               <ConfirmButton label="Remover certificado" confirmLabel="Confirmar: remover" className={DANGER} />
             </ActionForm>
           )}
+        </section>
+      )}
+
+      {tab === "consulta" && (
+        <section className={`${CARD} mt-3 p-4`} aria-labelledby="consulta">
+          <h2 id="consulta" className="text-sm font-semibold uppercase tracking-wide">Completar cadastro pelo CNPJ</h2>
+          <ActionForm action={completeFiscalCompanyAction} className="mt-3 space-y-3">
+            <div>
+              <label htmlFor="lookupCnpj" className={LABEL}>CNPJ da empresa</label>
+              <input id="lookupCnpj" name="lookupCnpj" defaultValue={settings.cnpj ? formatDocument(settings.cnpj) : ""} readOnly={Boolean(settings.cnpj)} autoComplete="off" className={INPUT} />
+            </div>
+            <label className="flex min-h-[var(--control)] items-start gap-2 py-2 text-sm">
+              <input type="checkbox" name="applyRegime" value="sim" className="mt-1" />
+              <span>Completar também o regime tributário, quando informado e ainda vazio.</span>
+            </label>
+            <button type="submit" className={PRIMARY}>Consultar e completar</button>
+          </ActionForm>
+          <details className="mt-2 text-sm text-slate-600">
+            <summary className="min-h-[var(--control)] cursor-pointer py-3 text-brand">Ver fonte e limites da consulta</summary>
+            <p>Preenche apenas campos vazios e preserva os dados cadastrados. Consulta BrasilAPI e, se indisponível, CNPJ.ws, com dados públicos da Receita. Confirme sublimite do Simples com a contabilidade. MEI e o tratamento fiscal dos produtos não são definidos automaticamente.</p>
+          </details>
         </section>
       )}
 
@@ -252,6 +282,18 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
               alíquotas de ICMS e o IPI vêm dos Parâmetros da linha.
             </p>
             <LineTabs lines={lines} current={line.id} path={HERE} others={{ ver: "regras" }} />
+            <ActionForm action={prepareSaleOperationAction} className="mt-3 flex flex-wrap items-end gap-3">
+              <input type="hidden" name="lineId" value={line.id} />
+              <div className="min-w-0 flex-1">
+                <label htmlFor="operation" className={LABEL}>Operação comum desta linha</label>
+                <select id="operation" name="operation" defaultValue="" className={INPUT}>
+                  <option value="">— escolher com a contabilidade —</option>
+                  <option value="revenda">Revenda de mercadoria de terceiros</option>
+                  <option value="producao">Venda de produção própria</option>
+                </select>
+              </div>
+              <button type="submit" className={SECONDARY}>Completar CFOPs vazios</button>
+            </ActionForm>
             {missingRules.length > 0 && (
               <details className="mt-3 rounded-lg border border-amber-300 bg-amber-50 text-sm text-amber-900">
                 <summary className="disclosure-heading">Pendências para emissão ({missingRules.length})<span className="disclosure-marker" aria-hidden="true">+</span></summary>
@@ -301,15 +343,16 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
         </>
       )}
       {tab === "pagamentos" && (
-        <>
           <section className={`${CARD} mt-4`} aria-labelledby="pagamento-na-nota">
-            <h2 id="pagamento-na-nota" className="border-b border-slate-200 px-5 py-3 text-sm font-semibold uppercase tracking-wide">
+            <h2 id="pagamento-na-nota" className="border-b border-slate-200 px-5 py-2 text-sm font-semibold uppercase tracking-wide">
               Forma de pagamento na nota
             </h2>
-            <p className="px-5 pt-3 text-sm text-slate-600">Como cada forma de pagamento da empresa aparece na nota fiscal.</p>
-            <ul className="px-5 pb-3">
-              {paymentCodes.map((method) => (
-                <li key={method.id} className="border-t border-slate-200 py-3 first:border-t-0">
+            <ActionForm action={completePaymentCodesAction} className="px-5 pt-3">
+              <button type="submit" className={PRIMARY}>Completar códigos conhecidos</button>
+            </ActionForm>
+            <ul id="pagamentos-fiscais" className="px-5 pb-3">
+              {paymentPage.rows.map((method) => (
+                <li key={method.id} data-row className="border-t border-slate-200 py-3 first:border-t-0">
                   <ActionForm action={savePaymentCodeAction} className="flex flex-wrap items-center gap-3">
                     <input type="hidden" name="id" value={method.id} />
                     <span className="min-w-0 flex-1 font-medium">
@@ -331,8 +374,9 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
                 </li>
               ))}
             </ul>
+            <Pager {...paymentPage} noun={["forma", "formas"]} hrefFor={(page) => `${HERE}?ver=pagamentos&pagina=${page}`} />
+            <FitRows listId="pagamentos-fiscais" shown={paymentSize} minimum={1} cookieName={PAYMENT_ROWS_COOKIE} />
           </section>
-        </>
       )}
 
       {tab === "numeracao" && (

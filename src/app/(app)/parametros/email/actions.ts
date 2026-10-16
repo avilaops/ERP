@@ -6,7 +6,7 @@ import { defaultMailbox, inboxProblems, mailboxProblems, mailChannel, MailSettin
 import { tenantDb } from "@/lib/db/pool";
 import { vaultKey } from "@/lib/fiscal/certificate";
 import { fetchNewMail } from "@/lib/mail/imap";
-import { buildMessage, MailError } from "@/lib/mail/message";
+import { buildMessage, isMailAddress, MailError } from "@/lib/mail/message";
 import { sendMail } from "@/lib/mail/smtp";
 import type { ActionState } from "@/lib/order-form";
 
@@ -41,13 +41,15 @@ export async function saveMailTextsAction(_previous: ActionState, formData: Form
 
 /**
  * "Salvar caixa da empresa". Before anything is stored a test message goes to
- * who is saving, by the mailbox typed: a mailbox that does not send is not kept.
+ * the recipient chosen, by the mailbox typed: a mailbox that does not send is not kept.
  * The password is sealed and never comes back to the screen or goes to a log.
  */
 export async function saveOwnMailboxAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
   const session = await requirePermission("parametros");
   const conn = tenantDb(session.tenant.slug);
   const text = reader(formData);
+  const recipient = text("testRecipient").trim().toLowerCase();
+  if (!isMailAddress(recipient)) return { error: "Informe um e-mail válido para receber o teste." };
   let key: Buffer;
   try {
     key = vaultKey(process.env.ERP_CERT_KEY);
@@ -59,17 +61,17 @@ export async function saveOwnMailboxAction(_previous: ActionState, formData: For
   if (problems.length > 0) return { error: problems.join(" ") };
   try {
     const message = buildMessage(
-      { from: input.from, fromName: session.tenant.name, to: session.email, replyTo: null, subject: "Teste da caixa de e-mail do ERP", text: `Esta mensagem confirma que o ERP consegue enviar pela caixa ${input.from}.\n\nPedido por ${session.email}.`, attachments: [] },
+      { from: input.from, fromName: session.tenant.name, to: recipient, replyTo: null, subject: "Teste da caixa de e-mail do ERP", text: `Esta mensagem confirma que o ERP consegue enviar pela caixa ${input.from}.\n\nPedido por ${session.email}.`, attachments: [] },
       new Date(),
     );
-    await sendMail({ host: input.host, port: input.port, username: input.username, password: input.password }, { from: input.from, to: session.email }, message);
+    await sendMail({ host: input.host, port: input.port, username: input.username, password: input.password }, { from: input.from, to: recipient }, message);
     await saveOwnMailbox(input, key, session.email, conn);
     console.info(`[e-mail] ${session.email} cadastrou a caixa da empresa de ${session.tenant.slug}`);
   } catch (error) {
     return problem(error);
   }
   revalidatePath(HERE);
-  return { error: null, notice: `Caixa gravada. Uma mensagem de teste foi enviada para ${session.email}.` };
+  return { error: null, notice: `Caixa gravada. Uma mensagem de teste foi enviada para ${recipient}.` };
 }
 
 /** "Remover caixa da empresa": the messages leave by the mailbox of Ávila Ops again. */
@@ -86,19 +88,21 @@ export async function removeOwnMailboxAction(): Promise<ActionState> {
   return { error: null, notice: "Caixa da empresa removida." };
 }
 
-/** "Enviar mensagem de teste" by the mailbox in use now, to who asked. */
-export async function testMailAction(): Promise<ActionState> {
+/** "Enviar mensagem de teste" by the mailbox in use now, to the recipient chosen. */
+export async function testMailAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
   const session = await requirePermission("parametros");
   const conn = tenantDb(session.tenant.slug);
+  const recipient = reader(formData)("testRecipient").trim().toLowerCase();
+  if (!isMailAddress(recipient)) return { error: "Informe um e-mail válido para receber o teste." };
   try {
     const channel = (await mailChannel(conn, process.env, () => vaultKey(process.env.ERP_CERT_KEY))) ?? defaultMailbox(process.env);
     if (!channel) return { error: "Não há caixa de saída: cadastre a caixa da empresa abaixo, ou peça à Ávila Ops para ligar a caixa padrão." };
     const message = buildMessage(
-      { from: channel.from, fromName: session.tenant.name, to: session.email, replyTo: null, subject: "Teste de envio do ERP", text: `Esta mensagem confirma que o ERP consegue enviar e-mail por ${channel.from}.\n\nPedido por ${session.email}.`, attachments: [] },
+      { from: channel.from, fromName: session.tenant.name, to: recipient, replyTo: null, subject: "Teste de envio do ERP", text: `Esta mensagem confirma que o ERP consegue enviar e-mail por ${channel.from}.\n\nPedido por ${session.email}.`, attachments: [] },
       new Date(),
     );
-    await sendMail(channel.smtp, { from: channel.from, to: session.email }, message);
-    return { error: null, notice: `Mensagem de teste enviada para ${session.email}, pela caixa ${channel.from}.` };
+    await sendMail(channel.smtp, { from: channel.from, to: recipient }, message);
+    return { error: null, notice: `Mensagem de teste enviada para ${recipient}, pela caixa ${channel.from}.` };
   } catch (error) {
     return problem(error);
   }
