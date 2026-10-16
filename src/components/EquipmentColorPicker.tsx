@@ -10,6 +10,11 @@ const FINISHES: Record<string, string> = {
   "Ocean Blue": "#1f4ea5",
 };
 
+/** Illustrative swatch only; an unknown finish is represented by its name. */
+export function EquipmentColorSwatch({ color }: { color: string }) {
+  return FINISHES[color] ? <span aria-hidden="true" className="h-6 w-6 shrink-0 rounded border border-slate-300" style={{ backgroundColor: FINISHES[color] }} /> : null;
+}
+
 export function EquipmentColorPicker({ name, label, current, options }: {
   name: string;
   label: string;
@@ -28,7 +33,7 @@ export function EquipmentColorPicker({ name, label, current, options }: {
           {["", ...available].map((color) => (
             <label key={color} className="flex min-h-[var(--control)] min-w-0 cursor-pointer items-center gap-2 rounded border border-slate-300 p-2 text-sm has-checked:border-brand has-checked:bg-brand-soft">
               <input type="radio" name={name} value={color} defaultChecked={(current ?? "") === color} className="shrink-0 accent-brand" />
-              {FINISHES[color] && <span aria-hidden="true" className="h-6 w-6 shrink-0 rounded border border-slate-300" style={{ backgroundColor: FINISHES[color] }} />}
+              <EquipmentColorSwatch color={color} />
               <span className="min-w-0 break-words">{color || "Não escolhida"}</span>
             </label>
           ))}

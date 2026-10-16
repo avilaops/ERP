@@ -57,7 +57,7 @@ export default async function PainelDoFunilPage({ searchParams }: { searchParams
       </p>
       <PageHeader title="Painel do funil" hint={`Oportunidades criadas nos últimos ${PERIODS.find(([key]) => key === days)![1]}${everyone ? " · equipe toda" : " · as suas"}`} />
 
-      <nav aria-label="Período" className="mt-2 flex flex-wrap gap-2">
+      <nav aria-label="Período" className="view-tabs">
         {PERIODS.map(([key, label]) => (
           <Link
             key={key}
@@ -69,7 +69,7 @@ export default async function PainelDoFunilPage({ searchParams }: { searchParams
           </Link>
         ))}
       </nav>
-      <nav aria-label="Partes do painel" className="mt-2 flex flex-wrap gap-x-1 border-b border-slate-200">
+      <nav aria-label="Partes do painel" className="view-tabs">
         {TABS.map(([key, label]) => (
           <Link
             key={key}

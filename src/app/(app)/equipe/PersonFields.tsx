@@ -1,3 +1,4 @@
+import { FormSteps } from "@/components/FormSteps";
 import { MENU_ITEMS, POWERS } from "@/lib/auth/permissions";
 import type { AccessProfile } from "@/lib/db/access-profiles";
 import { ROLE_LABELS, ROLES } from "@/lib/auth/roles";
@@ -24,7 +25,7 @@ export function PersonFields({ saved, profiles }: { saved: AppUser | null; profi
   // A profile of the company is one more choice of access, with its own screens.
   const profileKey = (id: number) => `perfil:${id}`;
   return (
-    <>
+    <FormSteps label="Etapa da pessoa" steps={[{ title: "Identificação", content: <div className="grid gap-3">
       <div>
         <label htmlFor="name" className="block font-medium">
           Nome
@@ -41,7 +42,7 @@ export function PersonFields({ saved, profiles }: { saved: AppUser | null; profi
           <input id="email" name="email" type="email" inputMode="email" autoComplete="off" autoCapitalize="none" className={INPUT} />
         )}
       </div>
-      <AccessPicker
+      </div> }, { title: "Acesso", content: <AccessPicker
         options={[
           ...ROLES.map((role) => ({ role: role as string, label: ROLE_LABELS[role], note: ROLE_NOTES[role] })),
           ...profiles.map((profile) => ({
@@ -59,7 +60,7 @@ export function PersonFields({ saved, profiles }: { saved: AppUser | null; profi
         role={saved?.profileId != null ? profileKey(saved.profileId) : (saved?.role ?? "VENDEDOR")}
         items={saved?.profileId != null ? null : (saved?.items ?? null)}
       />
-    </>
+    }]} />
   );
 }
 

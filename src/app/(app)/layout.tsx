@@ -11,7 +11,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <div className="flex min-h-screen flex-col md:flex-row">
       <Sidebar session={session} />
       {/* On a phone the last line of the page ends above the bar of destinations, never under it. */}
-      <main className="min-w-0 flex-1 px-4 pt-3 pb-[calc(var(--tabbar)+1rem)] md:px-8 md:py-6">{children}</main>
+      <a href="#conteudo" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-white focus:p-4 focus:text-brand">Ir para o conteúdo</a>
+      <main id="conteudo" tabIndex={-1} className="min-w-0 flex-1 px-4 pt-3 pb-[calc(var(--tabbar)+1rem)] md:px-8 md:py-6">{children}</main>
     </div>
   );
 }

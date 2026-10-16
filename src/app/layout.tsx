@@ -22,7 +22,7 @@ export const metadata: Metadata = {
   appleWebApp: { capable: true, title: APP_SHORT_NAME, statusBarStyle: "default" },
 };
 
-export const viewport: Viewport = { themeColor: THEME_COLOR };
+export const viewport: Viewport = { themeColor: THEME_COLOR, viewportFit: "cover" };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   // Claro or Escuro chosen by the person; without a choice the attribute is left out and the device decides (globals.css).

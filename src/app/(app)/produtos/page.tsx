@@ -127,10 +127,7 @@ export default async function ProdutosPage({
         heading={
           <>
             <h1 className="text-2xl font-semibold">{ITEM.label}</h1>
-            <p className="mt-1 max-w-2xl text-slate-600">
-              {words.costIntro} Preço e alçadas recalculam ao salvar a linha; a equipe só vê
-              depois que você publicar.
-            </p>
+            <p className="mt-1 max-w-2xl text-sm text-slate-600">Custos e preços dos equipamentos. Alterações chegam à equipe após publicar.</p>
           </>
         }
       />
@@ -142,7 +139,7 @@ export default async function ProdutosPage({
       <section className="mt-6 rounded-lg border border-slate-200 bg-white" aria-label="Equipamentos">
         <div className="flex flex-wrap items-end justify-between gap-4 p-4">
           <div className="flex flex-col gap-3">
-            <nav aria-label="Abas" className="flex w-fit rounded-lg border border-slate-200 p-0.5 text-sm">
+            <nav aria-label="Abas" className="view-tabs">
               {PRODUCT_TABS.map(({ key, label }) => (
                 <Link
                   key={key}
@@ -198,9 +195,9 @@ export default async function ProdutosPage({
                 <li key={row.id} className="border-t border-slate-200 first:border-t-0">
                   <Link href={`${ITEM.href}/${row.id}`} className="flex items-center justify-between gap-3 px-4 py-3 active:bg-slate-50">
                     <span className="min-w-0">
-                      <span className="block truncate font-medium">{row.values.name}</span>
-                      <span className="block truncate text-xs text-slate-500">{[row.values.code || "sem código", row.supplier].filter(Boolean).join(" · ")}</span>
-                      <span className="block truncate text-xs text-slate-500">{row.ncm}</span>
+                      <span className="block break-words font-medium">{row.values.name}</span>
+                      <span className="block break-words text-xs text-slate-500">{[row.values.code || "sem código", row.supplier].filter(Boolean).join(" · ")}</span>
+                      <span className="block break-words text-xs text-slate-500">{row.ncm}</span>
                     </span>
                     <span className="shrink-0 text-right">
                       <span className="block font-semibold">{row.tableWithIpi ?? "sem custo"}</span>

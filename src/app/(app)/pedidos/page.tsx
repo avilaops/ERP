@@ -1,5 +1,8 @@
 import Link from "next/link";
-import { CARD, PRIMARY, SECONDARY } from "@/components/ui";
+import { cookies } from "next/headers";
+import { FitRows } from "@/components/FitRows";
+import { CARD, PRIMARY, SECONDARY, MetricSummary, Pager, pageOf } from "@/components/ui";
+import { rowsPerPage } from "@/lib/rows";
 import { requirePermission } from "@/lib/auth";
 import { menuItem, seesAllOrders } from "@/lib/auth/permissions";
 import { listOrders } from "@/lib/db/orders";
@@ -33,6 +36,8 @@ export default async function PedidosPage({ searchParams }: { searchParams: Prom
   const everyone = seesAllOrders(session);
   const orders = await listOrders({ sellerEmail: everyone ? null : session.email }, conn);
   const { rows, counts, indicators } = ordersView(orders, { tab, search, me: session.email, month: isoDate(new Date()).slice(0, 7) });
+  const size = rowsPerPage((await cookies()).get("erp_linhas_pedidos")?.value, 1);
+  const slice = pageOf(rows, first(query.p), size);
 
   const address = (key: string) => {
     const params = new URLSearchParams();
@@ -61,18 +66,10 @@ export default async function PedidosPage({ searchParams }: { searchParams: Prom
         </Link>
       </div>
 
-      <dl className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-        {cards.map(([label, value, note]) => (
-          <div key={label} className={`${CARD} p-4`}>
-            <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</dt>
-            <dd className="mt-1 text-lg font-bold sm:text-2xl">{value}</dd>
-            <dd className="text-xs text-slate-600">{note}</dd>
-          </div>
-        ))}
-      </dl>
+      <MetricSummary items={cards.map(([label, value, note]) => ({ label, value, note }))} />
 
       <div className="mt-6 flex flex-wrap items-end justify-between gap-3">
-        <nav aria-label="Situação" className="flex flex-wrap rounded-lg border border-slate-200 bg-white p-0.5 text-sm">
+        <nav aria-label="Situação" className="view-tabs">
           {ORDER_TABS.map((item) => (
             <Link
               key={item.key}
@@ -100,7 +97,7 @@ export default async function PedidosPage({ searchParams }: { searchParams: Prom
         </form>
       </div>
 
-      <section className={`${CARD} mt-4`} aria-label="Lista de pedidos">
+      <section id="lista-pedidos" className={`${CARD} mt-4`} aria-label="Lista de pedidos">
         {rows.length === 0 ? (
           <p className="p-6 text-sm text-slate-600">
             {orders.length === 0
@@ -113,8 +110,8 @@ export default async function PedidosPage({ searchParams }: { searchParams: Prom
           <>
             {/* On a phone each order is a card; the table is for wider screens. */}
             <ul className="md:hidden">
-              {rows.map((row) => (
-                <li key={row.number} className="border-t border-slate-200 first:border-t-0">
+              {slice.rows.map((row) => (
+                <li data-row key={row.number} className="border-t border-slate-200 first:border-t-0">
                   <Link href={`${HERE}/${row.number}`} className="block px-4 py-3 active:bg-slate-50">
                     <div className="flex items-start justify-between gap-3">
                       <span className="min-w-0 font-medium text-brand">{row.customer}</span>
@@ -158,8 +155,8 @@ export default async function PedidosPage({ searchParams }: { searchParams: Prom
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((row) => (
-                    <tr key={row.number} className="border-t border-slate-200 align-top hover:bg-slate-50">
+                  {slice.rows.map((row) => (
+                    <tr data-row key={row.number} className="border-t border-slate-200 align-top hover:bg-slate-50">
                       <td className="px-4 py-3">
                         <Link href={`${HERE}/${row.number}`} className="font-medium text-brand underline-offset-2 hover:underline">
                           {row.customer}
@@ -181,6 +178,8 @@ export default async function PedidosPage({ searchParams }: { searchParams: Prom
           </>
         )}
       </section>
+      <Pager {...slice} noun={["pedido", "pedidos"]} hrefFor={(page) => `${address(tab)}${address(tab).includes("?") ? "&" : "?"}p=${page}`} />
+      <FitRows listId="lista-pedidos" shown={size} minimum={1} cookieName="erp_linhas_pedidos" />
     </>
   );
 }

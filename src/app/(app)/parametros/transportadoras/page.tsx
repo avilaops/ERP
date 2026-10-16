@@ -65,10 +65,10 @@ export default async function TransportadorasPage() {
         </Link>
       </p>
       <h1 className="mt-2 text-2xl font-semibold">Transportadoras</h1>
-      <p className="mt-1 max-w-3xl text-slate-600">
+      <details className="mt-1 max-w-3xl text-sm text-slate-600"><summary className="inline-flex min-h-[var(--control)] cursor-pointer items-center text-brand">Como funciona</summary><p className="pb-3">
         Quem leva a mercadoria. Na nota fiscal a transportadora é opcional: só a modalidade do frete é obrigatória. Cadastre aqui para
         escolher no pedido. Só CNPJ ou CPF e o nome são exigidos; com inscrição estadual, a UF também.
-      </p>
+      </p></details>
 
       <section className={`${CARD} mt-6 p-5`} aria-labelledby="nova">
         <h2 id="nova" className="text-sm font-semibold uppercase tracking-wide">

@@ -19,7 +19,7 @@ O menu fica à esquerda em todas as telas. Ele mostra apenas os itens liberados 
 
 | Item | Para que serve |
 | --- | --- |
-| Dashboard | Visão geral de vendas, funil, lucro e ranking. |
+| Painel | Visão geral de vendas, funil, lucro e ranking. |
 | Relatórios | Um resumo e uma lista de cada área (vendas, funil, clientes, notas, recebimentos, contas, comissões e produtos), com exportação para planilha. Cada pessoa vê os relatórios das telas que tem. |
 | Preços e metas | Metas de venda e acompanhamento da tabela. |
 | Aprovações | Pedidos que pediram aprovação por desconto ou entrada. |
@@ -35,7 +35,7 @@ O menu fica à esquerda em todas as telas. Ele mostra apenas os itens liberados 
 | Comissões | Comissão de cada vendedor por mês. |
 | Tabela de preços | Preços publicados para a equipe. |
 | Produtos e custos | Equipamentos e custos da assessoria. |
-| Parâmetros | Impostos, canal e política comercial. |
+| Configurações | Impostos, canal e política comercial. |
 | Simulador | Simulação de preço e desconto sem criar pedido. |
 | Equipe e acessos | Usuários e perfis. |
 

@@ -7,7 +7,7 @@ import type { Role } from "@/lib/auth/roles";
  * manual does not say a profile sees an item, the profile does not get it.
  */
 const MENU = [
-  { key: "dashboard", label: "Dashboard", href: "/dashboard", roles: ["DIRETORIA", "GERENTE_COMERCIAL", "VENDEDOR"] },
+  { key: "dashboard", label: "Painel", href: "/dashboard", roles: ["DIRETORIA", "GERENTE_COMERCIAL", "VENDEDOR"] },
   { key: "relatorios", label: "Relatórios", href: "/relatorios", roles: ["DIRETORIA", "GERENTE_COMERCIAL", "VENDEDOR", "FINANCEIRO"] },
   { key: "precos-metas", label: "Preços e metas", href: "/precos-metas", roles: ["DIRETORIA", "GERENTE_COMERCIAL"] },
   { key: "aprovacoes", label: "Aprovações", href: "/aprovacoes", roles: ["DIRETORIA", "GERENTE_COMERCIAL"] },
@@ -23,7 +23,7 @@ const MENU = [
   { key: "comissoes", label: "Comissões", href: "/comissoes", roles: ["DIRETORIA", "VENDEDOR", "FINANCEIRO"] },
   { key: "tabela-precos", label: "Tabela de preços", href: "/tabela-precos", roles: ["DIRETORIA", "GERENTE_COMERCIAL", "VENDEDOR"] },
   { key: "produtos", label: "Produtos e custos", href: "/produtos", roles: ["DIRETORIA"] },
-  { key: "parametros", label: "Parâmetros", href: "/parametros", roles: ["DIRETORIA"] },
+  { key: "parametros", label: "Configurações", href: "/parametros", roles: ["DIRETORIA"] },
   { key: "simulador", label: "Simulador", href: "/simulador", roles: ["DIRETORIA", "GERENTE_COMERCIAL", "VENDEDOR"] },
   { key: "equipe", label: "Equipe e acessos", href: "/equipe", roles: ["DIRETORIA"] },
 ] as const satisfies readonly {

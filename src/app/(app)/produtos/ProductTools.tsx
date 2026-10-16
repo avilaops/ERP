@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import type { ReactNode } from "react";
-import { PRIMARY, SECONDARY } from "@/components/ui";
+import { PRIMARY, SECONDARY, SectionDisclosure } from "@/components/ui";
 import type { PasteState } from "@/lib/advisory-paste";
 import type { NewProductState } from "@/lib/product-form";
 import { lineWords } from "@/lib/line-words";
@@ -41,7 +41,9 @@ export function ProductTools({
     <>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>{heading}</div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-start gap-2">
+          <SectionDisclosure title="Ferramentas do catálogo">
+          <div className="flex flex-wrap gap-2">
           {BUTTONS.map(([panel, label, controls]) => (
             <button
               key={panel}
@@ -58,9 +60,9 @@ export function ProductTools({
             Catálogo do fornecedor
           </Link>
           {/* On a phone a new equipment has a screen of its own. */}
-          <Link href={`/produtos/novo?linha=${lineId}`} className={`${PRIMARY} md:hidden`}>
-            + Equipamento
-          </Link>
+          </div>
+          </SectionDisclosure>
+          <Link href={`/produtos/novo?linha=${lineId}`} className={PRIMARY}>+ Equipamento</Link>
         </div>
       </div>
 

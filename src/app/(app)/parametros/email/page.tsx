@@ -34,13 +34,13 @@ export default async function EmailPage({ searchParams }: { searchParams: Promis
         </Link>
       </p>
       <h1 className="mt-2 text-2xl font-semibold">E-mail das notas</h1>
-      <p className="mt-1 max-w-3xl text-slate-600">
+      <details className="mt-1 max-w-3xl text-sm text-slate-600"><summary className="inline-flex min-h-[var(--control)] cursor-pointer items-center text-brand">Como funciona</summary><p className="pb-3">
         Quando uma nota fiscal é autorizada, o cliente recebe o XML e o DANFE por e-mail. A mensagem sai com o nome da sua empresa. Se a nota for
         cancelada, quem recebeu a nota recebe o aviso do cancelamento.
-      </p>
+      </p></details>
 
       {/* One part at a time: each is a decision of its own. */}
-      <nav aria-label="Partes do e-mail" className="mt-4 flex flex-wrap gap-x-1 border-b border-slate-200">
+      <nav aria-label="Partes do e-mail" className="view-tabs">
         {TABS.map(([key, label]) => (
           <Link
             key={key}

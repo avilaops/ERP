@@ -1,7 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
-import { PRIMARY } from "@/components/ui";
+import { useActionState, useState } from "react";
+import { INPUT as SHARED_INPUT, PRIMARY, SECONDARY } from "@/components/ui";
 import type { CustomerKind } from "@/lib/customer";
 import { CUSTOMER_FIELDS, IDLE_CUSTOMER } from "@/lib/customer-form";
 import type { CustomerFieldKey, CustomerFormState, CustomerFormValues } from "@/lib/customer-form";
@@ -9,7 +9,7 @@ import { UFS } from "@/lib/pricing/states";
 
 type SaveAction = (state: CustomerFormState, formData: FormData) => Promise<CustomerFormState>;
 
-const INPUT = "mt-1 min-h-[var(--control)] w-full min-w-0 rounded border bg-white px-3 outline-none focus:ring-2 focus:ring-brand";
+const INPUT = SHARED_INPUT;
 
 /**
  * The record of a customer. Only reads and shows text: what is required, the
@@ -40,6 +40,16 @@ export function CustomerForm({
   const [state, formAction, pending] = useActionState(action, IDLE_CUSTOMER);
   const values = state.status === "error" && state.values ? state.values : saved;
   const { main, address } = CUSTOMER_FIELDS[kind];
+  const [step, setStep] = useState(0);
+  const groups = [
+    { title: kind === "PJ" ? "Identificação da empresa" : "Identificação pessoal", fields: main.filter((item) => !["phone", "email", "contactName", "tradeName", "stateRegistration"].includes(item.key)) },
+    ...(kind === "PJ" ? [{ title: "Dados da empresa", fields: main.filter((item) => ["tradeName", "stateRegistration"].includes(item.key)) }] : []),
+    { title: "Contato", fields: main.filter((item) => ["phone", "email", "contactName"].includes(item.key)) },
+    { title: "Endereço", fields: address.filter((item) => ["cep", "street", "streetNumber"].includes(item.key)) },
+    { title: "Bairro e complemento", fields: address.filter((item) => ["complement", "district"].includes(item.key)) },
+    { title: "Cidade e estado", fields: address.filter((item) => ["city", "uf"].includes(item.key)) },
+  ];
+  const showAll = state.status === "error";
 
   const field = ({ key, label, help, wide }: (typeof main)[number]) => {
     const invalid = state.invalid.includes(key);
@@ -92,7 +102,7 @@ export function CustomerForm({
   };
 
   return (
-    <form action={formAction} noValidate className="flex flex-col gap-6">
+    <form action={formAction} noValidate className="flex flex-col gap-3">
       {id !== null && <input type="hidden" name="id" value={id} />}
       <input type="hidden" name="kind" value={kind} />
       {Object.entries(hidden ?? {}).map(([name, value]) => (
@@ -115,35 +125,33 @@ export function CustomerForm({
         </p>
       )}
 
-      <fieldset className="rounded-lg border border-slate-200 bg-white">
-        <legend className="sr-only">{kind === "PJ" ? "Empresa" : "Pessoa física"}</legend>
-        <h2 className="border-b border-slate-200 px-5 py-3 text-sm font-semibold uppercase tracking-wide">
-          {kind === "PJ" ? "Empresa (CNPJ)" : "Pessoa física (CPF)"}
-        </h2>
-        <div className="grid gap-5 p-5 sm:grid-cols-2">{main.map(field)}</div>
-        {kind === "PF" && <p className="px-5 pb-5 text-xs text-slate-500">Pessoa física é sempre não contribuinte do ICMS.</p>}
-      </fieldset>
-
-      <fieldset className="rounded-lg border border-slate-200 bg-white">
-        <legend className="sr-only">Endereço</legend>
-        <h2 className="border-b border-slate-200 px-5 py-3 text-sm font-semibold uppercase tracking-wide">Endereço</h2>
-        <div className="grid gap-5 p-5 sm:grid-cols-3">{address.map(field)}</div>
-        {cepNote && <p className="px-5 pb-5 text-xs text-slate-500">{cepNote}</p>}
-      </fieldset>
+      {!showAll && <label className="block text-sm font-medium"><span className="sr-only">Etapa do cadastro</span>
+        <select value={step} onChange={(event) => setStep(Number(event.target.value))} className={SHARED_INPUT}>
+          {groups.map((group, index) => <option key={group.title} value={index}>{index + 1} de {groups.length} · {group.title}</option>)}
+        </select>
+      </label>}
+      {groups.map((group, index) => (
+        <fieldset key={group.title} hidden={!showAll && step !== index} className="rounded-xl border border-slate-200 bg-white">
+          <legend className="sr-only">{group.title}</legend>
+          {showAll && <h2 className="border-b border-slate-200 px-4 py-3 text-sm font-semibold">{group.title}</h2>}
+          <div className="grid gap-3 p-4 sm:grid-cols-2">{group.fields.map(field)}</div>
+          {index === groups.length - 1 && cepNote && <p className="px-4 pb-4 text-sm text-slate-600">{cepNote}</p>}
+        </fieldset>
+      ))}
 
       {/* On the customer's own screen the button stays in reach at the bottom of a phone. Inside an order, the order has its own bar. */}
-      <div className={`flex items-center gap-4 ${hidden === undefined ? "sticky bottom-[var(--tabbar)] z-10 -mx-4 border-t border-slate-200 bg-white px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:static md:mx-0 md:border-0 md:bg-transparent md:p-0" : ""}`}>
+      <div className={`flex flex-wrap items-center gap-2 ${hidden === undefined ? "sticky bottom-[var(--tabbar)] z-10 -mx-4 border-t border-slate-200 bg-white px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:static md:mx-0 md:border-0 md:bg-transparent md:p-0" : ""}`}>
+        {!showAll && step > 0 && <button type="button" className={SECONDARY} onClick={() => setStep(step - 1)}>Voltar</button>}
+        {!showAll && step < groups.length - 1 && <button type="submit" className={PRIMARY} onClick={(event) => { event.preventDefault(); setStep(step + 1); }}>Continuar</button>}
         <button
           type="submit"
           disabled={pending}
-          className={PRIMARY}
+          className={!showAll && step < groups.length - 1 ? SECONDARY : PRIMARY}
         >
           {pending ? "Gravando…" : "Salvar cliente"}
         </button>
-        <p className="text-xs text-slate-500">
-          Campos com <span className="text-red-700">*</span> são exigidos para fechar o pedido.
-        </p>
       </div>
+        {showAll && <p className="text-xs text-slate-500">Campos com * são exigidos para fechar o pedido.</p>}
     </form>
   );
 }

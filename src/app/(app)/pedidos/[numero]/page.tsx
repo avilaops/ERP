@@ -69,7 +69,7 @@ export const dynamic = "force-dynamic";
 const NONE = "—";
 const TERMS = "condicoes";
 const TITLE = "text-sm font-semibold uppercase tracking-wide";
-const BUTTON = "rounded border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50";
+const BUTTON = SECONDARY;
 const HELP = "mt-1 text-xs text-slate-500";
 
 const BAND_COLORS = {
@@ -313,7 +313,7 @@ export default async function PedidoPage({
           <strong>Aprovação recusada</strong> por {decision.decidedBy} em {showDateTime(decision.decidedAt)}: {decision.comment}
         </p>
       )}
-      {/* On a phone the page is one part at a time; on a wider screen everything is drawn. */}
+      {/* Fields remain mounted while the selected part changes at every viewport. */}
       <OrderParts parts={parts} initial={initialPart}>
       {order.status === "aguardando_aprovacao" && allows(session, "aprovacoes") && (
         <section data-part="resumo" className="mt-3 rounded-lg border border-brand bg-white p-4" aria-labelledby="sua-decisao">
@@ -1002,7 +1002,7 @@ export default async function PedidoPage({
                           key={value}
                           href={`${here}?cliente=${slug}`}
                           aria-current={kind === value ? "page" : undefined}
-                          className={`rounded-md px-3 py-1.5 font-medium ${
+                          className={`inline-flex min-h-[var(--control)] items-center rounded-md px-3 font-medium ${
                             kind === value ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100"
                           }`}
                         >

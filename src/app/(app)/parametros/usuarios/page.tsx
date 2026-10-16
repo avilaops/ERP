@@ -30,10 +30,10 @@ export default async function UsuariosPage() {
         </Link>
       </p>
       <h1 className="mt-2 text-2xl font-semibold">Usuários de {session.tenant.name}</h1>
-      <p className="mt-1 max-w-3xl text-slate-600">
+      <details className="mt-1 max-w-3xl text-sm text-slate-600"><summary className="inline-flex min-h-[var(--control)] cursor-pointer items-center text-brand">Como funciona</summary><p className="pb-3">
         Quem está aqui entra no sistema com o perfil escolhido. A pessoa entra pelo login da Ávila Ops, com este mesmo e-mail; a
         senha é dela e não fica neste sistema.
-      </p>
+      </p></details>
 
       <section className={`${CARD} mt-6 p-5`} aria-labelledby="novo">
         <h2 id="novo" className="text-sm font-semibold uppercase tracking-wide">

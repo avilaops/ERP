@@ -81,10 +81,10 @@ export default async function DespesasFixasPage() {
         </Link>
       </p>
       <h1 className="mt-2 text-2xl font-semibold">Despesas fixas</h1>
-      <p className="mt-1 max-w-3xl text-slate-600">
+      <details className="mt-1 max-w-3xl text-sm text-slate-600"><summary className="inline-flex min-h-[var(--control)] cursor-pointer items-center text-brand">Como funciona</summary><p className="pb-3">
         O que a empresa paga todo mês. A soma das despesas em uso é o valor “Despesas fixas por mês” dos Parâmetros, usado no ponto de
         equilíbrio. Em Contas a pagar, um botão lança as contas do mês a partir desta lista.
-      </p>
+      </p></details>
       <p className="mt-3 text-lg">
         Total em uso: <strong>{showMoney(total)}</strong> por mês
       </p>

@@ -8,7 +8,7 @@ import type { Role } from "@/lib/auth/roles";
 
 // Columns: Diretoria, Gerente comercial, Vendedor, Financeiro.
 const MATRIX: [MenuItemKey, string, string, [boolean, boolean, boolean, boolean]][] = [
-  ["dashboard", "Dashboard", "/dashboard", [true, true, true, false]],
+  ["dashboard", "Painel", "/dashboard", [true, true, true, false]],
   ["relatorios", "Relatórios", "/relatorios", [true, true, true, true]],
   ["precos-metas", "Preços e metas", "/precos-metas", [true, true, false, false]],
   ["aprovacoes", "Aprovações", "/aprovacoes", [true, true, false, false]],
@@ -24,7 +24,7 @@ const MATRIX: [MenuItemKey, string, string, [boolean, boolean, boolean, boolean]
   ["comissoes", "Comissões", "/comissoes", [true, false, true, true]],
   ["tabela-precos", "Tabela de preços", "/tabela-precos", [true, true, true, false]],
   ["produtos", "Produtos e custos", "/produtos", [true, false, false, false]],
-  ["parametros", "Parâmetros", "/parametros", [true, false, false, false]],
+  ["parametros", "Configurações", "/parametros", [true, false, false, false]],
   ["simulador", "Simulador", "/simulador", [true, true, true, false]],
   ["equipe", "Equipe e acessos", "/equipe", [true, false, false, false]],
 ];

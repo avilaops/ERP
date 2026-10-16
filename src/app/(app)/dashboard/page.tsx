@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CARD, SECONDARY } from "@/components/ui";
+import { CARD, SECONDARY, SectionDisclosure } from "@/components/ui";
 import { Bars, Columns, Kpi } from "@/components/Charts";
 import { requirePermission } from "@/lib/auth";
 import { allows, menuItem, seesAllOrders, seesCosts } from "@/lib/auth/permissions";
@@ -92,7 +92,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           <h1 className="text-2xl font-semibold">{menuItem("dashboard").label}</h1>
           <p className="mt-1 text-slate-600">{everyone ? "Vendas de toda a equipe." : "Os seus números."}</p>
         </div>
-        <nav aria-label="Período" className="flex flex-wrap rounded-lg border border-slate-200 bg-white p-0.5 text-sm">
+        <nav aria-label="Período" className="view-tabs">
           {PERIODS.map((item) => (
             <Link
               key={item.key}
@@ -126,7 +126,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         </form>
       )}
 
-      <nav aria-label="Partes do dashboard" className="mt-3 flex flex-wrap gap-x-1 border-b border-slate-200">
+      <nav aria-label="Partes do dashboard" className="view-tabs">
         {tabs.map(([key, label]) => (
           <Link
             key={key}
@@ -154,6 +154,10 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         />
         <Kpi label="Em negociação" value={showMoney(view.open.total)} note={`${view.open.count} ${view.open.count === 1 ? "pedido em aberto" : "pedidos em aberto"} · hoje`} />
         <Kpi label="Ticket médio" value={view.averageTicket === null ? NONE : showMoney(view.averageTicket)} note={<>por pedido fechado{versus(change(view.averageTicket, view.previous.averageTicket))}</>} />
+      </dl>
+      )}
+      {tab === "resumo" && <SectionDisclosure title="Ver taxas e resultado" className="mt-3">
+      <dl className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <Kpi label="Taxa de fechamento" value={view.conversion === null ? NONE : showPercent(view.conversion, 0)} note={<>fechados ÷ (fechados + perdidos){versus(change(view.conversion, view.previous.conversion))}</>} />
         <Kpi label="Desconto médio" value={view.averageDiscount === null ? NONE : showPercent(view.averageDiscount)} note="nos pedidos fechados" />
         {profit && (
@@ -167,7 +171,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           </>
         )}
       </dl>
-      )}
+      </SectionDisclosure>}
 
       {tab === "resumo" && (
         <>

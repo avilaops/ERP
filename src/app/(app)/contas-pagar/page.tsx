@@ -1,5 +1,8 @@
 import Link from "next/link";
-import { CARD, DANGER, INPUT, PRIMARY, SECONDARY } from "@/components/ui";
+import { cookies } from "next/headers";
+import { FitRows } from "@/components/FitRows";
+import { CARD, DANGER, INPUT, PRIMARY, SECONDARY, PageHeader, MetricSummary, Pager, pageOf, ViewTabs } from "@/components/ui";
+import { rowsPerPage } from "@/lib/rows";
 import { requirePermission } from "@/lib/auth";
 import { allows, menuItem } from "@/lib/auth/permissions";
 import { monthLabel } from "@/lib/commissions-view";
@@ -34,7 +37,8 @@ const first = (value: string | string[] | undefined) => (Array.isArray(value) ? 
 export default async function ContasPagarPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const session = await requirePermission("contas-pagar");
   const conn = tenantDb(session.tenant.slug);
-  const tab = parsePayableTab(first((await searchParams).aba));
+  const query = await searchParams;
+  const tab = parsePayableTab(first(query.aba));
 
   const today = isoDate(new Date());
   const payables = await listPayables(conn);
@@ -45,6 +49,10 @@ export default async function ContasPagarPage({ searchParams }: { searchParams: 
   const summary = payablesSummary(payables, commissions, { today, inSevenDays: addDays(today, 7), month: today.slice(0, 7) });
   const shown = payables.filter((payable) => inPayableTab(payable, tab));
   const owed = tab === "pagas" ? [] : commissions.filter((item) => item.amount > 0);
+  const size = rowsPerPage((await cookies()).get("erp_linhas_pagar")?.value, 1);
+  const slice = pageOf([...owed.map((item) => ({ type: "commission" as const, item })), ...shown.map((item) => ({ type: "payable" as const, item }))], first(query.p), size);
+  const visibleCommissions = slice.rows.flatMap((row) => row.type === "commission" ? [row.item] : []);
+  const visiblePayables = slice.rows.flatMap((row) => row.type === "payable" ? [row.item] : []);
 
   const cards = [
     ["A pagar", showMoney(summary.open.total), count(summary.open.count), ""],
@@ -55,11 +63,11 @@ export default async function ContasPagarPage({ searchParams }: { searchParams: 
 
   return (
     <>
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold">{menuItem("contas-pagar").label}</h1>
-          <p className="mt-1 text-slate-600">Tudo o que a empresa tem a pagar, com as comissões devidas aos vendedores.</p>
-        </div>
+      <PageHeader title={menuItem("contas-pagar").label} hint="Organize vencimentos e pagamentos." />
+      <MetricSummary items={cards.map(([label, value, note, color]) => ({ label, value, note, attention: Boolean(color) }))} />
+      <details className={`${CARD} mt-3`}>
+        <summary className="disclosure-heading">Lançar conta e ferramentas<span className="disclosure-marker" aria-hidden="true">+</span></summary>
+        <div className="border-t border-slate-200 p-4">
         <div className="flex flex-wrap items-start gap-2">
           <ActionForm action={launchFixedExpensesAction}>
             <button type="submit" className={SECONDARY}>
@@ -70,20 +78,7 @@ export default async function ContasPagarPage({ searchParams }: { searchParams: 
             Baixar planilha (CSV)
           </a>
         </div>
-      </div>
-
-      <dl className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-        {cards.map(([label, value, note, color]) => (
-          <div key={label} className={`${CARD} p-4`}>
-            <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</dt>
-            <dd className={`mt-1 text-lg font-bold sm:text-2xl ${color}`}>{value}</dd>
-            <dd className="text-xs text-slate-600">{note}</dd>
-          </div>
-        ))}
-      </dl>
-
-      <details className={`${CARD} mt-6`}>
-        <summary className="cursor-pointer px-5 py-3 text-sm font-semibold uppercase tracking-wide">+ Lançar conta</summary>
+        </div>
         <ActionForm action={createPayableAction} className="grid gap-4 border-t border-slate-200 p-5 sm:grid-cols-2 xl:grid-cols-3">
           <div className="sm:col-span-2 xl:col-span-3">
             <label htmlFor="description" className={LABEL}>
@@ -150,26 +145,15 @@ export default async function ContasPagarPage({ searchParams }: { searchParams: 
         </ActionForm>
       </details>
 
-      <nav aria-label="Situação" className="mt-6 flex w-fit flex-wrap rounded-lg border border-slate-200 bg-white p-0.5 text-sm">
-        {PAYABLE_TABS.map((item) => (
-          <Link
-            key={item.key}
-            href={item.key === "abertas" ? HERE : `${HERE}?aba=${item.key}`}
-            aria-current={item.key === tab ? "page" : undefined}
-            className={`inline-flex min-h-[var(--control)] items-center rounded-md px-3 font-medium ${item.key === tab ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100"}`}
-          >
-            {item.label} ({payables.filter((payable) => inPayableTab(payable, item.key)).length})
-          </Link>
-        ))}
-      </nav>
+      <ViewTabs label="Situação" items={PAYABLE_TABS.map((item) => ({ href: `${HERE}?aba=${item.key}`, label: `${item.label} (${payables.filter((payable) => inPayableTab(payable, item.key)).length + (item.key === "pagas" ? 0 : commissions.filter((commission) => commission.amount > 0).length)})`, current: item.key === tab }))} />
 
       <section className={`${CARD} mt-4`} aria-label="Contas">
         {shown.length === 0 && owed.length === 0 ? (
           <p className="p-5 text-sm text-slate-600">Nenhuma conta nesta aba.</p>
         ) : (
-          <ul>
-            {owed.map((item) => (
-              <li key={`${item.sellerEmail}-${item.month}`} className="border-t border-slate-200 px-5 py-4 first:border-t-0">
+          <ul id="contas">
+            {visibleCommissions.map((item) => (
+              <li data-row key={`${item.sellerEmail}-${item.month}`} className="border-t border-slate-200 px-4 py-3 first:border-t-0">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="font-medium">Comissão de {item.sellerName}</p>
@@ -191,10 +175,10 @@ export default async function ContasPagarPage({ searchParams }: { searchParams: 
                 )}
               </li>
             ))}
-            {shown.map((payable) => {
+            {visiblePayables.map((payable) => {
               const late = payable.status === "aberta" && payable.dueDate < today;
               return (
-                <li key={payable.id} className="border-t border-slate-200 px-5 py-4 first:border-t-0">
+                <li data-row key={payable.id} className="border-t border-slate-200 px-4 py-3 first:border-t-0">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="font-medium">{payable.description}</p>
@@ -215,7 +199,9 @@ export default async function ContasPagarPage({ searchParams }: { searchParams: 
                     </div>
                   </div>
                   {payable.status === "aberta" ? (
-                    <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
+                    <details className="mt-2">
+                      <summary className="disclosure-heading !px-0 text-brand">Registrar pagamento<span className="disclosure-marker" aria-hidden="true">+</span></summary>
+                    <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
                       <ActionForm action={payPayableAction} className="flex flex-wrap items-end gap-3">
                         <input type="hidden" name="id" value={payable.id} />
                         <div>
@@ -264,6 +250,7 @@ export default async function ContasPagarPage({ searchParams }: { searchParams: 
                         <ConfirmButton label="Excluir" confirmLabel="Confirmar exclusão" className={DANGER} />
                       </ActionForm>
                     </div>
+                    </details>
                   ) : null}
                   {payable.status === "aberta" ? (
                     <details className="mt-3 text-sm">
@@ -348,6 +335,8 @@ export default async function ContasPagarPage({ searchParams }: { searchParams: 
           </ul>
         )}
       </section>
+      <Pager {...slice} noun={["conta", "contas"]} hrefFor={(page) => `${HERE}?${new URLSearchParams({ aba: tab, ...(page > 1 ? { p: String(page) } : {}) })}`} />
+      <FitRows listId="contas" shown={size} minimum={1} cookieName="erp_linhas_pagar" />
     </>
   );
 }

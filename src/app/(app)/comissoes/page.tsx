@@ -1,7 +1,7 @@
 import { futureCommission } from "@/lib/db/receivables";
 import { roundCents } from "@/lib/pricing/money";
 import Link from "next/link";
-import { CARD, PRIMARY } from "@/components/ui";
+import { CARD, PRIMARY, PageHeader, MetricSummary } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { managesCommissions, menuItem } from "@/lib/auth/permissions";
 import { chooseMonth, commissionsView, monthLabel } from "@/lib/commissions-view";
@@ -51,30 +51,18 @@ export default async function ComissoesPage({ searchParams }: { searchParams: Pr
 
   return (
     <>
-      <h1 className="text-2xl font-semibold">{manages ? menuItem("comissoes").label : "Minhas comissões"}</h1>
-      <p className="mt-1 max-w-3xl text-slate-600">
-        A comissão nasce quando o valor é recebido, sobre a parte sem IPI. O que entra num mês é pago no dia {paymentDay} do mês
-        seguinte. Estorno devolve a comissão e desconta do próximo pagamento.
-      </p>
+      <PageHeader title={manages ? menuItem("comissoes").label : "Minhas comissões"} hint={`A comissão nasce quando o valor é recebido, sobre a parte sem IPI. O que entra num mês é pago no dia ${paymentDay} do mês seguinte. Estorno devolve a comissão e desconta do próximo pagamento.`} />
 
-      <dl className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-        {(
+      <MetricSummary items={(
           [
             ["Recebido de clientes", showMoney(totals.received), `${monthLabel(month)} · sem IPI`],
             ["Comissão do mês", showMoney(totals.month), manages ? `${sellers} ${sellers === 1 ? "vendedor" : "vendedores"}` : "sua comissão"],
             ["Falta pagar", showMoney(totals.payable), "com o que ficou de meses anteriores"],
             ["Comissão futura", showMoney(totals.future), "do que ainda não foi recebido"],
           ] as const
-        ).map(([label, value, note]) => (
-          <div key={label} className="rounded-lg border border-slate-200 bg-white p-4">
-            <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</dt>
-            <dd className="mt-1 text-2xl font-bold">{value}</dd>
-            <dd className="text-xs text-slate-600">{note}</dd>
-          </div>
-        ))}
-      </dl>
+        ).map(([label, value, note]) => ({ label, value, note }))} />
 
-      <nav aria-label="Mês" className="mt-6 flex flex-wrap gap-2 text-sm">
+      <nav aria-label="Mês" className="view-tabs">
         {shown.map((item) => (
           <Link
             key={item}

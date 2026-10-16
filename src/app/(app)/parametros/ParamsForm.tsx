@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { PRIMARY } from "@/components/ui";
+import { INPUT, PRIMARY, SectionDisclosure } from "@/components/ui";
 import { lineWords } from "@/lib/line-words";
 import { IDLE_FORM_STATE, PARAM_SECTIONS, STATE_RATE_COLUMNS } from "@/lib/params-form";
 import type { ParamField, ParamsFormState, ParamsFormValues, StateRateKey } from "@/lib/params-form";
@@ -35,6 +35,7 @@ export function ParamsForm({ saved, action, lineId, imported }: { saved: ParamsF
   // A refused form shows every part: the mistake may be in any of them.
   const parts = [...PARAM_SECTIONS.map((section) => section.title), "ICMS por estado"];
   const [part, setPart] = useState(0);
+  const [ufGroup, setUfGroup] = useState(0);
   const everyPart = state.status === "error";
   const out = (index: number) => (everyPart || index === part ? "" : " hidden");
 
@@ -59,20 +60,11 @@ export function ParamsForm({ saved, action, lineId, imported }: { saved: ParamsF
       )}
 
       {!everyPart && (
-        <div role="tablist" aria-label="Partes da regra de preço" className="flex flex-wrap gap-2">
-          {parts.map((title, index) => (
-            <button
-              key={title}
-              type="button"
-              role="tab"
-              aria-selected={index === part}
-              onClick={() => setPart(index)}
-              className={`inline-flex min-h-[var(--control)] items-center rounded-full border px-4 text-sm font-medium ${index === part ? "border-brand bg-brand text-white" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100"}`}
-            >
-              {title}
-            </button>
-          ))}
-        </div>
+        <label className="block text-sm font-medium">Parte da regra de preço
+          <select value={part} onChange={(event) => setPart(Number(event.target.value))} className={INPUT}>
+            {parts.map((title, index) => <option key={title} value={index}>{title}</option>)}
+          </select>
+        </label>
       )}
 
       {PARAM_SECTIONS.map((section, index) => (
@@ -127,18 +119,25 @@ export function ParamsForm({ saved, action, lineId, imported }: { saved: ParamsF
           ICMS por estado de destino
         </h2>
         <div className="p-5">
-          <p className="max-w-3xl text-xs text-slate-500">
+          <SectionDisclosure title="Como as alíquotas entram no cálculo">
+          <p className="max-w-3xl text-sm text-slate-600">
             Alíquota interna de cada estado e o Fundo de Combate à Pobreza (FCP). Na venda para cliente não contribuinte
             de outro estado, o DIFAL que fica com a empresa é a alíquota interna do destino menos a interestadual, mais o
             FCP. O ICMS de saída é o que a venda para aquele estado paga na origem: em branco vale o ICMS interestadual
             geral; produto nacional usa 7% ou 12% conforme o destino. Confirme os números com o contador; se a lei mudar,
             é aqui que se altera.
           </p>
+          </SectionDisclosure>
           {/* The names of the columns once, on top of each block of nine states: the rows are only the numbers. */}
           <p className="mt-4 text-xs font-medium text-slate-600">Em %: Interno = ICMS interno do estado · FCP · Saída = ICMS de saída para o estado</p>
+          {!everyPart && <label className="mt-3 block text-sm font-medium">Estados
+            <select value={ufGroup} onChange={(event) => setUfGroup(Number(event.target.value))} className={INPUT}>
+              {Array.from({ length: 9 }, (_, index) => <option key={index} value={index}>{UFS.slice(index * 3, index * 3 + 3).join(" · ")}</option>)}
+            </select>
+          </label>}
           <div className="mt-2 grid grid-cols-[minmax(0,1fr)] gap-x-8 gap-y-6 sm:grid-cols-2 xl:grid-cols-3">
-            {[0, 9, 18].map((start) => (
-              <table key={start} className="w-full min-w-0 table-fixed border-separate border-spacing-x-1.5 border-spacing-y-1.5 text-sm">
+            {Array.from({ length: 9 }, (_, index) => index * 3).map((start) => (
+              <table key={start} hidden={!everyPart && ufGroup !== start / 3} className="w-full min-w-0 table-fixed border-separate border-spacing-x-1.5 border-spacing-y-1.5 text-sm">
                 <thead>
                   <tr className="text-xs font-medium text-slate-500">
                     <th scope="col" className="w-8 text-left font-medium">
@@ -152,7 +151,7 @@ export function ParamsForm({ saved, action, lineId, imported }: { saved: ParamsF
                   </tr>
                 </thead>
                 <tbody>
-                  {UFS.slice(start, start + 9).map((uf) => (
+                  {UFS.slice(start, start + 3).map((uf) => (
                     <tr key={uf}>
                       <th scope="row" className="text-left font-semibold">
                         {uf}

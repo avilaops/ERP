@@ -14,6 +14,8 @@ export default defineConfig({
   use: {
     baseURL: "http://127.0.0.1:3020",
     ...devices["Desktop Chrome"],
+    locale: "pt-BR",
+    launchOptions: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE } : undefined,
   },
   webServer: {
     command: "npm run dev",

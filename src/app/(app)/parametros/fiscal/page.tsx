@@ -1,11 +1,12 @@
 import { LineTabs } from "@/components/LineTabs";
 import { PasswordField } from "@/components/PasswordField";
+import { FormSteps } from "@/components/FormSteps";
 import { loadFiscalRules, listPaymentCodes, missingFiscalRules, PAYMENT_CODES } from "@/lib/db/fiscal-rules";
 import { listNumberVoids } from "@/lib/db/invoices";
 import { listLines } from "@/lib/db/product-lines";
 import { LINE_PARAM, pickLine } from "@/lib/lines-view";
 import Link from "next/link";
-import { CARD, DANGER, DANGER_OUTLINE, INPUT, PRIMARY, SECONDARY } from "@/components/ui";
+import { CARD, DANGER, DANGER_OUTLINE, INPUT, PRIMARY, SECONDARY, PageHeader } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { menuItem } from "@/lib/auth/permissions";
 import { formatDocument } from "@/lib/customer";
@@ -60,11 +61,21 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
     ["ibsCityRate", "Alíquota do IBS municipal (%)", formatPercent(rules.ibsCityRate), "0 em 2026", ""],
     ["cbsRate", "Alíquota da CBS (%)", formatPercent(rules.cbsRate), "0,9 em 2026", ""],
   ] as const;
-  // One part at a time: the certificate, who issues, the rules of the invoice of each line and its numbering.
+  const ruleGroups: [string, (typeof ruleFields)[number][]][] = [
+    ["Natureza da operação", ruleFields.slice(0, 1)],
+    ["CFOP", ruleFields.slice(1, 4)],
+    ["ICMS e IPI", ruleFields.slice(4, 7)],
+    ["PIS", ruleFields.slice(7, 9)],
+    ["COFINS", ruleFields.slice(9, 11)],
+    ["Classificação IBS/CBS", ruleFields.slice(11, 13)],
+    ["Alíquotas IBS/CBS", ruleFields.slice(13)],
+  ];
+  // One part at a time, preserving the fields and their existing server validation.
   const TABS = [
     ["certificado", certificate ? "Certificado" : "Certificado · falta"],
     ["emitente", missing.length > 0 ? "Emitente · falta" : "Emitente"],
     ["regras", missingRules.length > 0 ? "Regras da nota · falta" : "Regras da nota"],
+    ["pagamentos", "Formas de pagamento"],
     ["numeracao", "Numeração"],
   ] as const;
   const asked = query.ver;
@@ -91,13 +102,9 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
           ← {menuItem("parametros").label}
         </Link>
       </p>
-      <h1 className="mt-2 text-2xl font-semibold">Fiscal</h1>
-      <p className="mt-1 max-w-3xl text-slate-600">
-        Os dados de quem emite a nota e o certificado digital. É a base da nota fiscal eletrônica: a emissão ainda não está ligada, e
-        nada aqui gera nota.
-      </p>
+      <PageHeader title="Fiscal" hint="Emitente, certificado e regras da nota fiscal." />
 
-      <nav aria-label="Partes do fiscal" className="mt-4 flex flex-wrap gap-x-1 border-b border-slate-200">
+      <nav aria-label="Partes do fiscal" className="view-tabs">
         {TABS.map(([key, label]) => (
           <Link
             key={key}
@@ -246,20 +253,21 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
             </p>
             <LineTabs lines={lines} current={line.id} path={HERE} others={{ ver: "regras" }} />
             {missingRules.length > 0 && (
-              <p className="mt-3 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-                Para emitir nota desta linha, faltam: {missingRules.join(", ")}.
-              </p>
+              <details className="mt-3 rounded-lg border border-amber-300 bg-amber-50 text-sm text-amber-900">
+                <summary className="disclosure-heading">Pendências para emissão ({missingRules.length})<span className="disclosure-marker" aria-hidden="true">+</span></summary>
+                <p className="px-4 pb-3">Para emitir nota desta linha, faltam: {missingRules.join(", ")}.</p>
+              </details>
             )}
             <ActionForm key={line.id} action={saveFiscalRulesAction} className="mt-4 grid gap-4 sm:grid-cols-2">
               <input type="hidden" name="lineId" value={line.id} />
-              {ruleFields.map(([key, label, value, placeholder, span]) => (
+              <FormSteps steps={[...ruleGroups.map(([title, fields]) => ({ title, content: <div className="grid gap-3 sm:grid-cols-2">{fields.map(([key, label, value, placeholder, span]) => (
                 <div key={key} className={span}>
                   <label htmlFor={key} className={LABEL}>
                     {label}
                   </label>
                   <input id={key} name={key} type="text" defaultValue={value ?? ""} placeholder={placeholder} autoComplete="off" className={INPUT} />
                 </div>
-              ))}
+              ))}</div> })), { title: "Condições da venda", content: <div className="grid gap-3">
               <label className="flex min-h-[var(--control)] items-start gap-2 py-2.5 text-sm sm:col-span-2">
                 <input type="checkbox" name="finalConsumer" value="sim" defaultChecked={rules.finalConsumer} className="mt-1" />
                 <span>
@@ -281,6 +289,7 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
                 </label>
                 <textarea id="additionalInfo" name="additionalInfo" rows={3} defaultValue={rules.additionalInfo ?? ""} className={`${INPUT} py-2`} />
               </div>
+              </div> }]} />
               <div className="sm:col-span-2">
                 <button type="submit" className={PRIMARY}>
                   Salvar regras fiscais
@@ -289,7 +298,11 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
             </ActionForm>
           </section>
 
-          <section className={`${CARD} mt-6`} aria-labelledby="pagamento-na-nota">
+        </>
+      )}
+      {tab === "pagamentos" && (
+        <>
+          <section className={`${CARD} mt-4`} aria-labelledby="pagamento-na-nota">
             <h2 id="pagamento-na-nota" className="border-b border-slate-200 px-5 py-3 text-sm font-semibold uppercase tracking-wide">
               Forma de pagamento na nota
             </h2>

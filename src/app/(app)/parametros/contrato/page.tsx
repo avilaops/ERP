@@ -1,5 +1,6 @@
+import { FormSteps } from "@/components/FormSteps";
 import Link from "next/link";
-import { CARD, INPUT, PRIMARY, SECONDARY } from "@/components/ui";
+import { CARD, INPUT, PRIMARY, SECONDARY, SectionDisclosure } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { menuItem } from "@/lib/auth/permissions";
 import { CONTRACT_WORDS, DEFAULT_CONTRACT_BODY, DEFAULT_CONTRACT_TITLE } from "@/lib/contract/text";
@@ -37,11 +38,11 @@ export default async function ContractSettingsPage() {
         </Link>
       </p>
       <h1 className="mt-2 text-2xl font-semibold">Contrato</h1>
-      <p className="mt-1 max-w-3xl text-slate-600">
+      <details className="mt-1 max-w-3xl text-sm text-slate-600"><summary className="inline-flex min-h-[var(--control)] cursor-pointer items-center text-brand">Como funciona</summary><p className="pb-3">
         Depois que o pedido é fechado, o contrato sai deste modelo, preenchido com os dados do pedido, e vai para o cliente assinar por um link no e-mail. O
         cliente confirma com nome, CPF e um código enviado ao e-mail dele; o sistema guarda data, hora e endereço de rede de cada passo e junta esse
         registro ao PDF assinado.
-      </p>
+      </p></details>
       {!hasMailbox && (
         <p className="mt-3 max-w-3xl rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
           Ainda não há caixa de saída de e-mail: sem ela o contrato não é enviado. Veja{" "}
@@ -52,7 +53,7 @@ export default async function ContractSettingsPage() {
         </p>
       )}
 
-      <section className={`${CARD} mt-6 p-5`} aria-labelledby="arquivo">
+      <SectionDisclosure title="Importar um modelo de contrato" className="mt-3">
         <h2 id="arquivo" className="text-sm font-semibold uppercase tracking-wide">
           Já tem o contrato em Word?
         </h2>
@@ -75,10 +76,10 @@ export default async function ContractSettingsPage() {
             </button>
           )}
         </ActionForm>
-      </section>
+      </SectionDisclosure>
 
       <ActionForm action={saveContractSettingsAction} className="mt-6 flex flex-col gap-6">
-        <section className={`${CARD} p-5`} aria-labelledby="modelo">
+        <FormSteps steps={[{ title: "Modelo", content: (<section className={`${CARD} p-5`} aria-labelledby="modelo">
           <h2 id="modelo" className="text-sm font-semibold uppercase tracking-wide">
             Modelo do contrato
           </h2>
@@ -98,7 +99,7 @@ export default async function ContractSettingsPage() {
               <label htmlFor="body" className={LABEL}>
                 Texto (linha começada por “# ” vira título de seção; por “- ”, item de lista)
               </label>
-              <textarea key={settings.body ?? ""} id="body" name="body" rows={22} defaultValue={settings.body ?? ""} placeholder={DEFAULT_CONTRACT_BODY} className={`${INPUT} py-2 font-mono text-sm`} />
+              <textarea key={settings.body ?? ""} id="body" name="body" rows={6} defaultValue={settings.body ?? ""} placeholder={DEFAULT_CONTRACT_BODY} className={`${INPUT} py-2 font-mono text-sm`} />
             </div>
           </div>
           <details className="mt-4 text-sm">
@@ -113,9 +114,8 @@ export default async function ContractSettingsPage() {
               ))}
             </dl>
           </details>
-        </section>
-
-        <section className={`${CARD} p-5`} aria-labelledby="envio">
+        </section>) },
+{ title: "Envio ao cliente", content: (<section className={`${CARD} p-5`} aria-labelledby="envio">
           <h2 id="envio" className="text-sm font-semibold uppercase tracking-wide">
             Envio ao cliente
           </h2>
@@ -136,12 +136,11 @@ export default async function ContractSettingsPage() {
               <label htmlFor="mailBody" className={LABEL}>
                 Texto do e-mail: {"{empresa}"}, {"{cliente}"}, {"{pedido}"}, {"{validade}"} e {"{link}"} (obrigatório) são trocados pelos dados do contrato
               </label>
-              <textarea key={settings.mailBody ?? ""} id="mailBody" name="mailBody" rows={9} defaultValue={settings.mailBody ?? ""} placeholder={DEFAULT_CONTRACT_MAIL_BODY} className={`${INPUT} py-2`} />
+              <textarea key={settings.mailBody ?? ""} id="mailBody" name="mailBody" rows={5} defaultValue={settings.mailBody ?? ""} placeholder={DEFAULT_CONTRACT_MAIL_BODY} className={`${INPUT} py-2`} />
             </div>
           </div>
-        </section>
-
-        <section className={`${CARD} p-5`} aria-labelledby="seguranca">
+        </section>) },
+{ title: "Segurança", content: (<section className={`${CARD} p-5`} aria-labelledby="seguranca">
           <h2 id="seguranca" className="text-sm font-semibold uppercase tracking-wide">
             Segurança
           </h2>
@@ -184,7 +183,7 @@ export default async function ContractSettingsPage() {
               </span>
             </label>
           </div>
-        </section>
+        </section>) }]} />
 
         <div>
           <button type="submit" className={PRIMARY}>
