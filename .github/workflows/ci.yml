@@ -110,9 +110,12 @@ jobs:
         run: npm run test:telas -- menu.spec.ts --output=test-results/menu
 
       - name: Cores por equipamento nos cinco tamanhos
-        run: npm run test:telas -- cores-pedido.spec.ts
+        run: npm run test:telas -- cores-pedido.spec.ts --output=test-results/cores
 
-      - run: npm run test:telas -- telas.spec.ts
+      - name: Harmonização, etapas, temas e preservação de dados
+        run: npm run test:telas -- harmonizacao.spec.ts --workers=1 --output=test-results/harmonizacao
+
+      - run: npm run test:telas -- telas.spec.ts --output=test-results/varredura
 
       # Os prints de cada tela e a altura de cada uma (telas.json), para conferir sem rodar nada.
       - uses: actions/upload-artifact@v4

@@ -88,6 +88,7 @@ test("configurações: todas as etapas são alcançáveis nos cinco tamanhos", a
     ["/equipe/nova", "Etapa da pessoa"],
     ["/parametros/fiscal?ver=regras", "Etapa da configuração"],
     ["/parametros/contrato", "Etapa da configuração"],
+    ["/parametros?ver=precos", "Parte da regra de preço"],
   ];
   for (const [width, height] of SIZES) {
     await page.setViewportSize({ width, height });
@@ -106,7 +107,7 @@ test("configurações: todas as etapas são alcançáveis nos cinco tamanhos", a
   await page.getByRole("button", { name: "Salvar fornecedor", exact: true }).click();
   await expect(page.getByRole("alert")).toBeVisible();
   await expect(page.getByRole("combobox", { name: "Etapa do fornecedor", exact: true })).toHaveValue("-1");
-  await expect(page.getByLabel("Observações", { exact: true })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Observações", exact: true })).toBeVisible();
 });
 
 test("cores: erro preserva o nome e salvar confirma a alteração", async ({ page }) => {
