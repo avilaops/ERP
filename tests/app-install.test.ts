@@ -96,10 +96,12 @@ test("página: título, nome curto e cor vêm da identidade, e o zoom continua l
     "description: APP_DESCRIPTION,",
     "robots: { index: false, follow: false }",
     'appleWebApp: { capable: true, title: APP_SHORT_NAME, statusBarStyle: "default" }',
-    "export const viewport: Viewport = { themeColor: THEME_COLOR };",
   ]) {
     assert.ok(layout.includes(expected), `layout.tsx sem ${expected}`);
   }
+  const viewport = layout.match(/export const viewport:\s*Viewport\s*=\s*\{([^}]+)\}/)?.[1];
+  assert.ok(viewport, "layout.tsx exporta o viewport");
+  assert.match(viewport, /\bthemeColor:\s*THEME_COLOR\b/);
   assert.doesNotMatch(layout, /userScalable|maximumScale|"use client"|#[0-9a-f]{6}/i);
   // O Next serve estes dois pela convenção de arquivo e põe sozinho as marcações na página.
   for (const file of ["src/app/icon.png", "src/app/apple-icon.png"]) assert.ok(existsSync(`${ROOT}${file}`), file);

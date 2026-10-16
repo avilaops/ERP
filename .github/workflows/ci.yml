@@ -54,8 +54,11 @@ jobs:
 
       # Falha se algum teste for pulado: sem banco, os testes de banco não provam nada.
       - name: Testes
+        shell: bash
         run: |
+          set -euo pipefail
           npm test 2>&1 | tee test.log
+          grep -qE "^(ℹ|#) fail 0$" test.log
           grep -qE "^(ℹ|#) skipped 0$" test.log
 
       - run: npm run build
