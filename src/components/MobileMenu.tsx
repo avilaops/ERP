@@ -53,7 +53,7 @@ export function MobileMenu({ brand, tabs, more, children }: { brand: ReactNode; 
           <div className="min-w-0">{brand}</div>
         </div>
         {/* `relative`: what is placed out of the flow inside (texts for screen readers) slides with the menu instead of stretching the page. */}
-        <div id="menu-principal" className={`${open ? "flex" : "hidden"} relative min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain p-4 md:flex`}>
+        <div id="menu-principal" className={`${open ? "flex" : "hidden"} relative min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain p-3 md:flex`}>
           {children}
         </div>
       </aside>
