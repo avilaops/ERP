@@ -33,4 +33,12 @@ test("menu: grupos, página atual, conta e teclado nos cinco tamanhos", async ({
     if (width < 768) await page.getByRole("button", { name: "Mais", exact: true }).click();
     await expect(menu.getByRole("link", { name: "Fornecedores", exact: true })).toHaveAttribute("aria-current", "page");
   }
+  // At 200% text enlargement, groups remain reachable by keyboard and names wrap.
+  const menu = page.getByRole("navigation", { name: "Menu principal", exact: true });
+  await menu.evaluate((el) => { el.style.fontSize = "200%"; });
+  const administration = menu.locator("summary").filter({ hasText: "Administração" });
+  await administration.focus();
+  await page.keyboard.press("Enter");
+  await expect(menu.getByRole("link", { name: "Configurações", exact: true })).toBeVisible();
+  expect(await menu.evaluate((el) => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(0);
 });

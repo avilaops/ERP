@@ -16,14 +16,14 @@ export function NavigationGroups({ groups }: { groups: NavigationGroup[] }) {
       {groups.map((group) => (
         <details key={`${pathname}:${group.title}`} name="menu-secoes" open={group.items.some((item) => item.href === current)} className="group rounded-lg border border-slate-200">
           <summary className="flex min-h-[var(--control)] cursor-pointer list-none items-center justify-between gap-2 rounded-lg px-3 py-2 font-semibold text-slate-700 [&::-webkit-details-marker]:hidden">
-            <span>{group.title}</span>
+            <span className="min-w-0 break-words">{group.title}</span>
             <span aria-hidden="true" className="shrink-0 group-open:rotate-180">⌄</span>
           </summary>
           <div className="border-t border-slate-200 px-1 py-1">
             {group.items.map((item) => (
               <Link key={item.href} href={item.href} aria-current={item.href === current ? "page" : undefined}
                 className={`flex min-h-[var(--control)] items-center rounded-lg px-3 py-2 font-medium ${item.href === current ? "bg-brand-soft text-brand" : "text-slate-700 hover:bg-slate-100"}`}>
-                {item.label}
+                <span className="min-w-0 break-words">{item.label}</span>
               </Link>
             ))}
           </div>
