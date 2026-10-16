@@ -1,5 +1,6 @@
 import { pgErrorCode } from "@/lib/db/pool";
 import type { Queryable } from "@/lib/db/pool";
+import { standardPaymentCode } from "@/lib/fiscal/setup";
 
 /** A refusal the user can act on. The message goes to the screen as it is. */
 export class PaymentMethodError extends Error {}
@@ -44,10 +45,10 @@ export async function createPaymentMethod(label: string, who: string, conn: Quer
   check(label, 0, who);
   try {
     const { rows } = await conn.query(
-      `INSERT INTO payment_methods (label, position, updated_by)
-       SELECT $1, COALESCE(max(position), 0) + 1, $2 FROM payment_methods
+      `INSERT INTO payment_methods (label, position, updated_by, nfe_code)
+       SELECT $1, COALESCE(max(position), 0) + 1, $2, $3 FROM payment_methods
        RETURNING id, label, position, active, on_delivery`,
-      [label.trim(), who],
+      [label.trim(), who, standardPaymentCode(label)],
     );
     return method(rows[0]);
   } catch (error) {

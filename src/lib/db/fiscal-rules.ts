@@ -195,13 +195,13 @@ export async function listPaymentCodes(conn: Queryable): Promise<PaymentCode[]> 
   return rows.map((row) => ({ id: Number(row.id), label: String(row.label), active: row.active === true, code: text(row.nfe_code) }));
 }
 
-export async function savePaymentCode(id: number, value: string | null, updatedBy: string, conn: Queryable): Promise<void> {
+export async function savePaymentCode(id: number, value: string | null, updatedBy: string, conn: Queryable, completeBlankOnly = false): Promise<void> {
   if (updatedBy.trim() === "") throw new Error("Falta dizer quem está alterando a forma de pagamento.");
   const chosen = blank(value);
   if (chosen !== null && !PAYMENT_CODES.some(([known]) => known === chosen)) throw new FiscalError("Escolha a forma da nota na lista.");
   const { rows } = await conn.query(
-    "UPDATE payment_methods SET nfe_code = $2, updated_at = now(), updated_by = $3 WHERE id = $1 RETURNING id",
-    [id, chosen, updatedBy],
+    "UPDATE payment_methods SET nfe_code = CASE WHEN $4 THEN COALESCE(nfe_code, $2) ELSE $2 END, updated_at = now(), updated_by = $3 WHERE id = $1 RETURNING id",
+    [id, chosen, updatedBy, completeBlankOnly],
   );
   if (rows.length === 0) throw new FiscalError("Forma de pagamento não encontrada. Recarregue a página.");
 }

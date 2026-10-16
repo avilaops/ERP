@@ -2,8 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/auth";
-import { FiscalError, removeCertificate, saveCertificate, saveDanfeReformDate, saveFiscalSettings, saveProductFiscal } from "@/lib/db/fiscal";
-import { saveFiscalRules, savePaymentCode } from "@/lib/db/fiscal-rules";
+import { FiscalError, loadFiscalSettings, removeCertificate, saveCertificate, saveDanfeReformDate, saveFiscalSettings, saveProductFiscal } from "@/lib/db/fiscal";
+import { listPaymentCodes, loadFiscalRules, saveFiscalRules, savePaymentCode } from "@/lib/db/fiscal-rules";
+import { CnpjError, lookupCnpj } from "@/lib/cnpj";
+import { completeFiscalCompany, saleOperationCodes, standardPaymentCode } from "@/lib/fiscal/setup";
 import { IssueError, voidInvoiceNumbers } from "@/lib/db/issue-nfe";
 import { tenantDb } from "@/lib/db/pool";
 import { listLines } from "@/lib/db/product-lines";
@@ -23,6 +25,75 @@ const reader = (formData: FormData) => (key: string) => {
   return typeof value === "string" ? value.trim() : "";
 };
 const whole = (text: string) => (/^\d{1,9}$/.test(text) ? Number(text) : 0);
+
+/** Completes the issuer from public data without replacing a filled-in register. */
+export async function completeFiscalCompanyAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
+  const session = await requirePermission("parametros");
+  const conn = tenantDb(session.tenant.slug);
+  const text = reader(formData);
+  try {
+    const before = await loadFiscalSettings(conn);
+    const company = await lookupCnpj(before.cnpj || text("lookupCnpj"));
+    const current = await loadFiscalSettings(conn);
+    const filled = completeFiscalCompany(current, company, text("applyRegime") === "sim");
+    await saveFiscalSettings(filled, session.email, conn, true);
+    revalidatePath(HERE);
+    revalidatePath("/pedidos", "layout");
+    const tax = company.fiscal;
+    const flag = (value: boolean | null | undefined) => value === true ? "sim" : value === false ? "não" : "não informado";
+    return { error: null, notice: `Cadastro completado com ${tax?.source ?? "consulta pública"}${tax?.updatedAt ? ` (base de ${tax.updatedAt.slice(0, 10)})` : ""}. Simples: ${flag(tax?.simples)}; MEI: ${flag(tax?.mei)}. ${filled.taxRegime ? "Regime cadastrado; confira sublimite e regras da operação com a contabilidade." : "Confirme o regime na aba Emitente. MEI e sublimite não são definidos automaticamente."} Dados já preenchidos foram preservados.` };
+  } catch (error) {
+    if (error instanceof CnpjError || error instanceof Error && /CNPJ consultado|empresa ativa/.test(error.message)) return { error: error.message };
+    return problem("consultar o CNPJ", error);
+  }
+}
+
+/** Map only unambiguous standard methods whose code is still blank. */
+export async function completePaymentCodesAction(): Promise<ActionState> {
+  const session = await requirePermission("parametros");
+  const conn = tenantDb(session.tenant.slug);
+  try {
+    let count = 0;
+    for (const method of await listPaymentCodes(conn)) {
+      const code = standardPaymentCode(method.label);
+      if (method.code === null && code) {
+        await savePaymentCode(method.id, code, session.email, conn, true);
+        count++;
+      }
+    }
+    revalidatePath(HERE);
+    revalidatePath("/pedidos", "layout");
+    return { error: null, notice: `${count} forma(s) completada(s). Códigos existentes foram preservados. “Na entrega” exige informar o meio efetivo de pagamento na lista.` };
+  } catch (error) {
+    return problem("mapear os pagamentos", error);
+  }
+}
+
+/** Select the sale operation once per line, preserving accountant-supplied codes. */
+export async function prepareSaleOperationAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
+  const session = await requirePermission("parametros");
+  const conn = tenantDb(session.tenant.slug);
+  const text = reader(formData);
+  if (text("operation") !== "revenda" && text("operation") !== "producao") return { error: "Escolha revenda ou produção própria conforme a operação desta linha." };
+  try {
+    const line = exactLine(await listLines(conn), text("lineId"));
+    if (!line) return { error: "Escolha uma linha de produto válida." };
+    const current = await loadFiscalRules(line.id, conn);
+    const suggested = saleOperationCodes(text("operation") as "revenda" | "producao");
+    await saveFiscalRules(line.id, {
+      ...current,
+      operationNature: current.operationNature ?? suggested.operationNature,
+      cfopInternal: current.cfopInternal ?? suggested.cfopInternal,
+      cfopInterstate: current.cfopInterstate ?? suggested.cfopInterstate,
+      cfopInterstateNonTaxpayer: current.cfopInterstateNonTaxpayer ?? suggested.cfopInterstateNonTaxpayer,
+    }, session.email, conn);
+    revalidatePath(HERE);
+    revalidatePath("/pedidos", "layout");
+    return { error: null, notice: "CFOPs comuns de venda completados. Regras existentes preservadas. Confira CST, alíquotas, benefícios e operações especiais com a contabilidade na aba Regras da nota." };
+  } catch (error) {
+    return problem("preparar a operação de venda", error);
+  }
+}
 
 function problem(action: string, error: unknown): ActionState {
   if (error instanceof FiscalError || error instanceof CertificateError) return { error: error.message };

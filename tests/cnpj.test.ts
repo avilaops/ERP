@@ -21,10 +21,33 @@ test("consulta de CNPJ: só o CNPJ sai do servidor, e volta a empresa, campo a c
   assert.deepEqual(record, {
     cnpj: "66058955000108", legalName: "LUDUS EQUIPAMENTOS PARA MUSCULACAO LTDA", tradeName: null, status: "ATIVA", activity: "Comércio atacadista de outros equipamentos", size: "DEMAIS", openedOn: "2026-04-02",
     street: "RUA COPACABANA", number: "4108", complement: null, district: "PARQUE SANTA FELICIA", city: "VOTUPORANGA", uf: "SP", cep: "15505058", phone: "1797218555", email: null,
+    fiscal: { source: "BrasilAPI", updatedAt: null, simples: null, mei: null, stateRegistration: null, cityCode: null },
   });
   // Nada de pessoa física vem junto: nem nome nem documento de sócio.
   assert.ok(!JSON.stringify(record).includes("FULANO"));
   assert.equal(companySummary(record), "Situação na Receita: ATIVA · Comércio atacadista de outros equipamentos · VOTUPORANGA/SP · aberta em 02/04/2026");
+});
+
+test("consulta de CNPJ: alternativa preserva falso, não inventa dados ausentes e não aceita outro CNPJ", async () => {
+  const calls: string[] = [];
+  const answer = {
+    razao_social: "LUDUS EQUIPAMENTOS PARA MUSCULACAO LTDA", atualizado_em: "2026-09-12T03:00:00Z",
+    simples: { simples: "Não", mei: "Não" },
+    estabelecimento: { cnpj: "66058955000108", situacao_cadastral: "Ativa", estado: { sigla: "SP" }, cidade: { nome: "VOTUPORANGA", ibge_id: 3557105 },
+      inscricoes_estaduais: [{ ativo: true, inscricao_estadual: "718319130117", estado: { sigla: "SP" } }], socios: [{ nome: "não usar" }] },
+  };
+  const fetcher = async (url: string) => {
+    calls.push(url);
+    return url.includes("brasilapi") ? { status: 503, json: async () => ({}) } : { status: 200, json: async () => answer };
+  };
+  const record = await lookupCnpj("66058955000108", fetcher);
+  assert.equal(calls.length, 2);
+  assert.deepEqual(record.fiscal, { source: "CNPJ.ws", updatedAt: "2026-09-12T03:00:00Z", simples: false, mei: false, stateRegistration: "718319130117", cityCode: "3557105" });
+  assert.equal(record.street, null);
+  assert.doesNotMatch(JSON.stringify(record), /não usar/);
+  await assert.rejects(() => lookupCnpj("66058955000108", answering(200, { ...ANSWER, cnpj: "48240052000161" })), /outro CNPJ/);
+  const unknown = await lookupCnpj("66058955000108", answering(200, { ...ANSWER, opcao_pelo_simples: "false" }));
+  assert.equal(unknown.fiscal?.simples, null);
 });
 
 test("consulta de CNPJ: número inválido não é consultado; o que volta estranho é descartado; falha diz o que fazer", async () => {

@@ -4,6 +4,7 @@ import { FiscalError } from "@/lib/db/fiscal";
 import { EMPTY_FISCAL_RULES, listPaymentCodes, loadFiscalRules, missingFiscalRules, saveFiscalRules, savePaymentCode } from "@/lib/db/fiscal-rules";
 import type { FiscalRules } from "@/lib/db/fiscal-rules";
 import { createLine, deleteLine } from "@/lib/db/product-lines";
+import { createPaymentMethod } from "@/lib/db/payment-methods";
 import { openTestDb, SKIP_WITHOUT_DB } from "./db-helpers.ts";
 import type { TestDb } from "./db-helpers.ts";
 
@@ -59,6 +60,13 @@ test("linha com regras fiscais e sem equipamento sai inteira; forma de pagamento
   const financing = codes.get("Financiamento")!;
   await savePaymentCode(financing.id, "99", WHO, db.pool);
   assert.equal((await listPaymentCodes(db.pool)).find((method) => method.id === financing.id)?.code, "99");
+  await savePaymentCode(financing.id, "17", WHO, db.pool, true);
+  assert.equal((await listPaymentCodes(db.pool)).find((method) => method.id === financing.id)?.code, "99");
+  const deposit = await createPaymentMethod("Depósito bancário", WHO, db.pool);
+  const ambiguous = await createPaymentMethod("PIX ou cartão", WHO, db.pool);
+  const afterCreate = await listPaymentCodes(db.pool);
+  assert.equal(afterCreate.find((method) => method.id === deposit.id)?.code, "16");
+  assert.equal(afterCreate.find((method) => method.id === ambiguous.id)?.code, null);
   await assert.rejects(() => savePaymentCode(financing.id, "77", WHO, db.pool), FiscalError);
   await assert.rejects(() => savePaymentCode(999999, "17", WHO, db.pool), /não encontrada/);
 });
