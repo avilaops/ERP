@@ -11,8 +11,10 @@ import type { ActionState } from "@/lib/order-form";
 
 const FAILED = "Não foi possível gravar agora. Nada foi alterado; tente de novo.";
 
+export type ReceiptActionState = ActionState & { values?: { receivedOn: string; amount: string; method: string; note: string } };
+
 /** "Dar baixa": the amount is the one of the receivable; the form says only when, how and a note. */
-export async function recordReceiptAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
+export async function recordReceiptAction(_previous: ReceiptActionState, formData: FormData): Promise<ReceiptActionState> {
   const session = await requirePermission("recebimentos");
   const conn = tenantDb(session.tenant.slug);
 
@@ -20,12 +22,14 @@ export async function recordReceiptAction(_previous: ActionState, formData: Form
     const value = formData.get(key);
     return typeof value === "string" ? value.trim() : "";
   };
+  const values = { receivedOn: text("receivedOn"), amount: text("amount"), method: text("method"), note: text("note") };
+  const refused = (error: string): ReceiptActionState => ({ error, values });
   try {
     const method = text("method");
-    if (method !== "" && !(await listPaymentMethods(conn)).includes(method)) return { error: '"Forma": escolha uma forma da lista.' };
+    if (method !== "" && !(await listPaymentMethods(conn)).includes(method)) return refused('"Forma": escolha uma forma da lista.');
     // Blank is everything that is open; a smaller amount is a partial receipt.
     const amount = text("amount") === "" ? undefined : parseMoney(text("amount"));
-    if (amount === null) return { error: '"Valor recebido": informe um valor em reais maior que zero.' };
+    if (amount === null) return refused('"Valor recebido": informe um valor em reais maior que zero.');
     await recordReceipt(
       Number(text("id")),
       { receivedOn: text("receivedOn"), method: method || null, note: text("note") || null, amount },
@@ -34,9 +38,9 @@ export async function recordReceiptAction(_previous: ActionState, formData: Form
       conn,
     );
   } catch (error) {
-    if (error instanceof ReceivableError) return { error: error.message };
+    if (error instanceof ReceivableError) return refused(error.message);
     console.error("[recebimentos] falha ao dar baixa:", error instanceof Error ? error.message : error);
-    return { error: FAILED };
+    return refused(FAILED);
   }
   revalidatePath(menuItem("recebimentos").href);
   return { error: null };

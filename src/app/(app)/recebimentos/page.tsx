@@ -4,21 +4,22 @@ import Link from "next/link";
 import { FitRows } from "@/components/FitRows";
 import { CARD, DANGER_OUTLINE, pageOf, Pager, PRIMARY, SECONDARY, PageHeader, MetricSummary, ViewTabs } from "@/components/ui";
 import { rowsPerPage } from "@/lib/rows";
+import { OrderReference } from "@/components/OrderReference";
 import { requirePermission } from "@/lib/auth";
 import { confirmsRefunds, menuItem } from "@/lib/auth/permissions";
 import { listPaymentMethods } from "@/lib/db/orders";
 import { tenantDb } from "@/lib/db/pool";
 import { listOpenReceivables, listPendingRefunds, listReceipts, receivedInMonth } from "@/lib/db/receivables";
-import { formatMoney, isoDate, showDateTime, showIsoDate, showMoney } from "@/lib/format";
+import { isoDate, showDateTime, showIsoDate, showMoney } from "@/lib/format";
 import { addDays } from "@/lib/pricing/payment";
 import { isOverdue, receivablesSummary } from "@/lib/receivables-view";
 import { ActionForm } from "../pedidos/ActionForm";
-import { decideRefundAction, recordReceiptAction, requestRefundAction } from "./actions";
+import { decideRefundAction, requestRefundAction } from "./actions";
+import { ReceiptForm } from "./ReceiptForm";
 
 export const metadata = { title: `${menuItem("recebimentos").label} · ERP` };
 export const dynamic = "force-dynamic";
 
-const ORDERS = menuItem("pedidos").href;
 const INPUT = "min-h-[var(--control)] rounded border border-slate-300 bg-white px-2 text-sm outline-none focus:ring-2 focus:ring-brand";
 const count = (n: number) => `${n} ${n === 1 ? "valor" : "valores"}`;
 
@@ -80,9 +81,7 @@ export default async function RecebimentosPage({ searchParams }: { searchParams:
                 <li data-row key={item.id} className="border-t border-slate-200 px-4 py-3 first:border-t-0">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <Link href={`${ORDERS}/${item.orderNumber}`} className="font-medium text-brand underline-offset-2 hover:underline">
-                        {item.customerName ?? "sem cliente"}
-                      </Link>
+                      <OrderReference access={session} number={item.orderNumber} customer={item.customerName} />
                       <p className="text-xs text-slate-500">
                         #{item.orderNumber} · {item.label} · vendedor: {item.sellerName}
                       </p>
@@ -98,60 +97,7 @@ export default async function RecebimentosPage({ searchParams }: { searchParams:
                       </p>
                     </div>
                   </div>
-                  {/* The form of the write-off opens on request: closed, each amount is one line, and several fit a screen. */}
-                  <details className="group mt-2">
-                    <summary className="inline-flex min-h-[var(--control)] cursor-pointer items-center rounded-lg border border-slate-300 bg-white px-4 text-sm font-medium hover:bg-slate-50 group-open:hidden">Dar baixa</summary>
-                  <ActionForm action={recordReceiptAction} className="mt-3 flex flex-wrap items-end gap-3">
-                    <input type="hidden" name="id" value={item.id} />
-                    <div>
-                      <label htmlFor={`on-${item.id}`} className="block text-xs font-medium text-slate-600">
-                        Recebido em
-                      </label>
-                      <input id={`on-${item.id}`} name="receivedOn" type="date" defaultValue={today} max={today} className={`${INPUT} mt-1`} />
-                    </div>
-                    <div>
-                      <label htmlFor={`amount-${item.id}`} className="block text-xs font-medium text-slate-600">
-                        Valor recebido
-                      </label>
-                      <input
-                        key={item.open}
-                        id={`amount-${item.id}`}
-                        name="amount"
-                        type="text"
-                        inputMode="decimal"
-                        defaultValue={formatMoney(item.open)}
-                        className={`${INPUT} mt-1 w-32 text-right`}
-                      />
-                    </div>
-                    <div>
-                      <label htmlFor={`method-${item.id}`} className="block text-xs font-medium text-slate-600">
-                        Forma
-                      </label>
-                      <select
-                        id={`method-${item.id}`}
-                        name="method"
-                        defaultValue={item.method && methods.includes(item.method) ? item.method : ""}
-                        className={`${INPUT} mt-1`}
-                      >
-                        <option value="">—</option>
-                        {methods.map((method) => (
-                          <option key={method} value={method}>
-                            {method}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="min-w-40 flex-1">
-                      <label htmlFor={`note-${item.id}`} className="block text-xs font-medium text-slate-600">
-                        Observação
-                      </label>
-                      <input id={`note-${item.id}`} name="note" type="text" className={`${INPUT} mt-1 w-full`} />
-                    </div>
-                    <button type="submit" className={PRIMARY}>
-                      Dar baixa
-                    </button>
-                  </ActionForm>
-                  </details>
+                  <ReceiptForm key={`${item.id}:${item.open}`} id={item.id} openAmount={item.open} today={today} initialMethod={item.method} methods={methods} initiallyOpen={false} />
                 </li>
               );
             })}
@@ -176,9 +122,7 @@ export default async function RecebimentosPage({ searchParams }: { searchParams:
               <li data-row key={refund.id} className="border-t border-slate-200 px-4 py-3 first:border-t-0">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <Link href={`${ORDERS}/${refund.orderNumber}`} className="font-medium text-brand underline-offset-2 hover:underline">
-                      {refund.customerName ?? "sem cliente"}
-                    </Link>
+                    <OrderReference access={session} number={refund.orderNumber} customer={refund.customerName} />
                     <p className="text-xs text-slate-500">
                       #{refund.orderNumber} · {refund.label} · recebido em {showIsoDate(refund.receivedOn)} · vendedor: {refund.sellerName}
                     </p>
@@ -242,9 +186,7 @@ export default async function RecebimentosPage({ searchParams }: { searchParams:
                 {receiptSlice.rows.map((receipt) => (
                   <tr data-row key={receipt.id} className="border-t border-slate-200 align-top">
                     <td className="px-4 py-3">
-                      <Link href={`${ORDERS}/${receipt.orderNumber}`} className="font-medium text-brand underline-offset-2 hover:underline">
-                        {receipt.customerName ?? "sem cliente"}
-                      </Link>
+                      <OrderReference access={session} number={receipt.orderNumber} customer={receipt.customerName} />
                       <span className="block text-xs text-slate-500">
                         #{receipt.orderNumber} · {receipt.label}
                       </span>

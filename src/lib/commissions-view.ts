@@ -6,6 +6,8 @@ export type SellerCommissions = {
   sellerEmail: string;
   sellerName: string;
   entries: CommissionEntry[];
+  /** Net base of the month, including the signed base of refunds in this month. */
+  received: number;
   /** Everything of the month, refunds included. */
   total: number;
   /** The part of the month not paid yet. */
@@ -37,6 +39,7 @@ export function commissionsView(entries: CommissionEntry[], carried: ReadonlyMap
       sellerEmail,
       sellerName: own[0].sellerName,
       entries: own,
+      received: sum(own.map((entry) => entry.base)),
       total: sum(own.map((entry) => entry.amount)),
       open,
       carried: before,

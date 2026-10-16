@@ -29,6 +29,8 @@ import { listCommissionsDue } from "@/lib/db/payables";
 import { listCarriedBalances, listCommissionMonths, listCommissions, payCommissions } from "@/lib/db/commissions";
 import { loadApprovalPolicy, loadCommissionDay, saveApprovalPolicy, saveCommissionDay } from "@/lib/db/company";
 import { decideRefund, listOpenReceivables, listPendingRefunds, listReceipts, recordReceipt, requestRefund } from "@/lib/db/receivables";
+import { runReport } from "@/lib/db/reports";
+import { reportCsv } from "@/lib/reports-view";
 import { latestVersion, loadPublishedSnapshot, loadPublishedTable, publishPriceTable } from "@/lib/db/price-table";
 import { createProduct, listProducts, setProductPlateLoaded, updateProduct } from "@/lib/db/products";
 import { closingProblems, directorOf, dueDates, paymentOf, saleOf } from "@/lib/order-quote";
@@ -1058,6 +1060,8 @@ test("regras de aprovação da empresa: alçada do gerente, frete e diretoria qu
 
 test("recebimento parcial: a parcela fica em aberto pelo que falta, e a comissão nasce de cada parte", { skip }, async () => {
   const N = "261005-FRET";
+  const report = () => runReport("recebimentos", { from: null, to: null, person: null, today: "2026-10-06" }, db.pool);
+  const reportedEntry = async () => (await report()).rows.find((row) => row[0] === N && row[2] === "Entrada")!;
   const [down] = (await listOpenReceivables(db.pool)).filter((item) => item.orderNumber === N);
   assert.deepEqual([down.label, down.amount, down.open], ["Entrada", 20000, 20000]);
 
@@ -1068,6 +1072,7 @@ test("recebimento parcial: a parcela fica em aberto pelo que falta, e a comissã
   assert.deepEqual(await recordReceipt(down.id, { receivedOn: "2026-10-05", method: "PIX", note: null, amount: 5000 }, FINANCE, "2026-10-06", db.pool), { commission: 88.5 });
   const after = (await listOpenReceivables(db.pool)).find((item) => item.id === down.id);
   assert.deepEqual([after?.amount, after?.open], [20000, 15000]);
+  assert.equal((await reportedEntry())[5], 5000);
   // Com valor recebido, mesmo em parte, o pedido não se reabre.
   await assert.rejects(() => reopenOrder(N, DIRECTOR, ALL, db.pool), /já tem valor recebido/);
 
@@ -1076,6 +1081,7 @@ test("recebimento parcial: a parcela fica em aberto pelo que falta, e a comissã
   assert.ok(!(await listOpenReceivables(db.pool)).some((item) => item.id === down.id));
   const parts = (await listReceipts(10, db.pool)).filter((item) => item.orderNumber === N);
   assert.deepEqual(parts.map((item) => [item.label, item.amount, item.commission]), [["Entrada", 15000, 265.49], ["Entrada", 5000, 88.5]]);
+  assert.equal((await reportedEntry())[5], 20000);
 
   // Estornar a primeira parte devolve só ela: a entrada volta a ter 5.000 em aberto.
   await requestRefund(parts[1].id, "PIX em duplicidade", FINANCE, db.pool);
@@ -1083,6 +1089,16 @@ test("recebimento parcial: a parcela fica em aberto pelo que falta, e a comissã
   await decideRefund(request.id, true, DIRECTOR, "2026-10-06", db.pool);
   const back = (await listOpenReceivables(db.pool)).find((item) => item.id === down.id);
   assert.deepEqual([back?.amount, back?.open], [20000, 5000]);
+  assert.equal((await reportedEntry())[5], 15000, "estorno negativo reduz o recebido no relatório");
+  await recordReceipt(down.id, { receivedOn: "2026-10-06", method: "PIX", note: null }, FINANCE, "2026-10-06", db.pool);
+  assert.equal((await reportedEntry())[5], 20000, "nova baixa não soma o estorno outra vez");
+  assert.match(reportCsv(await report()), /261005-FRET;[^\r\n]*;Entrada;[^;]*;20000,00;20000,00;Recebida/);
+  // A segunda reversão deve compor com a primeira, mantendo o cenário em R$ 5.000 abertos.
+  const [replacement] = (await listReceipts(100, db.pool)).filter((item) => item.orderNumber === N && item.state === "valido" && item.amount === 5000);
+  await requestRefund(replacement.id, "Segunda reversão parcial", FINANCE, db.pool);
+  const second = (await listPendingRefunds(db.pool)).find((item) => item.orderNumber === N)!;
+  await decideRefund(second.id, true, DIRECTOR, "2026-10-06", db.pool);
+  assert.equal((await reportedEntry())[5], 15000);
 });
 
 test("cliente com pedido não se remove", { skip }, async () => {
