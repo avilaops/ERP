@@ -40,7 +40,7 @@ export async function completeFiscalCompanyAction(_previous: ActionState, formDa
     revalidatePath(HERE);
     revalidatePath("/pedidos", "layout");
     const tax = company.fiscal;
-    return { error: null, notice: `${tax?.source ?? "Consulta pública"}${tax?.updatedAt ? ` · ${tax.updatedAt.slice(0, 10).split("-").reverse().join("/")}` : ""}: cadastro completado. Confira Emitente.` };
+    return { error: null, notice: `${tax?.source ?? "Consulta pública"}${tax?.updatedAt ? ` · ${tax.updatedAt.slice(0, 10).split("-").reverse().join("/")}` : ""}: aplicado.` };
   } catch (error) {
     if (error instanceof CnpjError || error instanceof Error && /CNPJ consultado|empresa ativa/.test(error.message)) return { error: error.message };
     return problem("consultar o CNPJ", error);
