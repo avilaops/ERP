@@ -1,13 +1,14 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { FiscalError } from "@/lib/db/fiscal";
-import { completeSaleOperation, EMPTY_FISCAL_RULES, listPaymentCodes, loadFiscalRules, missingFiscalRules, saveFiscalRules, savePaymentCode } from "@/lib/db/fiscal-rules";
+import { completeKnownPaymentCodes, completeSaleOperation, EMPTY_FISCAL_RULES, listPaymentCodes, loadFiscalRules, missingFiscalRules, saveFiscalRules, savePaymentCode } from "@/lib/db/fiscal-rules";
 import type { FiscalRules } from "@/lib/db/fiscal-rules";
 import { createLine, deleteLine } from "@/lib/db/product-lines";
 import { createPaymentMethod, updatePaymentMethod } from "@/lib/db/payment-methods";
 import { saleOperationCodes } from "@/lib/fiscal/setup";
 import { openTestDb, SKIP_WITHOUT_DB } from "./db-helpers.ts";
 import type { TestDb } from "./db-helpers.ts";
+import type { Queryable } from "@/lib/db/pool";
 
 const skip = SKIP_WITHOUT_DB;
 const WHO = "diretoria@teste.local";
@@ -61,7 +62,7 @@ test("linha com regras fiscais e sem equipamento sai inteira; forma de pagamento
   const financing = codes.get("Financiamento")!;
   await savePaymentCode(financing.id, "99", WHO, db.pool);
   assert.equal((await listPaymentCodes(db.pool)).find((method) => method.id === financing.id)?.code, "99");
-  await savePaymentCode(financing.id, "17", WHO, db.pool, true);
+  assert.equal(await completeKnownPaymentCodes(WHO, db.pool), 0);
   assert.equal((await listPaymentCodes(db.pool)).find((method) => method.id === financing.id)?.code, "99");
   const deposit = await createPaymentMethod("Depósito bancário", WHO, db.pool);
   const ambiguous = await createPaymentMethod("PIX ou cartão", WHO, db.pool);
@@ -77,6 +78,52 @@ test("linha com regras fiscais e sem equipamento sai inteira; forma de pagamento
   assert.equal((await listPaymentCodes(db.pool)).find((method) => method.id === transfer.id)?.code, "99");
   await assert.rejects(() => savePaymentCode(financing.id, "77", WHO, db.pool), FiscalError);
   await assert.rejects(() => savePaymentCode(999999, "17", WHO, db.pool), /não encontrada/);
+});
+
+test("pagamentos em lote: uma falha reverte todas as alterações e o retorno conta apenas gravações efetivas", { skip }, async () => {
+  const deposit = await createPaymentMethod("Depósito bancário", WHO, db.pool);
+  const bankSlip = await createPaymentMethod("Boleto bancário", WHO, db.pool);
+  await savePaymentCode(deposit.id, null, WHO, db.pool);
+  await savePaymentCode(bankSlip.id, null, WHO, db.pool);
+  await db.pool.query("ALTER TABLE payment_methods ADD CONSTRAINT refuse_test_mapping CHECK (label <> 'Depósito bancário' OR nfe_code IS NULL)");
+  await assert.rejects(() => completeKnownPaymentCodes(WHO, db.pool), /refuse_test_mapping/);
+  let methods = await listPaymentCodes(db.pool);
+  assert.equal(methods.find((method) => method.id === deposit.id)?.code, null);
+  assert.equal(methods.find((method) => method.id === bankSlip.id)?.code, null);
+  await db.pool.query("ALTER TABLE payment_methods DROP CONSTRAINT refuse_test_mapping");
+  assert.equal(await completeKnownPaymentCodes(WHO, db.pool), 2);
+  methods = await listPaymentCodes(db.pool);
+  assert.equal(methods.find((method) => method.id === deposit.id)?.code, "16");
+  assert.equal(methods.find((method) => method.id === bankSlip.id)?.code, "15");
+  assert.equal(await completeKnownPaymentCodes(WHO, db.pool), 0);
+});
+
+test("pagamentos em lote: exclusão, renomeação e escolha manual durante a leitura são preservadas", { skip }, async () => {
+  const methods = await listPaymentCodes(db.pool);
+  const pix = methods.find((method) => method.label === "PIX")!;
+  const boleto = methods.find((method) => method.label === "Boleto")!;
+  const cheque = methods.find((method) => method.label === "Cheque")!;
+  const cash = methods.find((method) => method.label === "Dinheiro")!;
+  for (const method of [pix, boleto, cheque, cash]) await savePaymentCode(method.id, null, WHO, db.pool);
+  let changed = false;
+  const racing: Queryable = {
+    async query(sql, values) {
+      const result = await db.pool.query(sql, values);
+      if (!changed && sql.startsWith("SELECT id, label, active, nfe_code")) {
+        changed = true;
+        await db.pool.query("DELETE FROM payment_methods WHERE id = $1", [boleto.id]);
+        await db.pool.query("UPDATE payment_methods SET label = 'Pagamento combinado' WHERE id = $1", [cheque.id]);
+        await savePaymentCode(pix.id, "99", WHO, db.pool);
+      }
+      return result;
+    },
+  };
+  assert.equal(await completeKnownPaymentCodes(WHO, racing), 1);
+  const after = await listPaymentCodes(db.pool);
+  assert.equal(after.find((method) => method.id === pix.id)?.code, "99");
+  assert.equal(after.find((method) => method.id === cheque.id)?.code, null);
+  assert.equal(after.some((method) => method.id === boleto.id), false);
+  assert.equal(after.find((method) => method.id === cash.id)?.code, "01");
 });
 
 test("operação de venda: cria somente os CFOPs; completar vazios preserva impostos e escolhas atuais do contador", { skip }, async () => {

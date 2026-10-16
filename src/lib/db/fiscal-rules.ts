@@ -1,5 +1,6 @@
 import { FiscalError } from "@/lib/db/fiscal";
 import type { Queryable } from "@/lib/db/pool";
+import { standardPaymentCode } from "@/lib/fiscal/setup";
 
 /**
  * The fiscal rules of one product line, as the accountant defines them. Every
@@ -224,13 +225,32 @@ export async function listPaymentCodes(conn: Queryable): Promise<PaymentCode[]> 
   return rows.map((row) => ({ id: Number(row.id), label: String(row.label), active: row.active === true, code: text(row.nfe_code) }));
 }
 
-export async function savePaymentCode(id: number, value: string | null, updatedBy: string, conn: Queryable, completeBlankOnly = false): Promise<void> {
+export async function savePaymentCode(id: number, value: string | null, updatedBy: string, conn: Queryable): Promise<void> {
   if (updatedBy.trim() === "") throw new Error("Falta dizer quem está alterando a forma de pagamento.");
   const chosen = blank(value);
   if (chosen !== null && !PAYMENT_CODES.some(([known]) => known === chosen)) throw new FiscalError("Escolha a forma da nota na lista.");
   const { rows } = await conn.query(
-    "UPDATE payment_methods SET nfe_code = CASE WHEN $4 THEN COALESCE(nfe_code, $2) ELSE $2 END, updated_at = now(), updated_by = $3 WHERE id = $1 RETURNING id",
-    [id, chosen, updatedBy, completeBlankOnly],
+    "UPDATE payment_methods SET nfe_code = $2, updated_at = now(), updated_by = $3 WHERE id = $1 RETURNING id",
+    [id, chosen, updatedBy],
   );
   if (rows.length === 0) throw new FiscalError("Forma de pagamento não encontrada. Recarregue a página.");
+}
+
+/** One atomic batch. Concurrent renames, deletions and manual choices are skipped. */
+export async function completeKnownPaymentCodes(updatedBy: string, conn: Queryable): Promise<number> {
+  if (!updatedBy.trim()) throw new Error("Falta dizer quem está alterando a forma de pagamento.");
+  const suggestions = (await listPaymentCodes(conn)).flatMap((method) => {
+    const code = standardPaymentCode(method.label);
+    return method.code === null && code ? [{ id: method.id, label: method.label, code }] : [];
+  });
+  if (suggestions.length === 0) return 0;
+  const { rows } = await conn.query(
+    `UPDATE payment_methods AS method
+        SET nfe_code = mapping.code, updated_at = now(), updated_by = $4
+       FROM unnest($1::integer[], $2::text[], $3::text[]) AS mapping(id, label, code)
+      WHERE method.id = mapping.id AND method.label = mapping.label AND method.nfe_code IS NULL
+      RETURNING method.id`,
+    [suggestions.map((method) => method.id), suggestions.map((method) => method.label), suggestions.map((method) => method.code), updatedBy],
+  );
+  return rows.length;
 }
