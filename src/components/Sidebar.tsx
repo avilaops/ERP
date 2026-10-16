@@ -1,7 +1,9 @@
 import Link from "next/link";
-import { PRIMARY, SECTION_TITLE } from "@/components/ui";
+import { PRIMARY } from "@/components/ui";
 import { MobileMenu } from "@/components/MobileMenu";
 import type { MenuTab } from "@/components/MobileMenu";
+import { NavigationGroups } from "@/components/NavigationGroups";
+import { navigationGroups } from "@/lib/navigation";
 import { ThemeChoice } from "@/components/ThemeChoice";
 import type { Session } from "@/lib/auth";
 import { localProvider } from "@/lib/auth/local-provider";
@@ -31,17 +33,6 @@ const TAB_ORDER: [key: string, label: string, icon: string][] = [
 ];
 const MORE_ICON = "M5 12h.01M12 12h.01M19 12h.01";
 
-/**
- * The menu in four groups, so a long menu is read by subject instead of one
- * column of seventeen names. A screen not listed here goes to the last group.
- */
-const GROUPS: [title: string, keys: string[]][] = [
-  ["Vendas", ["dashboard", "funil", "pedidos", "clientes", "aprovacoes", "tabela-precos", "simulador"]],
-  ["Financeiro", ["recebimentos", "contas-pagar", "comissoes", "fornecedores"]],
-  ["Produtos", ["produtos", "estoque", "compras", "producao", "precos-metas"]],
-  ["Gestão", ["relatorios", "parametros", "equipe"]],
-];
-
 const Icon = ({ path }: { path: string }) => (
   <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d={path} />
@@ -59,26 +50,46 @@ export async function Sidebar({ session }: { session: Session }) {
     // eslint-disable-next-line @next/next/no-img-element -- served by the app itself, per company
     <img src={`/empresa/logo?v=${logoVersion.getTime()}`} alt={session.tenant.name} className="max-h-8 max-w-full object-contain md:max-h-11" />
   ) : (
-    <p className="truncate font-display text-lg font-bold uppercase leading-none md:whitespace-normal md:text-xl">{session.tenant.name}</p>
+    <p className="break-words font-display text-lg font-bold uppercase leading-none md:text-xl">{session.tenant.name}</p>
   );
   const tabs: MenuTab[] = TAB_ORDER.flatMap(([key, label, icon]) => {
     const item = items.find((entry) => entry.key === key);
     return item ? [{ href: item.href, label, icon: <Icon path={icon} /> }] : [];
   }).slice(0, 4);
-  const grouped = new Set(GROUPS.flatMap(([, keys]) => keys));
-  const groups = GROUPS.map(([title, keys], index) => {
-    const entries = items.filter((item) => keys.includes(item.key) || (index === GROUPS.length - 1 && !grouped.has(item.key)));
-    return [title, entries] as const;
-  }).filter(([, entries]) => entries.length > 0);
+  const groups = navigationGroups(items);
 
   return (
     <MobileMenu brand={brand} tabs={tabs} more={<Icon path={MORE_ICON} />}>
-      <section className="rounded border border-slate-200 bg-slate-50 px-3 py-2" aria-label="Seu acesso">
-        <p className="truncate font-semibold leading-tight">{session.name}</p>
-        <p className="text-sm text-slate-600">
-          {session.profile ?? ROLE_LABELS[session.role]} · {session.tenant.name}
-        </p>
-      </section>
+      <details name="menu-secoes" className="rounded-lg border border-slate-200 bg-slate-50">
+        <summary className="min-h-[var(--control)] cursor-pointer px-3 py-2">
+          <span className="block font-semibold">Minha conta</span>
+          <span className="block text-sm text-slate-600">{session.name.split(" ")[0]} · {session.profile ?? ROLE_LABELS[session.role]}</span>
+        </summary>
+        <div className="flex flex-col gap-2 border-t border-slate-200 p-3 text-sm">
+          <p className="break-words font-semibold">{session.name}</p>
+          <p className="text-slate-600">{session.tenant.name}</p>
+          <ThemeChoice />
+          <Link href="/conectar" className="flex min-h-[var(--control)] items-center text-slate-600 underline">
+            Conectar assistente (IA)
+          </Link>
+          {session.companies > 1 && (
+            <Link href="/empresa" className="flex min-h-[var(--control)] items-center text-slate-600 underline">
+              Trocar de empresa
+            </Link>
+          )}
+          {localLogin && (
+            <Link href="/dev/login" className="flex min-h-[var(--control)] items-center text-slate-600 underline">
+              Trocar perfil (login local)
+            </Link>
+          )}
+          {/* POST on purpose: the central auth refuses logout by GET. */}
+          <form action={`${SSO_LOGOUT_URL}?app=${SSO_APP_ID}`} method="post">
+            <button type="submit" className="flex min-h-[var(--control)] items-center text-slate-600 underline">
+              Sair
+            </button>
+          </form>
+        </div>
+      </details>
 
       {allows(session, "pedidos") && (
         <Link
@@ -89,41 +100,7 @@ export async function Sidebar({ session }: { session: Session }) {
         </Link>
       )}
 
-      <nav aria-label="Menu principal" className="flex flex-col gap-3">
-        {groups.map(([title, entries]) => (
-          <div key={title}>
-            <p className={`px-3 ${SECTION_TITLE}`}>{title}</p>
-            {entries.map((item) => (
-              <Link key={item.key} href={item.href} className="flex min-h-[var(--control)] items-center rounded-lg px-3 font-medium text-slate-700 hover:bg-slate-100 hover:text-slate-900">
-                {item.label}
-              </Link>
-            ))}
-          </div>
-        ))}
-      </nav>
-
-      <div className="mt-auto flex flex-col gap-2 text-sm">
-        <ThemeChoice />
-        <Link href="/conectar" className="text-slate-600 underline">
-          Conectar assistente (IA)
-        </Link>
-        {session.companies > 1 && (
-          <Link href="/empresa" className="text-slate-600 underline">
-            Trocar de empresa
-          </Link>
-        )}
-        {localLogin && (
-          <Link href="/dev/login" className="text-slate-600 underline">
-            Trocar perfil (login local)
-          </Link>
-        )}
-        {/* POST on purpose: the central auth refuses logout by GET. */}
-        <form action={`${SSO_LOGOUT_URL}?app=${SSO_APP_ID}`} method="post">
-          <button type="submit" className="text-slate-600 underline">
-            Sair
-          </button>
-        </form>
-      </div>
+      <NavigationGroups groups={groups} />
     </MobileMenu>
   );
 }

@@ -106,6 +106,9 @@ jobs:
       - run: npm run db:seed-demo -- --empresa ludus
 
       # Falha com rolagem lateral, controle abaixo de 44 px ou erro na página (docs/ux.md).
+      - name: Organização do menu nos cinco tamanhos
+        run: npm run test:telas -- menu.spec.ts
+
       - name: Cores por equipamento nos cinco tamanhos
         run: npm run test:telas -- cores-pedido.spec.ts
 
