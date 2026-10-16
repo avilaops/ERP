@@ -1,6 +1,7 @@
 import { futureCommission } from "@/lib/db/receivables";
 import { roundCents } from "@/lib/pricing/money";
 import Link from "next/link";
+import { OrderReference } from "@/components/OrderReference";
 import { CARD, PRIMARY } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { managesCommissions, menuItem } from "@/lib/auth/permissions";
@@ -16,7 +17,6 @@ export const metadata = { title: `${menuItem("comissoes").label} · ERP` };
 export const dynamic = "force-dynamic";
 
 const HERE = menuItem("comissoes").href;
-const ORDERS = menuItem("pedidos").href;
 const STATUS = {
   paga: ["Paga", "bg-emerald-100 text-emerald-900"],
   "em-aberto": ["A pagar", "bg-amber-100 text-amber-900"],
@@ -39,9 +39,8 @@ export default async function ComissoesPage({ searchParams }: { searchParams: Pr
   const groups = commissionsView(await listCommissions(month, scope, conn), await listCarriedBalances(month, scope, conn));
   const paymentDay = await loadCommissionDay(conn);
   // The four numbers of the month, for who is looking: a seller's are only their own.
-  const entries = groups.flatMap((group) => group.entries);
   const totals = {
-    received: roundCents(entries.filter((entry) => !entry.refund).reduce((sum, entry) => sum + entry.base, 0)),
+    received: roundCents(groups.reduce((sum, group) => sum + group.received, 0)),
     month: roundCents(groups.reduce((sum, group) => sum + group.total, 0)),
     payable: roundCents(groups.reduce((sum, group) => sum + group.payable, 0)),
     future: await futureCommission(scope, conn),
@@ -60,7 +59,7 @@ export default async function ComissoesPage({ searchParams }: { searchParams: Pr
       <dl className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         {(
           [
-            ["Recebido de clientes", showMoney(totals.received), `${monthLabel(month)} · sem IPI`],
+            ["Recebido líquido de clientes", showMoney(totals.received), `${monthLabel(month)} · sem IPI, com estornos do mês`],
             ["Comissão do mês", showMoney(totals.month), manages ? `${sellers} ${sellers === 1 ? "vendedor" : "vendedores"}` : "sua comissão"],
             ["Falta pagar", showMoney(totals.payable), "com o que ficou de meses anteriores"],
             ["Comissão futura", showMoney(totals.future), "do que ainda não foi recebido"],
@@ -139,9 +138,7 @@ export default async function ComissoesPage({ searchParams }: { searchParams: Pr
                     {group.entries.map((entry, index) => (
                       <tr key={index} className="border-t border-slate-200">
                         <td className="px-4 py-3">
-                          <Link href={`${ORDERS}/${entry.orderNumber}`} className="font-medium text-brand underline-offset-2 hover:underline">
-                            {entry.customerName ?? "sem cliente"}
-                          </Link>
+                          <OrderReference access={session} number={entry.orderNumber} customer={entry.customerName} />
                           <span className="block text-xs text-slate-500">
                             #{entry.orderNumber}
                             {entry.refund ? " · estorno" : ""}

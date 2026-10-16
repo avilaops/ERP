@@ -133,7 +133,7 @@ async function invoices(filter: ReportFilter, conn: Queryable): Promise<ReportDa
 
 const RECEIVABLES = `
   SELECT o.number AS order_number, c.name AS customer, r.kind, r.number, to_char(r.due_date, 'YYYY-MM-DD') AS due_on, r.amount, r.status, r.due_date < $3::date AS late,
-         COALESCE((SELECT sum(x.amount) FROM receipts x WHERE x.receivable_id = r.id), 0) - COALESCE((SELECT sum(y.amount) FROM refunds y WHERE y.receivable_id = r.id), 0) AS received
+         COALESCE((SELECT sum(x.amount) FROM receipts x WHERE x.receivable_id = r.id), 0) + COALESCE((SELECT sum(y.amount) FROM refunds y WHERE y.receivable_id = r.id), 0) AS received
     FROM receivables r JOIN orders o ON o.id = r.order_id LEFT JOIN customers c ON c.id = o.customer_id
    WHERE ($1::date IS NULL OR r.due_date >= $1) AND ($2::date IS NULL OR r.due_date <= $2)
    ORDER BY r.due_date, o.number, r.number`;

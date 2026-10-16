@@ -35,3 +35,18 @@ test("mês: rótulo em português e escolha só entre os meses que existem", () 
   assert.equal(chooseMonth("2026-11", ["2026-10"], "2026-11"), "2026-11");
   for (const asked of [undefined, "", "2020-01", "x"]) assert.equal(chooseMonth(asked, ["2026-10"], "2026-11"), "2026-11");
 });
+
+test("base líquida do mês inclui estorno de comissão paga e nova baixa sem duplicar o recebido", () => {
+  const original = entry("ana@x", 53.1, true);
+  const remainder = entry("ana@x", 106.19, true);
+  const refund = { ...entry("ana@x", -53.1), happenedOn: "2026-11-02" };
+  const net = commissionsView([original, remainder, refund], new Map())[0];
+  assert.equal(net.received, 5309.5);
+  assert.equal(net.open, -53.1);
+  assert.equal(net.payable, 0);
+  const restored = commissionsView([original, remainder, refund, entry("ana@x", 53.1)], new Map())[0];
+  assert.equal(restored.received, 7964.5);
+  assert.equal(restored.total, 159.29);
+  // Uma reversão em mês posterior reduz a base do mês da reversão, não o mês do recebimento.
+  assert.equal(commissionsView([refund], new Map())[0].received, -2655);
+});
