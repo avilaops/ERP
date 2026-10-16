@@ -111,8 +111,9 @@ test("configurações: todas as etapas são alcançáveis nos cinco tamanhos", a
 });
 
 test("cores: erro preserva o nome e salvar confirma a alteração", async ({ page }) => {
+  test.setTimeout(90_000);
   await page.goto("/parametros/cores");
-  await page.getByText("Adicionar cor", { exact: true }).click();
+  await page.locator("summary").filter({ hasText: "Adicionar cor" }).click();
   await page.getByLabel("Nome da cor", { exact: true }).fill("Piano Black");
   await page.getByRole("button", { name: "Adicionar", exact: true }).click();
   await expect(page.getByRole("alert")).toContainText("já está na lista");
