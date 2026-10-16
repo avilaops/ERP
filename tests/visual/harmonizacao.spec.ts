@@ -99,6 +99,9 @@ test("configurações: todas as etapas são alcançáveis nos cinco tamanhos", a
       for (const step of steps) {
         await chooser.selectOption(step);
         expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth), `${route} / ${step} / ${width}`).toBeLessThanOrEqual(0);
+        if (route === "/parametros/contrato") {
+          expect(await page.evaluate(() => document.documentElement.scrollHeight), `contrato / ${step} / ${width}`).toBeLessThanOrEqual(height);
+        }
         await page.screenshot({ path: testInfo.outputPath(`${route.slice(1).replace(/[^a-z0-9]/gi, "_")}-etapa-${step}-${width}.png`), fullPage: true });
       }
     }
