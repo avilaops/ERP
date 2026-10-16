@@ -12,7 +12,7 @@ test("harmonização: pilotos, cinco tamanhos e ambos os temas", async ({ page }
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("response", (response) => { if (response.status() >= 500) errors.push(`${response.status()} ${response.url()}`); });
-  const routes = ["/parametros/cores", "/parametros/cores?ver=braco", "/contas-pagar", "/recebimentos", "/recebimentos?ver=recebidos", "/clientes/novo"];
+  const routes = ["/parametros/cores", "/parametros/cores?ver=braco", "/contas-pagar", "/recebimentos", "/recebimentos?ver=recebidos", "/clientes/novo", "/pedidos"];
   for (const [width, height] of SIZES) {
     await page.setViewportSize({ width, height });
     for (const route of routes) {

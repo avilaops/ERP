@@ -15,6 +15,7 @@ export default defineConfig({
     baseURL: "http://127.0.0.1:3020",
     ...devices["Desktop Chrome"],
     locale: "pt-BR",
+    navigationTimeout: 30_000,
     launchOptions: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE } : undefined,
   },
   webServer: {

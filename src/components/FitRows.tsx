@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { MAX_ROWS, MIN_ROWS, ROWS_COOKIE } from "@/lib/rows";
 
 /**
@@ -12,6 +12,7 @@ import { MAX_ROWS, MIN_ROWS, ROWS_COOKIE } from "@/lib/rows";
  */
 export function FitRows({ listId, shown, minimum = MIN_ROWS, cookieName = ROWS_COOKIE }: { listId: string; shown: number; minimum?: number; cookieName?: string }) {
   const router = useRouter();
+  const measuredRow = useRef({ width: 0, height: 0 });
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const measure = () => {
@@ -20,8 +21,16 @@ export function FitRows({ listId, shown, minimum = MIN_ROWS, cookieName = ROWS_C
       if (!list || rows.length === 0) return;
       // Reserve room for the tallest visible closed row, including names on several lines.
       const closed = rows.filter((row) => !row.querySelector("details[open]")).map((row) => row.getBoundingClientRect().height).filter((height) => height > 0);
-      const height = closed.length === 0 ? 0 : Math.max(...closed);
-      if (height < 8) return;
+      const currentHeight = closed.length === 0 ? 0 : Math.max(...closed);
+      if (currentHeight < 8) return;
+      // Refreshing with fewer rows can hide the tallest item. Keep its measured
+      // height at this width, otherwise the list alternates between two sizes.
+      if (measuredRow.current.width !== window.innerWidth) {
+        measuredRow.current = { width: window.innerWidth, height: currentHeight };
+      } else {
+        measuredRow.current.height = Math.max(measuredRow.current.height, currentHeight);
+      }
+      const height = measuredRow.current.height;
       // Everything of the screen that is not the rows: what is above them, what comes after and the room kept for the bars.
       const main = list.closest("main");
       if (!main) return;
