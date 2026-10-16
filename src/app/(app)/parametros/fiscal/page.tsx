@@ -92,7 +92,7 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
         <Link href={menuItem("parametros").href} className={SECONDARY}>← {menuItem("parametros").label}</Link>
       } />
 
-      <details className="mt-3 sm:hidden">
+      <details key={tab} className="mt-3 sm:hidden">
         <summary className="min-h-[var(--control)] cursor-pointer py-3 font-medium text-brand">{TABS.find(([key]) => key === tab)?.[1]} · trocar</summary>
         <nav aria-label="Partes do fiscal no celular" className="grid grid-cols-2 gap-1">
           {TABS.map(([key, label]) => <Link key={key} href={key === TABS[0][0] ? HERE : `${HERE}?ver=${key}`} aria-current={key === tab ? "page" : undefined} className={SECONDARY}>{label}</Link>)}
@@ -332,7 +332,7 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
             <h2 id="pagamento-na-nota" className="border-b border-slate-200 px-5 py-3 text-sm font-semibold uppercase tracking-wide">
               Forma de pagamento na nota
             </h2>
-            <p className="px-5 pt-3 text-sm text-slate-600">Como cada forma de pagamento da empresa aparece na nota fiscal.</p>
+            <p className="px-5 pt-3 text-sm text-slate-600">Código fiscal de cada pagamento.</p>
             <ActionForm action={completePaymentCodesAction} className="px-5 pt-3">
               <button type="submit" className={PRIMARY}>Completar códigos conhecidos</button>
             </ActionForm>

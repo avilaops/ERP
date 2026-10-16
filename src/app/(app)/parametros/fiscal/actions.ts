@@ -40,8 +40,7 @@ export async function completeFiscalCompanyAction(_previous: ActionState, formDa
     revalidatePath(HERE);
     revalidatePath("/pedidos", "layout");
     const tax = company.fiscal;
-    const flag = (value: boolean | null | undefined) => value === true ? "sim" : value === false ? "não" : "não informado";
-    return { error: null, notice: `Cadastro completado com ${tax?.source ?? "consulta pública"}${tax?.updatedAt ? ` (base de ${tax.updatedAt.slice(0, 10)})` : ""}. Simples: ${flag(tax?.simples)}; MEI: ${flag(tax?.mei)}. ${filled.taxRegime ? "Regime cadastrado; confira sublimite e regras da operação com a contabilidade." : "Confirme o regime na aba Emitente. MEI e sublimite não são definidos automaticamente."} Dados já preenchidos foram preservados.` };
+    return { error: null, notice: `${tax?.source ?? "Consulta pública"}${tax?.updatedAt ? ` · ${tax.updatedAt.slice(0, 10).split("-").reverse().join("/")}` : ""}: cadastro completado. Confira Emitente.` };
   } catch (error) {
     if (error instanceof CnpjError || error instanceof Error && /CNPJ consultado|empresa ativa/.test(error.message)) return { error: error.message };
     return problem("consultar o CNPJ", error);
@@ -63,7 +62,7 @@ export async function completePaymentCodesAction(): Promise<ActionState> {
     }
     revalidatePath(HERE);
     revalidatePath("/pedidos", "layout");
-    return { error: null, notice: `${count} forma(s) completada(s). Códigos existentes foram preservados. “Na entrega” exige informar o meio efetivo de pagamento na lista.` };
+    return { error: null, notice: `Códigos conferidos: ${count} preenchido(s).` };
   } catch (error) {
     return problem("mapear os pagamentos", error);
   }
