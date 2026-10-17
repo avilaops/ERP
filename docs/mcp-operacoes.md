@@ -94,3 +94,12 @@ Perguntas de UX: título identifica a tarefa; perfil e política aparecem antes
 da decisão; ação principal é conectar/permitir/ligar ou desligar conforme a tela;
 os cinco tamanhos foram medidos; detalhes têm nomes explícitos; a escolha do
 assistente é preservada ao abrir instruções; teclado e ampliação foram conferidos.
+
+Publicação: `bc9374f`, em 17/10/2026. Health confirmou o commit e o container
+ficou `healthy`; migração 0068 aplicada. O MCP permaneceu ligado e a conexão
+ativa foi preservada (uma antes e depois). Recebimentos (um) e tarefas reais
+(13) não mudaram. Requisição sem token continua respondendo 401; metadados OAuth
+continuam no endereço público do ERP. Pacote verificado com 3.271 entradas.
+PR17 aberta, dependente da PR16; nenhuma das duas foi mesclada nesta entrega.
+A descoberta destas ferramentas na conversa do assistente externo ainda precisa
+ser conferida; a validação autenticada de HTTP foi feita em demonstração.

@@ -7,10 +7,10 @@
       "id": "T-20261017-mcp-prioridades",
       "title": "Ampliar MCP com baixa, margem, caixa e tarefa em pedido",
       "owner": null,
-      "status": "em-andamento",
+      "status": "em-revisao",
       "acceptance": ["Quatro ferramentas com permissoes por tela, poder e escopo", "Previa, confirmacao e protecao contra repeticao das escritas", "Testes de banco, tipos, lint e publicacao verificada sem mutacoes reais de teste"],
-      "evidence": ["https://linear.app/avilaops/issue/AVL-145", "https://linear.app/avilaops/issue/AVL-146", "docs/mcp-operacoes.md"],
-      "next": "Implementacao iniciada apos registro no Linear; validacao em banco isolado."
+      "evidence": ["https://linear.app/avilaops/issue/AVL-145", "https://linear.app/avilaops/issue/AVL-146", "https://github.com/avilaops/ERP/pull/17", "docs/mcp-operacoes.md", "117 testes afetados aprovados sem falhas ou pulos; lint, tipos e build aprovados", "HTTP em demo: handshake, lista por perfil, margem, caixa e tarefa com confirmacao idempotente; 15 medicoes de UI nos cinco tamanhos", "Publicado em bc9374f; health confirmou commit e container healthy. Migracao 0068 aplicada. Conexao ativa preservada (1); recebimentos (1) e tarefas reais (13) iguais antes/depois"],
+      "next": "Primeira entrega publicada. PR17 em revisao, com base dependente da PR16. Conferir descoberta das novas ferramentas no assistente do usuario e priorizar demais funcoes da AVL-145."
     },
     {
       "id": "T-20261017-refinar-proposta",
