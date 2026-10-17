@@ -3,7 +3,7 @@ import { getOrder, listOrders, loadOrderStanding, OrderError } from "@/lib/db/or
 import type { OrderSummary } from "@/lib/db/orders";
 import type { Queryable } from "@/lib/db/pool";
 import { loadPublishedTable } from "@/lib/db/price-table";
-import { loadClosingProposal, PROPOSAL_SNAPSHOT_SQL } from "@/lib/db/proposal-details";
+import { loadClosingProposal, EMPTY_PROPOSAL_DETAILS } from "@/lib/db/proposal-details";
 import { isoDate } from "@/lib/format";
 import { paymentOf, receivableColumns, saleOf } from "@/lib/order-quote";
 import { needsDirector } from "@/lib/pricing/order";
@@ -96,7 +96,7 @@ export async function decideApproval(number: string, decision: Decision, who: De
     `WITH target AS (
        UPDATE orders
           SET status = $2, closed_at = CASE WHEN $2 = 'fechado' THEN now() END, updated_at = now(), updated_by = $3,
-              proposal_details = CASE WHEN $2 = 'fechado' THEN ${PROPOSAL_SNAPSHOT_SQL} ELSE proposal_details END,
+              proposal_details = CASE WHEN $2 = 'fechado' THEN ($16::jsonb || (SELECT proposal_details FROM company_settings) || proposal_details) ELSE proposal_details END,
               proposal_details_revision = proposal_details_revision + CASE WHEN $2 = 'fechado' THEN 1 ELSE 0 END
         WHERE number = $1 AND status = 'aguardando_aprovacao' AND updated_at::text = $4
           AND ($14::bigint IS NULL OR (proposal_details_revision = $14::bigint
@@ -140,6 +140,7 @@ export async function decideApproval(number: string, decision: Decision, who: De
       plan.methods,
       proposal?.orderRevision ?? null,
       proposal?.companyRevision ?? null,
+      JSON.stringify(EMPTY_PROPOSAL_DETAILS),
     ],
   );
   if (rows.length === 0) throw new OrderError(GONE);

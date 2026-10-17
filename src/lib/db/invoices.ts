@@ -1,5 +1,5 @@
 import type { Queryable } from "@/lib/db/pool";
-import { PROPOSAL_SNAPSHOT_SQL } from "@/lib/db/proposal-details";
+import { EMPTY_PROPOSAL_DETAILS } from "@/lib/db/proposal-details";
 
 export type InvoiceStatus = "assinada" | "autorizada" | "rejeitada" | "denegada" | "cancelada";
 type Environment = "homologacao" | "producao";
@@ -72,10 +72,10 @@ export async function saveSignedInvoice(invoice: SignedInvoice, conn: Queryable)
      RETURNING ${COLUMNS}
      ), bumped AS (
        UPDATE orders SET nfe_rules_revision=nfe_rules_revision+1,
-           proposal_details=${PROPOSAL_SNAPSHOT_SQL}, proposal_details_revision=proposal_details_revision+1
+           proposal_details=$10::jsonb || (SELECT proposal_details FROM company_settings) || proposal_details, proposal_details_revision=proposal_details_revision+1
          WHERE id=$1 AND EXISTS (SELECT 1 FROM saved) RETURNING id
      ) SELECT saved.* FROM saved CROSS JOIN bumped`,
-    [invoice.orderId, invoice.environment, invoice.series, invoice.number, invoice.accessKey, invoice.signedXml, invoice.issuedAt, invoice.createdBy, invoice.rulesRevision ?? null],
+    [invoice.orderId, invoice.environment, invoice.series, invoice.number, invoice.accessKey, invoice.signedXml, invoice.issuedAt, invoice.createdBy, invoice.rulesRevision ?? null, JSON.stringify(EMPTY_PROPOSAL_DETAILS)],
   );
   if (!rows[0]) {
     const state = await conn.query("SELECT status FROM orders WHERE id=$1", [invoice.orderId]);

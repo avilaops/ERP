@@ -6,7 +6,7 @@ import type { Customer } from "@/lib/db/customers";
 import { pgErrorCode } from "@/lib/db/pool";
 import type { Queryable } from "@/lib/db/pool";
 import { loadPublishedSnapshot, loadPublishedTable } from "@/lib/db/price-table";
-import { loadClosingProposal, PROPOSAL_SNAPSHOT_SQL } from "@/lib/db/proposal-details";
+import { loadClosingProposal, EMPTY_PROPOSAL_DETAILS } from "@/lib/db/proposal-details";
 import { isoDate } from "@/lib/format";
 import { isPlates } from "@/lib/plates";
 import type { Plates } from "@/lib/plates";
@@ -653,7 +653,7 @@ export async function closeOrder(
     `WITH closed AS (
        UPDATE orders
           SET status = $2, closed_at = CASE WHEN $2 = 'fechado' THEN now() END, updated_at = now(), updated_by = $3,
-              proposal_details = CASE WHEN $2 = 'fechado' THEN ${PROPOSAL_SNAPSHOT_SQL} ELSE proposal_details END,
+              proposal_details = CASE WHEN $2 = 'fechado' THEN ($17::jsonb || (SELECT proposal_details FROM company_settings) || proposal_details) ELSE proposal_details END,
               proposal_details_revision = proposal_details_revision + CASE WHEN $2 = 'fechado' THEN 1 ELSE 0 END
         WHERE number = $1 AND status = 'em_negociacao' AND updated_at::text = $4
           AND ($5::text IS NULL OR seller_email = $5)
@@ -702,6 +702,7 @@ export async function closeOrder(
       selfApproved,
       proposal.orderRevision,
       proposal.companyRevision,
+      JSON.stringify(EMPTY_PROPOSAL_DETAILS),
     ],
   );
   if (rows.length === 0) throw new OrderError(CHANGED);
