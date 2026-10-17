@@ -123,11 +123,14 @@ test("ferramentas por cargo: cada perfil recebe só as das suas telas, e perfil 
     VENDEDOR: ["tarefa_criar_em_pedido", "produtos_buscar", "pedido_detalhe", "minhas_comissoes", "nota_fiscal_status", "producao_status", "funil_oportunidades", "funil_oportunidade", "funil_tarefas", "funil_criar_tarefa", "funil_anotar", "clientes_buscar", "cliente_historico", "pedidos_listar"],
     FINANCEIRO: ["recebimento_dar_baixa", "contas_a_pagar_lancar", "contas_a_pagar_dar_baixa", "cobranca_gerar_mensagem", "minhas_comissoes", "nota_fiscal_status", "producao_status", "recebimentos_em_aberto", "contas_a_pagar_em_aberto"],
   };
+  const sellerActions = ["clientes_cadastrar", "clientes_atualizar", "funil_criar_oportunidade", "funil_mover_etapa", "tarefas_limpar_duplicadas", "orcamento_criar", "pedido_enviar_aprovacao"];
+  expected.VENDEDOR.push(...sellerActions);
+  expected.GERENTE_COMERCIAL.push(...sellerActions, "aprovacao_aprovar", "aprovacao_reprovar", "pedido_cancelar");
   for (const role of ROLES) assert.deepEqual(names(session(role, "x@acme.test")).sort(), expected[role].toSorted(), role);
   // Perfil da empresa: diretoria só com Produção vê só a produção.
   assert.deepEqual(names(session("DIRETORIA", "x@acme.test", { items: ["producao"] })), ["producao_ordens", "producao_materiais"]);
-  // As novas escritas pedem confirmação; as atividades do funil mantêm o contrato existente.
-  assert.deepEqual(TOOLS.filter((tool) => tool.writes).map((tool) => tool.name), ["recebimento_dar_baixa", "tarefa_criar_em_pedido", "contas_a_pagar_lancar", "contas_a_pagar_dar_baixa", "funil_criar_tarefa", "funil_anotar"]);
+  // Toda escrita tem prévia e confirmação, inclusive as atividades já existentes.
+  assert.deepEqual(TOOLS.filter((tool) => tool.writes).map((tool) => tool.name).sort(), ["recebimento_dar_baixa", "tarefa_criar_em_pedido", "contas_a_pagar_lancar", "contas_a_pagar_dar_baixa", ...sellerActions, "aprovacao_aprovar", "aprovacao_reprovar", "pedido_cancelar", "funil_criar_tarefa", "funil_anotar"].sort());
   for (const tool of TOOLS) assert.match(tool.name, /^[a-z_]{3,40}$/);
 });
 
@@ -203,7 +206,11 @@ test("protocolo e alcance: o vendedor lê e grava só nas suas vendas, ferrament
   const theirs = await createOpportunity({ ...blank, title: "Do Caio", company: "Iron Box" }, { email: CAIO.email, name: "Caio" }, db.pool);
   await addActivity(mine, { kind: "tarefa", title: "Ligar para a Paula", dueOn: "2026-10-12" }, ANA.email, { ownerEmail: null }, db.pool);
   const noted: [string, boolean][] = [];
-  const ask = async (who: Session, method: string, params?: unknown, id: unknown = 1) => handleMcp({ jsonrpc: "2.0", id, method, params }, who, db.pool, async (tool, ok) => void noted.push([tool, ok]));
+  const ask = async (who: Session, method: string, params?: unknown, id: unknown = 1) => {
+    const client = await db.pool.connect();
+    try { return await handleMcp({ jsonrpc: "2.0", id, method, params }, who, client, async (tool, ok) => void noted.push([tool, ok])); }
+    finally { client.release(); }
+  };
   const data = (reply: { body: unknown }) => {
     const result = (reply.body as { result: { content: { text: string }[]; isError: boolean } }).result;
     return { value: result.isError ? result.content[0].text : JSON.parse(result.content[0].text), isError: result.isError };
@@ -233,8 +240,12 @@ test("protocolo e alcance: o vendedor lê e grava só nas suas vendas, ferrament
   assert.equal(data(await ask(ANA, "tools/call", { name: "funil_anotar", arguments: { id: theirs, texto: "Invasão" } })).isError, true);
   assert.deepEqual(await listActivities(theirs, db.pool), []);
   // Gravar na sua: fica em nome dela.
-  assert.deepEqual(data(await ask(ANA, "tools/call", { name: "funil_criar_tarefa", arguments: { id: mine, texto: "Enviar proposta", para: "2026-10-15" } })).value, { criada: true });
-  assert.deepEqual(data(await ask(ANA, "tools/call", { name: "funil_anotar", arguments: { id: String(mine), texto: "Quer inaugurar em janeiro" } })).value, { anotada: true });
+  const taskPreview = data(await ask(ANA, "tools/call", { name: "funil_criar_tarefa", arguments: { id: mine, texto: "Enviar proposta", para: "2026-10-15" } })).value;
+  assert.equal((await listActivities(mine, db.pool)).length, 1);
+  assert.deepEqual(data(await ask(ANA, "tools/call", { name: "funil_criar_tarefa", arguments: { confirmar: taskPreview.confirmar } })).value, { criada: true });
+  assert.deepEqual(data(await ask(ANA, "tools/call", { name: "funil_criar_tarefa", arguments: { confirmar: taskPreview.confirmar } })).value, { criada: true });
+  const notePreview = data(await ask(ANA, "tools/call", { name: "funil_anotar", arguments: { id: mine, texto: "Quer inaugurar em janeiro" } })).value;
+  assert.deepEqual(data(await ask(ANA, "tools/call", { name: "funil_anotar", arguments: { confirmar: notePreview.confirmar } })).value, { anotada: true });
   assert.ok((await listActivities(mine, db.pool)).some((activity) => activity.title === "Enviar proposta" && activity.createdBy === ANA.email && activity.dueOn === "2026-10-15"));
   assert.deepEqual(data(await ask(ANA, "tools/call", { name: "funil_tarefas" })).value.map((task: { texto: string }) => task.texto).sort(), ["Enviar proposta", "Ligar para a Paula"]);
 

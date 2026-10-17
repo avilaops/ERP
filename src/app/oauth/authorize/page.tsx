@@ -59,7 +59,7 @@ export default async function AuthorizePage({ searchParams }: { searchParams: Pr
           {tools.length === 0 && <li>Nenhuma ferramenta: o seu perfil não tem telas ligadas ao assistente.</li>}
         </ul>
       </details>
-      <p className="text-sm text-slate-600">Os dados lidos vão para a IA do aplicativo. Custos exigem diretoria autorizada. Contas, baixas e tarefas pedem confirmação; não há transferência bancária. Revogue em Conectar assistente.</p>
+      <p className="text-sm text-slate-600">Os dados lidos vão para a IA do aplicativo. Custos exigem diretoria autorizada. Alterações pedem prévia e confirmação; não há transferência bancária. Revogue em Conectar assistente.</p>
       {!on && <p className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">A conexão com assistentes está desligada para esta empresa. Quem liga é a diretoria, em Parâmetros → Assistente.</p>}
       <PublicForm action={decideAuthorizationAction} className="flex flex-col gap-2">
         {Object.entries(params).map(([name, value]) => (

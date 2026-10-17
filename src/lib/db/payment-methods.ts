@@ -71,6 +71,7 @@ export async function updatePaymentMethod(
   try {
     const { rows } = await conn.query(
       `UPDATE payment_methods SET nfe_code = CASE WHEN label = $2 THEN nfe_code ELSE $7 END,
+          company_pix = CASE WHEN label=$2 AND nfe_code='17' AND NOT COALESCE($6,on_delivery) THEN company_pix ELSE false END,
           label = $2, position = $3, active = $4, on_delivery = COALESCE($6, on_delivery), updated_at = now(), updated_by = $5
         WHERE id = $1 RETURNING id, label, position, active, on_delivery`,
       [id, change.label.trim(), change.position, change.active, who, change.onDelivery ?? null, standardPaymentCode(change.label)],

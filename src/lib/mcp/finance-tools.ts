@@ -39,7 +39,7 @@ export const FINANCE_TOOLS: Tool[] = [
     },
   },
   {
-    name: "contas_a_pagar_dar_baixa", title: "Registrar pagamento de conta", item: "contas-pagar", writes: true,
+    name: "contas_a_pagar_dar_baixa", title: "Registrar pagamento de conta", item: "contas-pagar", writes: true, destructive: true,
     description: "Registra pagamento já realizado, com valor efetivo, data e meio. Exige prévia e confirmação. Não transfere dinheiro nem executa pagamento bancário. Se a conta mudar ou já estiver paga, peça nova prévia.",
     inputSchema: object({ id: numeric("Id da conta em contas_a_pagar_em_aberto"), valor: numeric("Valor efetivamente pago, com juros/desconto quando houver"), data: field("Dia do pagamento: AAAA-MM-DD"), forma: field("Nome exato do meio ativo"), ...confirmField }),
     async run(session, conn, args) {
