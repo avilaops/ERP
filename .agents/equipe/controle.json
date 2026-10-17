@@ -4,6 +4,15 @@
   "members": [],
   "tasks": [
     {
+      "id": "T-20261017-mcp-prioridades",
+      "title": "Ampliar MCP com baixa, margem, caixa e tarefa em pedido",
+      "owner": null,
+      "status": "em-andamento",
+      "acceptance": ["Quatro ferramentas com permissoes por tela, poder e escopo", "Previa, confirmacao e protecao contra repeticao das escritas", "Testes de banco, tipos, lint e publicacao verificada sem mutacoes reais de teste"],
+      "evidence": ["https://linear.app/avilaops/issue/AVL-145", "https://linear.app/avilaops/issue/AVL-146", "docs/mcp-operacoes.md"],
+      "next": "Implementacao iniciada apos registro no Linear; validacao em banco isolado."
+    },
+    {
       "id": "T-20261017-refinar-proposta",
       "title": "Ocultar campos vazios e exigir condicoes comerciais antes de fechar",
       "owner": null,

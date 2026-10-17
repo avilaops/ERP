@@ -119,15 +119,15 @@ test("ferramentas por cargo: cada perfil recebe só as das suas telas, e perfil 
   const names = (who: Session) => toolsOf(who).map((tool) => tool.name);
   const expected: Record<Role, string[]> = {
     DIRETORIA: TOOLS.map((tool) => tool.name),
-    GERENTE_COMERCIAL: ["funil_oportunidades", "funil_oportunidade", "funil_tarefas", "funil_criar_tarefa", "funil_anotar", "clientes_buscar", "cliente_historico", "pedidos_listar", "aprovacoes_pendentes"],
-    VENDEDOR: ["funil_oportunidades", "funil_oportunidade", "funil_tarefas", "funil_criar_tarefa", "funil_anotar", "clientes_buscar", "cliente_historico", "pedidos_listar"],
-    FINANCEIRO: ["recebimentos_em_aberto", "contas_a_pagar_em_aberto"],
+    GERENTE_COMERCIAL: ["tarefa_criar_em_pedido", "funil_oportunidades", "funil_oportunidade", "funil_tarefas", "funil_criar_tarefa", "funil_anotar", "clientes_buscar", "cliente_historico", "pedidos_listar", "aprovacoes_pendentes"],
+    VENDEDOR: ["tarefa_criar_em_pedido", "funil_oportunidades", "funil_oportunidade", "funil_tarefas", "funil_criar_tarefa", "funil_anotar", "clientes_buscar", "cliente_historico", "pedidos_listar"],
+    FINANCEIRO: ["recebimento_dar_baixa", "recebimentos_em_aberto", "contas_a_pagar_em_aberto"],
   };
   for (const role of ROLES) assert.deepEqual(names(session(role, "x@acme.test")), expected[role], role);
   // Perfil da empresa: diretoria só com Produção vê só a produção.
   assert.deepEqual(names(session("DIRETORIA", "x@acme.test", { items: ["producao"] })), ["producao_ordens", "producao_materiais"]);
-  // Só duas ferramentas gravam, e nenhuma mexe em pedido, dinheiro ou aprovação.
-  assert.deepEqual(TOOLS.filter((tool) => tool.writes).map((tool) => tool.name), ["funil_criar_tarefa", "funil_anotar"]);
+  // As novas escritas pedem confirmação; as atividades do funil mantêm o contrato existente.
+  assert.deepEqual(TOOLS.filter((tool) => tool.writes).map((tool) => tool.name), ["recebimento_dar_baixa", "tarefa_criar_em_pedido", "funil_criar_tarefa", "funil_anotar"]);
   for (const tool of TOOLS) assert.match(tool.name, /^[a-z_]{3,40}$/);
 });
 

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CARD, DANGER } from "@/components/ui";
+import { CARD, DANGER, QUIET_LINK } from "@/components/ui";
 import { PublicForm } from "@/app/contrato/[empresa]/[token]/PublicForm";
 import { requireSession } from "@/lib/auth";
 import { ROLE_LABELS } from "@/lib/auth/roles";
@@ -31,9 +31,9 @@ export default async function ConectarPage() {
   const serverUrl = resourceUrl();
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-xl flex-col gap-4 bg-slate-50 px-4 py-6">
+    <main className="mx-auto flex min-h-screen max-w-xl flex-col gap-3 bg-slate-50 px-4 py-4">
       <p className="text-sm">
-        <Link href="/" className="text-brand underline">
+        <Link href="/" className={`${QUIET_LINK} inline-flex min-h-[var(--control)] items-center`}>
           ← Voltar ao ERP
         </Link>
       </p>
@@ -41,7 +41,7 @@ export default async function ConectarPage() {
         <p className="text-lg font-semibold text-slate-900">{session.tenant.name}</p>
         <h1 className="text-xl font-semibold">Conectar um assistente</h1>
         <p className="mt-1 text-slate-700">
-          Ligue o seu assistente de inteligência artificial ao ERP. Ele entra como <strong>{session.name}</strong> ({session.profile ?? ROLE_LABELS[session.role]}) e enxerga só o que as suas telas permitem.
+          Seu assistente usará o acesso de <strong>{session.name}</strong> ({session.profile ?? ROLE_LABELS[session.role]}).
         </p>
       </div>
 
@@ -64,9 +64,7 @@ export default async function ConectarPage() {
           ))}
           {tools.length === 0 && <li>Nenhuma ferramenta: o seu perfil não tem telas ligadas ao assistente.</li>}
         </ul>
-        <p className="mt-2 text-xs text-slate-600">Custo e margem nunca são enviados. Fechar pedido, aprovar, receber e pagar continuam só na tela.</p>
-      </details>
-
+        <p className="mt-2 text-sm text-slate-600">Custo e margem exigem o poder de custos da diretoria. Baixas e tarefas em pedidos pedem confirmação no chat. Fechar, aprovar e pagar contas continuam na tela.</p>
       {mine.length > 0 && (
         <section className={`${CARD} p-4`} aria-label="Meus assistentes conectados">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Conectados por você</h2>
@@ -90,6 +88,7 @@ export default async function ConectarPage() {
           </ul>
         </section>
       )}
+      </details>
     </main>
   );
 }

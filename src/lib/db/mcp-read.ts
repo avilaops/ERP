@@ -30,10 +30,12 @@ export async function pendingApprovalsForAssistant(conn: Queryable) {
 
 export async function openReceivablesForAssistant(conn: Queryable) {
   const { rows } = await conn.query(
-    `SELECT o.number, COALESCE(c.trade_name, c.name) AS customer, r.kind, r.number AS installment, r.due_date::text AS due, r.amount, r.method, (r.due_date < current_date) AS late
-       FROM receivables r JOIN orders o ON o.id = r.order_id LEFT JOIN customers c ON c.id = o.customer_id WHERE r.status = 'aberta' ORDER BY r.due_date, r.id LIMIT 100`,
+    `SELECT r.id, o.number, COALESCE(c.trade_name, c.name) AS customer, r.kind, r.number AS installment, r.due_date::text AS due, r.amount, r.method,
+            r.amount - COALESCE((SELECT sum(p.amount) FROM receipts p WHERE p.receivable_id = r.id AND NOT EXISTS (SELECT 1 FROM refund_requests q WHERE q.receipt_id = p.id AND q.status = 'confirmada')), 0) AS open,
+            (r.due_date < (now() AT TIME ZONE 'America/Sao_Paulo')::date) AS late
+       FROM receivables r JOIN orders o ON o.id = r.order_id LEFT JOIN customers c ON c.id = o.customer_id WHERE r.status = 'aberta' AND o.status = 'fechado' ORDER BY r.due_date, r.id LIMIT 100`,
   );
-  return rows.map((row) => ({ pedido: String(row.number), cliente: row.customer === null ? null : String(row.customer), tipo: String(row.kind), parcela: Number(row.installment), vence_em: String(row.due), valor: Number(row.amount), forma: row.method === null ? null : String(row.method), atrasada: row.late === true }));
+  return rows.map((row) => ({ id: Number(row.id), pedido: String(row.number), cliente: row.customer === null ? null : String(row.customer), tipo: String(row.kind), parcela: Number(row.installment), vence_em: iso(row.due), valor: Number(row.open), valor_original: Number(row.amount), forma: row.method === null ? null : String(row.method), atrasada: row.late === true }));
 }
 
 export async function openPayablesForAssistant(conn: Queryable) {

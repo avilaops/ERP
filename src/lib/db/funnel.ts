@@ -308,7 +308,7 @@ export async function setActivityDone(activityId: number, done: boolean, who: st
   const { rows } = await conn.query(
     `UPDATE opportunity_activities a SET done_at = CASE WHEN $3 THEN now() END, done_by = CASE WHEN $3 THEN $4 END
       WHERE a.id = $1 AND a.kind <> 'nota'
-        AND ($2::text IS NULL OR COALESCE((SELECT o.owner_email FROM opportunities o WHERE o.id = a.opportunity_id), a.owner_email) = $2) RETURNING a.id`,
+        AND ($2::text IS NULL OR COALESCE((SELECT o.owner_email FROM opportunities o WHERE o.id = a.opportunity_id), (SELECT d.seller_email FROM orders d WHERE d.id = a.order_id), a.owner_email) = $2) RETURNING a.id`,
     [activityId, scope.ownerEmail, done, who],
   );
   if (rows.length === 0) throw new FunnelError("Atividade não encontrada. Recarregue a página.");
@@ -316,7 +316,7 @@ export async function setActivityDone(activityId: number, done: boolean, who: st
 
 export async function deleteActivity(activityId: number, scope: FunnelScope, conn: Queryable): Promise<void> {
   const { rows } = await conn.query(
-    `WITH target AS (SELECT a.id FROM opportunity_activities a WHERE a.id = $1 AND ($2::text IS NULL OR COALESCE((SELECT o.owner_email FROM opportunities o WHERE o.id = a.opportunity_id), a.owner_email) = $2)),
+    `WITH target AS (SELECT a.id FROM opportunity_activities a WHERE a.id = $1 AND ($2::text IS NULL OR COALESCE((SELECT o.owner_email FROM opportunities o WHERE o.id = a.opportunity_id), (SELECT d.seller_email FROM orders d WHERE d.id = a.order_id), a.owner_email) = $2)),
           loose AS (UPDATE opportunity_meetings m SET activity_id = NULL FROM target WHERE m.activity_id = target.id),
           hung AS (UPDATE voice_calls v SET activity_id = NULL FROM target WHERE v.activity_id = target.id)
      DELETE FROM opportunity_activities a USING target WHERE a.id = target.id RETURNING a.id`,
@@ -356,7 +356,7 @@ export async function listPendingActivities(scope: FunnelScope, conn: Queryable)
        LEFT JOIN opportunities o ON o.id = a.opportunity_id LEFT JOIN pipeline_stages s ON s.id = o.stage_id LEFT JOIN customers c ON c.id = o.customer_id
        LEFT JOIN orders d ON d.id = a.order_id LEFT JOIN customers dc ON dc.id = d.customer_id
       WHERE a.done_at IS NULL AND a.kind <> 'nota' AND (a.opportunity_id IS NULL OR s.kind = 'aberta')
-        AND ($1::text IS NULL OR COALESCE(o.owner_email, a.owner_email) = $1)
+        AND ($1::text IS NULL OR COALESCE(o.owner_email, d.seller_email, a.owner_email) = $1)
       ORDER BY a.due_on NULLS LAST, a.id`,
     [scope.ownerEmail],
   );

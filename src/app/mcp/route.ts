@@ -1,4 +1,5 @@
 import { noteCall } from "@/lib/db/mcp";
+import { withTenantConnection } from "@/lib/db/pool";
 import { mcpAccess } from "@/lib/mcp/access";
 import { issuer, json, OPEN, preflight, resourceMetadataUrl } from "@/lib/mcp/http";
 import { handleMcp } from "@/lib/mcp/server";
@@ -36,7 +37,9 @@ export async function POST(request: Request): Promise<Response> {
   } catch {
     message = null;
   }
-  const reply = await handleMcp(message, access.session, access.conn, (tool, ok) => noteCall(access.grantId, access.session.email, tool, ok, access.conn));
+  const reply = await withTenantConnection(access.session.tenant.slug, (conn) =>
+    handleMcp(message, access.session, conn, (tool, ok) => noteCall(access.grantId, access.session.email, tool, ok, conn)),
+  );
   return reply.body === null ? new Response(null, { status: reply.status, headers: OPEN }) : json(reply.body, reply.status);
 }
 

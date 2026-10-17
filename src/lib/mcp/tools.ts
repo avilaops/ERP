@@ -1,6 +1,5 @@
 import type { Session } from "@/lib/auth/access";
 import { allows, seesAllOrders } from "@/lib/auth/permissions";
-import type { MenuItemKey } from "@/lib/auth/permissions";
 import { customerTimeline } from "@/lib/db/customer-timeline";
 import { getCustomer } from "@/lib/db/customers";
 import { addActivity, FunnelError, getOpportunity, listActivities, listOpportunities, listPendingActivities, opportunityParty } from "@/lib/db/funnel";
@@ -10,24 +9,15 @@ import { customersForAssistant, openPayablesForAssistant, openReceivablesForAssi
 import { listOpportunityMessages } from "@/lib/db/messages";
 import type { Queryable } from "@/lib/db/pool";
 import { listProductionOrders, listProductionStages } from "@/lib/db/production";
-
-/** A refusal the assistant can explain to the person. The message goes back as it is. */
-export class ToolError extends Error {}
+import { BUSINESS_TOOLS } from "@/lib/mcp/business-tools";
+import { ConfirmationError } from "@/lib/mcp/confirmation";
+import { ReceivableError } from "@/lib/db/receivables";
+import { ToolError } from "@/lib/mcp/definition";
+import type { Tool, Schema } from "@/lib/mcp/definition";
+export { ToolError } from "@/lib/mcp/definition";
+export type { Tool, Schema } from "@/lib/mcp/definition";
 
 type Args = Record<string, unknown>;
-type Schema = { type: "object"; properties: Record<string, { type: string; description: string; enum?: string[] }>; required?: string[]; additionalProperties: false };
-
-export type Tool = {
-  name: string;
-  title: string;
-  description: string;
-  /** The screen of the ERP this tool is the same thing as: who does not have the screen does not have the tool. */
-  item: MenuItemKey;
-  /** Changes something in the ERP. The others only read. */
-  writes?: boolean;
-  inputSchema: Schema;
-  run(session: Session, conn: Queryable, args: Args): Promise<unknown>;
-};
 
 const text = (args: Args, key: string, max = 300): string => (typeof args[key] === "string" ? (args[key] as string).trim().slice(0, max) : "");
 const id = (args: Args, key = "id"): number => {
@@ -42,6 +32,7 @@ const scopeOf = (session: Session) => ({ ownerEmail: seesAllOrders(session) ? nu
 const object = (properties: Schema["properties"], required: string[] = []): Schema => ({ type: "object", properties, required, additionalProperties: false });
 
 export const TOOLS: Tool[] = [
+  ...BUSINESS_TOOLS,
   {
     name: "funil_oportunidades", title: "Oportunidades do funil", item: "funil",
     description: "Lista as oportunidades de venda (vendas possíveis, antes do pedido): as da própria pessoa, ou as da equipe para gerência e diretoria. Até 50.",
@@ -171,7 +162,7 @@ export const TOOLS: Tool[] = [
 ];
 
 /** The tools a person has: the ones of the screens their profile reaches, nothing else. */
-export const toolsOf = (session: Session): Tool[] => TOOLS.filter((tool) => allows(session, tool.item));
+export const toolsOf = (session: Session): Tool[] => TOOLS.filter((tool) => allows(session, tool.item) && (tool.available?.(session) ?? true));
 
 /**
  * Runs one tool for a person. A tool of a screen the person does not have is
@@ -187,7 +178,7 @@ export async function callTool(session: Session, conn: Queryable, name: string, 
   try {
     return await tool.run(session, conn, given);
   } catch (error) {
-    if (error instanceof FunnelError) throw new ToolError(error.message);
+    if (error instanceof FunnelError || error instanceof ConfirmationError || error instanceof ReceivableError) throw new ToolError(error.message);
     throw error;
   }
 }
