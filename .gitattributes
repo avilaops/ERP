@@ -1,0 +1,3 @@
+src/lib/fiscal/schemas/** text eol=lf
+# Preserve whitespace in the versioned vendor schemas, including documentation.
+src/lib/fiscal/schemas/**/*.xsd -whitespace

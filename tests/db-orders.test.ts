@@ -1321,6 +1321,21 @@ test("emissão: guarda a nota assinada antes de enviar; rejeitada reemite com o 
   await assert.rejects(() => issueOrderNfe(number, who, now, vault, never, db.pool), /certificado digital A1/);
   await saveCertificate(testPfx({ name: "EMPRESA DE TESTE LTDA:11222333000181" }), "senha-de-teste", vault, who, now, db.pool);
 
+  // A validação local é obrigatória, mesmo sem serviço de conferência adicional.
+  // O cadastro aceita a rua de um caractere; o XSD exige pelo menos dois.
+  const originalStreet = (await db.pool.query("SELECT street FROM company_settings")).rows[0].street;
+  try {
+    await db.pool.query("UPDATE company_settings SET street = 'A'");
+    await assert.rejects(
+      () => issueOrderNfe(number, who, now, vault, never, db.pool),
+      (error: Error) => error instanceof IssueError && /conferência local/.test(error.message) && /xLgr/.test(error.message),
+    );
+    assert.deepEqual(await listOrderInvoices(orderId, db.pool), []);
+    assert.equal((await db.pool.query("SELECT nfe_next_number FROM company_settings")).rows[0].nfe_next_number, 42);
+  } finally {
+    await db.pool.query("UPDATE company_settings SET street = $1", [originalStreet]);
+  }
+
   const answer = (key: string, code: string, reason: string) =>
     `<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope"><soap:Body><retEnviNFe versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe"><cStat>104</cStat><xMotivo>Lote processado</xMotivo>` +
     `<protNFe versao="4.00"><infProt><tpAmb>2</tpAmb><verAplic>T</verAplic><chNFe>${key}</chNFe><dhRecbto>2026-10-08T10:00:05-03:00</dhRecbto>${code === "100" ? "<nProt>135260000000001</nProt><digVal>x=</digVal>" : ""}<cStat>${code}</cStat><xMotivo>${reason}</xMotivo></infProt></protNFe></retEnviNFe></soap:Body></soap:Envelope>`;
