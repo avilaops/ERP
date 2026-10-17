@@ -10,7 +10,7 @@
       "status": "em-revisao",
       "acceptance": ["PDF sem placeholders ou informacoes internas, favorecido legal e valores com centavos", "Garantia, frete e montagem exigidos no fechamento e na aprovacao", "HXKP legivel em uma pagina, QR valido e publicacao conferida pela UI"],
       "evidence": ["PDF real HXKP em uma pagina, inspecionado visualmente; QR decodificado com entrada de R$ 20.000,00 e chave CNPJ", "Validacao no servidor e na UI, incluindo revisoes concorrentes; sem condicoes reais inventadas", "76 testes das areas afetadas e 37 de rotas, tema e UX aprovados; lint, tipos e build aprovados", "Etapa Fechar em dois estados nos cinco tamanhos: 10 medicoes de uma tela, sem rolagem lateral e controles >=44 px", "Publicado em 58c97aa; health confirmou o commit e container healthy. PDF regenerado com snapshot somente leitura dos dados atuais, sem alterar termos, dinheiro ou emitir documentos"],
-      "next": "Retomar conferencia da UI publicada, teclado e retorno ao resumo apos fechar pedido ficticio: navegador integrado desconectou. Garantia, montagem e frete reais ainda precisam ser definidos pela empresa. PR16 permanece aberta."
+      "next": "Conferencia final concluida apos reconexao: PDF de producao baixado pela UI, uma pagina e QR validos. DM10 fechou por Enter e voltou ao Resumo; Tab alcancou a acao com texto/zoom 200%, restaurados depois. Garantia, montagem e frete reais ainda precisam ser definidos pela empresa. PR16 permanece aberta para revisao."
     },
     {
       "id": "T-20261017-proposta-completa",

@@ -118,10 +118,10 @@ conferidos. Nenhum recebimento foi confirmado e nenhum contrato ou nota foi envi
    pagamento ficaram visíveis em 360×640.
 5. Editar, consultar PDF e excluir ficam nas outras etapas; não ocupam o fechamento.
 6. O servidor recusa dados ausentes e alterações concorrentes antes de gerar títulos.
-7. A navegação, o link de preenchimento e os botões usam controles nativos. A
-   conexão do navegador caiu antes da conferência final de teclado e do retorno
-   ao resumo após concluir o fechamento fictício; essas duas verificações na UI
-   ainda precisam ser retomadas.
+7. A navegação, o link de preenchimento e os botões usam controles nativos. Após
+   reconectar o navegador, Tab alcançou o botão com texto e zoom a 200%; as
+   ampliações foram removidas. Enter fechou DM10 e a UI voltou ao Resumo, sem
+   permanecer na etapa Fechar removida. Todos os dados desse teste eram fictícios.
 
 ### Publicação desta revisão
 
@@ -131,10 +131,14 @@ manifesto e checksum; migrações já estavam em dia. O PDF revisado HXKP foi ge
 com uma nova leitura dos dados reais, inspecionado em uma página e seu QR
 decodificado. Valores, chave CNPJ e favorecido legal foram conferidos.
 
-A conferência final da rota publicada pela UI ficou pendente pela desconexão do
-navegador integrado. Não foi apresentado como download pela UI. O arquivo
-`pedido-261016-HXKP-revisado.pdf` foi entregue como artefato local. Permanecem os
-dados comerciais reais a definir pela empresa; não foram preenchidos com exemplos.
+Após reconectar o navegador integrado, o PDF de produção foi baixado pelo link
+**Salvar PDF** da tela de HXKP e substituiu a prévia local. Sua página foi
+renderizada e inspecionada; leitura do QR confirmou chave CNPJ e R$ 20.000,00.
+O arquivo `pedido-261016-HXKP-revisado.pdf` foi entregue como artefato local.
+No ambiente fictício DM10, condições incompletas bloquearam o fechamento; garantia
+e montagem herdadas e frete FOB liberaram a validação comercial. Após preencher
+o pagamento fictício, Enter fechou o pedido e a tela voltou ao Resumo. Permanecem
+os dados comerciais reais a definir pela empresa; não foram preenchidos com exemplos.
 
 Permanecem para preenchimento pela empresa: site, prazo/cobertura de garantia,
 montagem, modalidade/condições do frete, prazo de transporte e condições de
