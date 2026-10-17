@@ -73,6 +73,8 @@ export type FiscalOverview = {
   voids: FiscalNumberVoidOverview[];
 };
 
+export type FiscalOverviewScope = { sellerEmail: string | null; environment: Environment };
+
 const textOrNull = (value: unknown) => value === null || value === undefined ? null : String(value);
 const numberOrNull = (value: unknown) => value === null || value === undefined ? null : Number(value);
 
@@ -88,7 +90,7 @@ function stageOf(invoice: InvoiceStatus | null, job: JobStatus | null): FiscalOr
  * The operational fiscal screen receives status metadata only. XMLs, PFX files,
  * passwords and message bodies remain in their purpose-specific repositories.
  */
-export async function listFiscalOverview(conn: Queryable): Promise<FiscalOverview> {
+export async function listFiscalOverview(scope: FiscalOverviewScope, conn: Queryable): Promise<FiscalOverview> {
   const [orders, invoices, voidJobs, voids] = await Promise.all([
     conn.query(
       `SELECT o.id AS order_id, o.number AS order_number, COALESCE(c.trade_name, c.name, 'Cliente não vinculado') AS customer_name, o.closed_at,
@@ -99,14 +101,15 @@ export async function listFiscalOverview(conn: Queryable): Promise<FiscalOvervie
          LEFT JOIN customers c ON c.id = o.customer_id
          LEFT JOIN LATERAL (
            SELECT id, status, number, environment FROM fiscal_invoices
-            WHERE order_id = o.id ORDER BY id DESC LIMIT 1
+            WHERE order_id = o.id AND environment = $2 ORDER BY id DESC LIMIT 1
          ) i ON true
          LEFT JOIN LATERAL (
            SELECT id, kind, status, attempts, last_error, run_after FROM fiscal_jobs
             WHERE order_id = o.id ORDER BY id DESC LIMIT 1
          ) j ON true
-        WHERE o.status = 'fechado'
+        WHERE o.status = 'fechado' AND ($1::text IS NULL OR o.seller_email = $1)
         ORDER BY o.closed_at DESC, o.id DESC`,
+      [scope.sellerEmail, scope.environment],
     ),
     conn.query(
       `SELECT i.id, o.number AS order_number, COALESCE(c.trade_name, c.name, 'Cliente não vinculado') AS customer_name,
@@ -118,7 +121,9 @@ export async function listFiscalOverview(conn: Queryable): Promise<FiscalOvervie
          LEFT JOIN LATERAL (
            SELECT status, recipient, sent_at FROM fiscal_invoice_mails WHERE invoice_id = i.id ORDER BY id DESC LIMIT 1
          ) m ON true
+        WHERE ($1::text IS NULL OR o.seller_email = $1)
         ORDER BY i.issued_at DESC, i.id DESC`,
+      [scope.sellerEmail],
     ),
     conn.query(
       `SELECT id, environment, series, first_number, last_number, status, attempts, last_error, run_after, created_at

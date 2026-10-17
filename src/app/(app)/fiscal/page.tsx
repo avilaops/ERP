@@ -3,7 +3,8 @@ import Link from "next/link";
 import { FitRows } from "@/components/FitRows";
 import { CARD, MetricSummary, PageHeader, Pager, Pill, SECONDARY, ViewTabs, pageOf } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
-import { menuItem } from "@/lib/auth/permissions";
+import { menuItem, seesAllOrders } from "@/lib/auth/permissions";
+import { loadFiscalSettings } from "@/lib/db/fiscal";
 import { listFiscalOverview } from "@/lib/db/fiscal-overview";
 import type { FiscalOrderOverview } from "@/lib/db/fiscal-overview";
 import { tenantDb } from "@/lib/db/pool";
@@ -30,7 +31,7 @@ const range = (firstNumber: number, lastNumber: number) => firstNumber === lastN
 
 function orderDetail(order: FiscalOrderOverview): string {
   if (order.stage === "emitir") return "Pedido fechado, pronto para conferir e emitir a NF-e.";
-  if (order.jobKind && order.jobStatus) {
+  if (order.jobKind && (order.jobStatus === "pendente" || order.jobStatus === "processando" || order.jobStatus === "revisao_manual")) {
     const label = JOB_LABELS[order.jobKind];
     if (order.jobStatus === "revisao_manual") return `${label} interrompida após ${order.jobAttempts} tentativa(s). Confira a nota e a SEFAZ antes de repetir.`;
     return `${label} ${order.jobStatus === "processando" ? "em processamento" : "aguardando processamento"} · tentativa ${order.jobAttempts}.`;
@@ -43,7 +44,8 @@ function orderDetail(order: FiscalOrderOverview): string {
 export default async function FiscalPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const session = await requirePermission("fiscal");
   const conn = tenantDb(session.tenant.slug);
-  const [overview, query, store] = await Promise.all([listFiscalOverview(conn), searchParams, cookies()]);
+  const [settings, query, store] = await Promise.all([loadFiscalSettings(conn), searchParams, cookies()]);
+  const overview = await listFiscalOverview({ sellerEmail: seesAllOrders(session) ? null : session.email, environment: settings.environment }, conn);
   const asked = first(query.ver);
   const tab = asked === "notas" || asked === "inutilizacoes" ? asked : "pendencias";
   const size = rowsPerPage(store.get("erp_fiscal_linhas")?.value, 1);

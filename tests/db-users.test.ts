@@ -56,6 +56,10 @@ test("telas por pessoa: guardam-se só as do perfil; todas marcadas é sem restr
   await assert.rejects(() => updateUser(seller.id, { name: "Caio", role: "VENDEDOR", active: true, items: ["parametros"] }, BOSS, db.pool), /Marque pelo menos uma tela/);
   // Mudou de perfil: as telas marcadas valem para o perfil novo.
   assert.deepEqual((await updateUser(seller.id, { name: "Caio", role: "FINANCEIRO", active: true, items: ["recebimentos", "pedidos"] }, BOSS, db.pool)).items, ["recebimentos"]);
+  await assert.rejects(
+    () => updateUser(seller.id, { name: "Caio", role: "DIRETORIA", active: true, items: ["fiscal"] }, BOSS, db.pool),
+    /marque também a tela Pedidos/,
+  );
 
   // Ninguém tira telas de si mesmo: poderia ficar sem Parâmetros e sem Equipe.
   const boss = (await listUsers(db.pool)).find((user) => user.email === BOSS);

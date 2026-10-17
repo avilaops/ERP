@@ -4,6 +4,7 @@ import { loadFiscalSettings } from "@/lib/db/fiscal";
 import { listOrderInvoices } from "@/lib/db/invoices";
 import { previewOrderNfe } from "@/lib/db/order-nfe";
 import { getOrder } from "@/lib/db/orders";
+import type { OrderScope } from "@/lib/db/orders";
 import type { Queryable } from "@/lib/db/pool";
 import { sendInvoiceMail } from "@/lib/db/send-nfe-mail";
 import type { Send } from "@/lib/fiscal/channel";
@@ -46,8 +47,8 @@ export async function listOrderFiscalJobs(orderId: number, conn: Queryable): Pro
 }
 
 /** A request is durable before it returns to the screen. Repeated clicks join its active job. */
-export async function enqueueNfeIssue(orderNumber: string, who: string, conn: Queryable): Promise<{ id: number; joined: boolean }> {
-  const order = await getOrder(orderNumber, { sellerEmail: null }, conn);
+export async function enqueueNfeIssue(orderNumber: string, who: string, scope: OrderScope, conn: Queryable): Promise<{ id: number; joined: boolean }> {
+  const order = await getOrder(orderNumber, scope, conn);
   if (!order) throw new IssueError("Pedido não encontrado.");
   const preview = await previewOrderNfe(orderNumber, new Date(), conn);
   if (!preview) throw new IssueError("Pedido não encontrado ou ainda não fechado: só pedido fechado tem nota.");
@@ -65,8 +66,8 @@ export async function enqueueNfeIssue(orderNumber: string, who: string, conn: Qu
 }
 
 /** CC-e and cancellation are stored before the screen returns; repeated clicks join the same active event. */
-export async function enqueueNfeEvent(orderNumber: string, kind: "correcao" | "cancelamento", text: string, who: string, conn: Queryable): Promise<{ id: number; joined: boolean }> {
-  const order = await getOrder(orderNumber, { sellerEmail: null }, conn);
+export async function enqueueNfeEvent(orderNumber: string, kind: "correcao" | "cancelamento", text: string, who: string, scope: OrderScope, conn: Queryable): Promise<{ id: number; joined: boolean }> {
+  const order = await getOrder(orderNumber, scope, conn);
   if (!order) throw new IssueError("Pedido não encontrado.");
   let detail: string;
   try {
@@ -100,7 +101,8 @@ export async function claimFiscalJob(now: Date, conn: Queryable): Promise<Fiscal
     `UPDATE fiscal_jobs
         SET status = 'revisao_manual', lease_until = NULL,
             last_error = COALESCE(last_error, 'Processamento interrompido após cinco tentativas; confira o documento antes de qualquer nova operação.'), updated_at = $1
-      WHERE status = 'processando' AND lease_until <= $1 AND attempts >= $2`,
+      WHERE (status = 'processando' AND lease_until <= $1 AND attempts >= $2)
+         OR (status = 'pendente' AND attempts >= $2)`,
     [now, MAX_ATTEMPTS],
   );
   const { rows } = await conn.query(
@@ -182,50 +184,52 @@ async function sendAutomaticMail(kind: "nota" | "correcao" | "cancelamento", inv
 }
 
 /** Drains a bounded batch so one background tick can make progress without monopolising a tenant. */
-export async function runFiscalJobBatch(now: Date, dependencies: FiscalJobDependencies, conn: Queryable, limit = 10): Promise<number> {
+export async function runFiscalJobBatch(dependencies: FiscalJobDependencies, conn: Queryable, limit = 10, clock: () => Date = () => new Date()): Promise<number> {
   let processed = 0;
   while (processed < limit) {
-    if ((await runOneFiscalJob(now, dependencies, conn)) === "none") break;
+    if ((await runOneFiscalJob(clock(), dependencies, conn, clock)) === "none") break;
     processed += 1;
   }
   return processed;
 }
 
 /** Processes one invoice request. The lease is already durable before any network operation begins. */
-export async function runOneFiscalJob(now: Date, dependencies: FiscalJobDependencies, conn: Queryable): Promise<"none" | "completed" | "retry" | "manual_review"> {
+export async function runOneFiscalJob(now: Date, dependencies: FiscalJobDependencies, conn: Queryable, clock: () => Date = () => now): Promise<"none" | "completed" | "retry" | "manual_review"> {
   const job = await claimFiscalJob(now, conn);
   if (!job) return "none";
   try {
     if (job.kind === "emitir_nfe") {
       const prior = await conn.query("SELECT id, status FROM fiscal_invoices WHERE fiscal_job_id = $1 LIMIT 1", [job.id]);
       if (prior.rows[0] && prior.rows[0].status !== "assinada") {
-        if (prior.rows[0].status === "autorizada") await sendAutomaticMail("nota", Number(prior.rows[0].id), job.requestedBy, now, dependencies, conn);
-        await completeFiscalJob(job.id, now, conn);
+        const finishedAt = clock();
+        if (prior.rows[0].status === "autorizada") await sendAutomaticMail("nota", Number(prior.rows[0].id), job.requestedBy, finishedAt, dependencies, conn);
+        await completeFiscalJob(job.id, finishedAt, conn);
         return "completed";
       }
       const result = await issueOrderNfe(job.orderNumber, job.requestedBy, now, dependencies.vault, dependencies.send, conn, dependencies.check, job.id);
-      if (result.invoice.status === "autorizada") await sendAutomaticMail("nota", result.invoice.id, job.requestedBy, now, dependencies, conn);
+      const finishedAt = clock();
+      if (result.invoice.status === "autorizada") await sendAutomaticMail("nota", result.invoice.id, job.requestedBy, finishedAt, dependencies, conn);
       if (result.invoice.status === "assinada") {
-        await retryFiscalJob(job, result.message, now, conn);
-        return "retry";
+        return (await failFiscalJob(job, new IssueError(result.message), finishedAt, conn)) ? "retry" : "manual_review";
       }
     } else {
       const recorded = await conn.query("SELECT id, invoice_id FROM fiscal_invoice_events WHERE fiscal_job_id = $1 LIMIT 1", [job.id]);
       if (recorded.rows[0]) {
         const kind = job.kind === "correcao_nfe" ? "correcao" : "cancelamento";
-        await sendAutomaticMail(kind, Number(recorded.rows[0].invoice_id), job.requestedBy, now, dependencies, conn);
-        await completeFiscalJob(job.id, now, conn);
+        const finishedAt = clock();
+        await sendAutomaticMail(kind, Number(recorded.rows[0].invoice_id), job.requestedBy, finishedAt, dependencies, conn);
+        await completeFiscalJob(job.id, finishedAt, conn);
         return "completed";
       }
       const kind = job.kind === "correcao_nfe" ? "correcao" : "cancelamento";
       if (job.invoiceId === null) throw new IssueError("O evento pendente não está vinculado a uma nota; revise-o manualmente.");
       const result = await registerOrderNfeEvent(job.orderNumber, kind, job.eventText ?? "", job.requestedBy, now, dependencies.vault, dependencies.send, conn, { invoiceId: job.invoiceId, fiscalJobId: job.id });
-      await sendAutomaticMail(kind, result.invoiceId, job.requestedBy, now, dependencies, conn);
+      await sendAutomaticMail(kind, result.invoiceId, job.requestedBy, clock(), dependencies, conn);
     }
-    await completeFiscalJob(job.id, now, conn);
+    await completeFiscalJob(job.id, clock(), conn);
     return "completed";
   } catch (error) {
-    return (await failFiscalJob(job, error, now, conn)) ? "retry" : "manual_review";
+    return (await failFiscalJob(job, error, clock(), conn)) ? "retry" : "manual_review";
   }
 }
 

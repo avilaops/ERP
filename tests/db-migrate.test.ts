@@ -29,6 +29,14 @@ async function withClient<T>(fn: (client: pg.PoolClient) => Promise<T>): Promise
   }
 }
 
+test("migração: jobs de evento antigos só recebem uma nota inequívoca", () => {
+  const migration = readFileSync(join(MIGRATIONS_DIR, "0075_identidade_da_fila_fiscal.sql"), "utf8");
+  assert.match(migration, /count\(\*\)::integer AS matches/);
+  assert.match(migration, /candidates\.matches = 1/);
+  assert.match(migration, /status = 'revisao_manual'/);
+  assert.match(migration, /Evento criado antes da identificação da nota/);
+});
+
 test("migração: aplica em ordem, registra e rodar de novo não muda nada", { skip }, async () => {
   const first = await withClient((client) => migrate(client, MIGRATIONS_DIR));
   assert.deepEqual(first, [

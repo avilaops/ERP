@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/auth";
+import { seesAllOrders } from "@/lib/auth/permissions";
 import { FiscalError } from "@/lib/db/fiscal";
 import { saveOrderFiscalRules } from "@/lib/db/order-fiscal-rules";
 import { getOrder } from "@/lib/db/orders";
@@ -18,7 +19,7 @@ export async function saveNoteRulesAction(_previous: ActionState, form: FormData
   const read = (key: string) => typeof form.get(key) === "string" ? String(form.get(key)).trim() : "";
   const number = read("number");
   if (!ORDER_NUMBER.test(number)) return { error: "Pedido não encontrado." };
-  const order = await getOrder(number, { sellerEmail: null }, conn);
+  const order = await getOrder(number, { sellerEmail: seesAllOrders(session) ? null : session.email }, conn);
   const table = order ? await loadPublishedTable(order.priceTableVersion, conn) : null;
   if (!order || !table || order.status !== "fechado") return { error: "A preparação fiscal exige um pedido fechado." };
   const step = Number(read("step"));

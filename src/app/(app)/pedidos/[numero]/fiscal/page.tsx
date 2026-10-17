@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requirePermission } from "@/lib/auth";
+import { seesAllOrders } from "@/lib/auth/permissions";
 import { CARD, INPUT, LABEL, PRIMARY, SECONDARY, PageHeader } from "@/components/ui";
 import { loadFiscalSettings } from "@/lib/db/fiscal";
 import { listOrderInvoices } from "@/lib/db/invoices";
@@ -26,7 +27,7 @@ export default async function NoteRulesPage({ params, searchParams }: {
   const conn = tenantDb(session.tenant.slug);
   const { numero } = await params;
   if (!ORDER_NUMBER.test(numero)) notFound();
-  const order = await getOrder(numero, { sellerEmail: null }, conn);
+  const order = await getOrder(numero, { sellerEmail: seesAllOrders(session) ? null : session.email }, conn);
   if (!order || order.status !== "fechado") notFound();
   const table = await loadPublishedTable(order.priceTableVersion, conn);
   if (!table) notFound();

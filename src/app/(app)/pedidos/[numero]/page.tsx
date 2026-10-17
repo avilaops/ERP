@@ -232,6 +232,8 @@ export default async function PedidoPage({
   const events = invoice ? await listOrderInvoiceEvents(order.id, conn) : [];
   const mails = invoice ? await listOrderInvoiceMails(order.id, conn) : [];
   const fiscalJobs = invoice ? await listOrderFiscalJobs(order.id, conn) : [];
+  const currentFiscalJob = fiscalJobs[0] ?? null;
+  const currentInvoice = invoice ? (invoices.find((item) => item.environment === invoice.input.environment) ?? null) : null;
   const carriers = invoice ? await listCarriers(conn) : [];
   const transport = await loadOrderTransport(order.id, conn);
   const delivery = invoice ? await loadOrderDelivery(order.id, conn) : null;
@@ -509,7 +511,7 @@ export default async function PedidoPage({
         <details data-part="documentos" className="mt-3 rounded-lg border border-slate-200 bg-white p-4 text-sm" aria-labelledby="nota-fiscal">
           <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-2">
             <h2 id="nota-fiscal" className="text-sm font-semibold uppercase tracking-wide">Nota fiscal</h2>
-            <span className="text-slate-600">{invoices[0] ? `Nº ${invoices[0].number} · ${INVOICE_LABELS[invoices[0].status]} · ${invoices[0].environment === "homologacao" ? "homologação" : "produção"}` : "Ver preparação e emissão"}</span>
+            <span className="text-slate-600">{currentInvoice ? `Nº ${currentInvoice.number} · ${INVOICE_LABELS[currentInvoice.status]} · ${currentInvoice.environment === "homologacao" ? "homologação" : "produção"}` : "Ver preparação e emissão"}</span>
           </summary>
           <Link href={`/pedidos/${order.number}/fiscal`} className={`${SECONDARY} mt-3`}>
             Preparar regras desta nota
@@ -821,24 +823,24 @@ export default async function PedidoPage({
               <li className="rounded border border-slate-200 p-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">2 · Nota fiscal</p>
                 <p className="mt-1 text-sm">
-                  {fiscalJobs.some((job) => job.status === "revisao_manual")
+                  {currentFiscalJob?.status === "revisao_manual"
                     ? "A fila parou para revisão manual. Confira a situação antes de repetir."
-                    : fiscalJobs.some((job) => job.status === "pendente" || job.status === "processando")
+                    : currentFiscalJob?.status === "pendente" || currentFiscalJob?.status === "processando"
                       ? "A emissão ou o evento está na fila fiscal."
-                      : invoices[0]?.status === "autorizada"
-                        ? (mails.some((mail) => mail.invoiceId === invoices[0].id && mail.status === "enviado") ? "Nota autorizada e enviada por e-mail." : "Nota autorizada. Baixe os arquivos ou envie ao contato.")
-                        : invoices[0]?.status === "cancelada"
+                      : currentInvoice?.status === "autorizada"
+                        ? (mails.some((mail) => mail.invoiceId === currentInvoice.id && mail.status === "enviado") ? "Nota autorizada e enviada por e-mail." : "Nota autorizada. Baixe os arquivos ou envie ao contato.")
+                        : currentInvoice?.status === "cancelada"
                           ? "Nota cancelada. O XML e o e-mail do cancelamento ficam no histórico."
-                          : invoices[0]?.status === "denegada"
+                          : currentInvoice?.status === "denegada"
                             ? "Nota denegada pela SEFAZ. Consulte o motivo registrado."
-                            : invoices[0]?.status === "rejeitada"
+                            : currentInvoice?.status === "rejeitada"
                               ? "Nota rejeitada. Corrija a preparação e emita novamente."
-                              : invoices[0]?.status === "assinada"
+                              : currentInvoice?.status === "assinada"
                                 ? "Nota assinada sem resposta final gravada. Confira a situação na SEFAZ."
                                 : "Confira a preparação e emita a nota fiscal."}
                 </p>
-                <a href="#nota-fiscal" className={`${invoices[0]?.status === "autorizada" ? SECONDARY : PRIMARY} mt-2`}>
-                  {invoices[0]?.status === "autorizada" ? "Baixar ou enviar nota por e-mail" : "Preparar ou emitir nota fiscal"}
+                <a href="#nota-fiscal" className={`${currentInvoice?.status === "autorizada" ? SECONDARY : PRIMARY} mt-2`}>
+                  {currentInvoice?.status === "autorizada" ? "Baixar ou enviar nota por e-mail" : "Preparar ou emitir nota fiscal"}
                 </a>
               </li>
             )}

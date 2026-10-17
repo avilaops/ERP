@@ -69,6 +69,9 @@ function screens(role: Role, items: string[] | null | undefined): string[] | nul
   if (items == null) return null;
   const kept = narrowedItems(role, items);
   if (kept !== null && kept.length === 0) throw new UserError("Marque pelo menos uma tela: sem nenhuma a pessoa não abre nada.");
+  if (kept?.includes("fiscal") && !kept.includes("pedidos")) {
+    throw new UserError("Fiscal usa os documentos do pedido: marque também a tela Pedidos.");
+  }
   return kept;
 }
 

@@ -18,12 +18,15 @@ test("painel fiscal mapeia pedidos, notas e inutilizações sem buscar conteúdo
     }) as Queryable["query"],
   };
 
-  const result = await listFiscalOverview(conn);
+  const result = await listFiscalOverview({ sellerEmail: "fiscal@example.com", environment: "producao" }, conn);
 
   assert.equal(result.orders[0].stage, "emitir");
   assert.equal(result.invoices[0].mail?.status, "enviado");
   assert.equal(result.voidJobs[0].status, "revisao_manual");
   assert.equal(result.voids[0].first, 10);
   assert.equal(statements.length, 4);
+  assert.match(statements[0], /o\.seller_email = \$1/);
+  assert.match(statements[0], /environment = \$2/);
+  assert.match(statements[1], /o\.seller_email = \$1/);
   for (const sql of statements) assert.doesNotMatch(sql, /signed_xml|authorized_xml|certificate|passphrase/i);
 });

@@ -44,8 +44,27 @@
 - [x] Enviar commits ao GitHub e obter lint, tipos, testes, build e telas verdes.
 - [x] Inspecionar os prints de `/fiscal` nos cinco tamanhos e revisar o diff final.
 
+### Task 6: Auditoria final de escopo e recuperação
+
+- [x] Aplicar o escopo de pedidos ao painel, às prévias, à preparação e a todas as mutações fiscais.
+- [x] Classificar pendências pela nota do ambiente fiscal atual e pelo job mais recente.
+- [x] Impedir reabertura durante transmissão e encaminhar a quinta resposta não final para revisão.
+- [x] Renovar o relógio do lote, preservar jobs antigos na migração e adiar inutilização enquanto houver emissão concorrente.
+- [x] Exigir `Pedidos` em perfis que recebem `Fiscal`.
+
 ## Resultado
 
 - Implementação validada no GitHub Actions: <https://github.com/avilaops/ERP/actions/runs/39047714624>.
 - `/fiscal`, `?ver=notas` e `?ver=inutilizacoes`: uma tela, sem rolagem lateral e sem controles menores que 44 px em 360×640, 390×844, 430×932, 1366×768 e 1440×900.
 - Pull request pronta para revisão: <https://github.com/avilaops/ERP/pull/21>.
+- O lote consolidado da auditoria final é validado pelos checks obrigatórios vinculados ao HEAD da mesma PR antes do merge.
+
+## Conferência de UX
+
+1. Tarefa e título: `Fiscal` aparece na primeira dobra e separa operação de configuração.
+2. Informação decisiva: contadores, estado e próxima pendência aparecem sem abrir detalhes.
+3. Ação: cada linha oferece uma ação contextual, e a emissão permanece no pedido para confirmação explícita.
+4. Tamanhos: a PR mede 360×640, 390×844, 430×932, 1366×768 e 1440×900.
+5. Conteúdo excedente: abas, `Pager`, `FitRows` e links `Abrir nota no pedido` preservam o caminho.
+6. Navegação: abas e paginação são endereçáveis; preparação mantém etapas próprias.
+7. Acessibilidade: controles compartilhados preservam foco, área de toque e leitura ampliada; o CI visual confere regressões dimensionais.

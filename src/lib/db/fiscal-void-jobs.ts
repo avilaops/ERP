@@ -87,7 +87,7 @@ async function claimNumberVoidJob(now: Date, conn: Queryable): Promise<FiscalVoi
 }
 
 /** A missing answer is manual review: without a reliable consultation endpoint, automatic retransmission could duplicate a tax request. */
-export async function runOneNumberVoidJob(now: Date, vault: Buffer, send: Send, conn: Queryable): Promise<"none" | "completed" | "manual_review"> {
+export async function runOneNumberVoidJob(now: Date, vault: Buffer, send: Send, conn: Queryable): Promise<"none" | "completed" | "retry" | "manual_review"> {
   const job = await claimNumberVoidJob(now, conn);
   if (!job) return "none";
   try {
@@ -100,10 +100,18 @@ export async function runOneNumberVoidJob(now: Date, vault: Buffer, send: Send, 
        LIMIT 1`,
       [job.environment, job.range.series, job.range.first, job.range.last],
     );
-    if (used.length > 0 || activeIssue.rows[0]) {
-      throw new IssueError(used.length > 0
-        ? `A faixa passou a conter nota com veredito da SEFAZ (número ${used.join(", ")}); confira-a manualmente.`
-        : "Há uma emissão de NF-e ativa que pode usar esta faixa; confira-a manualmente antes de inutilizar.");
+    if (used.length > 0) {
+      throw new IssueError(`A faixa passou a conter nota com veredito da SEFAZ (número ${used.join(", ")}); confira-a manualmente.`);
+    }
+    if (activeIssue.rows[0]) {
+      await conn.query(
+        `UPDATE fiscal_void_jobs
+            SET status = 'pendente', attempts = GREATEST(attempts - 1, 0), run_after = $2,
+                lease_until = NULL, last_error = 'Aguardando a emissão fiscal ativa terminar antes de conferir a faixa.', updated_at = $1
+          WHERE id = $3 AND status = 'processando'`,
+        [now, new Date(now.getTime() + 60_000), job.id],
+      );
+      return "retry";
     }
     await sendPreparedNumberVoid({ ...job.range, environment: job.environment, issuerUf: job.issuerUf, signedXml: job.signedXml }, job.requestedBy, now, vault, send, conn);
     await conn.query("UPDATE fiscal_void_jobs SET status = 'concluido', completed_at = $2, lease_until = NULL, last_error = NULL, updated_at = $2 WHERE id = $1 AND status = 'processando'", [job.id, now]);
