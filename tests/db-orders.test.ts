@@ -1626,6 +1626,35 @@ test("nota autorizada: carta de correção numera 1, 2…; cancelamento grava o 
   assert.deepEqual((await listNumberVoids(db.pool)).map((item) => [item.first, item.last, item.protocol]), [[45, 45, "135260000000009"]]);
 });
 
+test("fila de inutilização: persiste o XML assinado antes da SEFAZ e não duplica clique repetido", { skip }, async () => {
+  const { enqueueNumberVoid, listNumberVoidJobs, runOneNumberVoidJob } = await import("@/lib/db/fiscal-void-jobs");
+  const { takeNextNumber, listNumberVoids } = await import("@/lib/db/invoices");
+  const { saveCertificate } = await import("@/lib/db/fiscal");
+  const { testPfx } = await import("./fiscal-helpers.ts");
+  const { randomBytes } = await import("node:crypto");
+
+  const now = new Date("2026-10-18T13:00:00Z");
+  const who = "diretoria@teste.local";
+  const vault = randomBytes(32);
+  await saveCertificate(testPfx({ name: "EMPRESA DE TESTE LTDA:11222333000181" }), "senha-de-teste", vault, who, now, db.pool);
+  assert.equal(await takeNextNumber(db.pool), 46);
+  const range = { series: 1, first: 46, last: 46, reason: "Numeração reservada e não utilizada no teste." };
+  const first = await enqueueNumberVoid(range, who, now, vault, db.pool);
+  const repeated = await enqueueNumberVoid(range, who, now, vault, db.pool);
+  assert.deepEqual([repeated.id, repeated.joined], [first.id, true]);
+  const queued = await db.pool.query("SELECT signed_xml, status, attempts FROM fiscal_void_jobs WHERE id = $1", [first.id]);
+  assert.match(queued.rows[0].signed_xml, /<inutNFe .*<Signature /);
+  assert.deepEqual([queued.rows[0].status, Number(queued.rows[0].attempts)], ["pendente", 0]);
+
+  const send = async (_url: string, _action: string, envelope: string) => {
+    assert.match(envelope, /<xServ>INUTILIZAR<\/xServ>/);
+    return `<retInutNFe versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe"><infInut><cStat>102</cStat><xMotivo>Inutilização de número homologado</xMotivo><nProt>135260000000010</nProt></infInut></retInutNFe>`;
+  };
+  assert.equal(await runOneNumberVoidJob(now, vault, send, db.pool), "completed");
+  assert.deepEqual((await listNumberVoidJobs(db.pool)).slice(0, 1).map((job) => [job.status, job.attempts]), [["concluido", 1]]);
+  assert.deepEqual((await listNumberVoids(db.pool)).slice(0, 1).map((item) => [item.first, item.last, item.protocol]), [[46, 46, "135260000000010"]]);
+});
+
 test("resposta perdida: evento duplicado (573) vem da consulta; número que já é de outra nota na SEFAZ (539) não é reaproveitado; duplicidade (204) traz o protocolo ou espera", { skip }, async () => {
   const { registerOrderNfeEvent, issueOrderNfe, IssueError } = await import("@/lib/db/issue-nfe");
   const { listOrderInvoiceEvents, listOrderInvoices } = await import("@/lib/db/invoices");

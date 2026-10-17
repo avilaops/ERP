@@ -285,14 +285,22 @@ export async function registerOrderNfeEvent(
  * will never issue. Refused here when a number of the range already is an
  * invoice with a verdict, or was not reached by the counter yet.
  */
-export async function voidInvoiceNumbers(
-  range: { series: number; first: number; last: number; reason: string },
-  who: string,
+export type NumberVoidRange = { series: number; first: number; last: number; reason: string };
+
+/** A signed request is made and stored before the fiscal worker talks to SEFAZ. */
+export type PreparedNumberVoid = NumberVoidRange & {
+  environment: "homologacao" | "producao";
+  issuerUf: string;
+  signedXml: string;
+};
+
+/** Validates the range and signs its immutable request, without transmitting it. */
+export async function prepareNumberVoid(
+  range: NumberVoidRange,
   now: Date,
   vault: Buffer,
-  send: Send,
   conn: Queryable,
-): Promise<{ message: string }> {
+): Promise<PreparedNumberVoid> {
   const settings = await loadFiscalSettings(conn);
   if (!settings.cnpj || !settings.uf || !UF_CODES[settings.uf]) throw new IssueError("Preencha o CNPJ e a UF da empresa em Parâmetros → Fiscal.");
   if (!(range.last < settings.nextNumber)) throw new IssueError(`Só dá para inutilizar número que o sistema já passou: o próximo da empresa é o ${settings.nextNumber}.`);
@@ -303,20 +311,51 @@ export async function voidInvoiceNumbers(
   if (!sealed) throw new IssueError("Envie o certificado digital A1 em Parâmetros → Fiscal.");
   if (sealed.validUntil.getTime() <= now.getTime()) throw new IssueError("O certificado digital venceu. Envie o certificado em vigor em Parâmetros → Fiscal.");
   const certificate = openCertificate(sealed, vault);
-
-  let signed: string;
-  let result;
+  let signedXml: string;
   try {
     const request = voidXml({ environment: settings.environment, stateCode: UF_CODES[settings.uf], year: issueInstant(now).slice(2, 4), cnpj: settings.cnpj, series: range.series, first: range.first, last: range.last, reason: range.reason });
-    signed = signVoidXml(request.xml, signingKeyOf(certificate.pfx, certificate.password));
-    await checkLocalXml(signed, "inutilizacao");
-    result = parseVoid(await send(voidUrl(settings.uf, settings.environment), VOID_ACTION, voidEnvelope(signed), { pfx: certificate.pfx, passphrase: certificate.password }));
+    signedXml = signVoidXml(request.xml, signingKeyOf(certificate.pfx, certificate.password));
+    await checkLocalXml(signedXml, "inutilizacao");
+  } catch (error) {
+    if (error instanceof SefazError) throw new IssueError(error.message);
+    throw error;
+  }
+  return { environment: settings.environment, issuerUf: settings.uf, series: range.series, first: range.first, last: range.last, reason: range.reason.replace(/\s+/g, " ").trim(), signedXml };
+}
+
+/** Sends exactly the signed request that was persisted with the operation. */
+export async function sendPreparedNumberVoid(
+  prepared: PreparedNumberVoid,
+  who: string,
+  now: Date,
+  vault: Buffer,
+  send: Send,
+  conn: Queryable,
+): Promise<{ message: string }> {
+  const sealed = await loadSealedCertificate(conn);
+  if (!sealed) throw new IssueError("Envie o certificado digital A1 em Parâmetros → Fiscal.");
+  if (sealed.validUntil.getTime() <= now.getTime()) throw new IssueError("O certificado digital venceu. Envie o certificado em vigor em Parâmetros → Fiscal.");
+  const certificate = openCertificate(sealed, vault);
+  let result;
+  try {
+    result = parseVoid(await send(voidUrl(prepared.issuerUf, prepared.environment), VOID_ACTION, voidEnvelope(prepared.signedXml), { pfx: certificate.pfx, passphrase: certificate.password }));
   } catch (error) {
     if (error instanceof SefazError) throw new IssueError(error.message);
     throw error;
   }
   if (!result.registered) throw new IssueError(`A SEFAZ não inutilizou (${result.code}): ${result.reason}`);
 
-  await recordNumberVoid({ environment: settings.environment, series: range.series, first: range.first, last: range.last, reason: range.reason.replace(/\s+/g, " ").trim(), signedXml: signed, protocol: result.protocol, createdBy: who }, conn);
-  return { message: `Numeração ${range.first} a ${range.last} inutilizada. Protocolo ${result.protocol}.` };
+  await recordNumberVoid({ environment: prepared.environment, series: prepared.series, first: prepared.first, last: prepared.last, reason: prepared.reason, signedXml: prepared.signedXml, protocol: result.protocol, createdBy: who }, conn);
+  return { message: `Numeração ${prepared.first} a ${prepared.last} inutilizada. Protocolo ${result.protocol}.` };
+}
+
+export async function voidInvoiceNumbers(
+  range: { series: number; first: number; last: number; reason: string },
+  who: string,
+  now: Date,
+  vault: Buffer,
+  send: Send,
+  conn: Queryable,
+): Promise<{ message: string }> {
+  return sendPreparedNumberVoid(await prepareNumberVoid(range, now, vault, conn), who, now, vault, send, conn);
 }

@@ -102,6 +102,9 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "0069_cancelamento_de_rascunhos.sql",
     "0070_email_da_carta_de_correcao.sql",
     "0071_pix_direto_e_termos_preservados.sql",
+    "0072_fila_fiscal.sql",
+    "0073_fila_de_eventos_fiscais.sql",
+    "0074_fila_inutilizacao_fiscal.sql",
   ]);
 
   const second = await withClient((client) => migrate(client, MIGRATIONS_DIR));
@@ -136,8 +139,10 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "fiscal_invoice_events",
     "fiscal_invoice_mails",
     "fiscal_invoices",
+    "fiscal_jobs",
     "fiscal_number_voids",
     "fiscal_rules",
+    "fiscal_void_jobs",
     "fixed_expenses",
     "idempotency_keys",
     "lost_reasons",

@@ -6,10 +6,9 @@ import { FiscalError, loadFiscalSettings, removeCertificate, saveCertificate, sa
 import { completeKnownPaymentCodes, completeSaleOperation, saveFiscalRules, savePaymentCode } from "@/lib/db/fiscal-rules";
 import { CnpjError, lookupCnpj } from "@/lib/cnpj";
 import { completeFiscalCompany, saleOperationCodes } from "@/lib/fiscal/setup";
-import { IssueError, voidInvoiceNumbers } from "@/lib/db/issue-nfe";
+import { IssueError, enqueueNumberVoid } from "@/lib/db/fiscal-void-jobs";
 import { tenantDb } from "@/lib/db/pool";
 import { listLines } from "@/lib/db/product-lines";
-import { sendToSefaz } from "@/lib/fiscal/channel";
 import { cityCode } from "@/lib/fiscal/cities";
 import { parsePercent } from "@/lib/format";
 import { exactLine } from "@/lib/lines-view";
@@ -263,20 +262,19 @@ export async function voidNumbersAction(_previous: ActionState, formData: FormDa
   const conn = tenantDb(session.tenant.slug);
   const text = reader(formData);
   try {
-    await voidInvoiceNumbers(
+    const job = await enqueueNumberVoid(
       { series: whole(text("series")), first: whole(text("first")), last: whole(text("last")), reason: text("reason") },
       session.email,
       new Date(),
       vaultKey(process.env.ERP_CERT_KEY),
-      sendToSefaz,
       conn,
     );
+    revalidatePath(HERE);
+    return { error: null, notice: job.joined ? "Esta faixa já está na fila fiscal." : "Inutilização colocada na fila fiscal. A situação será atualizada automaticamente." };
   } catch (error) {
     if (error instanceof IssueError) return { error: error.message };
     return problem("inutilizar a numeração", error);
   }
-  revalidatePath(HERE);
-  return OK;
 }
 
 /** "Salvar data": from when the DANFE is printed in the layout of the tax reform. */

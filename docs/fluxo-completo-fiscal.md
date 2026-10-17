@@ -29,6 +29,20 @@ Esses ajustes de integração ainda dependem de implantação própria.
 9. Inutilização de numeração fica em Parâmetros → Fiscal; é uma operação distinta de
    cancelar nota autorizada. Só utilizar uma faixa efetivamente aplicável.
 
+## Fila persistente de operações fiscais
+
+Em desenvolvimento na PR 21, a tela grava a solicitação antes de qualquer chamada
+externa. Emissão, CC-e e cancelamento compartilham a fila por pedido; uma operação
+pendente impede outra no mesmo pedido. A inutilização mantém sua própria fila porque
+é uma faixa de numeração da empresa, sem pedido associado: o XML assinado é salvo
+antes da chamada à SEFAZ.
+
+O worker marca cada trabalho como pendente, processando, concluído ou em revisão
+manual. Emissão retoma consultando a SEFAZ antes de reenviar o XML. Para
+inutilização, resposta perdida vai para revisão manual: não há uma consulta segura
+implementada para confirmar a faixa antes de repetir uma solicitação irreversível.
+Nenhuma dessas filas substitui a autorização externa em homologação ou produção.
+
 ## Correções do envio de eventos
 
 - O arquivo novo é `procEventoNFe`, com evento assinado e o `retEvento` real.
