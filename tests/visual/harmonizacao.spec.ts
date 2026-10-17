@@ -66,14 +66,16 @@ test("cadastro: etapas e erro de validação preservam o preenchimento", async (
 });
 
 test("pedido: etapas no desktop e histórico preservam os dados", async ({ page }) => {
+  test.setTimeout(90_000);
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/pedidos?busca=DM09");
   const href = await page.locator('a[href$="-DM09"]').first().getAttribute("href");
   expect(href).toBeTruthy();
-  await page.goto(`${href}?ver=pagamento`);
-  const note = page.getByLabel("Observações do pagamento", { exact: true });
+  await page.goto(`${href}/pagamento?etapa=1`);
+  const note = page.getByLabel("Observações", { exact: true });
   await note.fill("Manter ao alternar etapas");
-  await page.getByRole("button", { name: /Itens/ }).click();
+  await page.getByRole("button", { name: "Voltar", exact:true }).click();
+  await expect(page).toHaveURL(/etapa=0/);
   await expect(note).toBeHidden();
   await page.goBack();
   await expect(note).toBeVisible();

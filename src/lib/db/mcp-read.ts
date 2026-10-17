@@ -23,25 +23,27 @@ export async function ordersForAssistant(filter: { sellerEmail: string | null; s
 export async function pendingApprovalsForAssistant(conn: Queryable) {
   const { rows } = await conn.query(
     `SELECT o.number, COALESCE(c.trade_name, c.name) AS customer, o.seller_name, a.requested_at, a.requested_by
-       FROM order_approvals a JOIN orders o ON o.id = a.order_id LEFT JOIN customers c ON c.id = o.customer_id WHERE a.status = 'pendente' ORDER BY a.requested_at LIMIT 50`,
+       FROM order_approvals a JOIN orders o ON o.id = a.order_id LEFT JOIN customers c ON c.id = o.customer_id WHERE a.status = 'pendente' AND o.status='aguardando_aprovacao' ORDER BY a.requested_at LIMIT 50`,
   );
   return rows.map((row) => ({ pedido: String(row.number), cliente: row.customer === null ? null : String(row.customer), vendedor: String(row.seller_name), pedido_em: iso(row.requested_at), pedido_por: String(row.requested_by) }));
 }
 
 export async function openReceivablesForAssistant(conn: Queryable) {
   const { rows } = await conn.query(
-    `SELECT o.number, COALESCE(c.trade_name, c.name) AS customer, r.kind, r.number AS installment, r.due_date::text AS due, r.amount, r.method, (r.due_date < current_date) AS late
-       FROM receivables r JOIN orders o ON o.id = r.order_id LEFT JOIN customers c ON c.id = o.customer_id WHERE r.status = 'aberta' ORDER BY r.due_date, r.id LIMIT 100`,
+    `SELECT r.id, o.number, COALESCE(c.trade_name, c.name) AS customer, r.kind, r.number AS installment, r.due_date::text AS due, r.amount, r.method,
+            r.amount - COALESCE((SELECT sum(p.amount) FROM receipts p WHERE p.receivable_id = r.id AND NOT EXISTS (SELECT 1 FROM refund_requests q WHERE q.receipt_id = p.id AND q.status = 'confirmada')), 0) AS open,
+            (r.due_date < (now() AT TIME ZONE 'America/Sao_Paulo')::date) AS late
+       FROM receivables r JOIN orders o ON o.id = r.order_id LEFT JOIN customers c ON c.id = o.customer_id WHERE r.status = 'aberta' AND o.status = 'fechado' ORDER BY r.due_date, r.id LIMIT 100`,
   );
-  return rows.map((row) => ({ pedido: String(row.number), cliente: row.customer === null ? null : String(row.customer), tipo: String(row.kind), parcela: Number(row.installment), vence_em: String(row.due), valor: Number(row.amount), forma: row.method === null ? null : String(row.method), atrasada: row.late === true }));
+  return rows.map((row) => ({ id: Number(row.id), pedido: String(row.number), cliente: row.customer === null ? null : String(row.customer), tipo: String(row.kind), parcela: Number(row.installment), vence_em: iso(row.due), valor: Number(row.open), valor_original: Number(row.amount), forma: row.method === null ? null : String(row.method), atrasada: row.late === true }));
 }
 
 export async function openPayablesForAssistant(conn: Queryable) {
   const { rows } = await conn.query(
-    `SELECT p.description, s.name AS supplier, p.category, p.due_date::text AS due, p.amount, (p.due_date < current_date) AS late
+    `SELECT p.id, p.description, s.name AS supplier, p.category, p.due_date::text AS due, p.amount, (p.due_date < (now() AT TIME ZONE 'America/Sao_Paulo')::date) AS late
        FROM payables p LEFT JOIN suppliers s ON s.id = p.supplier_id WHERE p.status = 'aberta' ORDER BY p.due_date, p.id LIMIT 100`,
   );
-  return rows.map((row) => ({ descricao: String(row.description), fornecedor: row.supplier === null ? null : String(row.supplier), categoria: row.category === null ? null : String(row.category), vence_em: String(row.due), valor: Number(row.amount), atrasada: row.late === true }));
+  return rows.map((row) => ({ id: Number(row.id), descricao: String(row.description), fornecedor: row.supplier === null ? null : String(row.supplier), categoria: row.category === null ? null : String(row.category), vence_em: String(row.due), valor: Number(row.amount), atrasada: row.late === true }));
 }
 
 export async function customersForAssistant(search: string, conn: Queryable) {

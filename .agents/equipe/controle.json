@@ -4,6 +4,33 @@
   "members": [],
   "tasks": [
     {
+      "id": "T-20261017-mcp-comercial",
+      "title": "Concluir cadastros, orcamento, funil e decisoes confirmadas no MCP",
+      "owner": null,
+      "status": "em-revisao",
+      "acceptance": ["Dez acoes comerciais com previa, confirmacao, revisao e autoria", "Solicitar aprovacao nao fecha venda automaticamente", "Cancelamento sem baixa ou efeitos vinculados; concorrencia com baixa, contrato e producao protegida", "Consolidar duplicadas sem apagar historico; escopo de equipe e alçada preservados", "Testes isolados, HTTP, UI, build e publicacao verificados"],
+      "evidence": ["https://linear.app/avilaops/issue/AVL-149", "147 testes afetados e suite final de 743 testes aprovados, sem falhas ou pulos; lint, tipos e build aprovados", "HTTP demo 1.3.0: dez acoes comerciais e fluxo de cliente a recebimento parcial; cancelamento com baixa recusado, tarefa duplicada consolidada com motivo", "25 medicoes finais de UI nos cinco tamanhos sem excesso lateral ou controles menores que 44 px; teclado, rascunho e ampliacao conferidos", "Publicado em 703d7ac; health publico confirmou commit e container healthy, migracao 0069 aplicada, conexao e contagens reais preservadas", "https://github.com/avilaops/ERP/pull/19", "docs/mcp-operacoes.md"],
+      "next": "Publicado com AVL-148 em 703d7ac: health publico e container healthy; migracao 0069 aplicada. 743 testes, lint, tipos e build aprovados; conexao ativa e contagens reais preservadas. PR19 em revisao; varredura geral de telas do CI em execucao. Conferir descoberta no Claude do usuario e aceite operacional fiscal, sem mutacoes reais de teste."
+    },
+    {
+      "id": "T-20261017-mcp-financeiro-consultas",
+      "title": "Completar financeiro e consultas comerciais e operacionais no MCP",
+      "owner": null,
+      "status": "em-revisao",
+      "acceptance": ["Quinze ferramentas respeitam perfil, tela, poder e empresa", "Contas a pagar exigem previa, confirmacao, revisao e repeticao idempotente", "Relatorios usam dados registrados e explicitam limites sem presumir agenda, custo ou envio", "Banco isolado, HTTP e UI conferidos antes da publicacao"],
+      "evidence": ["https://linear.app/avilaops/issue/AVL-148", "docs/mcp-operacoes.md", "733 testes aprovados; 14 testes MCP repetidos apos ajustes finais; lint e tipos aprovados", "HTTP demo 1.2.0: 15 novas ferramentas, 12 consultas, cobranca rascunho, conta e baixa com confirmacao sem duplicacao", "Conta ficticia de R$ 123,45 conferida como paga na UI; 15 medicoes de uma tela nos cinco tamanhos, controles >=44 px; teclado e texto/zoom 200% conferidos"],
+      "next": "Publicado com as dez mutacoes comerciais em 703d7ac. As 29 funcoes da AVL-145 estao implementadas e publicadas. Conexao ativa (1), clientes (3), pedidos (7), recebimentos (1), contas a pagar (0), atividades (13) e notas (0) iguais antes/depois. PR18/PR19 abertas; descoberta no assistente externo ainda sem comprovacao."
+    },
+    {
+      "id": "T-20261017-mcp-prioridades",
+      "title": "Ampliar MCP com baixa, margem, caixa e tarefa em pedido",
+      "owner": null,
+      "status": "em-revisao",
+      "acceptance": ["Quatro ferramentas com permissoes por tela, poder e escopo", "Previa, confirmacao e protecao contra repeticao das escritas", "Testes de banco, tipos, lint e publicacao verificada sem mutacoes reais de teste"],
+      "evidence": ["https://linear.app/avilaops/issue/AVL-145", "https://linear.app/avilaops/issue/AVL-146", "https://github.com/avilaops/ERP/pull/17", "docs/mcp-operacoes.md", "117 testes afetados aprovados sem falhas ou pulos; lint, tipos e build aprovados", "HTTP em demo: handshake, lista por perfil, margem, caixa e tarefa com confirmacao idempotente; 15 medicoes de UI nos cinco tamanhos", "Publicado em bc9374f; health confirmou commit e container healthy. Migracao 0068 aplicada. Conexao ativa preservada (1); recebimentos (1) e tarefas reais (13) iguais antes/depois"],
+      "next": "Primeira entrega preservada na publicacao 703d7ac, que completa as 29 funcoes da AVL-145. PR17 permanece aberta, dependente da PR16; PR18/PR19 tambem em revisao. Conferir descoberta das ferramentas no assistente do usuario."
+    },
+    {
       "id": "T-20261017-refinar-proposta",
       "title": "Ocultar campos vazios e exigir condicoes comerciais antes de fechar",
       "owner": null,

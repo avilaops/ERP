@@ -130,6 +130,17 @@ test("pagamentos em lote: exclusão, renomeação e escolha manual durante a lei
   assert.equal(after.find((method) => method.id === cash.id)?.code, "01");
 });
 
+test("QR da empresa: adesão explícita, independente do rótulo do provedor", {skip}, async()=>{
+  const provider=await createPaymentMethod("Mercado Pago - PIX",WHO,db.pool);
+  await savePaymentCode(provider.id,"17",WHO,db.pool);
+  assert.equal((await listPaymentCodes(db.pool)).find(m=>m.id===provider.id)?.companyPix,false);
+  await savePaymentCode(provider.id,"17",WHO,db.pool,true);
+  assert.equal((await listPaymentCodes(db.pool)).find(m=>m.id===provider.id)?.companyPix,true);
+  await assert.rejects(()=>savePaymentCode(provider.id,"03",WHO,db.pool,true),/exige meio PIX/);
+  await updatePaymentMethod(provider.id,{label:"Cartão de teste",position:20,active:true},WHO,db.pool);
+  assert.equal((await listPaymentCodes(db.pool)).find(m=>m.id===provider.id)?.companyPix,false);
+});
+
 test("operação de venda: cria somente os CFOPs; completar vazios preserva impostos e escolhas atuais do contador", { skip }, async () => {
   const line = await createLine("Operação automática", 1, WHO, db.pool);
   await completeSaleOperation(line.id, saleOperationCodes("revenda"), WHO, db.pool);

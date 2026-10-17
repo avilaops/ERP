@@ -31,11 +31,14 @@ export function ClientPicker({ clients, serverUrl }: { clients: ConnectClient[];
           ))}
         </select>
       </div>
-      <ol className="list-decimal space-y-1 pl-5 text-sm text-slate-800">
-        {client.steps.map((step) => (
-          <li key={step}>{step}</li>
-        ))}
-      </ol>
+      <details>
+        <summary className="min-h-[var(--control)] cursor-pointer py-3 text-sm font-medium">Ver como conectar {client.name}</summary>
+        <ol className="list-decimal space-y-1 pl-5 text-sm text-slate-800">
+          {client.steps.map((step) => (
+            <li key={step}>{step}</li>
+          ))}
+        </ol>
+      </details>
       {client.installLink && (
         <a href={client.installLink} className={GO}>
           Adicionar ao {client.name}
