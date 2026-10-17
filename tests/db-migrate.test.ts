@@ -321,7 +321,7 @@ test("o pacote publicado leva tudo o que o db-migrate.ts importa", async () => {
     if (seen.has(file)) return;
     seen.add(file);
     for (const match of readFileSync(join(root, file), "utf8").matchAll(/from "(\.{1,2}\/[^"]+)"/g)) {
-      walk(relative(root, join(root, dirname(file), match[1])));
+      walk(relative(root, join(root, dirname(file), match[1])).replaceAll("\\", "/"));
     }
   };
   walk("scripts/db-migrate.ts");

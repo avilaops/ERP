@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { MENU_ITEMS } from "@/lib/auth/permissions";
 
 const APP_DIR = fileURLToPath(new URL("../src/app/(app)/", import.meta.url));
+const projectPath = (path: string) => path.replaceAll("\\", "/");
 
 /** Every page.tsx under the protected group, as a route path. */
 function pages(dir = APP_DIR, route = ""): string[] {
@@ -47,11 +48,11 @@ const SRC_DIR = fileURLToPath(new URL("../src/", import.meta.url));
 const SOURCES_UNDER_SRC = () =>
   readdirSync(SRC_DIR, { recursive: true, encoding: "utf8" })
     .filter((file) => /\.tsx?$/.test(file))
-    .map((file) => [file, readFileSync(SRC_DIR + file, "utf8")] as const);
+    .map((file) => [projectPath(file), readFileSync(SRC_DIR + file, "utf8")] as const);
 
 /** Every source file under the protected group, relative to it. */
 const appFiles = () =>
-  readdirSync(APP_DIR, { recursive: true, encoding: "utf8" }).filter((file) => /\.tsx?$/.test(file));
+  readdirSync(APP_DIR, { recursive: true, encoding: "utf8" }).filter((file) => /\.tsx?$/.test(file)).map(projectPath);
 
 test("toda ação de servidor confere a permissão antes de qualquer outra coisa", () => {
   const actions = appFiles().filter((file) => /^\s*["']use server["']/m.test(readFileSync(APP_DIR + file, "utf8")));
@@ -373,7 +374,7 @@ const API_DIR = fileURLToPath(new URL("../src/app/api/", import.meta.url));
 const PUBLIC_ROUTES = new Set(["health/route.ts"]);
 
 test("toda rota de src/app/api confere a sessão, e a empresa só sai dela", () => {
-  const routes = readdirSync(API_DIR, { recursive: true, encoding: "utf8" }).filter((file) => /(^|\/)route\.tsx?$/.test(file));
+  const routes = readdirSync(API_DIR, { recursive: true, encoding: "utf8" }).filter((file) => /(^|\\)route\.tsx?$/.test(file)).map(projectPath);
   assert.ok(routes.includes("produtos/[id]/foto/route.ts"));
   for (const file of PUBLIC_ROUTES) assert.ok(routes.includes(file), `${file} está na lista de rotas públicas e não existe`);
   for (const file of routes) {
