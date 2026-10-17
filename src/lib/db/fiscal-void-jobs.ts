@@ -92,6 +92,14 @@ export async function runOneNumberVoidJob(now: Date, vault: Buffer, send: Send, 
   if (!job) return "none";
   try {
     const used = await usedNumbersIn(job.environment, job.range.series, job.range.first, job.range.last, conn);
+    const unresolvedIssue = await conn.query(
+      `SELECT i.number FROM fiscal_jobs j
+        JOIN fiscal_invoices i ON i.fiscal_job_id = j.id
+       WHERE j.kind = 'emitir_nfe' AND j.status = 'revisao_manual' AND i.status = 'assinada'
+         AND i.environment = $1 AND i.series = $2 AND i.number BETWEEN $3 AND $4
+       LIMIT 1`,
+      [job.environment, job.range.series, job.range.first, job.range.last],
+    );
     const activeIssue = await conn.query(
       `SELECT 1 FROM fiscal_jobs j
         LEFT JOIN fiscal_invoices i ON i.fiscal_job_id = j.id
@@ -102,6 +110,9 @@ export async function runOneNumberVoidJob(now: Date, vault: Buffer, send: Send, 
     );
     if (used.length > 0) {
       throw new IssueError(`A faixa passou a conter nota com veredito da SEFAZ (número ${used.join(", ")}); confira-a manualmente.`);
+    }
+    if (unresolvedIssue.rows[0]) {
+      throw new IssueError(`A faixa contém a nota assinada ${Number(unresolvedIssue.rows[0].number)} em revisão manual; confira a situação na SEFAZ antes de inutilizar.`);
     }
     if (activeIssue.rows[0]) {
       await conn.query(

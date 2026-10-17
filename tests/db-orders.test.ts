@@ -1473,11 +1473,12 @@ test("fila fiscal: clique repetido compartilha a emissão; perda de resposta ret
   const authorize = async (url: string, _action: string, envelope: string) => {
     if (/nfeconsultaprotocolo4/.test(url)) {
       const key = /<chNFe>(\d{44})<\/chNFe>/.exec(envelope)![1];
-      return `<retConsSitNFe versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe"><cStat>217</cStat><xMotivo>NF-e não consta</xMotivo><chNFe>${key}</chNFe></retConsSitNFe>`;
+      return `<retConsSitNFe versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe"><cStat>100</cStat><xMotivo>Autorizado o uso da NF-e</xMotivo><chNFe>${key}</chNFe><protNFe versao="4.00"><infProt><chNFe>${key}</chNFe><nProt>135260000000071</nProt><cStat>100</cStat><xMotivo>Autorizado o uso da NF-e</xMotivo></infProt></protNFe></retConsSitNFe>`;
     }
-    const key = /Id="NFe(\d{44})"/.exec(envelope)![1];
-    return `<retEnviNFe versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe"><cStat>104</cStat><xMotivo>Lote processado</xMotivo><protNFe versao="4.00"><infProt><chNFe>${key}</chNFe><nProt>135260000000071</nProt><cStat>100</cStat><xMotivo>Autorizado o uso da NF-e</xMotivo></infProt></protNFe></retEnviNFe>`;
+    throw new Error("a nota recuperada por consulta não deve ser retransmitida");
   };
+  await db.pool.query("UPDATE fiscal_invoices SET fiscal_job_id = NULL WHERE order_id = $1", [orderId]);
+  await db.pool.query("UPDATE fiscal_jobs SET invoice_id = NULL WHERE id = $1", [first.id]);
   assert.equal(await runOneFiscalJob(delayedAgain.rows[0].run_after as Date, { ...dependencies, send: authorize }, db.pool), "completed");
   assert.deepEqual((await listOrderInvoices(orderId, db.pool)).map((invoice) => [invoice.status, invoice.number, invoice.protocol]), [["autorizada", 43, "135260000000071"]]);
   assert.deepEqual(mail, ["fila@cliente.test"]);
@@ -1488,8 +1489,8 @@ test("fila fiscal: clique repetido compartilha a emissão; perda de resposta ret
   assert.ok(done.rows[0].completed_at);
 
   // Se o processo cair depois do veredito, a retomada reconhece a nota ligada ao job e não transmite outra vez.
-  const linked = await db.pool.query("SELECT fiscal_job_id FROM fiscal_invoices WHERE order_id = $1", [orderId]);
-  assert.equal(Number(linked.rows[0].fiscal_job_id), first.id);
+  const linked = await db.pool.query("SELECT i.id, i.fiscal_job_id, j.invoice_id FROM fiscal_invoices i JOIN fiscal_jobs j ON j.id = $2 WHERE i.order_id = $1", [orderId, first.id]);
+  assert.deepEqual([Number(linked.rows[0].fiscal_job_id), Number(linked.rows[0].invoice_id)], [first.id, Number(linked.rows[0].id)]);
   await db.pool.query("UPDATE fiscal_jobs SET status = 'processando', lease_until = $2, completed_at = NULL WHERE id = $1", [first.id, new Date(now.getTime() - 1)]);
   let recoveredCalls = 0;
   assert.equal(await runOneFiscalJob(now, { ...dependencies, send: async () => { recoveredCalls += 1; throw new Error("não deve transmitir"); } }, db.pool), "completed");
@@ -1745,7 +1746,16 @@ test("fila de inutilização: persiste o XML assinado antes da SEFAZ e não dupl
   assert.equal(await runOneNumberVoidJob(now, vault, async () => { retransmissions += 1; return ""; }, db.pool), "retry");
   assert.equal(retransmissions, 0);
   assert.deepEqual((await db.pool.query("SELECT status, attempts, last_error FROM fiscal_void_jobs WHERE id = $1", [guardedJob.id])).rows.map((row) => [row.status, Number(row.attempts), /aguardando a emissão fiscal ativa/i.test(row.last_error)]), [["pendente", 0, true]]);
-  await db.pool.query("DELETE FROM fiscal_jobs WHERE id = $1", [active.rows[0].id]);
+  await db.pool.query("UPDATE fiscal_jobs SET status = 'revisao_manual' WHERE id = $1", [active.rows[0].id]);
+  const unresolved = await db.pool.query(
+    `INSERT INTO fiscal_invoices (order_id, environment, series, number, access_key, status, signed_xml, issued_at, created_by, fiscal_job_id)
+     VALUES ($1, 'homologacao', 1, $2, $3, 'assinada', '<NFe>aguardando resposta</NFe>', $4, $5, $6) RETURNING id`,
+    [order.rows[0].id, guarded, "9".repeat(44), now, who, active.rows[0].id],
+  );
+  await db.pool.query("UPDATE fiscal_jobs SET invoice_id = $2 WHERE id = $1", [active.rows[0].id, unresolved.rows[0].id]);
+  assert.equal(await runOneNumberVoidJob(new Date(now.getTime() + 60_000), vault, async () => { retransmissions += 1; return ""; }, db.pool), "manual_review");
+  assert.equal(retransmissions, 0);
+  assert.deepEqual((await db.pool.query("SELECT status, last_error FROM fiscal_void_jobs WHERE id = $1", [guardedJob.id])).rows.map((row) => [row.status, /nota assinada .* revisão manual/i.test(row.last_error)]), [["revisao_manual", true]]);
 });
 
 test("resposta perdida: evento duplicado (573) vem da consulta; número que já é de outra nota na SEFAZ (539) não é reaproveitado; duplicidade (204) traz o protocolo ou espera", { skip }, async () => {

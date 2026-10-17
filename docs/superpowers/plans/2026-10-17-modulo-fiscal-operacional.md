@@ -54,6 +54,7 @@
 - [x] Parar emissões antigas sem identidade para revisão e ocultar ações de configuração de quem não acessa `Configurações`.
 - [x] Encaminhar eventos legados interrompidos para revisão antes que o worker possa retransmiti-los.
 - [x] Isolar jobs pelo ambiente da nota, renovar o relógio antes da inutilização e ocultar atalhos sem acesso.
+- [x] Vincular autorizações recuperadas por consulta e bloquear inutilização sobre nota assinada em revisão.
 
 ## Resultado
 

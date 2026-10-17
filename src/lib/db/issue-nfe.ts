@@ -52,6 +52,12 @@ export async function issueOrderNfe(orderNumber: string, who: string, now: Date,
   return withQueryableConnection(conn, held => issueOnConnection(orderNumber, who, now, vault, send, held, check, fiscalJobId));
 }
 
+async function linkInvoiceToJob(invoiceId: number, fiscalJobId: number | undefined, conn: Queryable): Promise<void> {
+  if (fiscalJobId === undefined) return;
+  await conn.query("UPDATE fiscal_invoices SET fiscal_job_id = $2 WHERE id = $1", [invoiceId, fiscalJobId]);
+  await conn.query("UPDATE fiscal_jobs SET invoice_id = $2 WHERE id = $1", [fiscalJobId, invoiceId]);
+}
+
 async function prepareOrderInvoice(orderNumber: string, who: string, now: Date, vault: Buffer, send: Send, conn: Queryable, check: LayoutCheck | null, fiscalJobId?: number) {
   await conn.query("BEGIN");
   try {
@@ -89,6 +95,7 @@ async function prepareOrderInvoice(orderNumber: string, who: string, now: Date, 
       }
       if (known.status === "autorizada") {
         const saved = await recordVerdict(waiting.id, { status: "autorizada", code: known.code, reason: known.reason, protocol: known.protocol, authorizedXml: nfeProcXml(stored, known.protocolXml) }, conn);
+        await linkInvoiceToJob(saved.id, fiscalJobId, conn);
         await conn.query("COMMIT");
         return { completed: { invoice: saved, message: `A nota ${saved.number} já estava autorizada na SEFAZ. Protocolo ${known.protocol}.` } };
       }
@@ -141,10 +148,7 @@ async function prepareOrderInvoice(orderNumber: string, who: string, now: Date, 
       }
     }
 
-    if (fiscalJobId !== undefined) {
-      await conn.query("UPDATE fiscal_invoices SET fiscal_job_id = $2 WHERE id = $1", [invoice.id, fiscalJobId]);
-      await conn.query("UPDATE fiscal_jobs SET invoice_id = $2 WHERE id = $1", [fiscalJobId, invoice.id]);
-    }
+    await linkInvoiceToJob(invoice.id, fiscalJobId, conn);
 
     await conn.query("COMMIT");
     return { invoice, signedXml, certificate, url, environment, issuerUf:preview.issuerUf };
