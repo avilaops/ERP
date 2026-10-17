@@ -5,7 +5,6 @@ import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/auth";
 import { seesAllOrders } from "@/lib/auth/permissions";
 import { getOrder, listPaymentMethods, OrderError, savePayment } from "@/lib/db/orders";
-import { listOnDeliveryMethods } from "@/lib/db/payment-methods";
 import { tenantDb } from "@/lib/db/pool";
 import { formatMoney } from "@/lib/format";
 import { parseOrderPayment } from "@/lib/order-form";
@@ -24,9 +23,8 @@ export async function savePaymentStepAction(_previous: ActionState, form: FormDa
   const groups: PaymentField[][] = [["downPayment", "downPaymentMethod", "downPaymentDate"], ["balanceMethod", "paymentNotes"], ["installmentCount", "firstInstallmentDays", "installmentIntervalDays"]];
   const step = Number(read("step"));
   if (!Number.isInteger(step) || !groups[step] || !read("revision")) return { error: "Recarregue o pagamento do pedido." };
-  const legacy = await listOnDeliveryMethods(conn);
   const values: Record<PaymentField, string | null> = { downPayment: formatMoney(order.downPayment), downPaymentMethod: order.downPaymentMethod,
-    downPaymentDate: order.downPaymentDate, balanceMethod: legacy.includes(order.balanceMethod ?? "") ? null : order.balanceMethod,
+    downPaymentDate: order.downPaymentDate, balanceMethod: order.balanceMethod,
     installmentCount: String(order.installmentCount ?? ""), firstInstallmentDays: String(order.firstInstallmentDays ?? ""),
     installmentIntervalDays: String(order.installmentIntervalDays ?? ""), paymentNotes: order.paymentNotes };
   const methods = await listPaymentMethods(conn);

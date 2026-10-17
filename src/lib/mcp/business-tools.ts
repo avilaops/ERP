@@ -63,7 +63,7 @@ async function checkMethod(method: string, conn: Queryable) {
 }
 
 const receiptTool: Tool = {
-  name: "recebimento_dar_baixa", title: "Registrar recebimento", item: "recebimentos", writes: true,
+  name: "recebimento_dar_baixa", title: "Registrar recebimento", item: "recebimentos", writes: true, destructive: true,
   description: "Prepara uma baixa parcial ou total de uma parcela. Primeiro informe id, valor, data e forma; mostre o resumo e peça confirmação. Depois use somente confirmar. Repetir o mesmo código devolve o resultado sem nova baixa.",
   inputSchema: object({ id: { type: "number", description: "Id da parcela em recebimentos_em_aberto" }, valor: { type: "number", description: "Valor recebido em reais, maior que zero e com até dois decimais" }, data: field("Dia do recebimento: AAAA-MM-DD"), forma: field("Nome exato do meio ativo na empresa"), observacao: field("Observação opcional, até 300 caracteres"), ...confirmField }),
   async run(session, conn, args) {
@@ -103,7 +103,7 @@ const taskTool: Tool = {
       if (!order) throw new ToolError("Pedido não encontrado.");
       if (order.revision !== payload.revision || ["cancelado", "perdido"].includes(order.status)) throw new ToolError("O pedido mudou desde a prévia. Peça uma nova prévia.");
       // Two separately prepared previews of the same pending task also reuse the task.
-      const existing = await conn.query("SELECT id FROM opportunity_activities WHERE order_id = $1 AND opportunity_id IS NULL AND kind = 'tarefa' AND title = $2 AND due_on IS NOT DISTINCT FROM $3::date AND done_at IS NULL AND owner_email = $4", [order.id, payload.title, payload.due, order.sellerEmail]);
+      const existing = await conn.query("SELECT id FROM opportunity_activities WHERE order_id = $1 AND opportunity_id IS NULL AND kind = 'tarefa' AND title = $2 AND due_on IS NOT DISTINCT FROM $3::date AND done_at IS NULL", [order.id, payload.title, payload.due]);
       let taskId = existing.rows[0]?.id;
       if (!taskId) {
         const added = await conn.query("INSERT INTO opportunity_activities (order_id, kind, title, due_on, owner_email, created_by) VALUES ($1, 'tarefa', $2, $3::date, $4, $5) RETURNING id", [order.id, payload.title, payload.due, order.sellerEmail, session.email]);

@@ -28,7 +28,7 @@ export type QuoteContext = {
 export type QuoteMeasures = { weightKg?: number | null; ncm?: string | null };
 
 /** PIX through a payment link keeps the provider's flow instead of a direct company QR. */
-export const usesCompanyPix = (method: string | null, code: string | null): boolean => code === "17" && !/\blink\b/i.test(method ?? "");
+export const usesCompanyPix = (companyPix: boolean, code: string | null): boolean => companyPix && code === "17";
 
 /** Only registered data and authored terms belong in the customer document. */
 export function completeQuote(document: QuoteDocument, order: Pick<Order, "number" | "status" | "customer" | "items" | "downPayment" | "customInstallments" | "installmentIntervalDays">, context: QuoteContext, products: Map<number, QuoteMeasures>): QuoteDocument {
@@ -39,8 +39,8 @@ export function completeQuote(document: QuoteDocument, order: Pick<Order, "numbe
     issuer.cnpj ? `CNPJ: ${formatDocument(issuer.cnpj)}` : null,
     issuer.stateRegistration ? `Inscrição estadual: ${issuer.stateRegistration}` : null,
     addressLine(issuer),
-    contact.phone ? `Telefone: ${formatPhone(contact.phone)}` : null,
-    contact.email,
+    terms.phone ? `Telefone: ${formatPhone(terms.phone)}` : null,
+    terms.email,
     terms.website ? `Site: ${terms.website}` : null,
   ].filter((line): line is string => Boolean(line));
   const differentState = !delivery && order.customer?.uf && document.delivery && document.delivery !== UF_NAMES[order.customer.uf];
@@ -68,7 +68,7 @@ export function completeQuote(document: QuoteDocument, order: Pick<Order, "numbe
     : order.status === "aguardando_aprovacao" ? "Orçamento aguardando aprovação interna" : order.status === "em_negociacao" ? "Orçamento em negociação" : "Pedido cancelado ou perdido";
   const cadence = order.customInstallments.length === 0 && document.payment.some((line) => /em \d+ parcelas/.test(line)) && order.installmentIntervalDays
     ? [`Vencimentos calculados a cada ${order.installmentIntervalDays} dias.`] : [];
-  const footer = [`${document.company}${issuer.cnpj ? ` · CNPJ ${formatDocument(issuer.cnpj)}` : ""}`, [contact.phone ? formatPhone(contact.phone) : null, contact.email].filter(Boolean).join(" · ")].filter(Boolean);
+  const footer = [`${document.company}${issuer.cnpj ? ` · CNPJ ${formatDocument(issuer.cnpj)}` : ""}`, [terms.phone ? formatPhone(terms.phone) : null, terms.email].filter(Boolean).join(" · ")].filter(Boolean);
   return {
     ...document, issuerLines, status, footer, electronicAcceptance: context.acceptance !== null,
     delivery: null,
