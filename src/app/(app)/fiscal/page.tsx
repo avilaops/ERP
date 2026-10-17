@@ -64,7 +64,6 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
     <>
       <PageHeader
         title="Fiscal"
-        hint="Da preparação do pedido fechado ao histórico da NF-e, sem misturar operação com configuração."
         actions={<Link href="/parametros/fiscal" className={SECONDARY}>Configurações fiscais</Link>}
       />
       <MetricSummary items={[
@@ -75,7 +74,7 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
       ]} />
       <ViewTabs label="Partes do Fiscal" items={[
         { href: HERE, label: `Pendências (${pending.length})`, current: tab === "pendencias" },
-        { href: `${HERE}?ver=notas`, label: `Notas fiscais (${overview.invoices.length})`, current: tab === "notas" },
+        { href: `${HERE}?ver=notas`, label: `Notas (${overview.invoices.length})`, current: tab === "notas" },
         { href: `${HERE}?ver=inutilizacoes`, label: `Inutilizações (${openVoidJobs.length + overview.voids.length})`, current: tab === "inutilizacoes" },
       ]} />
 
@@ -88,7 +87,7 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
             <ul id="fiscal-list" className="divide-y divide-slate-200">
               {pendingSlice.rows.map((order) => (
                 <li data-row key={order.orderId} className="p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
                     <div className="min-w-0">
                       <Link href={`/pedidos/${order.orderNumber}?ver=documentos#nota-fiscal`} className="font-semibold text-brand underline">{order.customerName}</Link>
                       <p className="break-words text-xs text-slate-600">Pedido #{order.orderNumber} · fechado em {showDateTime(order.closedAt)}</p>
