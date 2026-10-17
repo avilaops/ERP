@@ -43,10 +43,10 @@ test("orçamento: descrição e foto de cada equipamento pedido, e só deles", {
   const measured = await loadQuoteProducts([full.id, described.id, bare.id], db.pool);
   assert.equal(measured.get(full.id)?.description, "Dimensões (C x L x A): 1,65 x 1,20 x 1,40 m · Peso: 182,5 kg");
   assert.ok(Buffer.from(measured.get(full.id)?.photo ?? []).equals(stored.bytes));
-  assert.deepEqual(measured.get(described.id), { description: "Peso: 95 kg", photo: null });
-  assert.deepEqual(products.get(bare.id), { description: null, photo: null });
+  assert.deepEqual(measured.get(described.id), { description: "Peso: 95 kg", photo: null, ncm: null, weightKg: 95 });
+  assert.deepEqual(products.get(bare.id), { description: null, photo: null, ncm: null, weightKg: null });
   // Só a linha de medidas e a foto: nenhum campo de custo sai daqui.
-  for (const product of products.values()) assert.deepEqual(Object.keys(product), ["description", "photo"]);
+  for (const product of products.values()) assert.deepEqual(Object.keys(product), ["description", "photo", "ncm", "weightKg"]);
 });
 
 test("orçamento: lista vazia ou sem id válido não vai ao banco", { skip }, async () => {

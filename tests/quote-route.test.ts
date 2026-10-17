@@ -168,7 +168,7 @@ test("vendedor dono, gerente e diretoria recebem o PDF do pedido", { skip }, asy
     assert.equal(response.headers.get("content-length"), String(bytes.length));
     assert.equal(Buffer.from(bytes.subarray(0, 5)).toString("latin1"), "%PDF-");
     const pdf = await PDFDocument.load(bytes, { updateMetadata: false });
-    assert.equal(pdf.getPageCount(), 1);
+    assert.equal(pdf.getPageCount(), 2);
     assert.equal(pdf.getTitle(), `Orçamento #${ORDER}`);
     // A empresa é a da sessão: sem logo cadastrada, o nome dela vai no cabeçalho.
     assert.equal(pdf.getAuthor(), "Empresa A");
@@ -184,7 +184,7 @@ test("vendedor dono, gerente e diretoria recebem o PDF do pedido", { skip }, asy
       "Leg press",
       "Desconto (5,0%)",
       invoiceTotal,
-      "Entrega: Maranhão",
+      "Local: Maranhão",
       "Cliente: a informar",
       // O vendedor é o do pedido, quem quer que gere o arquivo.
       "Vera Vendedora",
@@ -200,13 +200,13 @@ test("vendedor dono, gerente e diretoria recebem o PDF do pedido", { skip }, asy
   }
 });
 
-test("com a logo da empresa cadastrada, ela entra no PDF no lugar do nome", { skip }, async () => {
+test("com a logo cadastrada, nome da empresa continua na identificação da vendedora", { skip }, async () => {
   const logo = await sharp({ create: { width: 400, height: 120, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0.5 } } }).webp().toBuffer();
   await saveLogo(logo, EMAILS.DIRETORIA, tenantDb(A));
   signIn(EMAILS.VENDEDOR);
   const bytes = new Uint8Array(await (await get(ORDER)).arrayBuffer());
   assert.equal(pdfImages(bytes), 2);
-  assert.ok(!pdfText(bytes).split("\n").includes("Empresa A"));
+  assert.ok(pdfText(bytes).includes("EMPRESA VENDEDORA\nEmpresa A"));
 });
 
 test("foto gravada que não abre: o PDF sai assim mesmo, com o quadro dela vazio", { skip }, async () => {

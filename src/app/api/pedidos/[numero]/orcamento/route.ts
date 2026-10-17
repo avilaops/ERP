@@ -11,6 +11,8 @@ import { dueDates, paymentOf, saleOf } from "@/lib/order-quote";
 import { logoPng, thumbnail } from "@/lib/photos/normalize";
 import { NO_ITEMS_MESSAGE, QuoteError, quoteDocument } from "@/lib/quote/document";
 import { renderQuotePdf } from "@/lib/quote/pdf";
+import { completeQuote } from "@/lib/quote/complete";
+import { loadQuoteContext } from "@/lib/db/quote-context";
 
 /**
  * The quotation of one order as a PDF, for the customer. The only way the PDF
@@ -73,6 +75,7 @@ export async function GET(_request: Request, context: Context): Promise<Response
     if (error instanceof QuoteError) return text(error.message, 409);
     throw error;
   }
+  document = completeQuote(document, order, await loadQuoteContext(order, new Date(), conn), products);
 
   // One image at a time: the server has little memory.
   const photos = new Map<number, Uint8Array>();

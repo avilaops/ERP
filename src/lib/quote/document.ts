@@ -79,6 +79,12 @@ export type QuoteDocument = {
   totals: QuoteTotal[];
   /** Sum of the quantities. */
   units: number;
+  issuerLines?: string[];
+  status?: string;
+  footer?: string[];
+  sections?: { title: string; lines: string[] }[];
+  pix?: { key: string; name: string; amount: string; code: string };
+  electronicAcceptance?: boolean;
 };
 
 type QuoteInput = {
@@ -181,7 +187,7 @@ export function quoteDocument({ company, order, table, sale, dates, products, to
     { label: "Valor sem IPI", value: showMoney(sale.netSale), strong: false },
     { label: `IPI (${formatPercent(table.ipi)}%)`, value: showMoney(sale.ipi), strong: false },
     { label: "Total da nota", value: showMoney(sale.invoiceTotal), strong: true },
-  ].filter((_, index) => (hasDiscount || index !== 1) && (hasIpi || (index !== 2 && index !== 3)));
+  ].filter((_, index) => (hasDiscount || index !== 1) && (hasIpi || (index !== 2 && index !== 3)) && (hasDiscount || !hasIpi || index !== 0));
 
   return {
     company,

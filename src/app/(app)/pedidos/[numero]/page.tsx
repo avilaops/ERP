@@ -299,6 +299,7 @@ export default async function PedidoPage({
             </a>
           )}
           {order.items.length > 0 && <CopyButton text={proposal} label="Copiar proposta" className={BUTTON} />}
+          <Link href={`/pedidos/${order.number}/proposta`} className={BUTTON}>Dados do PDF</Link>
         </div>
       </div>
       {latest && latest.version !== table.version && (

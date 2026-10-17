@@ -97,6 +97,7 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "0063_anilheiro_olimpico_ou_standard.sql",
     "0064_cores_do_equipamento_no_pedido.sql",
     "0066_regras_fiscais_por_pedido.sql",
+    "0067_dados_comerciais_da_proposta.sql",
   ]);
 
   const second = await withClient((client) => migrate(client, MIGRATIONS_DIR));

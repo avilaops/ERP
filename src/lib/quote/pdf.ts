@@ -1,6 +1,7 @@
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import type { PDFFont, PDFImage, PDFPage } from "pdf-lib";
 import type { QuoteDocument, QuoteItem } from "@/lib/quote/document";
+import QRCode from "qrcode";
 
 /** A4 upright, in points. */
 const PAGE = { width: 595.28, height: 841.89 };
@@ -138,6 +139,7 @@ export async function renderQuotePdf(document: QuoteDocument, { logo, photos }: 
     bold: await pdf.embedFont(StandardFonts.HelveticaBold),
   };
   const clean = (text: string) => drawable(text, fonts.regular);
+  const bodyBottom = document.footer ? MARGIN + 48 : BODY_BOTTOM;
 
   let page: PDFPage = pdf.addPage([PAGE.width, PAGE.height]);
   /** Top of what comes next, going down the page. */
@@ -164,7 +166,7 @@ export async function renderQuotePdf(document: QuoteDocument, { logo, photos }: 
   const paragraph = (text: string, { size = 9, bold = false, color = INK, x = MARGIN, width = CONTENT_WIDTH } = {}) => {
     const leading = size + 3;
     for (const line of wrap(clean(text), bold ? fonts.bold : fonts.regular, size, width)) {
-      if (y - leading < BODY_BOTTOM) newPage();
+      if (y - leading < bodyBottom) newPage();
       write(line, x, y - size, { size, bold, color });
       y -= leading;
     }
@@ -185,6 +187,7 @@ export async function renderQuotePdf(document: QuoteDocument, { logo, photos }: 
   y -= LOGO_BOX.height + 10;
   rule(y);
   y -= 14;
+  if (document.status) { paragraph(`Situação: ${document.status}`, { bold: true }); y -= 8; }
 
   // Selling company and customer, side by side.
   const half = CONTENT_WIDTH / 2;
@@ -204,7 +207,7 @@ export async function renderQuotePdf(document: QuoteDocument, { logo, photos }: 
     return at;
   };
   const { customer, seller } = document;
-  const afterSeller = block("Empresa vendedora", [document.company], MARGIN);
+  const afterSeller = block("Empresa vendedora", [document.company, ...(document.issuerLines ?? [])], MARGIN);
   const afterCustomer = customer
     ? block(
         "Cliente",
@@ -257,7 +260,7 @@ export async function renderQuotePdf(document: QuoteDocument, { logo, photos }: 
     const height = Math.max(ROW_MIN_HEIGHT, textHeight + 2 * ROW_PADDING);
 
     // A row never splits: it goes whole to the next page, under the head again.
-    if (y - height < BODY_BOTTOM) {
+    if (y - height < bodyBottom) {
       newPage();
       tableHead();
     }
@@ -295,7 +298,7 @@ export async function renderQuotePdf(document: QuoteDocument, { logo, photos }: 
 
   // Totals, kept together.
   const totalsHeight = 16 + document.totals.reduce((total, row) => total + (row.strong ? 24 : 14), 0);
-  if (y - totalsHeight < BODY_BOTTOM) newPage();
+  if (y - totalsHeight < bodyBottom) newPage();
   y -= 12;
   write(`${document.units} un.`, MARGIN, y - 9, { color: MUTED });
   const labelX = right - 230;
@@ -329,46 +332,76 @@ export async function renderQuotePdf(document: QuoteDocument, { logo, photos }: 
   // The payment as agreed, in a box of its own.
   if (document.payment.length > 0) {
     const lines = document.payment.flatMap((line) => wrap(clean(line), fonts.regular, 9, CONTENT_WIDTH - 20));
-    const boxHeight = 24 + lines.length * 12;
-    if (y - boxHeight - 8 < BODY_BOTTOM) newPage();
-    y -= 8;
-    page.drawRectangle({ x: MARGIN, y: y - boxHeight, width: CONTENT_WIDTH, height: boxHeight, color: SHADE });
-    write("CONDIÇÕES DE PAGAMENTO", MARGIN + 10, y - 14, { size: 8, bold: true, color: MUTED });
-    lines.forEach((line, index) => write(line, MARGIN + 10, y - 27 - index * 12));
-    y -= boxHeight + 8;
+    let offset = 0;
+    while (offset < lines.length) {
+      if (y - 56 < bodyBottom) newPage();
+      const count = Math.min(lines.length - offset, Math.floor((y - bodyBottom - 40) / 12));
+      const boxHeight = 24 + count * 12;
+      y -= 8;
+      page.drawRectangle({ x: MARGIN, y: y - boxHeight, width: CONTENT_WIDTH, height: boxHeight, color: SHADE });
+      write("CONDIÇÕES DE PAGAMENTO", MARGIN + 10, y - 14, { size: 8, bold: true, color: MUTED });
+      lines.slice(offset, offset + count).forEach((line, index) => write(line, MARGIN + 10, y - 27 - index * 12));
+      offset += count;
+      y -= boxHeight + 8;
+    }
   }
 
-  // Where and when, and who signs: the customer, the seller and, when the company has one, the commercial manager.
-  const signers: [string, (string | null)[]][] = [
-    ["Cliente", document.customer ? [document.customer.name, document.customer.document] : []],
-    ["Vendedor", [seller.name]],
-    ...(document.manager ? ([["Gerente comercial", [document.manager]]] as [string, string[]][]) : []),
-  ];
-  const signaturesHeight = 96;
-  if (y - signaturesHeight < BODY_BOTTOM) newPage();
-  y -= 18;
-  write(document.signedAt, MARGIN, y - 9);
-  y -= 52;
-  const slot = CONTENT_WIDTH / signers.length;
-  signers.forEach(([title, details], index) => {
-    const left = MARGIN + index * slot + 8;
-    const width = slot - 16;
-    page.drawLine({ start: { x: left, y }, end: { x: left + width, y }, thickness: 0.6, color: INK });
-    const centered = (text: string, baseline: number, options: { size: number; bold?: boolean; color?: typeof INK }) => {
-      const font = options.bold ? fonts.bold : fonts.regular;
-      const shown = fitted(clean(text), font, options.size, width);
-      write(shown, left + (width - font.widthOfTextAtSize(shown, options.size)) / 2, baseline, options);
-    };
-    centered(title.toUpperCase(), y - 11, { size: 7, bold: true, color: MUTED });
-    details.filter((detail): detail is string => Boolean(detail)).forEach((detail, at) => centered(detail, y - 21 - at * 10, { size: 8 }));
-  });
-  y -= 44;
+  if (document.pix) {
+    if (y - 154 < bodyBottom) newPage();
+    y -= 10;
+    const qr = await pdf.embedPng(await QRCode.toBuffer(document.pix.code, { errorCorrectionLevel: "M", margin: 4, width: 400 }));
+    page.drawImage(qr, { x: MARGIN, y: y - 126, width: 126, height: 126 });
+    const top = y;
+    const x = MARGIN + 138;
+    paragraph("PIX DA ENTRADA", { x, width: CONTENT_WIDTH - 138, bold: true });
+    for (const line of [`Valor em aberto: ${document.pix.amount}`, `Favorecido: ${document.pix.name}`, `Chave: ${document.pix.key}`, "Confira o favorecido no aplicativo do seu banco."]) paragraph(line, { x, width: CONTENT_WIDTH - 138 });
+    y = Math.min(y, top - 126) - 12;
+  }
+
+  for (const section of document.sections ?? []) {
+    if (y - 45 < bodyBottom) newPage();
+    y -= 10;
+    paragraph(section.title.toUpperCase(), { bold: true });
+    y -= 4;
+    for (const line of section.lines) { paragraph(line); y -= 3; }
+  }
+
+  if (!document.electronicAcceptance) {
+    // Physical signature spaces are replaced by the existing digital contract when there is one.
+    const signers: [string, (string | null)[]][] = [
+      ["Cliente", document.customer ? [document.customer.name, document.customer.document] : []],
+      ["Vendedor", [seller.name]],
+      ...(document.manager ? ([["Gerente comercial", [document.manager]]] as [string, string[]][]) : []),
+    ];
+    const signaturesHeight = 96;
+    if (y - signaturesHeight < bodyBottom) newPage();
+    y -= 18;
+    write(document.signedAt, MARGIN, y - 9);
+    y -= 52;
+    const slot = CONTENT_WIDTH / signers.length;
+    signers.forEach(([title, details], index) => {
+      const left = MARGIN + index * slot + 8;
+      const width = slot - 16;
+      page.drawLine({ start: { x: left, y }, end: { x: left + width, y }, thickness: 0.6, color: INK });
+      const centered = (text: string, baseline: number, options: { size: number; bold?: boolean; color?: typeof INK }) => {
+        const font = options.bold ? fonts.bold : fonts.regular;
+        const shown = fitted(clean(text), font, options.size, width);
+        write(shown, left + (width - font.widthOfTextAtSize(shown, options.size)) / 2, baseline, options);
+      };
+      centered(title.toUpperCase(), y - 11, { size: 7, bold: true, color: MUTED });
+      details.filter((detail): detail is string => Boolean(detail)).forEach((detail, at) => centered(detail, y - 21 - at * 10, { size: 8 }));
+    });
+    y -= 44;
+  }
 
   // Footer, once the number of pages is known.
   const pages = pdf.getPages();
   pages.forEach((sheet, index) => {
     page = sheet;
-    rule(MARGIN + 14);
+    rule(MARGIN + (document.footer ? 36 : 14));
+    if (document.footer) {
+      document.footer.forEach((line, at) => write(fitted(clean(line), fonts.regular, 7, CONTENT_WIDTH), MARGIN, MARGIN + 24 - at * 10, { size: 7, color: MUTED }));
+    }
     if (document.validUntil) write(`Valores válidos até ${document.validUntil}.`, MARGIN, MARGIN + 2, { size: 8, color: MUTED });
     write(`Página ${index + 1} de ${pages.length}`, right, MARGIN + 2, { size: 8, color: MUTED, align: "right" });
   });

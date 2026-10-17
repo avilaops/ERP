@@ -153,7 +153,7 @@ test("pedido fechado: o documento se chama Pedido e não tem validade; em negoci
 test("sem desconto: some a linha do desconto e a coluna dos itens", () => {
   const document = build({ ...ORDER, discount: 0 });
   assert.equal(document.hasDiscount, false);
-  assert.deepEqual(document.totals.map((row) => row.label), ["Total de tabela", "Valor sem IPI", "IPI (13%)", "Total da nota"]);
+  assert.deepEqual(document.totals.map((row) => row.label), ["Valor sem IPI", "IPI (13%)", "Total da nota"]);
   assert.deepEqual(document.items.map((item) => item.unitDiscount), [null, null]);
 });
 

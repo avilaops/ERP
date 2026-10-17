@@ -3,6 +3,7 @@ import type { CustomerInput } from "@/lib/customer";
 import { moneyInWords } from "@/lib/contract/words";
 import { showMoney } from "@/lib/format";
 import type { QuoteDocument } from "@/lib/quote/document";
+import { normalizedAddress } from "@/lib/address";
 
 /**
  * The contract of an order is a text the company writes once, with fields in
@@ -99,6 +100,7 @@ const joined = (parts: (string | null | undefined)[], separator: string) => part
 
 /** `Rua A, 10, sala 2 - Centro, Votuporanga/SP, CEP 15500-000`, with whatever there is. */
 export function addressLine(place: { street: string | null; streetNumber: string | null; complement?: string | null; district: string | null; city: string | null; uf: string | null; cep: string | null }): string {
+  place = normalizedAddress(place);
   const street = joined([place.street, place.streetNumber, place.complement], ", ");
   return joined([joined([street, place.district], " - "), joined([place.city, place.uf], "/"), place.cep ? `CEP ${formatCep(place.cep)}` : null], ", ");
 }
