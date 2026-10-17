@@ -102,6 +102,9 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "0069_cancelamento_de_rascunhos.sql",
     "0070_email_da_carta_de_correcao.sql",
     "0071_pix_direto_e_termos_preservados.sql",
+    "0072_fila_fiscal.sql",
+    "0073_fila_de_eventos_fiscais.sql",
+    "0074_fila_inutilizacao_fiscal.sql",
   ]);
 
   const second = await withClient((client) => migrate(client, MIGRATIONS_DIR));
@@ -136,8 +139,10 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "fiscal_invoice_events",
     "fiscal_invoice_mails",
     "fiscal_invoices",
+    "fiscal_jobs",
     "fiscal_number_voids",
     "fiscal_rules",
+    "fiscal_void_jobs",
     "fixed_expenses",
     "idempotency_keys",
     "lost_reasons",
@@ -226,7 +231,8 @@ test("migração: reconhece o PIX já aplicado com o nome anterior sem repetir S
     try {
       await migrate(client, dir);
       await client.query("UPDATE payment_methods SET company_pix=false");
-      assert.deepEqual(await migrate(client, MIGRATIONS_DIR), ["0070_email_da_carta_de_correcao.sql", current]);
+      const remaining = readdirSync(MIGRATIONS_DIR).filter((name) => name >= "0070_").sort();
+      assert.deepEqual(await migrate(client, MIGRATIONS_DIR), remaining);
       assert.deepEqual(await migrate(client, MIGRATIONS_DIR), []);
       const flags = await client.query("SELECT 1 FROM payment_methods WHERE company_pix");
       assert.equal(flags.rows.length, 0);
@@ -316,7 +322,7 @@ test("o pacote publicado leva tudo o que o db-migrate.ts importa", async () => {
     if (seen.has(file)) return;
     seen.add(file);
     for (const match of readFileSync(join(root, file), "utf8").matchAll(/from "(\.{1,2}\/[^"]+)"/g)) {
-      walk(relative(root, join(root, dirname(file), match[1])));
+      walk(relative(root, join(root, dirname(file), match[1])).replaceAll("\\", "/"));
     }
   };
   walk("scripts/db-migrate.ts");

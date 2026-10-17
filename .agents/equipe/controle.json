@@ -4,6 +4,24 @@
   "members": [],
   "tasks": [
     {
+      "id": "T-20261017-validacao-fiscal-local",
+      "title": "Conferir XML fiscal localmente antes da transmissao",
+      "owner": null,
+      "status": "em-revisao",
+      "acceptance": ["Schemas locais com versao, origem e hash", "Falha de XML ou motor bloqueia emissao e eventos", "Previa antes da numeracao e XML final antes da transmissao", "Banco isolado e standalone conferidos; resultado externo separado"],
+      "evidence": ["https://linear.app/avilaops/issue/AVL-73", "https://linear.app/avilaops/issue/AVL-69", "https://github.com/avilaops/ERP/pull/21", "docs/validacao-fiscal-local.md", "751 testes aprovados sem falhas ou pulos; lint, tipos e npm ci dry-run aprovados; teste integrado confirma recusa antes de numerar ou chamar o transporte", "Build e standalone sem rede/tests: quatro XMLs ficticios validos e um invalido recusado; 13 hashes e worker/WASM conferidos", "Publicado em 40a7b70, health publico confirmado e container healthy; motor executado no container sem transmitir; conexao e contagens reais preservadas"],
+      "next": "PR21 em revisao; homologacao externa e entrega real ainda pendentes. UI HXKP aguarda login, regras tributarias dependem do contador na AVL-12. Matriz completa e jobs persistentes continuam nas AVL-69/AVL-75."
+    },
+    {
+      "id": "T-20261017-fila-fiscal-persistente",
+      "title": "Processar emissão fiscal persistente e recuperar transmissão",
+      "owner": null,
+      "status": "em-andamento",
+      "acceptance": ["Fila isolada por empresa com lease e idempotência por pedido", "Falha após transmissão consulta antes de reenviar o XML original", "Retentativas limitadas não repetem rejeição definitiva", "Worker, testes e publicação registrados separadamente"],
+      "evidence": ["https://linear.app/avilaops/issue/AVL-75", "https://github.com/avilaops/ERP/pull/21", "Commit c351a3f: migration 0072, fila por tenant e worker no background", "Commit 55bae30: migration 0073 inclui CC-e e cancelamento na fila; texto validado antes da gravação e e-mail automático preservado", "Commit 18e97a0: migration 0074 persiste inutilização com XML assinado antes do worker; resposta incerta exige revisão manual", "Typecheck, lint, validação de XML fiscal/eventos e testes de rotas/empacotamento aprovados; teste integrado de banco preparado mas ERP_TEST_DATABASE_URL ausente", "UI HXKP bloqueou regras fiscais ausentes sem transmitir e não teve erros de console", "17/10: etapa 1 fiscal HXKP conferida em produção nos cinco tamanhos; sem erro/aviso de console, resposta 5xx, overflow horizontal, alerta visível ou controle abaixo de 44 px. Fluxo local completo indisponível sem ERP_LOCAL_LOGIN e banco demo; registro em AVL-75.", "17/10: PR21 rebaseada na base fiscal; migração PIX preservada em 0071 e filas renumeradas para 0072–0074, sem colisão de ledger."],
+      "next": "Executar os testes de banco com ERP_TEST_DATABASE_URL, revisar a PR e validar as filas em homologação sem emissão real."
+    },
+    {
       "id": "T-20261017-fluxo-fiscal-eventos",
       "title": "Retomar fluxo completo e distribuir CC-e com protocolo do evento",
       "owner": null,

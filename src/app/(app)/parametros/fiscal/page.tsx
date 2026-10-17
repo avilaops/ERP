@@ -6,6 +6,7 @@ import { PasswordField } from "@/components/PasswordField";
 import { FormSteps } from "@/components/FormSteps";
 import { loadFiscalRules, listPaymentCodes, missingFiscalRules, PAYMENT_CODES } from "@/lib/db/fiscal-rules";
 import { listNumberVoids } from "@/lib/db/invoices";
+import { listNumberVoidJobs } from "@/lib/db/fiscal-void-jobs";
 import { listLines } from "@/lib/db/product-lines";
 import { LINE_PARAM, pickLine } from "@/lib/lines-view";
 import Link from "next/link";
@@ -44,6 +45,7 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
   const missingRules = missingFiscalRules(rules);
   const paymentCodes = await listPaymentCodes(conn);
   const voids = await listNumberVoids(conn);
+  const voidJobs = await listNumberVoidJobs(conn);
   const reformFrom = await loadDanfeReformDate(conn);
   const simples = settings.taxRegime === 1;
   const ruleFields = [
@@ -434,9 +436,16 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
                 <input id="void-reason" name="reason" type="text" autoComplete="off" placeholder="Ex.: Numeração pulada por falha na emissão." className={INPUT} />
               </div>
               <div className="sm:col-span-3">
-                <ConfirmButton label="Inutilizar numeração" confirmLabel="Confirmar: inutilizar na SEFAZ" className={DANGER_OUTLINE} />
+                <ConfirmButton label="Inutilizar numeração" confirmLabel="Confirmar: colocar inutilização na fila fiscal" className={DANGER_OUTLINE} />
               </div>
             </ActionForm>
+            {voidJobs.filter((job) => job.status !== "concluido").map((job) => (
+              <div key={job.id} className={`mt-3 rounded border px-3 py-2 text-sm ${job.status === "revisao_manual" ? "border-amber-300 bg-amber-50 text-amber-950" : "border-sky-300 bg-sky-50 text-sky-950"}`}>
+                <strong>{job.status === "pendente" ? "Inutilização aguardando a fila" : job.status === "processando" ? "Inutilização em processamento" : "Inutilização exige revisão"}</strong>
+                <span className="block text-xs">Série {job.series}, {job.first} a {job.last} · tentativa {job.attempts} · próxima verificação {showDateTime(job.runAfter)}</span>
+                {job.lastError && <span className="mt-1 block text-xs">{job.lastError}</span>}
+              </div>
+            ))}
             {voids.length > 0 && (
               <ul className="mt-4 text-sm">
                 {voids.map((item) => (

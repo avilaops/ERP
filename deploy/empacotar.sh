@@ -38,6 +38,25 @@ cp src/lib/db/config.ts src/lib/db/migrate.ts src/lib/db/control-schema.ts "$RAI
 rm -rf "$RAIZ/db/migrations" && cp -r db/migrations "$RAIZ/db/"
 rm -rf "$RAIZ/db/control" && cp -r db/control "$RAIZ/db/"
 
+# O validador precisa funcionar no standalone, sem depender da árvore de testes.
+node <<'NODE'
+const { createHash } = require('node:crypto');
+const { readFileSync } = require('node:fs');
+const { resolve, join } = require('node:path');
+const root = resolve('.next/standalone');
+const schemas = join(root, 'src/lib/fiscal/schemas');
+const manifest = JSON.parse(readFileSync(join(schemas, 'manifest.json'), 'utf8'));
+for (const [kind, pack] of Object.entries(manifest.packages)) {
+  for (const file of pack.files) {
+    const hash = createHash('sha256').update(readFileSync(join(schemas, kind, file.name))).digest('hex');
+    if (hash !== file.sha256) throw new Error(`Schema fiscal ausente ou alterado: ${kind}/${file.name}`);
+  }
+}
+const runtime = join(root, 'node_modules/xmllint-wasm');
+for (const file of ['package.json', 'index-node.js', 'xmllint-node.js', 'xmllint.wasm']) readFileSync(join(runtime, file));
+if (typeof require(runtime).validateXML !== 'function') throw new Error('Validador fiscal indisponível no standalone');
+NODE
+
 SAIDA="${1:-$(mktemp -d)/standalone.tgz}"
 tar -czf "$SAIDA" -C "$RAIZ" \
   --exclude='./.git' --exclude='./.env*' --exclude='./tests' --exclude='./.work' \
@@ -63,5 +82,7 @@ done
 [ "$(conta '^\./node_modules/@img/sharp-linux-x64/lib/sharp-linux-x64\.node$')" = "1" ] || { echo "! sem o binário nativo do sharp (@img/sharp-linux-x64)"; exit 1; }
 [ "$(conta '^\./node_modules/@img/sharp-libvips-linux-x64/lib/libvips-cpp\.so')" != "0" ] || { echo "! sem a libvips do sharp (@img/sharp-libvips-linux-x64)"; exit 1; }
 [ "$(conta '^\./public/icons/icon-512\.png$')" = "1" ] || { echo "! sem os ícones do aplicativo (public/icons)"; exit 1; }
+[ "$(conta '^\./src/lib/fiscal/schemas/manifest\.json$')" = "1" ] || { echo "! sem o manifesto dos schemas fiscais"; exit 1; }
+[ "$(conta '^\./node_modules/xmllint-wasm/xmllint\.wasm$')" = "1" ] || { echo "! sem o motor local de validação fiscal"; exit 1; }
 echo "· $(du -h "$SAIDA" | cut -f1) em $SAIDA"
 echo "$SAIDA"

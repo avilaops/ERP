@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { MENU_ITEMS } from "@/lib/auth/permissions";
 
 const APP_DIR = fileURLToPath(new URL("../src/app/(app)/", import.meta.url));
+const projectPath = (path: string) => path.replaceAll("\\", "/");
 
 /** Every page.tsx under the protected group, as a route path. */
 function pages(dir = APP_DIR, route = ""): string[] {
@@ -47,11 +48,11 @@ const SRC_DIR = fileURLToPath(new URL("../src/", import.meta.url));
 const SOURCES_UNDER_SRC = () =>
   readdirSync(SRC_DIR, { recursive: true, encoding: "utf8" })
     .filter((file) => /\.tsx?$/.test(file))
-    .map((file) => [file, readFileSync(SRC_DIR + file, "utf8")] as const);
+    .map((file) => [projectPath(file), readFileSync(SRC_DIR + file, "utf8")] as const);
 
 /** Every source file under the protected group, relative to it. */
 const appFiles = () =>
-  readdirSync(APP_DIR, { recursive: true, encoding: "utf8" }).filter((file) => /\.tsx?$/.test(file));
+  readdirSync(APP_DIR, { recursive: true, encoding: "utf8" }).filter((file) => /\.tsx?$/.test(file)).map(projectPath);
 
 test("toda ação de servidor confere a permissão antes de qualquer outra coisa", () => {
   const actions = appFiles().filter((file) => /^\s*["']use server["']/m.test(readFileSync(APP_DIR + file, "utf8")));
@@ -373,7 +374,9 @@ const API_DIR = fileURLToPath(new URL("../src/app/api/", import.meta.url));
 const PUBLIC_ROUTES = new Set(["health/route.ts"]);
 
 test("toda rota de src/app/api confere a sessão, e a empresa só sai dela", () => {
-  const routes = readdirSync(API_DIR, { recursive: true, encoding: "utf8" }).filter((file) => /(^|\/)route\.tsx?$/.test(file));
+  const routes = readdirSync(API_DIR, { recursive: true, encoding: "utf8" })
+    .filter((file) => /(^|[\\/])route\.tsx?$/.test(file))
+    .map(projectPath);
   assert.ok(routes.includes("produtos/[id]/foto/route.ts"));
   for (const file of PUBLIC_ROUTES) assert.ok(routes.includes(file), `${file} está na lista de rotas públicas e não existe`);
   for (const file of routes) {
@@ -495,11 +498,12 @@ test("nota fiscal: a conferência do XML só sai para quem edita os parâmetros,
   assert.doesNotMatch(loader, /UPDATE|INSERT|DELETE/);
 });
 
-test("nota fiscal: só quem edita os parâmetros emite; a verificação do servidor da SEFAZ nunca é desligada; o XML autorizado segue o alcance do pedido", () => {
+test("nota fiscal: só quem edita os parâmetros coloca a emissão na fila; a verificação da SEFAZ nunca é desligada; o XML autorizado segue o alcance do pedido", () => {
   const action = readFileSync(new URL("../src/app/(app)/pedidos/nfe-actions.ts", import.meta.url), "utf8");
-  assert.ok(action.indexOf('await requirePermission("parametros")') < action.indexOf("issueOrderNfe("));
+  assert.ok(action.indexOf('await requirePermission("parametros")') < action.indexOf("enqueueNfeIssue("));
+  assert.ok(action.includes('"@/lib/db/fiscal-jobs"'));
   assert.ok(action.includes("vaultKey(process.env.ERP_CERT_KEY)"));
-  const sources = ["src/lib/fiscal/sefaz.ts", "src/lib/db/issue-nfe.ts", "src/app/(app)/pedidos/nfe-actions.ts"].map((file) => readFileSync(new URL(`../${file}`, import.meta.url), "utf8"));
+  const sources = ["src/lib/fiscal/sefaz.ts", "src/lib/db/issue-nfe.ts", "src/lib/db/fiscal-jobs.ts", "src/app/(app)/pedidos/nfe-actions.ts"].map((file) => readFileSync(new URL(`../${file}`, import.meta.url), "utf8"));
   for (const code of sources) {
     assert.doesNotMatch(code, /rejectUnauthorized:\s*false|NODE_TLS_REJECT_UNAUTHORIZED/);
     // A senha e o arquivo do certificado nunca vão para log nem para mensagem.

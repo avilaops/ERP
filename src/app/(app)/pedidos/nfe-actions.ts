@@ -3,17 +3,15 @@
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/auth";
 import { menuItem } from "@/lib/auth/permissions";
-import { IssueError, issueOrderNfe, registerOrderNfeEvent } from "@/lib/db/issue-nfe";
+import { IssueError } from "@/lib/db/issue-nfe";
+import { enqueueNfeEvent, enqueueNfeIssue } from "@/lib/db/fiscal-jobs";
 import { CarrierError, saveOrderTransport } from "@/lib/db/carriers";
 import { saveFreightMode } from "@/lib/db/invoices";
 import { DeliveryError, saveOrderDelivery } from "@/lib/db/order-delivery";
-import { loadMailInfo } from "@/lib/db/mail";
 import { getOrder } from "@/lib/db/orders";
 import { sendInvoiceMail } from "@/lib/db/send-nfe-mail";
 import { tenantDb } from "@/lib/db/pool";
 import { vaultKey } from "@/lib/fiscal/certificate";
-import { sendToSefaz } from "@/lib/fiscal/channel";
-import { layoutCheck } from "@/lib/fiscal/precheck";
 import { MailError } from "@/lib/mail/message";
 import { sendMail } from "@/lib/mail/smtp";
 import type { ActionState } from "@/lib/order-form";
@@ -22,36 +20,6 @@ import { ORDER_NUMBER } from "@/lib/order-number";
 const FAILED = "Não foi possível emitir agora. Confira a situação da nota abaixo antes de tentar de novo.";
 
 const FAILED_TO_SAVE = "Não foi possível gravar agora. Tente de novo.";
-
-const send = sendToSefaz;
-
-/**
- * Sends the invoice to the customer right after the tax authority answered,
- * when the company wants it so and the customer has an e-mail. A failure here
- * never undoes what was authorised: it is recorded, and the screen offers to send again.
- */
-async function mailAfter(kind: "nota" | "cancelamento" | "correcao", invoiceId: number, sentBy: string, conn: ReturnType<typeof tenantDb>, eventId?: number): Promise<string | null> {
-  try {
-    if (!(await loadMailInfo(conn)).autoSend) return null;
-    // Once per invoice: issuing again an invoice already authorised does not write to the customer twice.
-    const sent = await conn.query("SELECT recipient FROM fiscal_invoice_mails WHERE invoice_id = $1 AND kind = 'nota' AND status = 'enviado' ORDER BY id DESC LIMIT 1", [invoiceId]);
-    if (kind === "nota" && sent.rows[0]) return null;
-    // The cancellation goes to who received the invoice; if nobody did, there is nobody to warn by here.
-    if (kind !== "nota" && !sent.rows[0]) return null;
-    if (kind === "correcao") {
-      if (!eventId) throw new MailError("A CC-e registrada não informou o evento para envio.");
-      const already = await conn.query("SELECT 1 FROM fiscal_invoice_mails WHERE invoice_id = $1 AND kind = 'correcao' AND status = 'enviado' AND event_id=$2", [invoiceId,eventId]);
-      if (already.rows[0]) return null;
-    }
-    const result = await sendInvoiceMail({ invoiceId, ...(kind === "correcao" ? { kind,eventId } : {}), to: kind !== "nota" ? String(sent.rows[0].recipient) : null, sentBy, now: new Date(), env: process.env, key: () => vaultKey(process.env.ERP_CERT_KEY), send: sendMail }, conn);
-    return result.status === "enviado" ? `E-mail enviado para ${result.recipient}.` : `O e-mail para ${result.recipient} não saiu: ${result.detail ?? "falha no envio"}`;
-  } catch (error) {
-    // No address, no mailbox: said on the screen of the order, not an error of the issuing.
-    if (error instanceof MailError) return `E-mail não enviado: ${error.message}`;
-    console.error("[e-mail] falha ao enviar a nota:", error instanceof Error ? error.message : error);
-    return "E-mail não enviado: falha inesperada. Use \"Enviar por e-mail\" na nota.";
-  }
-}
 
 /**
  * "Emitir nota fiscal" of a closed order. Only who edits the fiscal parameters
@@ -63,11 +31,10 @@ export async function issueNfeAction(_previous: ActionState, formData: FormData)
   const number = formData.get("number");
   if (typeof number !== "string" || !ORDER_NUMBER.test(number)) return { error: "Pedido não encontrado." };
 
-  let notice: string | null = null;
   try {
-    const result = await issueOrderNfe(number, session.email, new Date(), vaultKey(process.env.ERP_CERT_KEY), send, conn, layoutCheck({ ERP_FISCAL_URL: process.env.ERP_FISCAL_URL, ERP_FISCAL_TOKEN: process.env.ERP_FISCAL_TOKEN }));
-    console.info(`[nfe] pedido ${number}: nota ${result.invoice.number} ${result.invoice.status} (${result.invoice.statusCode ?? "-"}), por ${session.email}`);
-    if (result.invoice.status === "autorizada") notice = await mailAfter("nota", result.invoice.id, session.email, conn);
+    const job = await enqueueNfeIssue(number, session.email, conn);
+    revalidatePath(`${menuItem("pedidos").href}/${number}`);
+    return { error: null, notice: job.joined ? "A emissão desta nota já está na fila." : "Emissão colocada na fila fiscal. A situação será atualizada automaticamente." };
   } catch (error) {
     revalidatePath(`${menuItem("pedidos").href}/${number}`);
     if (error instanceof IssueError) return { error: error.message };
@@ -75,8 +42,6 @@ export async function issueNfeAction(_previous: ActionState, formData: FormData)
     console.error("[nfe] falha ao emitir:", error instanceof Error ? error.message : error);
     return { error: FAILED };
   }
-  revalidatePath(`${menuItem("pedidos").href}/${number}`);
-  return { error: null, notice };
 }
 
 /** "Registrar carta de correção" and "Cancelar nota fiscal" of the authorised invoice of an order. Same hands as issuing. */
@@ -89,18 +54,15 @@ export async function registerNfeEventAction(_previous: ActionState, formData: F
   if (typeof number !== "string" || !ORDER_NUMBER.test(number)) return { error: "Pedido não encontrado." };
   if (kind !== "cancelamento" && kind !== "correcao") return { error: "Escolha carta de correção ou cancelamento." };
 
-  let notice: string | null = null;
   try {
-    const result = await registerOrderNfeEvent(number, kind, typeof text === "string" ? text : "", session.email, new Date(), vaultKey(process.env.ERP_CERT_KEY), send, conn);
-    console.info(`[nfe] pedido ${number}: ${result.message} Por ${session.email}`);
-    notice = await mailAfter(kind, result.invoiceId, session.email, conn, result.eventId);
+    const job = await enqueueNfeEvent(number, kind, typeof text === "string" ? text : "", session.email, conn);
+    revalidatePath(`${menuItem("pedidos").href}/${number}`);
+    return { error: null, notice: job.joined ? "Este evento fiscal já está na fila." : "Evento fiscal colocado na fila. A situação será atualizada automaticamente." };
   } catch (error) {
     if (error instanceof IssueError) return { error: error.message };
     console.error("[nfe] falha ao registrar evento:", error instanceof Error ? error.message : error);
     return { error: FAILED };
   }
-  revalidatePath(`${menuItem("pedidos").href}/${number}`);
-  return { error: null, notice };
 }
 
 /** The transport of the invoice: the way of freight (one of the options of the layout), who carries and the volumes. */

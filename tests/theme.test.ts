@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 import { parseTheme } from "@/lib/theme";
 
 const read = (file: string) => readFileSync(new URL(`../${file}`, import.meta.url), "utf8");
@@ -24,11 +25,11 @@ test("aparência: o escuro vale pela escolha da pessoa e, sem escolha, pelo apar
 test("aparência: toda cor usada nas telas tem valor no escuro", () => {
   const css = read("src/app/globals.css");
   const dark = css.match(/html\[data-theme="dark"\] \{([^}]*)\}/)?.[1] ?? "";
-  const dir = new URL("../src", import.meta.url).pathname;
+  const dir = fileURLToPath(new URL("../src/", import.meta.url));
   const used = new Set<string>();
   for (const file of readdirSync(dir, { recursive: true }) as string[]) {
     if (!/\.tsx?$/.test(file)) continue;
-    for (const [, color] of readFileSync(`${dir}/${file}`, "utf8").matchAll(/\b(?:bg|text|border|ring|divide|accent|outline)-((?:white|brand(?:-dark|-soft)?|(?:slate|red|emerald|amber|indigo)-\d{2,3}))\b/g)) {
+    for (const [, color] of readFileSync(`${dir}${file}`, "utf8").matchAll(/\b(?:bg|text|border|ring|divide|accent|outline)-((?:white|brand(?:-dark|-soft)?|(?:slate|red|emerald|amber|indigo)-\d{2,3}))\b/g)) {
       used.add(color);
     }
   }

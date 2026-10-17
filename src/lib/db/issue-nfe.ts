@@ -17,12 +17,23 @@ import {
 import { EVENT_ACTION, eventEnvelope, eventUrl, eventXml, parseEvent, processedEventXml } from "@/lib/fiscal/events";
 import { UF_CODES } from "@/lib/fiscal/nfe";
 import { signEventXml, signingKeyOf, signNfeXml, signVoidXml } from "@/lib/fiscal/sign";
+import { assertFiscalXml, FiscalXmlError } from "@/lib/fiscal/local-layout";
+import type { FiscalXmlKind } from "@/lib/fiscal/local-layout";
 
 /** A refusal of the issuing the user can act on. */
 export class IssueError extends Error {}
 
 /** "Rejeição: Duplicidade de Evento" (MOC 7.0, Anexo I): the event of that type and sequence already exists for the invoice. */
 const DUPLICATED_EVENT = "573";
+
+async function checkLocalXml(xml: string, kind: FiscalXmlKind): Promise<void> {
+  try {
+    await assertFiscalXml(xml, kind);
+  } catch (error) {
+    if (error instanceof FiscalXmlError) throw new IssueError(error.message);
+    throw error;
+  }
+}
 
 export type { Send } from "@/lib/fiscal/channel";
 
@@ -34,8 +45,8 @@ export type IssueResult = { invoice: Invoice; message: string };
  * stored before anything is sent, so a call that dies half way leaves a trace
  * and never a second number. A rejected invoice is issued again with its own
  * number; an invoice sent without an answer is sent again exactly as signed.
- * With `check`, a new invoice is first conferred against the official layout,
- * before any number is taken: one that fails is not numbered nor sent.
+ * The local XSD check is mandatory before numbering and before transmission.
+ * `check` may add an external conference; it never replaces the local check.
  */
 export async function issueOrderNfe(orderNumber: string, who: string, now: Date, vault: Buffer, send: Send, conn: Queryable, check: LayoutCheck | null = null): Promise<IssueResult> {
   return withQueryableConnection(conn, held => issueOnConnection(orderNumber, who, now, vault, send, held, check));
@@ -84,15 +95,17 @@ async function prepareOrderInvoice(orderNumber: string, who: string, now: Date, 
       if (known.status !== "nao-consta") {
         throw new IssueError(`A SEFAZ respondeu sobre a nota ${waiting.number} (${known.code}): ${known.reason}. Nada foi reenviado; confira com o contador.`);
       }
+      await checkLocalXml(stored, "nfe");
     } else {
+      let draft: string;
+      try {
+        draft = signNfeXml(buildNfeXml(preview.input).xml, signingKeyOf(certificate.pfx, certificate.password));
+      } catch (error) {
+        if (error instanceof NfeError) throw new IssueError(error.message);
+        throw error;
+      }
+      await checkLocalXml(draft, "nfe");
       if (check) {
-        let draft: string;
-        try {
-          draft = signNfeXml(buildNfeXml(preview.input).xml, signingKeyOf(certificate.pfx, certificate.password));
-        } catch (error) {
-          if (error instanceof NfeError) throw new IssueError(error.message);
-          throw error;
-        }
         const problems = await check(draft);
         if (problems.length > 0) throw new IssueError(`A nota não passou na conferência do leiaute oficial e não foi enviada; nenhum número foi usado. ${problems.join(" · ")}`);
       }
@@ -116,6 +129,7 @@ async function prepareOrderInvoice(orderNumber: string, who: string, now: Date, 
         throw error;
       }
       signedXml = signNfeXml(built.xml, signingKeyOf(certificate.pfx, certificate.password));
+      await checkLocalXml(signedXml, "nfe");
       try {
         invoice = await saveSignedInvoice(
           { orderId: preview.orderId, environment, series, number, accessKey: accessKey(numbered.input), signedXml, issuedAt: numbered.input.issuedAt, createdBy: who, rulesRevision: numbered.rulesRevision },
@@ -226,6 +240,7 @@ export async function registerOrderNfeEvent(
   try {
     const event = eventXml({ kind, environment: invoice.environment, accessKey: invoice.accessKey, cnpj: invoice.accessKey.slice(6, 20), at: issueInstant(now), sequence, protocol: invoice.protocol, text });
     signed = signEventXml(event.xml, signingKeyOf(certificate.pfx, certificate.password));
+    await checkLocalXml(signed, "evento");
   } catch (error) {
     if (error instanceof NfeError) throw new IssueError(error.message);
     throw error;
@@ -270,14 +285,22 @@ export async function registerOrderNfeEvent(
  * will never issue. Refused here when a number of the range already is an
  * invoice with a verdict, or was not reached by the counter yet.
  */
-export async function voidInvoiceNumbers(
-  range: { series: number; first: number; last: number; reason: string },
-  who: string,
+export type NumberVoidRange = { series: number; first: number; last: number; reason: string };
+
+/** A signed request is made and stored before the fiscal worker talks to SEFAZ. */
+export type PreparedNumberVoid = NumberVoidRange & {
+  environment: "homologacao" | "producao";
+  issuerUf: string;
+  signedXml: string;
+};
+
+/** Validates the range and signs its immutable request, without transmitting it. */
+export async function prepareNumberVoid(
+  range: NumberVoidRange,
   now: Date,
   vault: Buffer,
-  send: Send,
   conn: Queryable,
-): Promise<{ message: string }> {
+): Promise<PreparedNumberVoid> {
   const settings = await loadFiscalSettings(conn);
   if (!settings.cnpj || !settings.uf || !UF_CODES[settings.uf]) throw new IssueError("Preencha o CNPJ e a UF da empresa em Parâmetros → Fiscal.");
   if (!(range.last < settings.nextNumber)) throw new IssueError(`Só dá para inutilizar número que o sistema já passou: o próximo da empresa é o ${settings.nextNumber}.`);
@@ -288,19 +311,51 @@ export async function voidInvoiceNumbers(
   if (!sealed) throw new IssueError("Envie o certificado digital A1 em Parâmetros → Fiscal.");
   if (sealed.validUntil.getTime() <= now.getTime()) throw new IssueError("O certificado digital venceu. Envie o certificado em vigor em Parâmetros → Fiscal.");
   const certificate = openCertificate(sealed, vault);
-
-  let signed: string;
-  let result;
+  let signedXml: string;
   try {
     const request = voidXml({ environment: settings.environment, stateCode: UF_CODES[settings.uf], year: issueInstant(now).slice(2, 4), cnpj: settings.cnpj, series: range.series, first: range.first, last: range.last, reason: range.reason });
-    signed = signVoidXml(request.xml, signingKeyOf(certificate.pfx, certificate.password));
-    result = parseVoid(await send(voidUrl(settings.uf, settings.environment), VOID_ACTION, voidEnvelope(signed), { pfx: certificate.pfx, passphrase: certificate.password }));
+    signedXml = signVoidXml(request.xml, signingKeyOf(certificate.pfx, certificate.password));
+    await checkLocalXml(signedXml, "inutilizacao");
+  } catch (error) {
+    if (error instanceof SefazError) throw new IssueError(error.message);
+    throw error;
+  }
+  return { environment: settings.environment, issuerUf: settings.uf, series: range.series, first: range.first, last: range.last, reason: range.reason.replace(/\s+/g, " ").trim(), signedXml };
+}
+
+/** Sends exactly the signed request that was persisted with the operation. */
+export async function sendPreparedNumberVoid(
+  prepared: PreparedNumberVoid,
+  who: string,
+  now: Date,
+  vault: Buffer,
+  send: Send,
+  conn: Queryable,
+): Promise<{ message: string }> {
+  const sealed = await loadSealedCertificate(conn);
+  if (!sealed) throw new IssueError("Envie o certificado digital A1 em Parâmetros → Fiscal.");
+  if (sealed.validUntil.getTime() <= now.getTime()) throw new IssueError("O certificado digital venceu. Envie o certificado em vigor em Parâmetros → Fiscal.");
+  const certificate = openCertificate(sealed, vault);
+  let result;
+  try {
+    result = parseVoid(await send(voidUrl(prepared.issuerUf, prepared.environment), VOID_ACTION, voidEnvelope(prepared.signedXml), { pfx: certificate.pfx, passphrase: certificate.password }));
   } catch (error) {
     if (error instanceof SefazError) throw new IssueError(error.message);
     throw error;
   }
   if (!result.registered) throw new IssueError(`A SEFAZ não inutilizou (${result.code}): ${result.reason}`);
 
-  await recordNumberVoid({ environment: settings.environment, series: range.series, first: range.first, last: range.last, reason: range.reason.replace(/\s+/g, " ").trim(), signedXml: signed, protocol: result.protocol, createdBy: who }, conn);
-  return { message: `Numeração ${range.first} a ${range.last} inutilizada. Protocolo ${result.protocol}.` };
+  await recordNumberVoid({ environment: prepared.environment, series: prepared.series, first: prepared.first, last: prepared.last, reason: prepared.reason, signedXml: prepared.signedXml, protocol: result.protocol, createdBy: who }, conn);
+  return { message: `Numeração ${prepared.first} a ${prepared.last} inutilizada. Protocolo ${result.protocol}.` };
+}
+
+export async function voidInvoiceNumbers(
+  range: { series: number; first: number; last: number; reason: string },
+  who: string,
+  now: Date,
+  vault: Buffer,
+  send: Send,
+  conn: Queryable,
+): Promise<{ message: string }> {
+  return sendPreparedNumberVoid(await prepareNumberVoid(range, now, vault, conn), who, now, vault, send, conn);
 }

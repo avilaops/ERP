@@ -233,7 +233,9 @@ const SRC = fileURLToPath(new URL("../src/", import.meta.url));
 const read = (file: string) => readFileSync(SRC + file, "utf8");
 
 test("portas públicas do marketing: sem sessão, só o que o endereço nomeia, nunca indexadas; as telas são de quem vê a equipe toda", () => {
-  const sources = readdirSync(SRC, { recursive: true, encoding: "utf8" }).filter((file) => /\.tsx?$/.test(file));
+  const sources = readdirSync(SRC, { recursive: true, encoding: "utf8" })
+    .filter((file) => /\.tsx?$/.test(file))
+    .map((file) => file.replaceAll("\\", "/"));
   const open = sources.filter((file) => file.startsWith("app/captura/") || file.startsWith("app/descadastro/"));
   assert.deepEqual(open.sort(), ["app/captura/[empresa]/[token]/actions.ts", "app/captura/[empresa]/[token]/page.tsx", "app/descadastro/[empresa]/[token]/actions.ts", "app/descadastro/[empresa]/[token]/agora/route.ts", "app/descadastro/[empresa]/[token]/page.tsx"]);
   for (const file of open) {

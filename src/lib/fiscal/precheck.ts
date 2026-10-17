@@ -4,8 +4,8 @@
  * the current package). The service has no address of its own: it is reached
  * through the single MCP of the company (`https://mcp.avilaops.com/mcp`), where
  * its tools carry the `fiscal_` prefix, with a service token that opens only them. It saves a rejection for a field out of the layout.
- * It is a help, never a lock: with the service off, slow or answering nonsense
- * the invoice goes on to SEFAZ, which has the last word anyway.
+ * This optional check complements the mandatory local XSD validation in
+ * issue-nfe.ts. Failure here never disables or replaces that local validation.
  */
 export type LayoutCheck = (signedXml: string) => Promise<string[]>;
 
@@ -56,7 +56,7 @@ export function layoutCheck(env: { ERP_FISCAL_URL?: string; ERP_FISCAL_TOKEN?: s
       return layoutProblems(JSON.parse(text));
     } catch (error) {
       // Never the XML: only what kind of failure it was.
-      console.error("[nfe] conferência do leiaute indisponível, a nota segue para a SEFAZ:", error instanceof Error ? error.message : error);
+      console.error("[nfe] conferência adicional indisponível; validação local obrigatória preservada:", error instanceof Error ? error.message : error);
       return [];
     }
   };

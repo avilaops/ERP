@@ -1321,6 +1321,21 @@ test("emissão: guarda a nota assinada antes de enviar; rejeitada reemite com o 
   await assert.rejects(() => issueOrderNfe(number, who, now, vault, never, db.pool), /certificado digital A1/);
   await saveCertificate(testPfx({ name: "EMPRESA DE TESTE LTDA:11222333000181" }), "senha-de-teste", vault, who, now, db.pool);
 
+  // A validação local é obrigatória, mesmo sem serviço de conferência adicional.
+  // O cadastro aceita a rua de um caractere; o XSD exige pelo menos dois.
+  const originalStreet = (await db.pool.query("SELECT street FROM company_settings")).rows[0].street;
+  try {
+    await db.pool.query("UPDATE company_settings SET street = 'A'");
+    await assert.rejects(
+      () => issueOrderNfe(number, who, now, vault, never, db.pool),
+      (error: Error) => error instanceof IssueError && /conferência local/.test(error.message) && /xLgr/.test(error.message),
+    );
+    assert.deepEqual(await listOrderInvoices(orderId, db.pool), []);
+    assert.equal((await db.pool.query("SELECT nfe_next_number FROM company_settings")).rows[0].nfe_next_number, 42);
+  } finally {
+    await db.pool.query("UPDATE company_settings SET street = $1", [originalStreet]);
+  }
+
   const answer = (key: string, code: string, reason: string) =>
     `<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope"><soap:Body><retEnviNFe versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe"><cStat>104</cStat><xMotivo>Lote processado</xMotivo>` +
     `<protNFe versao="4.00"><infProt><tpAmb>2</tpAmb><verAplic>T</verAplic><chNFe>${key}</chNFe><dhRecbto>2026-10-08T10:00:05-03:00</dhRecbto>${code === "100" ? "<nProt>135260000000001</nProt><digVal>x=</digVal>" : ""}<cStat>${code}</cStat><xMotivo>${reason}</xMotivo></infProt></protNFe></retEnviNFe></soap:Body></soap:Envelope>`;
@@ -1399,6 +1414,56 @@ test("emissão: guarda a nota assinada antes de enviar; rejeitada reemite com o 
   // Nada do certificado vai para a tabela das notas.
   const dump = await db.pool.query("SELECT signed_xml || coalesce(authorized_xml, '') AS text FROM fiscal_invoices");
   assert.doesNotMatch(dump.rows[0].text, /PRIVATE KEY|senha-de-teste/);
+});
+
+test("fila fiscal: clique repetido compartilha a emissão; perda de resposta retenta o mesmo XML e envia o e-mail automático", { skip }, async () => {
+  const { enqueueNfeIssue, runOneFiscalJob } = await import("@/lib/db/fiscal-jobs");
+  const { listOrderInvoices } = await import("@/lib/db/invoices");
+  const { saveCertificate } = await import("@/lib/db/fiscal");
+  const { SefazError } = await import("@/lib/fiscal/sefaz");
+  const { testPfx } = await import("./fiscal-helpers.ts");
+  const { randomBytes } = await import("node:crypto");
+
+  const number = await createOrder({ seller: SELLER, version: 1, productId: ID["LD-B001"], quantity: 1 }, numbers("261018-JOB1"), db.pool);
+  await linkOrderCustomer(number, customerSp, SELLER.email, MINE, db.pool);
+  await saveOrderTerms(number, { ...TERMS, deliveryUf: "SP" }, SELLER.email, MINE, db.pool);
+  await savePayment(number, { ...PAYMENT, downPayment: 1_000 }, SELLER.email, MINE, db.pool);
+  await closeOrder(number, SELLER.email, MINE, db.pool);
+  const orderId = Number((await db.pool.query("SELECT id FROM orders WHERE number = $1", [number])).rows[0].id);
+  await db.pool.query("UPDATE customers SET email = 'fila@cliente.test' WHERE id = $1", [customerSp]);
+
+  const now = new Date("2026-10-18T12:00:00Z");
+  const who = "diretoria@teste.local";
+  const vault = randomBytes(32);
+  await saveCertificate(testPfx({ name: "EMPRESA DE TESTE LTDA:11222333000181" }), "senha-de-teste", vault, who, now, db.pool);
+  const first = await enqueueNfeIssue(number, who, db.pool);
+  const repeated = await enqueueNfeIssue(number, who, db.pool);
+  assert.deepEqual([repeated.id, repeated.joined], [first.id, true]);
+
+  const timeout = async () => { throw new SefazError("A SEFAZ não respondeu a tempo."); };
+  const mail: string[] = [];
+  const dependencies = { vault, send: timeout, check: null, env: { ERP_SMTP_HOST: "mail.teste", ERP_SMTP_USER: "fiscal@teste.local", ERP_SMTP_PASSWORD: "segredo", ERP_MAIL_FROM: "fiscal@teste.local" }, mailSend: async (_config: unknown, envelope: { to: string }) => void mail.push(envelope.to) };
+  assert.equal(await runOneFiscalJob(now, dependencies, db.pool), "retry");
+  assert.deepEqual((await listOrderInvoices(orderId, db.pool)).map((invoice) => [invoice.status, invoice.number]), [["assinada", 43]]);
+  const delayed = await db.pool.query("SELECT status, attempts, run_after FROM fiscal_jobs WHERE id = $1", [first.id]);
+  assert.deepEqual([delayed.rows[0].status, Number(delayed.rows[0].attempts)], ["pendente", 1]);
+
+  const authorize = async (url: string, _action: string, envelope: string) => {
+    if (/nfeconsultaprotocolo4/.test(url)) {
+      const key = /<chNFe>(\d{44})<\/chNFe>/.exec(envelope)![1];
+      return `<retConsSitNFe versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe"><cStat>217</cStat><xMotivo>NF-e não consta</xMotivo><chNFe>${key}</chNFe></retConsSitNFe>`;
+    }
+    const key = /Id="NFe(\d{44})"/.exec(envelope)![1];
+    return `<retEnviNFe versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe"><cStat>104</cStat><xMotivo>Lote processado</xMotivo><protNFe versao="4.00"><infProt><chNFe>${key}</chNFe><nProt>135260000000071</nProt><cStat>100</cStat><xMotivo>Autorizado o uso da NF-e</xMotivo></infProt></protNFe></retEnviNFe>`;
+  };
+  assert.equal(await runOneFiscalJob(delayed.rows[0].run_after as Date, { ...dependencies, send: authorize }, db.pool), "completed");
+  assert.deepEqual((await listOrderInvoices(orderId, db.pool)).map((invoice) => [invoice.status, invoice.number, invoice.protocol]), [["autorizada", 43, "135260000000071"]]);
+  assert.deepEqual(mail, ["fila@cliente.test"]);
+  const done = await db.pool.query("SELECT status, attempts, lease_until, completed_at FROM fiscal_jobs WHERE id = $1", [first.id]);
+  assert.equal(done.rows[0].status, "concluido");
+  assert.equal(Number(done.rows[0].attempts), 2);
+  assert.equal(done.rows[0].lease_until, null);
+  assert.ok(done.rows[0].completed_at);
 });
 
 test("nota autorizada: carta de correção numera 1, 2…; cancelamento grava o evento e a nota vira cancelada; recusa da SEFAZ não grava nada", { skip }, async () => {
@@ -1559,6 +1624,35 @@ test("nota autorizada: carta de correção numera 1, 2…; cancelamento grava o 
   assert.equal(await takeNextNumber(db.pool), 45);
   assert.match((await voidInvoiceNumbers({ series: 1, first: 45, last: 45, reason: "Numeração pulada por falha de sistema." }, who, now, vault, voided, db.pool)).message, /45 a 45 inutilizada/);
   assert.deepEqual((await listNumberVoids(db.pool)).map((item) => [item.first, item.last, item.protocol]), [[45, 45, "135260000000009"]]);
+});
+
+test("fila de inutilização: persiste o XML assinado antes da SEFAZ e não duplica clique repetido", { skip }, async () => {
+  const { enqueueNumberVoid, listNumberVoidJobs, runOneNumberVoidJob } = await import("@/lib/db/fiscal-void-jobs");
+  const { takeNextNumber, listNumberVoids } = await import("@/lib/db/invoices");
+  const { saveCertificate } = await import("@/lib/db/fiscal");
+  const { testPfx } = await import("./fiscal-helpers.ts");
+  const { randomBytes } = await import("node:crypto");
+
+  const now = new Date("2026-10-18T13:00:00Z");
+  const who = "diretoria@teste.local";
+  const vault = randomBytes(32);
+  await saveCertificate(testPfx({ name: "EMPRESA DE TESTE LTDA:11222333000181" }), "senha-de-teste", vault, who, now, db.pool);
+  assert.equal(await takeNextNumber(db.pool), 46);
+  const range = { series: 1, first: 46, last: 46, reason: "Numeração reservada e não utilizada no teste." };
+  const first = await enqueueNumberVoid(range, who, now, vault, db.pool);
+  const repeated = await enqueueNumberVoid(range, who, now, vault, db.pool);
+  assert.deepEqual([repeated.id, repeated.joined], [first.id, true]);
+  const queued = await db.pool.query("SELECT signed_xml, status, attempts FROM fiscal_void_jobs WHERE id = $1", [first.id]);
+  assert.match(queued.rows[0].signed_xml, /<inutNFe .*<Signature /);
+  assert.deepEqual([queued.rows[0].status, Number(queued.rows[0].attempts)], ["pendente", 0]);
+
+  const send = async (_url: string, _action: string, envelope: string) => {
+    assert.match(envelope, /<xServ>INUTILIZAR<\/xServ>/);
+    return `<retInutNFe versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe"><infInut><cStat>102</cStat><xMotivo>Inutilização de número homologado</xMotivo><nProt>135260000000010</nProt></infInut></retInutNFe>`;
+  };
+  assert.equal(await runOneNumberVoidJob(now, vault, send, db.pool), "completed");
+  assert.deepEqual((await listNumberVoidJobs(db.pool)).slice(0, 1).map((job) => [job.status, job.attempts]), [["concluido", 1]]);
+  assert.deepEqual((await listNumberVoids(db.pool)).slice(0, 1).map((item) => [item.first, item.last, item.protocol]), [[46, 46, "135260000000010"]]);
 });
 
 test("resposta perdida: evento duplicado (573) vem da consulta; número que já é de outra nota na SEFAZ (539) não é reaproveitado; duplicidade (204) traz o protocolo ou espera", { skip }, async () => {

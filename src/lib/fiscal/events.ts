@@ -48,13 +48,19 @@ export type NfeEvent = {
 const escape = (text: string) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 const clean = (text: string) => text.replace(/\s+/g, " ").trim();
 
+/** Normalizes and validates the human text before the event enters the durable queue. */
+export function eventText(kind: NfeEvent["kind"], value: string): string {
+  const text = clean(value);
+  const limit = kind === "cancelamento" ? 255 : 1000;
+  if (text.length < 15) throw new NfeError(kind === "cancelamento" ? "Escreva o motivo do cancelamento com pelo menos 15 letras." : "Escreva a correção com pelo menos 15 letras.");
+  if (text.length > limit) throw new NfeError(`O texto passa de ${limit} letras.`);
+  return text;
+}
+
 /** The event, not signed. Throws `NfeError` with what the user has to fix. */
 export function eventXml(event: NfeEvent): { id: string; xml: string } {
   if (!ACCESS_KEY_PATTERN.test(event.accessKey)) throw new Error("Chave de acesso inválida.");
-  const text = clean(event.text);
-  const limit = event.kind === "cancelamento" ? 255 : 1000;
-  if (text.length < 15) throw new NfeError(event.kind === "cancelamento" ? "Escreva o motivo do cancelamento com pelo menos 15 letras." : "Escreva a correção com pelo menos 15 letras.");
-  if (text.length > limit) throw new NfeError(`O texto passa de ${limit} letras.`);
+  const text = eventText(event.kind, event.text);
   if (!Number.isInteger(event.sequence) || event.sequence < 1 || event.sequence > 20) throw new NfeError("Uma nota aceita até 20 cartas de correção.");
   if (event.kind === "cancelamento" && !/^\d{15}$/.test(event.protocol ?? "")) throw new Error("O cancelamento precisa do protocolo de autorização da nota.");
 

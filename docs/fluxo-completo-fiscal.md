@@ -29,6 +29,20 @@ Esses ajustes de integração ainda dependem de implantação própria.
 9. Inutilização de numeração fica em Parâmetros → Fiscal; é uma operação distinta de
    cancelar nota autorizada. Só utilizar uma faixa efetivamente aplicável.
 
+## Fila persistente de operações fiscais
+
+Em desenvolvimento na PR 21, a tela grava a solicitação antes de qualquer chamada
+externa. Emissão, CC-e e cancelamento compartilham a fila por pedido; uma operação
+pendente impede outra no mesmo pedido. A inutilização mantém sua própria fila porque
+é uma faixa de numeração da empresa, sem pedido associado: o XML assinado é salvo
+antes da chamada à SEFAZ.
+
+O worker marca cada trabalho como pendente, processando, concluído ou em revisão
+manual. Emissão retoma consultando a SEFAZ antes de reenviar o XML. Para
+inutilização, resposta perdida vai para revisão manual: não há uma consulta segura
+implementada para confirmar a faixa antes de repetir uma solicitação irreversível.
+Nenhuma dessas filas substitui a autorização externa em homologação ou produção.
+
 ## Correções do envio de eventos
 
 - O arquivo novo é `procEventoNFe`, com evento assinado e o `retEvento` real.
@@ -95,3 +109,13 @@ A aba real abriu no login e aguarda autenticação do usuário para conferir o H
 pela UI. Emissão e eventos externos, assinatura do cliente e entrega de e-mail
 continuam sem evidência desta retomada. Não inferir tributação pelo CNPJ nem usar
 a simulação como prova de autorização. Verificações finais de lint/tipos aprovadas.
+
+## Continuação: validação local obrigatória
+
+Em 17/10/2026, publicada a AVL-73 em `40a7b70`: NF-e, cancelamento, CC-e e
+inutilização passam por XSD local antes de transmitir. Falha do motor também
+bloqueia. Prévia assinada é conferida antes da numeração; recuperação consulta a
+SEFAZ antes de decidir pelo reenvio. 751 testes, lint, tipos, build e standalone
+isolado aprovados; health público e execução do motor no container confirmados.
+Dados reais e configuração preservados, sem emissão externa ou entrega de e-mail.
+Detalhes e limites em [Conferência local do XML fiscal](validacao-fiscal-local.md).
