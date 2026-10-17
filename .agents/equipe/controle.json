@@ -10,7 +10,7 @@
       "status": "em-revisao",
       "acceptance": ["Identificacao fiscal e contato da vendedora, PIX configurado, entrega e transporte no PDF", "Garantia e condicoes comerciais configuraveis sem termos presumidos", "NCM, peso, status, desconto e parcelas coerentes; PDF legivel e UI nos cinco tamanhos"],
       "evidence": ["docs/dados-da-proposta.md", "715 testes aprovados, sem falhas ou pulos; lint e tipos aprovados", "15 etapas nos cinco tamanhos: 75 amostras de uma tela, sem rolagem lateral e controles >=44 px; teclado, zoom e texto 200% conferidos", "Demo DM11: validacao preserva campos, voltar salva, garantia especifica e demais termos herdados refletidos no PDF; frete FOB separado", "Previa real HXKP em duas paginas conferida; QR lido com chave CNPJ e valor de R$ 20.000; condicoes nao definidas ficam explicitas"],
-      "next": "Publicar e conferir pela UI. Garantia, montagem, site, frete e prazo de transporte reais ainda dependem de definicao/cadastro."
+      "next": "Publicado em fa1f709; health e container saudaveis. Contato da ficha e chave PIX do contrato cadastrados pela UI. PDF real HXKP baixado pela tela, duas paginas e QR de R$ 20.000 decodificado; sem dados ficticios. Garantia, montagem, site, frete e prazo de transporte reais ainda dependem de definicao/cadastro. PR16 em revisao."
     },
     {
       "id": "T-20261016-empresa-no-orcamento",

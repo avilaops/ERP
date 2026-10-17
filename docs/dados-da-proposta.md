@@ -70,3 +70,16 @@ do hash guardado. Sem contrato enviado, continuam os espaços de assinatura fís
 - Depois da revisão de endereço e meio PIX, 16 testes dirigidos passaram sem falhas
   ou pulos, incluindo complemento de apartamento preservado, entrega em outro estado
   pendente de endereço e link PIX sem QR direto da empresa.
+
+## Publicação
+
+Publicado em `fa1f709`, health e container saudáveis. Migração `0067` aplicada na
+Ludus. Contato da ficha cadastral e chave PIX CNPJ do contrato fornecido foram
+cadastrados pela UI. O PDF real do pedido `261016-HXKP` foi baixado pela tela e suas
+duas páginas inspecionadas; leitura do QR confirmou chave e R$ 20.000 da entrada.
+Total dos equipamentos de R$ 42.824,48, NCM, peso de 455 kg, endereço e periodicidade
+conferidos. Nenhum recebimento foi confirmado e nenhum contrato ou nota foi enviado.
+
+Permanecem para preenchimento pela empresa: site, prazo/cobertura de garantia,
+montagem, modalidade/condições do frete, prazo de transporte e condições de
+atraso/cancelamento. O PDF informa essas pendências e a tela permite preenchê-las.
