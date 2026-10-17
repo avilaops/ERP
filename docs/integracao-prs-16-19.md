@@ -12,7 +12,7 @@ locais de DOCUMENTOS e trabalhos anteriores preservados no checkout original.
 - Proposta: termos herdados, inclusive ausências explícitas, são materializados
   ao fechar e ao guardar contrato/nota. Mudanças posteriores dos padrões não
   alteram os termos do documento. A migration congela os valores atualmente
-  disponíveis em pedidos antigos já bloqueados; não recupera padrões históricos.
+  disponíveis em pedidos antigos já fechados ou bloqueados; não recupera padrões históricos.
 - PIX direto: propriedade explícita `company_pix`, separada do código fiscal e
   do nome do provedor. Só a forma padrão PIX existente é habilitada pela migration;
   outros métodos exigem escolha explícita. Troca do código ou renomeação retira

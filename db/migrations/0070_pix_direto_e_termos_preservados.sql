@@ -11,5 +11,6 @@ UPDATE orders o SET proposal_details =
   || c.proposal_details || o.proposal_details,
   proposal_details_revision=o.proposal_details_revision+1
 FROM company_settings c
-WHERE EXISTS (SELECT 1 FROM order_contracts d WHERE d.order_id=o.id AND d.status IN ('enviado','assinado'))
+WHERE o.status='fechado'
+   OR EXISTS (SELECT 1 FROM order_contracts d WHERE d.order_id=o.id AND d.status IN ('enviado','assinado'))
    OR EXISTS (SELECT 1 FROM fiscal_invoices f WHERE f.order_id=o.id AND f.status IN ('assinada','autorizada','denegada'));
