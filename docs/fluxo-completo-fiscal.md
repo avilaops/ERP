@@ -70,7 +70,21 @@ situação antes da ação; abrir Contrato ou Nota fiscal é a decisão inicial;
 tamanhos foram medidos; os detalhes têm nomes explícitos; recolher mantém o rascunho;
 teclado e ampliação foram conferidos. Abertura dos detalhes pode exigir rolagem.
 
-Produção e emissão externa ainda precisam de evidência própria. A aba real abriu no
-login: aguarda autenticação do usuário para conferir HXKP e as definições fiscais
-atuais. Não inferir tributação pelo CNPJ. Não declarar emissão, CC-e, cancelamento,
-assinatura ou entrega de e-mail reais com base na simulação.
+Publicação: `37a1f70`, em 17/10/2026 às 09:15:57 UTC. Build aprovado, pacote com
+3.275 entradas; delta SHA-256
+`ce8b805bdb4c40e13369ac6f22fc519e8d46fe272ad474c788682432419d7e2b`.
+Health público confirmou o commit e o container ficou `healthy`; migração 0070
+aplicada. Pacote e imagem anteriores conservados para recuperação. POST sem token
+continua 401. PR20 aberta para revisão, sem mesclar PRs anteriores.
+
+Antes/depois: uma conexão ativa, três clientes, sete pedidos, um recebimento,
+nenhuma conta a pagar, 13 atividades, nenhuma nota/evento/envio fiscal. Caixa de
+saída própria `ludus@ludusequipamentos.com`, envio automático ligado e certificado
+válido; ambiente em homologação. No HXKP ainda estão vazios CSTs de ICMS, IPI,
+PIS/COFINS e CST/classificação de IBS/CBS, considerando as regras efetivas do pedido.
+Essa conferência de configuração foi somente leitura, não prova da aprovação contábil.
+
+A aba real abriu no login e aguarda autenticação do usuário para conferir o HXKP
+pela UI. Emissão e eventos externos, assinatura do cliente e entrega de e-mail
+continuam sem evidência desta retomada. Não inferir tributação pelo CNPJ nem usar
+a simulação como prova de autorização. Verificações finais de lint/tipos aprovadas.
