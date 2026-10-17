@@ -79,8 +79,7 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
       ]} />
 
       {tab === "pendencias" && (
-        <section className={`${CARD} mt-3`} aria-labelledby="fiscal-pendencias">
-          <h2 id="fiscal-pendencias" className="border-b border-slate-200 px-4 py-3 text-sm font-semibold uppercase tracking-wide">Próximo trabalho</h2>
+        <section className={`${CARD} mt-3`} aria-label="Próximo trabalho">
           {pendingSlice.rows.length === 0 ? (
             <p className="p-4 text-sm text-slate-600">Nenhum pedido aguardando ação fiscal.</p>
           ) : (
