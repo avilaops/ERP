@@ -1,10 +1,14 @@
 import { IssueError, issueOrderNfe } from "@/lib/db/issue-nfe";
+import { loadMailInfo } from "@/lib/db/mail";
 import { previewOrderNfe } from "@/lib/db/order-nfe";
 import { getOrder } from "@/lib/db/orders";
 import type { Queryable } from "@/lib/db/pool";
+import { sendInvoiceMail } from "@/lib/db/send-nfe-mail";
 import type { Send } from "@/lib/fiscal/channel";
 import type { LayoutCheck } from "@/lib/fiscal/precheck";
 import { vaultKey } from "@/lib/fiscal/certificate";
+import { sendMail } from "@/lib/mail/smtp";
+import type { MailSender } from "@/lib/db/send-nfe-mail";
 
 const MAX_ATTEMPTS = 5;
 const LEASE_MS = 2 * 60_000;
@@ -88,14 +92,27 @@ async function failFiscalJob(job: FiscalJob, error: unknown, now: Date, conn: Qu
   );
 }
 
-export type FiscalJobDependencies = { vault: Buffer; send: Send; check: LayoutCheck | null };
+export type FiscalJobDependencies = { vault: Buffer; send: Send; check: LayoutCheck | null; env: Record<string, string | undefined>; mailSend?: MailSender };
+
+/** An e-mail failure never reopens a concluded fiscal job: sendInvoiceMail records its own result. */
+async function sendAutomaticMail(invoiceId: number, sentBy: string, now: Date, dependencies: FiscalJobDependencies, conn: Queryable): Promise<void> {
+  try {
+    if (!(await loadMailInfo(conn)).autoSend) return;
+    const prior = await conn.query("SELECT 1 FROM fiscal_invoice_mails WHERE invoice_id = $1 AND kind = 'nota' AND status = 'enviado' LIMIT 1", [invoiceId]);
+    if (prior.rows[0]) return;
+    await sendInvoiceMail({ invoiceId, to: null, sentBy, now, env: dependencies.env, key: () => dependencies.vault, send: dependencies.mailSend ?? sendMail }, conn);
+  } catch (error) {
+    console.error("[fila fiscal] e-mail automático não enviado:", error instanceof Error ? error.message : error);
+  }
+}
 
 /** Processes one invoice request. The lease is already durable before any network operation begins. */
 export async function runOneFiscalJob(now: Date, dependencies: FiscalJobDependencies, conn: Queryable): Promise<"none" | "completed" | "retry" | "manual_review"> {
   const job = await claimFiscalJob(now, conn);
   if (!job) return "none";
   try {
-    await issueOrderNfe(job.orderNumber, job.requestedBy, now, dependencies.vault, dependencies.send, conn, dependencies.check);
+    const result = await issueOrderNfe(job.orderNumber, job.requestedBy, now, dependencies.vault, dependencies.send, conn, dependencies.check);
+    if (result.invoice.status === "autorizada") await sendAutomaticMail(result.invoice.id, job.requestedBy, now, dependencies, conn);
     await completeFiscalJob(job.id, now, conn);
     return "completed";
   } catch (error) {
@@ -106,5 +123,5 @@ export async function runOneFiscalJob(now: Date, dependencies: FiscalJobDependen
 
 /** Dependencies used by the production background routine, kept here to make the worker testable. */
 export function fiscalJobDependencies(env: Record<string, string | undefined>, send: Send, check: LayoutCheck | null): FiscalJobDependencies {
-  return { vault: vaultKey(env.ERP_CERT_KEY), send, check };
+  return { vault: vaultKey(env.ERP_CERT_KEY), send, check, env };
 }

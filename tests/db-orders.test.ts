@@ -1416,6 +1416,56 @@ test("emissão: guarda a nota assinada antes de enviar; rejeitada reemite com o 
   assert.doesNotMatch(dump.rows[0].text, /PRIVATE KEY|senha-de-teste/);
 });
 
+test("fila fiscal: clique repetido compartilha a emissão; perda de resposta retenta o mesmo XML e envia o e-mail automático", { skip }, async () => {
+  const { enqueueNfeIssue, runOneFiscalJob } = await import("@/lib/db/fiscal-jobs");
+  const { listOrderInvoices } = await import("@/lib/db/invoices");
+  const { saveCertificate } = await import("@/lib/db/fiscal");
+  const { SefazError } = await import("@/lib/fiscal/sefaz");
+  const { testPfx } = await import("./fiscal-helpers.ts");
+  const { randomBytes } = await import("node:crypto");
+
+  const number = await createOrder({ seller: SELLER, version: 1, productId: ID["LD-B001"], quantity: 1 }, numbers("261018-JOB1"), db.pool);
+  await linkOrderCustomer(number, customerSp, SELLER.email, MINE, db.pool);
+  await saveOrderTerms(number, { ...TERMS, deliveryUf: "SP" }, SELLER.email, MINE, db.pool);
+  await savePayment(number, PAYMENT, SELLER.email, MINE, db.pool);
+  await closeOrder(number, SELLER.email, MINE, db.pool);
+  const orderId = Number((await db.pool.query("SELECT id FROM orders WHERE number = $1", [number])).rows[0].id);
+  await db.pool.query("UPDATE customers SET email = 'fila@cliente.test' WHERE id = $1", [customerSp]);
+
+  const now = new Date("2026-10-18T12:00:00Z");
+  const who = "diretoria@teste.local";
+  const vault = randomBytes(32);
+  await saveCertificate(testPfx({ name: "EMPRESA DE TESTE LTDA:11222333000181" }), "senha-de-teste", vault, who, now, db.pool);
+  const first = await enqueueNfeIssue(number, who, db.pool);
+  const repeated = await enqueueNfeIssue(number, who, db.pool);
+  assert.deepEqual([repeated.id, repeated.joined], [first.id, true]);
+
+  const timeout = async () => { throw new SefazError("A SEFAZ não respondeu a tempo."); };
+  const mail: string[] = [];
+  const dependencies = { vault, send: timeout, check: null, env: { ERP_SMTP_HOST: "mail.teste", ERP_SMTP_USER: "fiscal@teste.local", ERP_SMTP_PASSWORD: "segredo", ERP_MAIL_FROM: "fiscal@teste.local" }, mailSend: async (_config: unknown, envelope: { to: string }) => void mail.push(envelope.to) };
+  assert.equal(await runOneFiscalJob(now, dependencies, db.pool), "retry");
+  assert.deepEqual((await listOrderInvoices(orderId, db.pool)).map((invoice) => [invoice.status, invoice.number]), [["assinada", 43]]);
+  const delayed = await db.pool.query("SELECT status, attempts, run_after FROM fiscal_jobs WHERE id = $1", [first.id]);
+  assert.deepEqual([delayed.rows[0].status, Number(delayed.rows[0].attempts)], ["pendente", 1]);
+
+  const authorize = async (url: string, _action: string, envelope: string) => {
+    if (/nfeconsultaprotocolo4/.test(url)) {
+      const key = /<chNFe>(\d{44})<\/chNFe>/.exec(envelope)![1];
+      return `<retConsSitNFe versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe"><cStat>217</cStat><xMotivo>NF-e não consta</xMotivo><chNFe>${key}</chNFe></retConsSitNFe>`;
+    }
+    const key = /Id="NFe(\d{44})"/.exec(envelope)![1];
+    return `<retEnviNFe versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe"><cStat>104</cStat><xMotivo>Lote processado</xMotivo><protNFe versao="4.00"><infProt><chNFe>${key}</chNFe><nProt>135260000000071</nProt><cStat>100</cStat><xMotivo>Autorizado o uso da NF-e</xMotivo></infProt></protNFe></retEnviNFe>`;
+  };
+  assert.equal(await runOneFiscalJob(delayed.rows[0].run_after as Date, { ...dependencies, send: authorize }, db.pool), "completed");
+  assert.deepEqual((await listOrderInvoices(orderId, db.pool)).map((invoice) => [invoice.status, invoice.number, invoice.protocol]), [["autorizada", 43, "135260000000071"]]);
+  assert.deepEqual(mail, ["fila@cliente.test"]);
+  const done = await db.pool.query("SELECT status, attempts, lease_until, completed_at FROM fiscal_jobs WHERE id = $1", [first.id]);
+  assert.equal(done.rows[0].status, "concluido");
+  assert.equal(Number(done.rows[0].attempts), 2);
+  assert.equal(done.rows[0].lease_until, null);
+  assert.ok(done.rows[0].completed_at);
+});
+
 test("nota autorizada: carta de correção numera 1, 2…; cancelamento grava o evento e a nota vira cancelada; recusa da SEFAZ não grava nada", { skip }, async () => {
   const { registerOrderNfeEvent, issueOrderNfe, IssueError } = await import("@/lib/db/issue-nfe");
   const { listOrderInvoiceEvents, listOrderInvoices } = await import("@/lib/db/invoices");
