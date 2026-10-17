@@ -18,7 +18,7 @@ const document: QuoteDocument = {
   items: [{ productId: 1, code: "LD-A001", name: "Equipamento", description: "Peso: 156 kg", quantity: 2, unitPrice: "R$ 10.000", unitDiscount: null, unitIpi: "R$ 1.300", unitWithIpi: "R$ 11.300", totalWithIpi: "R$ 22.600" }],
   hasDiscount: false, hasIpi: true, totals: [{ label: "Total da nota", value: "R$ 42.824,48", strong: true }], units: 3,
 };
-const address = { street: "Rua A, 81", streetNumber: "81", complement: "81", district: "Jardim Vitória régia", city: "São José do rio preto", uf: "SP", cep: "15075170" };
+const address = { street: "Rua A, 81", streetNumber: "81", complement: null, district: "Jardim Vitória régia", city: "São José do rio preto", uf: "SP", cep: "15075170" };
 const order = { number: "261016-HXKP", status: "fechado" as const, customer: null, items: [{ productId: 1, quantity: 2 }, { productId: 2, quantity: 1 }], downPayment: 20000, customInstallments: [], installmentIntervalDays: 30 };
 const context: QuoteContext = {
   issuer: { legalName: "Ludus Equipamentos Ltda", cnpj: "66058955000108", stateRegistration: "718319130117", street: "Rua Copacabana", streetNumber: "4108", district: "Parque Santa Felicia", city: "Votuporanga", cityCode: "3557105", uf: "SP", cep: "15505058", taxRegime: 3, series: 1, nextNumber: 1, environment: "homologacao" },
@@ -60,10 +60,11 @@ test("ausências são explícitas; peso incompleto não vira peso total e parcel
   assert.doesNotMatch(complete.payment.join(" "), /a cada/);
 });
 
-test("normalização remove número e complemento repetidos, preserva números legítimos e usa município oficial", () => {
+test("normalização remove número repetido, preserva complementos e números legítimos e usa município oficial", () => {
   assert.match(addressLine(address), /Rua A, 81 - Jardim Vitória Régia, São José do Rio Preto\/SP/);
   assert.equal(normalizedAddress({ ...address, street: "Avenida 81", streetNumber: "10", complement: "sala 81" }).street, "Avenida 81");
   assert.equal(normalizedAddress({ ...address, street: "Rua A, 81", streetNumber: "82" }).street, "Rua A, 81");
+  assert.equal(normalizedAddress({ ...address, complement: "81" }).complement, "81");
 });
 
 test("campos comerciais recusam URLs perigosas, e-mail errado, frete inválido e textos sem limite", () => {

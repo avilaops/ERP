@@ -11,7 +11,8 @@ export function normalizedAddress<T extends { street: string | null; streetNumbe
     if (parts.length > 1 && parts[parts.length - 1].toLowerCase() === number.toLowerCase()) street = parts.slice(0, -1).join(", ");
   }
   return { ...place, street, streetNumber: number,
-    complement: place.complement?.trim().toLowerCase() === number?.toLowerCase() ? null : place.complement,
+    // A numeric complement may be an apartment, even when it equals the street number.
+    complement: place.complement,
     district: place.district ? title(place.district) : null,
     city: findCity(place.city, place.uf)?.name ?? place.city };
 }
