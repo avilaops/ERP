@@ -3,7 +3,7 @@ import Link from "next/link";
 import { FitRows } from "@/components/FitRows";
 import { CARD, MetricSummary, PageHeader, Pager, Pill, SECONDARY, ViewTabs, pageOf } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
-import { menuItem, seesAllOrders } from "@/lib/auth/permissions";
+import { allows, menuItem, seesAllOrders } from "@/lib/auth/permissions";
 import { loadFiscalSettings } from "@/lib/db/fiscal";
 import { listFiscalOverview } from "@/lib/db/fiscal-overview";
 import type { FiscalOrderOverview } from "@/lib/db/fiscal-overview";
@@ -66,7 +66,7 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
     <>
       <PageHeader
         title="Fiscal"
-        actions={<Link href="/parametros/fiscal" className={SECONDARY}>Configurações fiscais</Link>}
+        actions={allows(session, "parametros") ? <Link href="/parametros/fiscal" className={SECONDARY}>Configurações fiscais</Link> : undefined}
       />
       <MetricSummary items={[
         { label: "A emitir", value: String(pending.filter((order) => order.stage === "emitir").length), note: "pedidos fechados" },
@@ -139,7 +139,7 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
         <section className={`${CARD} mt-3`} aria-labelledby="fiscal-inutilizacoes">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-4 py-3">
             <h2 id="fiscal-inutilizacoes" className="text-sm font-semibold uppercase tracking-wide">Inutilizações</h2>
-            <Link href="/parametros/fiscal?ver=numeracao#inutilizar" className={SECONDARY}>Solicitar inutilização</Link>
+            {allows(session, "parametros") && <Link href="/parametros/fiscal?ver=numeracao#inutilizar" className={SECONDARY}>Solicitar inutilização</Link>}
           </div>
           {voidSlice.rows.length === 0 ? (
             <p className="p-4 text-sm text-slate-600">Nenhuma inutilização registrada ou aguardando processamento.</p>

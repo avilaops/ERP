@@ -6,6 +6,8 @@ O item **Fiscal** aparece para a Diretoria e concentra o trabalho que começa de
 
 Um perfil personalizado só recebe **Fiscal** junto com **Pedidos**, porque a emissão, os arquivos e o envio ficam no pedido. Se o perfil não puder ver os pedidos da equipe, o painel e todas as ações fiscais ficam limitados aos pedidos da própria pessoa.
 
+**Configurações fiscais** e **Solicitar inutilização** aparecem somente para quem também recebeu **Configurações**. A consulta das inutilizações continua disponível no Fiscal.
+
 ## Pendências
 
 Cada pedido fechado aparece com uma situação:

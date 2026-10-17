@@ -51,6 +51,7 @@
 - [x] Impedir reabertura durante transmissão e encaminhar a quinta resposta não final para revisão.
 - [x] Renovar o relógio do lote, preservar jobs antigos na migração e adiar inutilização enquanto houver emissão concorrente.
 - [x] Exigir `Pedidos` em perfis que recebem `Fiscal`.
+- [x] Parar emissões antigas sem identidade para revisão e ocultar ações de configuração de quem não acessa `Configurações`.
 
 ## Resultado
 

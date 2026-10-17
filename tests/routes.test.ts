@@ -539,6 +539,8 @@ test("Fiscal: painel mostra o trabalho completo e não lê XML nem certificado",
   assert.equal(query.includes("search_path"), false);
   assert.ok(query.includes("o.seller_email = $1"));
   assert.ok(query.includes("environment = $2"));
+  assert.ok(page.includes('allows(session, "parametros") ? <Link href="/parametros/fiscal"'));
+  assert.ok(page.includes('allows(session, "parametros") && <Link href="/parametros/fiscal?ver=numeracao#inutilizar"'));
   const jobs = readFileSync(new URL("../src/lib/db/fiscal-jobs.ts", import.meta.url), "utf8");
   assert.ok(jobs.includes("runOneFiscalJob(clock(), dependencies, conn, clock)"));
 });

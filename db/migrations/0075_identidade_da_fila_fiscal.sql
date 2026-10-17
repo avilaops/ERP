@@ -9,6 +9,17 @@ ALTER TABLE fiscal_invoices
 ALTER TABLE fiscal_invoice_events
     ADD COLUMN fiscal_job_id integer UNIQUE REFERENCES fiscal_jobs (id);
 
+-- A versão anterior também não ligava a emissão à nota produzida. Não existe
+-- informação suficiente para distinguir com segurança um job ainda não iniciado
+-- de outro que caiu depois de transmitir; nenhum deles pode ser repetido sozinho.
+UPDATE fiscal_jobs
+   SET status = 'revisao_manual', lease_until = NULL,
+       last_error = 'Emissão criada antes da identificação da nota; confira a nota e a SEFAZ antes de emitir novamente.',
+       updated_at = now()
+ WHERE kind = 'emitir_nfe'
+   AND status IN ('pendente', 'processando')
+   AND invoice_id IS NULL;
+
 -- Jobs de evento criados pela versão anterior não guardavam a nota escolhida.
 -- Só vinculamos quando há exatamente uma nota autorizada no ambiente atual;
 -- qualquer ambiguidade para antes de uma operação fiscal irreversível.
