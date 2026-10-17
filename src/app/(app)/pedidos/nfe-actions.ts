@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/auth";
 import { menuItem } from "@/lib/auth/permissions";
-import { IssueError, issueOrderNfe, registerOrderNfeEvent } from "@/lib/db/issue-nfe";
+import { IssueError, registerOrderNfeEvent } from "@/lib/db/issue-nfe";
+import { enqueueNfeIssue } from "@/lib/db/fiscal-jobs";
 import { CarrierError, saveOrderTransport } from "@/lib/db/carriers";
 import { saveFreightMode } from "@/lib/db/invoices";
 import { DeliveryError, saveOrderDelivery } from "@/lib/db/order-delivery";
@@ -13,7 +14,6 @@ import { sendInvoiceMail } from "@/lib/db/send-nfe-mail";
 import { tenantDb } from "@/lib/db/pool";
 import { vaultKey } from "@/lib/fiscal/certificate";
 import { sendToSefaz } from "@/lib/fiscal/channel";
-import { layoutCheck } from "@/lib/fiscal/precheck";
 import { MailError } from "@/lib/mail/message";
 import { sendMail } from "@/lib/mail/smtp";
 import type { ActionState } from "@/lib/order-form";
@@ -63,11 +63,10 @@ export async function issueNfeAction(_previous: ActionState, formData: FormData)
   const number = formData.get("number");
   if (typeof number !== "string" || !ORDER_NUMBER.test(number)) return { error: "Pedido não encontrado." };
 
-  let notice: string | null = null;
   try {
-    const result = await issueOrderNfe(number, session.email, new Date(), vaultKey(process.env.ERP_CERT_KEY), send, conn, layoutCheck({ ERP_FISCAL_URL: process.env.ERP_FISCAL_URL, ERP_FISCAL_TOKEN: process.env.ERP_FISCAL_TOKEN }));
-    console.info(`[nfe] pedido ${number}: nota ${result.invoice.number} ${result.invoice.status} (${result.invoice.statusCode ?? "-"}), por ${session.email}`);
-    if (result.invoice.status === "autorizada") notice = await mailAfter("nota", result.invoice.id, session.email, conn);
+    const job = await enqueueNfeIssue(number, session.email, conn);
+    revalidatePath(`${menuItem("pedidos").href}/${number}`);
+    return { error: null, notice: job.joined ? "A emissão desta nota já está na fila." : "Emissão colocada na fila fiscal. A situação será atualizada automaticamente." };
   } catch (error) {
     revalidatePath(`${menuItem("pedidos").href}/${number}`);
     if (error instanceof IssueError) return { error: error.message };
@@ -75,8 +74,6 @@ export async function issueNfeAction(_previous: ActionState, formData: FormData)
     console.error("[nfe] falha ao emitir:", error instanceof Error ? error.message : error);
     return { error: FAILED };
   }
-  revalidatePath(`${menuItem("pedidos").href}/${number}`);
-  return { error: null, notice };
 }
 
 /** "Registrar carta de correção" and "Cancelar nota fiscal" of the authorised invoice of an order. Same hands as issuing. */

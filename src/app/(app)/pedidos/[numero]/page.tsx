@@ -755,7 +755,7 @@ export default async function PedidoPage({
                   <input type="hidden" name="number" value={order.number} />
                   <ConfirmButton
                     label={invoices.some((item) => item.status === "assinada") ? "Reenviar a nota à SEFAZ" : "Emitir nota fiscal"}
-                    confirmLabel="Confirmar: assinar e enviar à SEFAZ"
+                  confirmLabel="Confirmar: colocar emissão na fila fiscal"
                     className={PRIMARY}
                   />
                 </ActionForm>

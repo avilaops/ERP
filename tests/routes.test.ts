@@ -495,11 +495,12 @@ test("nota fiscal: a conferência do XML só sai para quem edita os parâmetros,
   assert.doesNotMatch(loader, /UPDATE|INSERT|DELETE/);
 });
 
-test("nota fiscal: só quem edita os parâmetros emite; a verificação do servidor da SEFAZ nunca é desligada; o XML autorizado segue o alcance do pedido", () => {
+test("nota fiscal: só quem edita os parâmetros coloca a emissão na fila; a verificação da SEFAZ nunca é desligada; o XML autorizado segue o alcance do pedido", () => {
   const action = readFileSync(new URL("../src/app/(app)/pedidos/nfe-actions.ts", import.meta.url), "utf8");
-  assert.ok(action.indexOf('await requirePermission("parametros")') < action.indexOf("issueOrderNfe("));
+  assert.ok(action.indexOf('await requirePermission("parametros")') < action.indexOf("enqueueNfeIssue("));
+  assert.ok(action.includes('"@/lib/db/fiscal-jobs"'));
   assert.ok(action.includes("vaultKey(process.env.ERP_CERT_KEY)"));
-  const sources = ["src/lib/fiscal/sefaz.ts", "src/lib/db/issue-nfe.ts", "src/app/(app)/pedidos/nfe-actions.ts"].map((file) => readFileSync(new URL(`../${file}`, import.meta.url), "utf8"));
+  const sources = ["src/lib/fiscal/sefaz.ts", "src/lib/db/issue-nfe.ts", "src/lib/db/fiscal-jobs.ts", "src/app/(app)/pedidos/nfe-actions.ts"].map((file) => readFileSync(new URL(`../${file}`, import.meta.url), "utf8"));
   for (const code of sources) {
     assert.doesNotMatch(code, /rejectUnauthorized:\s*false|NODE_TLS_REJECT_UNAUTHORIZED/);
     // A senha e o arquivo do certificado nunca vão para log nem para mensagem.
