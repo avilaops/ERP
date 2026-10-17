@@ -486,21 +486,24 @@ test("dashboard: o filtro de vendedor só escolhe entre os pedidos que a pessoa 
   assert.ok(order.includes("<ActionForm action={decideApprovalAction}"));
 });
 
-test("nota fiscal: a conferência do XML só sai para quem edita os parâmetros, de pedido fechado, e não assina nem envia", () => {
+test("nota fiscal: a conferência do XML só sai para quem opera o Fiscal, de pedido fechado, e não assina nem envia", () => {
   const route = readFileSync(`${API_DIR}pedidos/[numero]/nfe-previa/route.ts`, "utf8");
-  assert.ok(route.indexOf("await getSession()") < route.indexOf('allows(session, "parametros")'));
-  assert.ok(route.indexOf('allows(session, "parametros")') < route.indexOf("previewOrderNfe("));
+  assert.ok(route.indexOf("await getSession()") < route.indexOf('allows(session, "fiscal")'));
+  assert.ok(route.indexOf('allows(session, "fiscal")') < route.indexOf("previewOrderNfe("));
+  assert.ok(route.includes("sellerEmail: seesAllOrders(session) ? null : session.email"));
+  assert.ok(route.indexOf("getOrder(") < route.indexOf("previewOrderNfe("));
   assert.doesNotMatch(route, /certificate|vaultKey|fetch\(|sefaz/i);
   const order = readFileSync(new URL("../src/app/(app)/pedidos/[numero]/page.tsx", import.meta.url), "utf8");
-  assert.ok(order.includes('order.status === "fechado" && allows(session, "parametros") ? await previewOrderNfe('));
+  assert.ok(order.includes('order.status === "fechado" && allows(session, "fiscal") ? await previewOrderNfe('));
   const loader = readFileSync(new URL("../src/lib/db/order-nfe.ts", import.meta.url), "utf8");
   assert.ok(loader.includes('order.status !== "fechado"'));
   assert.doesNotMatch(loader, /UPDATE|INSERT|DELETE/);
 });
 
-test("nota fiscal: só quem edita os parâmetros coloca a emissão na fila; a verificação da SEFAZ nunca é desligada; o XML autorizado segue o alcance do pedido", () => {
+test("nota fiscal: só quem opera o Fiscal coloca a emissão na fila; a verificação da SEFAZ nunca é desligada; o XML autorizado segue o alcance do pedido", () => {
   const action = readFileSync(new URL("../src/app/(app)/pedidos/nfe-actions.ts", import.meta.url), "utf8");
-  assert.ok(action.indexOf('await requirePermission("parametros")') < action.indexOf("enqueueNfeIssue("));
+  assert.ok(action.indexOf('await requirePermission("fiscal")') < action.indexOf("enqueueNfeIssue("));
+  assert.ok(action.includes("sellerEmail: seesAllOrders(session) ? null : session.email"));
   assert.ok(action.includes('"@/lib/db/fiscal-jobs"'));
   assert.ok(action.includes("vaultKey(process.env.ERP_CERT_KEY)"));
   const sources = ["src/lib/fiscal/sefaz.ts", "src/lib/db/issue-nfe.ts", "src/lib/db/fiscal-jobs.ts", "src/app/(app)/pedidos/nfe-actions.ts"].map((file) => readFileSync(new URL(`../${file}`, import.meta.url), "utf8"));
@@ -516,11 +519,32 @@ test("nota fiscal: só quem edita os parâmetros coloca a emissão na fila; a ve
   assert.ok(route.indexOf("getOrder(") < route.indexOf("loadAuthorizedXml("));
 });
 
-test("DANFE: segue o alcance do pedido; a conferência é só de quem edita os parâmetros", () => {
+test("DANFE: segue o alcance do pedido; a conferência é só de quem opera o Fiscal", () => {
   const route = readFileSync(`${API_DIR}pedidos/[numero]/danfe/route.ts`, "utf8");
   assert.ok(route.indexOf("await getSession()") < route.indexOf("getOrder("));
   assert.ok(route.includes("sellerEmail: seesAllOrders(session) ? null : session.email"));
   assert.ok(route.indexOf("getOrder(") < route.indexOf("loadAuthorizedXml("));
   const preview = readFileSync(`${API_DIR}pedidos/[numero]/danfe-previa/route.ts`, "utf8");
-  assert.ok(preview.indexOf('allows(session, "parametros")') < preview.indexOf("previewOrderNfe("));
+  assert.ok(preview.indexOf('allows(session, "fiscal")') < preview.indexOf("previewOrderNfe("));
+  assert.ok(preview.includes("sellerEmail: seesAllOrders(session) ? null : session.email"));
+});
+
+test("Fiscal: painel mostra o trabalho completo e não lê XML nem certificado", () => {
+  const page = source("/fiscal");
+  assert.ok(page.includes('await requirePermission("fiscal")'));
+  for (const label of ["Pendências", "Notas fiscais", "Inutilizações", "Configurações fiscais", "Abrir nota no pedido"]) assert.ok(page.includes(label), label);
+  assert.doesNotMatch(page, /signed_xml|authorized_xml|certificate|passphrase|vaultKey/i);
+  const query = readFileSync(new URL("../src/lib/db/fiscal-overview.ts", import.meta.url), "utf8");
+  assert.doesNotMatch(query, /signed_xml|authorized_xml|certificate|passphrase/i);
+  assert.equal(query.includes("search_path"), false);
+  assert.ok(query.includes("o.seller_email = $1"));
+  assert.ok(query.includes("environment = $2"));
+  assert.ok(page.includes('allows(session, "parametros") ? <Link href="/parametros/fiscal"'));
+  assert.ok(page.includes('allows(session, "parametros") && <Link href="/parametros/fiscal?ver=numeracao#inutilizar"'));
+  const jobs = readFileSync(new URL("../src/lib/db/fiscal-jobs.ts", import.meta.url), "utf8");
+  assert.ok(jobs.includes("runOneFiscalJob(clock(), dependencies, conn, clock)"));
+  const background = readFileSync(new URL("../src/lib/background.ts", import.meta.url), "utf8");
+  assert.ok(background.includes("runOneNumberVoidJob(new Date(),"));
+  const settings = source("/parametros/fiscal");
+  assert.ok(settings.includes('allows(session, "fiscal") && <Link href="/fiscal"'));
 });

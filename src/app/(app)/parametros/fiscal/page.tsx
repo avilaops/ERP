@@ -12,7 +12,7 @@ import { LINE_PARAM, pickLine } from "@/lib/lines-view";
 import Link from "next/link";
 import { CARD, DANGER, DANGER_OUTLINE, INPUT, LABEL, PRIMARY, SECONDARY, PageHeader, Pager, pageOf } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
-import { menuItem } from "@/lib/auth/permissions";
+import { allows, menuItem } from "@/lib/auth/permissions";
 import { formatDocument } from "@/lib/customer";
 import { loadCertificateInfo, loadDanfeReformDate, loadFiscalSettings, missingFiscalData, TAX_REGIMES } from "@/lib/db/fiscal";
 import { tenantDb } from "@/lib/db/pool";
@@ -105,9 +105,10 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
 
   return (
     <>
-      <PageHeader title="Fiscal" hint="Preparação da nota." actions={
-        <Link href={menuItem("parametros").href} className={SECONDARY}>← {menuItem("parametros").label}</Link>
-      } />
+      <PageHeader title="Fiscal" hint="Preparação da nota." actions={<>
+        {allows(session, "fiscal") && <Link href="/fiscal" className={SECONDARY}>← Operação fiscal</Link>}
+        <Link href={menuItem("parametros").href} className={SECONDARY}>{menuItem("parametros").label}</Link>
+      </>} />
 
       <details key={tab} className="mt-3 sm:hidden">
         <summary className="min-h-[var(--control)] cursor-pointer py-3 font-medium text-brand">{TABS.find(([key]) => key === tab)?.[1]} · trocar</summary>

@@ -1,6 +1,6 @@
 # Preparação fiscal por nota
 
-No pedido fechado, em **Contrato e nota → Preparar regras desta nota**, a pessoa com permissão de Configurações pode escolher as regras antes de conferir ou emitir.
+No pedido fechado, em **Documentos e nota fiscal → Preparar regras desta nota**, a pessoa com permissão Fiscal pode escolher as regras antes de conferir ou emitir.
 
 O padrão da linha de produtos é o ponto de partida. Cada etapa grava somente seus campos neste pedido. Os demais continuam acompanhando o padrão da empresa. Escolher revenda ou produção própria preenche a natureza e os três CFOPs desta nota; a opção personalizada permite informar outra natureza e conferir os códigos nas etapas seguintes.
 

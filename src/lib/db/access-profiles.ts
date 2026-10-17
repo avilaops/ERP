@@ -43,6 +43,9 @@ export function cleanProfile(input: ProfileInput): ProfileInput {
   const own = menuFor(input.baseRole).map((item) => item.key);
   const items = own.filter((key) => input.items.includes(key));
   if (items.length === 0) throw new ProfileError("Marque pelo menos uma tela: sem nenhuma a pessoa não abre nada.");
+  if (items.includes("fiscal") && !items.includes("pedidos")) {
+    throw new ProfileError("Fiscal usa os documentos do pedido: marque também a tela Pedidos.");
+  }
   const denied = powersOf(input.baseRole).map((power) => power.key as string).filter((key) => input.denied.includes(key));
   if (denied.includes("custos")) {
     const showing = menuFor(input.baseRole).filter((item) => items.includes(item.key) && COST_SCREENS.includes(item.key));

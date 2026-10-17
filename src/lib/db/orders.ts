@@ -3,7 +3,7 @@ import { taxpayerFromRegistration } from "@/lib/customer";
 import { loadApprovalPolicy } from "@/lib/db/company";
 import { getCustomer } from "@/lib/db/customers";
 import type { Customer } from "@/lib/db/customers";
-import { pgErrorCode } from "@/lib/db/pool";
+import { pgErrorCode, withQueryableConnection } from "@/lib/db/pool";
 import type { Queryable } from "@/lib/db/pool";
 import { loadPublishedSnapshot, loadPublishedTable } from "@/lib/db/price-table";
 import { loadClosingProposal, EMPTY_PROPOSAL_DETAILS } from "@/lib/db/proposal-details";
@@ -715,49 +715,78 @@ export async function closeOrder(
  */
 export async function reopenOrder(number: string, who: string, scope: OrderScope, conn: Queryable): Promise<void> {
   assertWho(who);
-  const received = await conn.query(
-    `SELECT 1 FROM receivables r JOIN orders o ON o.id = r.order_id
-      WHERE o.number = $1 AND ($2::text IS NULL OR o.seller_email = $2)
-        AND EXISTS (SELECT 1 FROM receipts p WHERE p.receivable_id = r.id
-                       AND NOT EXISTS (SELECT 1 FROM refund_requests q WHERE q.receipt_id = p.id AND q.status = 'confirmada'))
-      LIMIT 1`,
-    [number, scope.sellerEmail],
-  );
-  if (received.rows.length > 0) {
-    throw new OrderError("Este pedido já tem valor recebido e não pode ser reaberto. Fale com o financeiro.");
-  }
-  const { rows } = await conn.query(
-    `WITH reopened AS (
-       UPDATE orders
-          SET status = 'em_negociacao', closed_at = NULL, updated_at = now(), updated_by = $2
-        WHERE number = $1 AND status IN ('fechado', 'aguardando_aprovacao')
-          AND ($3::text IS NULL OR seller_email = $3)
-          AND NOT EXISTS (SELECT 1 FROM receivables r JOIN receipts p ON p.receivable_id = r.id
-                           WHERE r.order_id = orders.id
-                             AND NOT EXISTS (SELECT 1 FROM refund_requests q WHERE q.receipt_id = p.id AND q.status = 'confirmada'))
-        RETURNING id
-     ), cancelled AS (
-       -- What was still to be received leaves with the closing.
-       UPDATE receivables SET status = 'cancelada', updated_at = now(), updated_by = $2
-         FROM reopened WHERE order_id = reopened.id AND status = 'aberta'
-     ), marked AS (
-       UPDATE order_closings SET reopened_at = now(), reopened_by = $2
-         FROM reopened WHERE order_id = reopened.id AND reopened_at IS NULL
-     ), withdrawn AS (
-       -- A request nobody decided leaves with the order: it is asked again at the next closing.
-       DELETE FROM order_approvals USING reopened WHERE order_id = reopened.id AND status = 'pendente'
-     ), unsigned AS (
-       -- A contract nobody signed describes an order that is about to change: it leaves too. A signed one stays.
-       UPDATE order_contracts SET status = 'cancelado', cancelled_at = now(), cancelled_by = $2, code_hash = NULL
-         FROM reopened WHERE order_id = reopened.id AND status = 'enviado'
-       RETURNING order_contracts.id
-     ), noted AS (
-       INSERT INTO order_contract_events (contract_id, kind, detail, actor) SELECT id, 'cancelado', 'pedido reaberto', $2 FROM unsigned
-     )
-     SELECT id FROM reopened`,
-    [number, who, scope.sellerEmail],
-  );
-  if (rows.length === 0) throw new OrderError("Pedido não encontrado, ou não está fechado nem aguardando aprovação.");
+  await withQueryableConnection(conn, async (held) => {
+    await held.query("BEGIN");
+    try {
+      const target = await held.query(
+        `SELECT id FROM orders
+          WHERE number = $1 AND status IN ('fechado', 'aguardando_aprovacao')
+            AND ($2::text IS NULL OR seller_email = $2)
+          FOR UPDATE`,
+        [number, scope.sellerEmail],
+      );
+      if (!target.rows[0]) throw new OrderError("Pedido não encontrado, ou não está fechado nem aguardando aprovação.");
+      const orderId = Number(target.rows[0].id);
+
+      // Lock pending jobs before the worker can claim them. A job already claimed
+      // means the tax-authority call may be in flight and reopening must wait for a person.
+      const activeFiscal = await held.query(
+        "SELECT status FROM fiscal_jobs WHERE order_id = $1 AND status IN ('pendente', 'processando') FOR UPDATE",
+        [orderId],
+      );
+      if (activeFiscal.rows.some((row) => row.status === "processando")) {
+        throw new OrderError("Há uma operação fiscal em processamento. Aguarde a conclusão ou a revisão antes de reabrir o pedido.");
+      }
+
+      const received = await held.query(
+        `SELECT 1 FROM receivables r
+          WHERE r.order_id = $1
+            AND EXISTS (SELECT 1 FROM receipts p WHERE p.receivable_id = r.id
+                           AND NOT EXISTS (SELECT 1 FROM refund_requests q WHERE q.receipt_id = p.id AND q.status = 'confirmada'))
+          LIMIT 1`,
+        [orderId],
+      );
+      if (received.rows.length > 0) throw new OrderError("Este pedido já tem valor recebido e não pode ser reaberto. Fale com o financeiro.");
+
+      const reopened = await held.query(
+        `WITH reopened AS (
+           UPDATE orders SET status = 'em_negociacao', closed_at = NULL, updated_at = now(), updated_by = $2
+            WHERE id = $1
+              AND NOT EXISTS (SELECT 1 FROM receivables r JOIN receipts p ON p.receivable_id = r.id
+                               WHERE r.order_id = orders.id
+                                 AND NOT EXISTS (SELECT 1 FROM refund_requests q WHERE q.receipt_id = p.id AND q.status = 'confirmada'))
+            RETURNING id
+         ), cancelled AS (
+           UPDATE receivables SET status = 'cancelada', updated_at = now(), updated_by = $2
+             FROM reopened WHERE order_id = reopened.id AND status = 'aberta'
+         ), marked AS (
+           UPDATE order_closings SET reopened_at = now(), reopened_by = $2
+             FROM reopened WHERE order_id = reopened.id AND reopened_at IS NULL
+         ), withdrawn AS (
+           DELETE FROM order_approvals USING reopened WHERE order_id = reopened.id AND status = 'pendente'
+         ), unsigned AS (
+           UPDATE order_contracts SET status = 'cancelado', cancelled_at = now(), cancelled_by = $2, code_hash = NULL
+             FROM reopened WHERE order_id = reopened.id AND status = 'enviado'
+           RETURNING order_contracts.id
+         ), noted AS (
+           INSERT INTO order_contract_events (contract_id, kind, detail, actor) SELECT id, 'cancelado', 'pedido reaberto', $2 FROM unsigned
+         ), fiscal_review AS (
+           UPDATE fiscal_jobs SET status = 'revisao_manual', lease_until = NULL,
+                  last_error = 'Pedido reaberto depois da confirmação da operação fiscal; confirme novamente após fechar o pedido.', updated_at = now()
+             FROM reopened WHERE order_id = reopened.id AND status = 'pendente'
+         )
+         SELECT id FROM reopened`,
+        [orderId, who],
+      );
+      if (!reopened.rows[0]) {
+        throw new OrderError("Este pedido recebeu um valor enquanto era reaberto. Fale com o financeiro.");
+      }
+      await held.query("COMMIT");
+    } catch (error) {
+      await held.query("ROLLBACK");
+      throw error;
+    }
+  });
 }
 
 /**
@@ -809,6 +838,8 @@ export async function deleteOrder(number: string, scope: OrderScope, conn: Query
      ), unlinked AS (
        -- The opportunity of the funnel that became this order stays; only the link goes.
        UPDATE opportunities SET order_id = NULL FROM free WHERE order_id = free.id RETURNING order_id
+     ), fiscal_jobs_removed AS (
+       DELETE FROM fiscal_jobs USING free WHERE order_id = free.id RETURNING order_id
      ), items AS (
        DELETE FROM order_items USING free WHERE order_id = free.id RETURNING order_id
      ), removed AS (

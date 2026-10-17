@@ -33,6 +33,7 @@ O menu fica à esquerda em todas as telas. Ele mostra apenas os itens liberados 
 | Contas a pagar | Despesas e pagamentos da empresa. |
 | Fornecedores | Fábricas, assessoria e prestadores. |
 | Comissões | Comissão de cada vendedor por mês. |
+| Fiscal | Pedidos a emitir, fila, revisões manuais, notas fiscais, e-mails e inutilizações. |
 | Tabela de preços | Preços publicados para a equipe. |
 | Produtos e custos | Equipamentos e custos da assessoria. |
 | Configurações | Impostos, canal e política comercial. |

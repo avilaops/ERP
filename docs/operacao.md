@@ -312,7 +312,7 @@ expedição. O item guarda o nome da cor: tirar uma cor da lista não muda pedid
 ## Tela do pedido no celular
 
 No celular o pedido aparece uma parte por vez, escolhida na barra do topo: Resumo, Itens, Cliente, Entrega,
-Pagamento e, quando houver, Contrato e nota. O pedido em negociação abre na primeira parte que falta
+Pagamento e, quando houver, Documentos e nota fiscal. O pedido em negociação abre na primeira parte que falta
 preencher; o fechado, no Resumo. Trocar de parte não sai da página: o que foi digitado continua lá. Em tela
 larga tudo aparece junto, como antes.
 
