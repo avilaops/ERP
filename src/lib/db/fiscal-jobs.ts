@@ -21,6 +21,23 @@ export type FiscalJob = {
   attempts: number;
 };
 
+export type FiscalJobSummary = {
+  id: number;
+  status: "pendente" | "processando" | "concluido" | "revisao_manual";
+  attempts: number;
+  lastError: string | null;
+  runAfter: Date;
+};
+
+/** The order page only needs the work still relevant to the person, never XML or certificate data. */
+export async function listOrderFiscalJobs(orderId: number, conn: Queryable): Promise<FiscalJobSummary[]> {
+  const { rows } = await conn.query(
+    "SELECT id, status, attempts, last_error, run_after FROM fiscal_jobs WHERE order_id = $1 ORDER BY id DESC LIMIT 5",
+    [orderId],
+  );
+  return rows.map((row) => ({ id: Number(row.id), status: row.status as FiscalJobSummary["status"], attempts: Number(row.attempts), lastError: row.last_error === null ? null : String(row.last_error), runAfter: row.run_after as Date }));
+}
+
 /** A request is durable before it returns to the screen. Repeated clicks join its active job. */
 export async function enqueueNfeIssue(orderNumber: string, who: string, conn: Queryable): Promise<{ id: number; joined: boolean }> {
   const order = await getOrder(orderNumber, { sellerEmail: null }, conn);

@@ -16,6 +16,7 @@ import { loadOrderDelivery } from "@/lib/db/order-delivery";
 import { listLines } from "@/lib/db/product-lines";
 import { lineWords } from "@/lib/line-words";
 import { listOrderInvoiceMails } from "@/lib/db/send-nfe-mail";
+import { listOrderFiscalJobs } from "@/lib/db/fiscal-jobs";
 import { listOrderInvoiceEvents, listOrderInvoices } from "@/lib/db/invoices";
 import { previewOrderNfe } from "@/lib/db/order-nfe";
 import { findCustomerByDocument } from "@/lib/db/customers";
@@ -229,6 +230,7 @@ export default async function PedidoPage({
   const invoices = invoice ? await listOrderInvoices(order.id, conn) : [];
   const events = invoice ? await listOrderInvoiceEvents(order.id, conn) : [];
   const mails = invoice ? await listOrderInvoiceMails(order.id, conn) : [];
+  const fiscalJobs = invoice ? await listOrderFiscalJobs(order.id, conn) : [];
   const carriers = invoice ? await listCarriers(conn) : [];
   const transport = await loadOrderTransport(order.id, conn);
   const delivery = invoice ? await loadOrderDelivery(order.id, conn) : null;
@@ -365,6 +367,13 @@ export default async function PedidoPage({
             O cliente recebe um link por e-mail, lê o contrato e assina com nome, CPF e um código enviado ao e-mail dele. O PDF assinado sai com o registro das
             assinaturas na última folha.
           </p>
+          {fiscalJobs.filter((job) => job.status !== "concluido").map((job) => (
+            <div key={job.id} className={`mt-3 rounded border px-3 py-2 ${job.status === "revisao_manual" ? "border-amber-300 bg-amber-50 text-amber-950" : "border-sky-300 bg-sky-50 text-sky-950"}`}>
+              <strong>{job.status === "pendente" ? "Emissão aguardando a fila" : job.status === "processando" ? "Emissão em processamento" : "Emissão exige revisão"}</strong>
+              <span className="block text-xs">Tentativa {job.attempts} · próxima verificação {showDateTime(job.runAfter)}</span>
+              {job.lastError && <span className="mt-1 block text-xs">{job.lastError}</span>}
+            </div>
+          ))}
           {contracts.length > 0 && (
             <ul className="mt-3 flex flex-col gap-2">
               {contracts.map((contract) => {
@@ -750,7 +759,7 @@ export default async function PedidoPage({
                   DANFE de conferência
                 </a>
               </p>
-              {!invoices.some((item) => item.status === "autorizada" && item.environment === invoice.input.environment) && (
+              {!invoices.some((item) => item.status === "autorizada" && item.environment === invoice.input.environment) && !fiscalJobs.some((job) => job.status === "pendente" || job.status === "processando") && (
                 <ActionForm action={issueNfeAction} className="mt-3">
                   <input type="hidden" name="number" value={order.number} />
                   <ConfirmButton
