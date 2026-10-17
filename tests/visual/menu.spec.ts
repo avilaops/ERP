@@ -9,7 +9,7 @@ test("menu: grupos, página atual, conta e teclado nos cinco tamanhos", async ({
     await page.goto("/pedidos");
     if (width < 768) await page.getByRole("button", { name: "Mais", exact: true }).click();
     const menu = page.getByRole("navigation", { name: "Menu principal", exact: true });
-    await expect(menu.locator(":scope > details")).toHaveCount(6);
+    await expect(menu.locator(":scope > details")).toHaveCount(7);
     await expect(menu.getByRole("link", { name: "Pedidos", exact: true })).toHaveAttribute("aria-current", "page");
     await menu.getByText("Financeiro", { exact: true }).click();
     await expect(menu.getByRole("link", { name: "Contas a pagar", exact: true })).toBeVisible();
@@ -18,6 +18,8 @@ test("menu: grupos, página atual, conta e teclado nos cinco tamanhos", async ({
     await summary.focus();
     await page.keyboard.press("Enter");
     await expect(menu.getByRole("link", { name: "Contas a pagar", exact: true })).toBeHidden();
+    await menu.locator("summary").filter({ hasText: "Fiscal" }).click();
+    await expect(menu.getByRole("link", { name: "Fiscal", exact: true })).toBeVisible();
     const frame = page.locator("#menu-principal");
     expect(await frame.evaluate((el) => el.scrollHeight - el.clientHeight)).toBeLessThanOrEqual(1);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);

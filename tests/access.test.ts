@@ -41,7 +41,7 @@ test("decisão: com sessão do SSO e e-mail fora do diretório fica sem acesso",
   }
 });
 
-test("decisão: cada um dos quatro perfis em cada um dos 14 itens", () => {
+test("decisão: cada um dos quatro perfis em todos os itens", () => {
   for (const role of ROLES) {
     for (const item of MENU_ITEMS) {
       const decision = decideAccess({ authenticated: true, user: user(role), displayName: "Nome" }, item.key);

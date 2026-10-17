@@ -96,7 +96,7 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
                     <Pill tone={STAGES[order.stage].tone}>{STAGES[order.stage].label}</Pill>
                   </div>
                   <p className="mt-2 text-sm text-slate-700">{orderDetail(order)}</p>
-                  {order.jobError && <p className="mt-1 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-900">{order.jobError}</p>}
+                  {order.jobError && <p className="mt-1 rounded border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-900">{order.jobError}</p>}
                   <Link href={`/pedidos/${order.orderNumber}?ver=documentos#nota-fiscal`} className={`${SECONDARY} mt-2`}>Abrir nota no pedido</Link>
                 </li>
               ))}
@@ -154,7 +154,7 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
                     </div>
                     <Pill tone={item.status === "revisao_manual" ? "bad" : "neutral"}>{item.status === "revisao_manual" ? "Revisão manual" : item.status === "processando" ? "Processando" : "Na fila"}</Pill>
                   </div>
-                  {item.lastError && <p className="mt-2 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900">{item.lastError}</p>}
+                  {item.lastError && <p className="mt-2 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-900">{item.lastError}</p>}
                   {item.status === "revisao_manual" && <p className="mt-2 text-sm text-slate-700">Confira a faixa na SEFAZ. Uma inutilização de resultado incerto não é retransmitida automaticamente.</p>}
                 </li>
               ) : (
