@@ -46,7 +46,10 @@ test("condição do pedido: não altera dinheiro nem revisão comercial; vazio v
 test("documento emitido: contrato já enviado bloqueia alterações sem modificar o PDF guardado", { skip }, async () => {
   const pdf = Buffer.alloc(120, 1);
   const contract = await createContract({ orderId, sequence: 1, title: "Contrato de teste", body: "Texto preservado", pdf, sha256: "a".repeat(64), tokenHash: "b".repeat(64), expiresAt: new Date("2099-01-01"), recipientName: "Cliente de teste", recipientEmail: "cliente@example.com", createdBy: actor }, db.pool);
-  await assert.rejects(() => saveProposalDetails({ actor, orderId, revision: "2", fields: ["installation"], values: { installation: "Inclusa" } }, db.pool), /contrato\/nota emitidos/);
-  assert.deepEqual((await loadProposalDetails(db.pool, orderId)).details, {});
+  const frozen = await loadProposalDetails(db.pool, orderId);
+  await assert.rejects(() => saveProposalDetails({ actor, orderId, revision: frozen.revision, fields: ["installation"], values: { installation: "Inclusa" } }, db.pool), /contrato\/nota emitidos/);
+  assert.equal(frozen.details.warranty,"Termo de garantia fictício");
+  await saveProposalDetails({actor,revision:(await loadProposalDetails(db.pool)).revision,fields:["warranty","installation"],values:{warranty:"Novo padrão",installation:"Novo serviço"}},db.pool);
+  assert.deepEqual((await loadProposalDetails(db.pool, orderId)).details,frozen.details);
   assert.deepEqual((await db.pool.query("SELECT pdf FROM order_contracts WHERE id = $1", [contract.id])).rows[0].pdf, pdf);
 });

@@ -18,7 +18,7 @@ export async function loadQuoteContext(order: Order, now: Date, conn: Queryable)
       FROM receivables r WHERE r.order_id = $1 AND r.kind = 'entrada' AND r.status <> 'cancelada'`, [order.id]),
     conn.query("SELECT status, expires_at, signed_at, recipient_email FROM order_contracts WHERE order_id = $1 AND status IN ('enviado', 'assinado') ORDER BY sequence DESC LIMIT 1", [order.id]),
   ]);
-  const method = await conn.query("SELECT nfe_code FROM payment_methods WHERE label = $1", [order.downPaymentMethod]);
+  const method = await conn.query("SELECT nfe_code,company_pix,on_delivery FROM payment_methods WHERE label = $1", [order.downPaymentMethod]);
   const contract = contracts.rows[0];
   const acceptance = !contract ? null : contract.status === "assinado"
     ? `Contrato assinado eletronicamente em ${showDateTime(new Date(contract.signed_at))}. Comprovantes e documento assinado disponíveis no sistema.`
@@ -28,5 +28,5 @@ export async function loadQuoteContext(order: Order, now: Date, conn: Queryable)
   return { issuer, companyDetails: company.details, orderDetails: details.details, delivery, transport, pix,
     downPaymentOpen: payment.rows[0] ? Math.max(0, Number(payment.rows[0].open)) : null,
     // A payment link may also be coded 17: it must keep its provider's payment flow.
-    downPaymentIsPix: usesCompanyPix(order.downPaymentMethod, method.rows[0]?.nfe_code ?? null), acceptance };
+    downPaymentIsPix: usesCompanyPix(method.rows[0]?.company_pix===true && method.rows[0]?.on_delivery!==true, method.rows[0]?.nfe_code ?? null), acceptance };
 }

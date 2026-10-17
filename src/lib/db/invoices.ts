@@ -1,4 +1,5 @@
 import type { Queryable } from "@/lib/db/pool";
+import { PROPOSAL_SNAPSHOT_SQL } from "@/lib/db/proposal-details";
 
 export type InvoiceStatus = "assinada" | "autorizada" | "rejeitada" | "denegada" | "cancelada";
 type Environment = "homologacao" | "producao";
@@ -59,16 +60,21 @@ export class InvoicePreparationChanged extends Error {}
 export async function saveSignedInvoice(invoice: SignedInvoice, conn: Queryable): Promise<Invoice> {
   const { rows } = await conn.query(
     `WITH preparation AS (
-       UPDATE orders SET nfe_rules_revision = nfe_rules_revision + 1
-        WHERE id = $1 AND status <> 'cancelado' AND ($9::integer IS NULL OR nfe_rules_revision = $9) RETURNING id
-     )
+       SELECT id FROM orders
+        WHERE id = $1 AND status <> 'cancelado' AND ($9::integer IS NULL OR nfe_rules_revision = $9) FOR UPDATE
+     ), saved AS (
      INSERT INTO fiscal_invoices (order_id, environment, series, number, access_key, status, signed_xml, issued_at, created_by)
      SELECT id, $2, $3, $4, $5, 'assinada', $6, $7, $8 FROM preparation
      ON CONFLICT (environment, series, number) DO UPDATE
         SET access_key = EXCLUDED.access_key, status = 'assinada', signed_xml = EXCLUDED.signed_xml, issued_at = EXCLUDED.issued_at,
             status_code = NULL, status_reason = NULL, updated_at = now(), created_by = EXCLUDED.created_by
       WHERE fiscal_invoices.order_id = EXCLUDED.order_id AND fiscal_invoices.status IN ('rejeitada', 'assinada')
-     RETURNING ${COLUMNS}`,
+     RETURNING ${COLUMNS}
+     ), bumped AS (
+       UPDATE orders SET nfe_rules_revision=nfe_rules_revision+1,
+           proposal_details=${PROPOSAL_SNAPSHOT_SQL}, proposal_details_revision=proposal_details_revision+1
+         WHERE id=$1 AND EXISTS (SELECT 1 FROM saved) RETURNING id
+     ) SELECT saved.* FROM saved CROSS JOIN bumped`,
     [invoice.orderId, invoice.environment, invoice.series, invoice.number, invoice.accessKey, invoice.signedXml, invoice.issuedAt, invoice.createdBy, invoice.rulesRevision ?? null],
   );
   if (!rows[0]) {

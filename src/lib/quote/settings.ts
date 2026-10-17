@@ -59,7 +59,7 @@ export function checkedProposalDetails(input: ProposalDetails): ProposalDetails 
     if (key === "phone" && (!/^[+()0-9 .-]+$/.test(value) || !/^\d{10,15}$/.test(value.replace(/\D/g, "")))) throw new ProposalSettingsError("Telefone comercial: informe DDD e número.");
     if (key === "website") {
       let url: URL;
-      try { url = new URL(value.startsWith("http") ? value : `https://${value}`); } catch { throw new ProposalSettingsError("Confira o site da empresa."); }
+      try { url = new URL(/^[a-z][a-z0-9+.-]*:/i.test(value) ? value : `https://${value}`); } catch { throw new ProposalSettingsError("Confira o site da empresa."); }
       if (!["http:", "https:"].includes(url.protocol) || url.username || url.password || !url.hostname.includes(".")) throw new ProposalSettingsError("Informe um site http ou https.");
     }
     if (key === "freightMode" && !["CIF", "FOB", "retirada"].includes(value)) throw new ProposalSettingsError("Escolha a modalidade de frete da lista.");

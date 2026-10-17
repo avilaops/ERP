@@ -249,7 +249,7 @@ export async function savePaymentCodeAction(_previous: ActionState, formData: Fo
   const conn = tenantDb(session.tenant.slug);
   const text = reader(formData);
   try {
-    await savePaymentCode(whole(text("id")), text("code") || null, session.email, conn);
+    await savePaymentCode(whole(text("id")), text("code") || null, session.email, conn, text("companyPix")==="on");
   } catch (error) {
     return problem("gravar a forma de pagamento da nota", error);
   }

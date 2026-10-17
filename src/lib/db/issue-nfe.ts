@@ -5,6 +5,7 @@ import type { Invoice } from "@/lib/db/invoices";
 import { issueInstant, previewOrderNfe } from "@/lib/db/order-nfe";
 import { getOrder } from "@/lib/db/orders";
 import type { Queryable } from "@/lib/db/pool";
+import { withQueryableConnection } from "@/lib/db/pool";
 import type { Send } from "@/lib/fiscal/channel";
 import type { LayoutCheck } from "@/lib/fiscal/precheck";
 import { openCertificate } from "@/lib/fiscal/certificate";
@@ -37,6 +38,15 @@ export type IssueResult = { invoice: Invoice; message: string };
  * before any number is taken: one that fails is not numbered nor sent.
  */
 export async function issueOrderNfe(orderNumber: string, who: string, now: Date, vault: Buffer, send: Send, conn: Queryable, check: LayoutCheck | null = null): Promise<IssueResult> {
+  return withQueryableConnection(conn, held => issueOnConnection(orderNumber, who, now, vault, send, held, check));
+}
+
+async function issueOnConnection(orderNumber: string, who: string, now: Date, vault: Buffer, send: Send, conn: Queryable, check: LayoutCheck | null): Promise<IssueResult> {
+  const prepared = await (async () => {
+  await conn.query("BEGIN");
+  try {
+  // Serialize preparation of this order and roll back its number on any refusal.
+  await conn.query("SELECT id FROM orders WHERE number=$1 FOR UPDATE", [orderNumber]);
   const preview = await previewOrderNfe(orderNumber, now, conn);
   if (!preview) throw new IssueError("Pedido não encontrado ou ainda não fechado: só pedido fechado tem nota.");
   if (preview.problems.length > 0) throw new IssueError(`A nota ainda não pode ser emitida. Falta: ${preview.problems.join(" ")}`);
@@ -69,7 +79,8 @@ export async function issueOrderNfe(orderNumber: string, who: string, now: Date,
     }
     if (known.status === "autorizada") {
       const saved = await recordVerdict(waiting.id, { status: "autorizada", code: known.code, reason: known.reason, protocol: known.protocol, authorizedXml: nfeProcXml(stored, known.protocolXml) }, conn);
-      return { invoice: saved, message: `A nota ${saved.number} já estava autorizada na SEFAZ. Protocolo ${known.protocol}.` };
+      await conn.query("COMMIT");
+      return { completed: { invoice: saved, message: `A nota ${saved.number} já estava autorizada na SEFAZ. Protocolo ${known.protocol}.` } };
     }
     if (known.status !== "nao-consta") {
       throw new IssueError(`A SEFAZ respondeu sobre a nota ${waiting.number} (${known.code}): ${known.reason}. Nada foi reenviado; confira com o contador.`);
@@ -117,6 +128,16 @@ export async function issueOrderNfe(orderNumber: string, who: string, now: Date,
     }
   }
 
+  await conn.query("COMMIT");
+  return { invoice, signedXml, certificate, url, environment, issuerUf:preview.issuerUf };
+  } catch (error) {
+    await conn.query("ROLLBACK");
+    throw error;
+  }
+  })();
+  if (prepared.completed) return prepared.completed;
+  const { invoice, signedXml, certificate, url, environment, issuerUf } = prepared;
+
   let answer: string;
   try {
     answer = await send(url, AUTHORIZATION_ACTION, authorizationEnvelope(signedXml, String(invoice.id)), { pfx: certificate.pfx, passphrase: certificate.password });
@@ -148,7 +169,7 @@ export async function issueOrderNfe(orderNumber: string, who: string, now: Date,
       // authorised in a call whose answer never arrived: the protocol is fetched, and nothing is issued twice.
       let known;
       try {
-        known = parseConsult(await send(consultUrl(preview.issuerUf, environment), CONSULT_ACTION, consultEnvelope(invoice.accessKey, environment), { pfx: certificate.pfx, passphrase: certificate.password }), invoice.accessKey);
+        known = parseConsult(await send(consultUrl(issuerUf, environment), CONSULT_ACTION, consultEnvelope(invoice.accessKey, environment), { pfx: certificate.pfx, passphrase: certificate.password }), invoice.accessKey);
       } catch (error) {
         if (error instanceof SefazError) throw new IssueError(`A SEFAZ diz que a nota ${invoice.number} já existe (204) e a consulta dela falhou: ${error.message} A nota continua aguardando resposta: emita de novo para consultar outra vez.`);
         throw error;

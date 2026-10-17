@@ -28,7 +28,7 @@ export type QuoteContext = {
 export type QuoteMeasures = { weightKg?: number | null; ncm?: string | null };
 
 /** PIX through a payment link keeps the provider's flow instead of a direct company QR. */
-export const usesCompanyPix = (method: string | null, code: string | null): boolean => code === "17" && !/\blink\b/i.test(method ?? "");
+export const usesCompanyPix = (companyPix: boolean, code: string | null): boolean => companyPix && code === "17";
 
 /** Only registered data and authored terms belong in the customer document. */
 export function completeQuote(document: QuoteDocument, order: Pick<Order, "number" | "status" | "customer" | "items" | "downPayment" | "customInstallments" | "installmentIntervalDays">, context: QuoteContext, products: Map<number, QuoteMeasures>): QuoteDocument {

@@ -1,8 +1,11 @@
 import type { Queryable } from "@/lib/db/pool";
-import { checkedProposalDetails, closingProposalProblems, ProposalSettingsError } from "@/lib/quote/settings";
+import { checkedProposalDetails, closingProposalProblems, PROPOSAL_FIELDS, ProposalSettingsError } from "@/lib/quote/settings";
 import type { ProposalDetails, ProposalField } from "@/lib/quote/settings";
 
 export type StoredProposalDetails = { details: ProposalDetails; revision: string };
+
+/** Explicit nulls freeze absent terms too, so later defaults cannot fill old documents. */
+export const PROPOSAL_SNAPSHOT_SQL = `'${JSON.stringify(Object.fromEntries(Object.keys(PROPOSAL_FIELDS).map(key => [key, null])))}'::jsonb || (SELECT proposal_details FROM company_settings) || orders.proposal_details`;
 
 /** Read terms and both revisions in one snapshot for the closing's conditional write. */
 export async function loadClosingProposal(orderId: number, conn: Queryable): Promise<{ missing: string[]; orderRevision: string; companyRevision: string }> {

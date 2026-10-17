@@ -123,8 +123,8 @@ export const QUERY_TOOLS: Tool[] = [
     description: "Diretoria: pagina pedidos e confere política atual (desconto, entrada, frete e faixa), sem divulgar custos. Prazo acima do limite não é inferido: o ERP não possui limite global de prazo de fabricação.",
     inputSchema: object({ pagina: numeric("Página de pedidos analisados, até 25 por página") }),
     async run(_session, conn, args) {
-      const page = pageOf(args), orders = await listOrders({ sellerEmail: null }, conn);
-      const selected = orders.slice((page - 1) * 25, page * 25);
+      const page = pageOf(args), orders = await listOrders({ sellerEmail: null }, conn, { limit:26, offset:(page-1)*25 });
+      const selected = orders.slice(0, 25);
       const result = [];
       for (const summary of selected) {
         const order = await getOrder(summary.number, { sellerEmail: null }, conn);
@@ -132,7 +132,7 @@ export const QUERY_TOOLS: Tool[] = [
         const standing = await loadOrderStanding(order, conn);
         if (standing.policy?.needsApproval) result.push({ pedido: order.number, situacao: order.status, vendedor: order.sellerName, desconto: order.discount, motivos: standing.policy.reasons });
       }
-      return { pagina: page, pedidos_analisados: selected.length, tem_mais: orders.length > page * 25, criterio: "Política atual aplicada aos dados e à tabela do pedido; não desfaz aprovação já registrada. Sem limite global de prazo para avaliar atraso comercial.", pedidos: result };
+      return { pagina: page, pedidos_analisados: selected.length, tem_mais: orders.length > 25, criterio: "Política atual aplicada aos dados e à tabela do pedido; não desfaz aprovação já registrada. Sem limite global de prazo para avaliar atraso comercial.", pedidos: result };
     },
   },
   {
