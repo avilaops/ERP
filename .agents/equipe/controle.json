@@ -18,8 +18,8 @@
       "owner": null,
       "status": "em-andamento",
       "acceptance": ["Fila isolada por empresa com lease e idempotência por pedido", "Falha após transmissão consulta antes de reenviar o XML original", "Retentativas limitadas não repetem rejeição definitiva", "Worker, testes e publicação registrados separadamente"],
-      "evidence": ["https://linear.app/avilaops/issue/AVL-75", "https://github.com/avilaops/ERP/pull/21", "Commit 5dad505: migration 0071, fila por tenant e worker no background", "Typecheck e lint aprovados; teste da rota de emissão passou; UI HXKP bloqueou regras fiscais ausentes sem transmitir"],
-      "next": "Cobrir a fila com testes de banco, publicar somente após revisão e completar eventos fiscais/e-mail em trabalhos persistentes."
+      "evidence": ["https://linear.app/avilaops/issue/AVL-75", "https://github.com/avilaops/ERP/pull/21", "Commit 5dad505: migration 0071, fila por tenant e worker no background", "Commit 65f75c8: migration 0072 inclui CC-e e cancelamento na fila; texto validado antes da gravação e e-mail automático preservado", "Typecheck, lint e tests/nfe-events.test.ts aprovados; UI HXKP bloqueou regras fiscais ausentes sem transmitir e não teve erros de console"],
+      "next": "Executar os testes de banco com ERP_TEST_DATABASE_URL, publicar somente após revisão e validar a fila em homologação sem emissão real."
     },
     {
       "id": "T-20261017-fluxo-fiscal-eventos",
