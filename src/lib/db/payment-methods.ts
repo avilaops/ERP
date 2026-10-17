@@ -1,5 +1,6 @@
 import { pgErrorCode } from "@/lib/db/pool";
 import type { Queryable } from "@/lib/db/pool";
+import { standardPaymentCode } from "@/lib/fiscal/setup";
 
 /** A refusal the user can act on. The message goes to the screen as it is. */
 export class PaymentMethodError extends Error {}
@@ -44,10 +45,10 @@ export async function createPaymentMethod(label: string, who: string, conn: Quer
   check(label, 0, who);
   try {
     const { rows } = await conn.query(
-      `INSERT INTO payment_methods (label, position, updated_by)
-       SELECT $1, COALESCE(max(position), 0) + 1, $2 FROM payment_methods
+      `INSERT INTO payment_methods (label, position, updated_by, nfe_code)
+       SELECT $1, COALESCE(max(position), 0) + 1, $2, $3 FROM payment_methods
        RETURNING id, label, position, active, on_delivery`,
-      [label.trim(), who],
+      [label.trim(), who, standardPaymentCode(label)],
     );
     return method(rows[0]);
   } catch (error) {
@@ -69,9 +70,10 @@ export async function updatePaymentMethod(
   check(change.label, change.position, who);
   try {
     const { rows } = await conn.query(
-      `UPDATE payment_methods SET label = $2, position = $3, active = $4, on_delivery = COALESCE($6, on_delivery), updated_at = now(), updated_by = $5
+      `UPDATE payment_methods SET nfe_code = CASE WHEN label = $2 THEN nfe_code ELSE $7 END,
+          label = $2, position = $3, active = $4, on_delivery = COALESCE($6, on_delivery), updated_at = now(), updated_by = $5
         WHERE id = $1 RETURNING id, label, position, active, on_delivery`,
-      [id, change.label.trim(), change.position, change.active, who, change.onDelivery ?? null],
+      [id, change.label.trim(), change.position, change.active, who, change.onDelivery ?? null, standardPaymentCode(change.label)],
     );
     if (rows.length === 0) throw new PaymentMethodError("Forma de pagamento não encontrada.");
     return method(rows[0]);

@@ -30,6 +30,8 @@ test("linhas por tela: o que o navegador mediu fica entre o mínimo e o máximo;
   assert.equal(rowsPerPage("12"), 12);
   assert.equal(rowsPerPage("1"), MIN_ROWS);
   assert.equal(rowsPerPage("99"), MAX_ROWS);
+  assert.equal(rowsPerPage("1", 1), 1);
+  assert.equal(rowsPerPage("99", 1), MAX_ROWS);
   for (const junk of ["", "abc", "-5", "1e3", "12; path=/"]) assert.equal(rowsPerPage(junk), DEFAULT_ROWS, junk);
 });
 

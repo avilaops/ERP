@@ -74,7 +74,7 @@ export function missingFiscalData(settings: FiscalSettings): string[] {
 }
 
 /** Writes the fiscal data. Blank fields are allowed, wrong ones are not. */
-export async function saveFiscalSettings(input: FiscalSettings, updatedBy: string, conn: Queryable): Promise<void> {
+export async function saveFiscalSettings(input: FiscalSettings, updatedBy: string, conn: Queryable, completeBlanksOnly = false): Promise<void> {
   if (updatedBy.trim() === "") throw new Error("Falta dizer quem está alterando os dados fiscais.");
   // Letters are part of a CNPJ since July 2026 (NT 2026.004): only the punctuation is dropped.
   const cnpj = normalizeDocument(input.cnpj ?? "") || null;
@@ -96,13 +96,26 @@ export async function saveFiscalSettings(input: FiscalSettings, updatedBy: strin
 
   const { rows } = await conn.query(
     `UPDATE company_settings
-        SET legal_name = $1, cnpj = $2, state_registration = $3, tax_regime = $4, street = $5, street_number = $6, district = $7,
-            city = $8, city_code = $9, uf = $10, cep = $11, nfe_series = $12, nfe_next_number = $13, nfe_environment = $14,
+        SET legal_name = CASE WHEN $16 THEN COALESCE(legal_name, $1) ELSE $1 END,
+            cnpj = CASE WHEN $16 THEN COALESCE(cnpj, $2) ELSE $2 END,
+            state_registration = CASE WHEN $16 THEN COALESCE(state_registration, $3) ELSE $3 END,
+            tax_regime = CASE WHEN $16 THEN COALESCE(tax_regime, $4) ELSE $4 END,
+            street = CASE WHEN $16 THEN COALESCE(street, $5) ELSE $5 END,
+            street_number = CASE WHEN $16 THEN COALESCE(street_number, $6) ELSE $6 END,
+            district = CASE WHEN $16 THEN COALESCE(district, $7) ELSE $7 END,
+            city = CASE WHEN $16 THEN COALESCE(city, $8) ELSE $8 END,
+            city_code = CASE WHEN $16 THEN COALESCE(city_code, $9) ELSE $9 END,
+            uf = CASE WHEN $16 THEN COALESCE(uf, $10) ELSE $10 END,
+            cep = CASE WHEN $16 THEN COALESCE(cep, $11) ELSE $11 END,
+            nfe_series = CASE WHEN $16 THEN nfe_series ELSE $12 END,
+            nfe_next_number = CASE WHEN $16 THEN nfe_next_number ELSE $13 END,
+            nfe_environment = CASE WHEN $16 THEN nfe_environment ELSE $14 END,
             updated_at = now(), updated_by = $15
+      WHERE NOT $16 OR cnpj IS NULL OR cnpj = $2
       RETURNING id`,
     [
       blank(input.legalName), cnpj, registration, input.taxRegime, blank(input.street), blank(input.streetNumber), blank(input.district),
-      blank(input.city), cityCode, uf, cep, input.series, input.nextNumber, input.environment, updatedBy,
+      blank(input.city), cityCode, uf, cep, input.series, input.nextNumber, input.environment, updatedBy, completeBlanksOnly,
     ],
   );
   if (rows.length === 0) throw new Error(NO_ROW);

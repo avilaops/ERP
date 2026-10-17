@@ -363,7 +363,9 @@ type ItemFigures = { product: number; contributionBase: number; ipi: number; icm
 function figuresOf(item: NfeItem, input: NfeInput): ItemFigures {
   const { rules, issuer, recipient } = input;
   const product = roundCents(item.quantity * item.unitPrice);
-  const ipi = rules.ipiCst === null ? 0 : roundCents(product * item.ipiRate);
+    // Keep the IPI agreed in the order visible while its CST is still missing.
+    // nfeProblems blocks XML generation until that classification is supplied.
+    const ipi = roundCents(product * item.ipiRate);
   const taxed = issuer.taxRegime !== 1 && rules.icmsCode === "00";
   const icmsBase = taxed ? roundCents(product + (rules.finalConsumer && rules.ipiInIcmsBase ? ipi : 0)) : 0;
   const interstate = issuer.uf !== destinationUf(input);
