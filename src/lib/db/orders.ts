@@ -6,7 +6,7 @@ import type { Customer } from "@/lib/db/customers";
 import { pgErrorCode } from "@/lib/db/pool";
 import type { Queryable } from "@/lib/db/pool";
 import { loadPublishedSnapshot, loadPublishedTable } from "@/lib/db/price-table";
-import { loadClosingProposal } from "@/lib/db/proposal-details";
+import { loadClosingProposal, EMPTY_PROPOSAL_DETAILS } from "@/lib/db/proposal-details";
 import { isoDate } from "@/lib/format";
 import { isPlates } from "@/lib/plates";
 import type { Plates } from "@/lib/plates";
@@ -652,7 +652,9 @@ export async function closeOrder(
   const { rows } = await conn.query(
     `WITH closed AS (
        UPDATE orders
-          SET status = $2, closed_at = CASE WHEN $2 = 'fechado' THEN now() END, updated_at = now(), updated_by = $3
+          SET status = $2, closed_at = CASE WHEN $2 = 'fechado' THEN now() END, updated_at = now(), updated_by = $3,
+              proposal_details = CASE WHEN $2 = 'fechado' THEN ($17::jsonb || (SELECT proposal_details FROM company_settings) || proposal_details) ELSE proposal_details END,
+              proposal_details_revision = proposal_details_revision + CASE WHEN $2 = 'fechado' THEN 1 ELSE 0 END
         WHERE number = $1 AND status = 'em_negociacao' AND updated_at::text = $4
           AND ($5::text IS NULL OR seller_email = $5)
           AND proposal_details_revision = $15::bigint
@@ -700,6 +702,7 @@ export async function closeOrder(
       selfApproved,
       proposal.orderRevision,
       proposal.companyRevision,
+      JSON.stringify(EMPTY_PROPOSAL_DETAILS),
     ],
   );
   if (rows.length === 0) throw new OrderError(CHANGED);
@@ -846,7 +849,7 @@ export type OrderSummary = {
 };
 
 /** Every order the scope reaches, newest change first, each with the table price of its own version. */
-export async function listOrders(scope: OrderScope, conn: Queryable): Promise<OrderSummary[]> {
+export async function listOrders(scope: OrderScope, conn: Queryable, pagination?: { limit: number; offset: number }): Promise<OrderSummary[]> {
   const { rows } = await conn.query(
     `SELECT o.number, o.status, o.seller_email, o.seller_name, c.name AS customer_name, c.trade_name,
             c.document AS customer_document, o.delivery_uf, o.taxpayer, o.discount, v.ipi, o.updated_at, o.closed_at,
@@ -858,8 +861,8 @@ export async function listOrders(scope: OrderScope, conn: Queryable): Promise<Or
        JOIN price_table_versions v ON v.version = o.price_table_version
        LEFT JOIN customers c ON c.id = o.customer_id
       WHERE ($1::text IS NULL OR o.seller_email = $1)
-      ORDER BY o.updated_at DESC, o.id DESC`,
-    [scope.sellerEmail],
+      ORDER BY o.updated_at DESC, o.id DESC LIMIT $2::integer OFFSET $3::integer`,
+    [scope.sellerEmail, pagination ? Math.max(1, Math.min(100, Math.trunc(pagination.limit))) : null, pagination ? Math.max(0, Math.trunc(pagination.offset)) : 0],
   );
   return rows.map((row) => ({
     number: String(row.number),

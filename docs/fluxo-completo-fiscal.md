@@ -6,6 +6,13 @@ Retomada de 17/10/2026: [AVL-21](https://linear.app/avilaops/issue/AVL-21),
 
 ## Roteiro pela interface
 
+Integração do PR 20: o envio automático recebe o ID do evento registrado e
+deduplica/anexa essa mesma CC-e, mesmo quando outra sequência é gravada antes
+do envio. O reenvio manual continua podendo selecionar a última carta.
+A migration `0070_email_da_carta_de_correcao.sql`, confirmada em produção,
+mantém seu nome; a nova migration de PIX/termos é `0071_pix_direto_e_termos_preservados.sql`.
+Esses ajustes de integração ainda dependem de implantação própria.
+
 1. Cliente e atendimento: conferir documento, endereço, contato e e-mail de quem assina.
 2. Orçamento: equipamentos, opções, quantidades, entrega, pagamento e PDF.
 3. Pedido: garantia, montagem, frete e demais termos; solicitar aprovação e fechar.

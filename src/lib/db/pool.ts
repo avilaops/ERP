@@ -49,6 +49,13 @@ export async function withTenantConnection<T>(slug: string, fn: (conn: Queryable
   }
 }
 
+/** Pin a pool for multi-statement work; an already held client stays held by its caller. */
+export async function withQueryableConnection<T>(conn: Queryable, fn: (held: Queryable) => Promise<T>): Promise<T> {
+  if (!(conn instanceof pg.Pool)) return fn(conn);
+  const client = await conn.connect();
+  try { return await fn(client); } finally { client.release(); }
+}
+
 /** Closes every pool. For scripts and tests; the server keeps them open. */
 export async function closeTenantPools(): Promise<void> {
   const pools = [...(globalThis.__ERP_DB_POOLS__?.values() ?? [])];

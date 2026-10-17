@@ -1224,7 +1224,7 @@ test("nota fiscal de conferência: pedido fechado, com os cadastros preenchidos,
   assert.equal(customized!.input.rules.pisRate, 0.012);
   assert.match(buildNfeXml(customized!.input).xml, /<natOp>Venda específica desta nota<\/natOp>/);
   assert.deepEqual(await loadFiscalRules(1, db.pool), defaults);
-  const other = await db.pool.query("SELECT id FROM orders WHERE id <> $1 LIMIT 1", [own.id]);
+  const other = await db.pool.query("SELECT id FROM orders WHERE id <> $1 AND status <> 'cancelado' LIMIT 1", [own.id]);
   assert.deepEqual((await loadOrderFiscalRules(Number(other.rows[0].id), 1, db.pool)).rules, defaults);
   await saveFiscalRules(1, { ...defaults, additionalInfo: "Padrão atualizado pela contabilidade" }, DIRECTOR, db.pool);
   assert.equal((await loadOrderFiscalRules(own.id, 1, db.pool)).rules.additionalInfo, "Padrão atualizado pela contabilidade");
@@ -1248,6 +1248,11 @@ test("nota fiscal de conferência: pedido fechado, com os cadastros preenchidos,
   assert.deepEqual((await loadOrderFiscalRules(own.id, 1, db.pool)).rules, defaults);
   assert.equal((await loadOrderFiscalRules(own.id, 1, db.pool)).customized, false);
   const racing = await loadOrderFiscalRules(own.id, 1, db.pool);
+  const occupied=await saveSignedInvoice({orderId:Number(other.rows[0].id),environment:"homologacao",series:1,number:998,accessKey:"3".repeat(44),signedXml:"XML de teste",issuedAt:now.toISOString(),createdBy:DIRECTOR},db.pool);
+  try {
+    await assert.rejects(()=>saveSignedInvoice({orderId:own.id,environment:"homologacao",series:1,number:998,accessKey:"4".repeat(44),signedXml:"Colisão",issuedAt:now.toISOString(),createdBy:DIRECTOR,rulesRevision:racing.revision},db.pool), /já pertence a outra nota/);
+    assert.equal((await loadOrderFiscalRules(own.id,1,db.pool)).revision,racing.revision);
+  } finally {await db.pool.query("DELETE FROM fiscal_invoices WHERE id=$1",[occupied.id]);}
   const editOrSign = await Promise.allSettled([
     saveOrderFiscalRules(own.id, 1, racing.revision, { additionalInfo: "Edição durante assinatura" }, DIRECTOR, db.pool),
     saveSignedInvoice({ orderId: own.id, environment: "homologacao", series: 1, number: 999, accessKey: "2".repeat(44), signedXml: "XML fictício do teste de concorrência", issuedAt: now.toISOString(), createdBy: DIRECTOR, rulesRevision: racing.revision }, db.pool),
@@ -1333,6 +1338,18 @@ test("emissão: guarda a nota assinada antes de enviar; rejeitada reemite com o 
   assert.equal((await db.pool.query("SELECT nfe_next_number FROM company_settings")).rows[0].nfe_next_number, 42);
 
   // 1. A rede cai: a nota fica guardada, aguardando resposta, com o número 42.
+  const held = await db.pool.connect();
+  try {
+    await assert.rejects(() => issueOrderNfe(number, who, now, vault, never, {
+      async query(sql,values) {
+        const result=await held.query(sql,values);
+        if(sql.startsWith("UPDATE company_settings SET nfe_next_number"))throw new Error("Falha após reservar número");
+        return result;
+      },
+    }), /Falha após reservar número/);
+  } finally {held.release();}
+  assert.equal((await db.pool.query("SELECT nfe_next_number FROM company_settings")).rows[0].nfe_next_number,42);
+  assert.deepEqual(await listOrderInvoices(orderId,db.pool),[]);
   await assert.rejects(
     () => issueOrderNfe(number, who, now, vault, async (_url, _action, envelope) => { sent.push(envelope); throw new SefazError("A SEFAZ não respondeu a tempo."); }, db.pool),
     (error: Error) => error instanceof IssueError && /aguardando resposta/.test(error.message),
@@ -1484,6 +1501,13 @@ test("nota autorizada: carta de correção numera 1, 2…; cancelamento grava o 
   const archived = await db.pool.query("SELECT signed_xml FROM fiscal_invoice_events WHERE id = $1", [correctionMail.eventId]);
   assert.match(archived.rows[0].signed_xml, /<procEventoNFe[\s\S]*<retEvento[\s\S]*<nProt>135260000077777<\/nProt>/);
   assert.ok(outbox[2].message.includes(Buffer.from(archived.rows[0].signed_xml).toString("base64").slice(0, 60)));
+  const firstEvent=(await listOrderInvoiceEvents(orderId,db.pool)).find(event=>event.kind==="correcao" && event.sequence===1)!;
+  const bound:string[]=[];
+  await sendInvoiceMail({...request,kind:"correcao",eventId:firstEvent.id,send:async(_config,_envelope,message)=>{bound.push(message);}},db.pool);
+  assert.match(bound[0],/filename="CCe-1-NFe\d{44}\.xml"/);
+  assert.doesNotMatch(bound[0],/filename="CCe-2-NFe/);
+  assert.equal((await listOrderInvoiceMails(orderId,db.pool))[0].eventId,firstEvent.id);
+  await assert.rejects(()=>sendInvoiceMail({...request,kind:"correcao",eventId:999999},db.pool),/evento fiscal ainda não está registrado/);
 
   assert.match((await registerOrderNfeEvent(number, "cancelamento", "Cliente desistiu da compra antes da saída.", who, now, vault, accept, db.pool)).message, /cancelada/);
   // Cancelada: o e-mail leva o XML da nota e o do cancelamento, sem DANFE.

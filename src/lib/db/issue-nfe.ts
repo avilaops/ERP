@@ -5,6 +5,7 @@ import type { Invoice } from "@/lib/db/invoices";
 import { issueInstant, previewOrderNfe } from "@/lib/db/order-nfe";
 import { getOrder } from "@/lib/db/orders";
 import type { Queryable } from "@/lib/db/pool";
+import { withQueryableConnection } from "@/lib/db/pool";
 import type { Send } from "@/lib/fiscal/channel";
 import type { LayoutCheck } from "@/lib/fiscal/precheck";
 import { openCertificate } from "@/lib/fiscal/certificate";
@@ -37,85 +38,107 @@ export type IssueResult = { invoice: Invoice; message: string };
  * before any number is taken: one that fails is not numbered nor sent.
  */
 export async function issueOrderNfe(orderNumber: string, who: string, now: Date, vault: Buffer, send: Send, conn: Queryable, check: LayoutCheck | null = null): Promise<IssueResult> {
-  const preview = await previewOrderNfe(orderNumber, now, conn);
-  if (!preview) throw new IssueError("Pedido não encontrado ou ainda não fechado: só pedido fechado tem nota.");
-  if (preview.problems.length > 0) throw new IssueError(`A nota ainda não pode ser emitida. Falta: ${preview.problems.join(" ")}`);
-  const { environment, series } = preview.input;
+  return withQueryableConnection(conn, held => issueOnConnection(orderNumber, who, now, vault, send, held, check));
+}
 
-  const sealed = await loadSealedCertificate(conn);
-  if (!sealed) throw new IssueError("Envie o certificado digital A1 em Parâmetros → Fiscal antes de emitir.");
-  if (sealed.validUntil.getTime() <= now.getTime()) throw new IssueError("O certificado digital venceu. Envie o certificado em vigor em Parâmetros → Fiscal.");
-  const certificate = openCertificate(sealed, vault);
-  const url = authorizationUrl(preview.issuerUf, environment);
+async function prepareOrderInvoice(orderNumber: string, who: string, now: Date, vault: Buffer, send: Send, conn: Queryable, check: LayoutCheck | null) {
+  await conn.query("BEGIN");
+  try {
+    // Serialize preparation of this order and roll back its number on any refusal.
+    await conn.query("SELECT id FROM orders WHERE number=$1 FOR UPDATE", [orderNumber]);
+    const preview = await previewOrderNfe(orderNumber, now, conn);
+    if (!preview) throw new IssueError("Pedido não encontrado ou ainda não fechado: só pedido fechado tem nota.");
+    if (preview.problems.length > 0) throw new IssueError(`A nota ainda não pode ser emitida. Falta: ${preview.problems.join(" ")}`);
+    const { environment, series } = preview.input;
 
-  const previous = (await listOrderInvoices(preview.orderId, conn)).filter((invoice) => invoice.environment === environment);
-  if (previous.some((invoice) => invoice.status === "autorizada")) throw new IssueError("Este pedido já tem nota autorizada.");
-  const waiting = previous.find((invoice) => invoice.status === "assinada");
+    const sealed = await loadSealedCertificate(conn);
+    if (!sealed) throw new IssueError("Envie o certificado digital A1 em Parâmetros → Fiscal antes de emitir.");
+    if (sealed.validUntil.getTime() <= now.getTime()) throw new IssueError("O certificado digital venceu. Envie o certificado em vigor em Parâmetros → Fiscal.");
+    const certificate = openCertificate(sealed, vault);
+    const url = authorizationUrl(preview.issuerUf, environment);
 
-  let invoice: Invoice;
-  let signedXml: string;
-  if (waiting) {
-    const stored = await loadSignedXml(waiting.id, conn);
-    if (!stored) throw new Error("A nota aguardando resposta perdeu o XML.");
-    invoice = waiting;
-    signedXml = stored;
-    // Sent before without an answer: first ask SEFAZ what it has. Only an invoice it never received is sent again.
-    let known;
-    try {
-      known = parseConsult(await send(consultUrl(preview.issuerUf, environment), CONSULT_ACTION, consultEnvelope(waiting.accessKey, environment), { pfx: certificate.pfx, passphrase: certificate.password }), waiting.accessKey);
-    } catch (error) {
-      if (error instanceof SefazError) throw new IssueError(`${error.message} A nota ${waiting.number} continua aguardando resposta.`);
-      throw error;
-    }
-    if (known.status === "autorizada") {
-      const saved = await recordVerdict(waiting.id, { status: "autorizada", code: known.code, reason: known.reason, protocol: known.protocol, authorizedXml: nfeProcXml(stored, known.protocolXml) }, conn);
-      return { invoice: saved, message: `A nota ${saved.number} já estava autorizada na SEFAZ. Protocolo ${known.protocol}.` };
-    }
-    if (known.status !== "nao-consta") {
-      throw new IssueError(`A SEFAZ respondeu sobre a nota ${waiting.number} (${known.code}): ${known.reason}. Nada foi reenviado; confira com o contador.`);
-    }
-  } else {
-    if (check) {
-      let draft: string;
+    const previous = (await listOrderInvoices(preview.orderId, conn)).filter((invoice) => invoice.environment === environment);
+    if (previous.some((invoice) => invoice.status === "autorizada")) throw new IssueError("Este pedido já tem nota autorizada.");
+    const waiting = previous.find((invoice) => invoice.status === "assinada");
+
+    let invoice: Invoice;
+    let signedXml: string;
+    if (waiting) {
+      const stored = await loadSignedXml(waiting.id, conn);
+      if (!stored) throw new Error("A nota aguardando resposta perdeu o XML.");
+      invoice = waiting;
+      signedXml = stored;
+      // Sent before without an answer: first ask SEFAZ what it has. Only an invoice it never received is sent again.
+      let known;
       try {
-        draft = signNfeXml(buildNfeXml(preview.input).xml, signingKeyOf(certificate.pfx, certificate.password));
+        known = parseConsult(await send(consultUrl(preview.issuerUf, environment), CONSULT_ACTION, consultEnvelope(waiting.accessKey, environment), { pfx: certificate.pfx, passphrase: certificate.password }), waiting.accessKey);
+      } catch (error) {
+        if (error instanceof SefazError) throw new IssueError(`${error.message} A nota ${waiting.number} continua aguardando resposta.`);
+        throw error;
+      }
+      if (known.status === "autorizada") {
+        const saved = await recordVerdict(waiting.id, { status: "autorizada", code: known.code, reason: known.reason, protocol: known.protocol, authorizedXml: nfeProcXml(stored, known.protocolXml) }, conn);
+        await conn.query("COMMIT");
+        return { completed: { invoice: saved, message: `A nota ${saved.number} já estava autorizada na SEFAZ. Protocolo ${known.protocol}.` } };
+      }
+      if (known.status !== "nao-consta") {
+        throw new IssueError(`A SEFAZ respondeu sobre a nota ${waiting.number} (${known.code}): ${known.reason}. Nada foi reenviado; confira com o contador.`);
+      }
+    } else {
+      if (check) {
+        let draft: string;
+        try {
+          draft = signNfeXml(buildNfeXml(preview.input).xml, signingKeyOf(certificate.pfx, certificate.password));
+        } catch (error) {
+          if (error instanceof NfeError) throw new IssueError(error.message);
+          throw error;
+        }
+        const problems = await check(draft);
+        if (problems.length > 0) throw new IssueError(`A nota não passou na conferência do leiaute oficial e não foi enviada; nenhum número foi usado. ${problems.join(" · ")}`);
+      }
+      const rejected = previous.find((item) => item.status === "rejeitada" && item.series === series);
+      // A rejected invoice is issued again with its number, unless that number was made unusable meanwhile
+      // or the rejection itself says the number already belongs to another invoice at SEFAZ (204, 539…).
+      const reuse = rejected && !NUMBER_TAKEN.has(rejected.statusCode ?? "") && !(await isNumberVoided(environment, series, rejected.number, conn)) ? rejected.number : null;
+      const number = reuse ?? (await takeNextNumber(conn));
+      // Rule B03-10: never the number of the invoice, nor repeated or sequential digits (rejection 897).
+      let randomCode: string;
+      do randomCode = String(randomInt(0, 100_000_000)).padStart(8, "0");
+      while (!isAcceptableRandomCode(randomCode, number));
+
+      const numbered = await previewOrderNfe(orderNumber, now, conn, { number, randomCode });
+      if (!numbered || numbered.problems.length > 0 || numbered.rulesRevision !== preview.rulesRevision) throw new IssueError("O pedido ou a preparação fiscal mudou enquanto a nota era montada. Confira e tente de novo.");
+      let built: { key: string; xml: string };
+      try {
+        built = buildNfeXml(numbered.input);
       } catch (error) {
         if (error instanceof NfeError) throw new IssueError(error.message);
         throw error;
       }
-      const problems = await check(draft);
-      if (problems.length > 0) throw new IssueError(`A nota não passou na conferência do leiaute oficial e não foi enviada; nenhum número foi usado. ${problems.join(" · ")}`);
+      signedXml = signNfeXml(built.xml, signingKeyOf(certificate.pfx, certificate.password));
+      try {
+        invoice = await saveSignedInvoice(
+          { orderId: preview.orderId, environment, series, number, accessKey: accessKey(numbered.input), signedXml, issuedAt: numbered.input.issuedAt, createdBy: who, rulesRevision: numbered.rulesRevision },
+          conn,
+        );
+      } catch (error) {
+        if (error instanceof InvoicePreparationChanged) throw new IssueError(error.message);
+        throw error;
+      }
     }
-    const rejected = previous.find((item) => item.status === "rejeitada" && item.series === series);
-    // A rejected invoice is issued again with its number, unless that number was made unusable meanwhile
-    // or the rejection itself says the number already belongs to another invoice at SEFAZ (204, 539…).
-    const reuse = rejected && !NUMBER_TAKEN.has(rejected.statusCode ?? "") && !(await isNumberVoided(environment, series, rejected.number, conn)) ? rejected.number : null;
-    const number = reuse ?? (await takeNextNumber(conn));
-    // Rule B03-10: never the number of the invoice, nor repeated or sequential digits (rejection 897).
-    let randomCode: string;
-    do randomCode = String(randomInt(0, 100_000_000)).padStart(8, "0");
-    while (!isAcceptableRandomCode(randomCode, number));
 
-    const numbered = await previewOrderNfe(orderNumber, now, conn, { number, randomCode });
-    if (!numbered || numbered.problems.length > 0 || numbered.rulesRevision !== preview.rulesRevision) throw new IssueError("O pedido ou a preparação fiscal mudou enquanto a nota era montada. Confira e tente de novo.");
-    let built: { key: string; xml: string };
-    try {
-      built = buildNfeXml(numbered.input);
-    } catch (error) {
-      if (error instanceof NfeError) throw new IssueError(error.message);
-      throw error;
-    }
-    signedXml = signNfeXml(built.xml, signingKeyOf(certificate.pfx, certificate.password));
-    try {
-      invoice = await saveSignedInvoice(
-        { orderId: preview.orderId, environment, series, number, accessKey: accessKey(numbered.input), signedXml, issuedAt: numbered.input.issuedAt, createdBy: who, rulesRevision: numbered.rulesRevision },
-        conn,
-      );
-    } catch (error) {
-      if (error instanceof InvoicePreparationChanged) throw new IssueError(error.message);
-      throw error;
-    }
+    await conn.query("COMMIT");
+    return { invoice, signedXml, certificate, url, environment, issuerUf:preview.issuerUf };
+  } catch (error) {
+    await conn.query("ROLLBACK");
+    throw error;
   }
+}
+
+async function issueOnConnection(orderNumber: string, who: string, now: Date, vault: Buffer, send: Send, conn: Queryable, check: LayoutCheck | null): Promise<IssueResult> {
+  const prepared = await prepareOrderInvoice(orderNumber, who, now, vault, send, conn, check);
+  if (prepared.completed) return prepared.completed;
+  const { invoice, signedXml, certificate, url, environment, issuerUf } = prepared;
 
   let answer: string;
   try {
@@ -148,7 +171,7 @@ export async function issueOrderNfe(orderNumber: string, who: string, now: Date,
       // authorised in a call whose answer never arrived: the protocol is fetched, and nothing is issued twice.
       let known;
       try {
-        known = parseConsult(await send(consultUrl(preview.issuerUf, environment), CONSULT_ACTION, consultEnvelope(invoice.accessKey, environment), { pfx: certificate.pfx, passphrase: certificate.password }), invoice.accessKey);
+        known = parseConsult(await send(consultUrl(issuerUf, environment), CONSULT_ACTION, consultEnvelope(invoice.accessKey, environment), { pfx: certificate.pfx, passphrase: certificate.password }), invoice.accessKey);
       } catch (error) {
         if (error instanceof SefazError) throw new IssueError(`A SEFAZ diz que a nota ${invoice.number} já existe (204) e a consulta dela falhou: ${error.message} A nota continua aguardando resposta: emita de novo para consultar outra vez.`);
         throw error;
@@ -186,7 +209,7 @@ export async function registerOrderNfeEvent(
   vault: Buffer,
   send: Send,
   conn: Queryable,
-): Promise<{ invoiceId: number; message: string }> {
+): Promise<{ invoiceId: number; eventId: number; message: string }> {
   const order = await getOrder(orderNumber, { sellerEmail: null }, conn);
   if (!order) throw new IssueError("Pedido não encontrado.");
   const settings = await loadFiscalSettings(conn);
@@ -230,16 +253,16 @@ export async function registerOrderNfeEvent(
       throw error;
     }
     if (!found) throw new IssueError(`A SEFAZ não registrou (${result.code}): ${result.reason}. A consulta da nota não trouxe esse evento: confira no portal da SEFAZ.`);
-    await recordInvoiceEvent({ invoiceId: invoice.id, kind, sequence, text: found.text, signedXml: found.xml, protocol: found.protocol, statusCode: found.code, createdBy: who }, conn);
-    if (kind === "cancelamento") return { invoiceId: invoice.id, message: `A nota ${invoice.number} já estava cancelada na SEFAZ. Protocolo ${found.protocol}.` };
-    if (found.text === text.replace(/\s+/g, " ").trim()) return { invoiceId: invoice.id, message: `A carta de correção ${sequence} já estava registrada na SEFAZ. Protocolo ${found.protocol}.` };
+    const eventId = await recordInvoiceEvent({ invoiceId: invoice.id, kind, sequence, text: found.text, signedXml: found.xml, protocol: found.protocol, statusCode: found.code, createdBy: who }, conn);
+    if (kind === "cancelamento") return { invoiceId: invoice.id, eventId, message: `A nota ${invoice.number} já estava cancelada na SEFAZ. Protocolo ${found.protocol}.` };
+    if (found.text === text.replace(/\s+/g, " ").trim()) return { invoiceId: invoice.id, eventId, message: `A carta de correção ${sequence} já estava registrada na SEFAZ. Protocolo ${found.protocol}.` };
     throw new IssueError(`A carta de correção ${sequence} já estava registrada na SEFAZ com outro texto ("${found.text}", protocolo ${found.protocol}) e foi gravada aqui. Se a correção de agora ainda é necessária, registre de novo: ela sai como a carta ${sequence + 1}.`);
   }
   if (!result.registered) throw new IssueError(`A SEFAZ não registrou (${result.code}): ${result.reason}`);
   if (processed === null) throw new IssueError("O recibo completo do evento não foi obtido. Consulte a SEFAZ antes de reenviar.");
 
-  await recordInvoiceEvent({ invoiceId: invoice.id, kind, sequence, text: text.replace(/\s+/g, " ").trim(), signedXml: processed, protocol: result.protocol, statusCode: result.code, createdBy: who }, conn);
-  return { invoiceId: invoice.id, message: kind === "cancelamento" ? `Nota ${invoice.number} cancelada. Protocolo ${result.protocol}.` : `Carta de correção ${sequence} registrada. Protocolo ${result.protocol}.` };
+  const eventId = await recordInvoiceEvent({ invoiceId: invoice.id, kind, sequence, text: text.replace(/\s+/g, " ").trim(), signedXml: processed, protocol: result.protocol, statusCode: result.code, createdBy: who }, conn);
+  return { invoiceId: invoice.id, eventId, message: kind === "cancelamento" ? `Nota ${invoice.number} cancelada. Protocolo ${result.protocol}.` : `Carta de correção ${sequence} registrada. Protocolo ${result.protocol}.` };
 }
 
 /**

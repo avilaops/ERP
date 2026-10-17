@@ -367,6 +367,7 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
                         </option>
                       ))}
                     </select>
+                    <label className="flex min-h-[var(--control)] items-center gap-2 text-sm"><input type="checkbox" name="companyPix" defaultChecked={method.companyPix} className="h-5 w-5" />QR PIX direto da empresa</label>
                     <button type="submit" className={SECONDARY}>
                       Salvar
                     </button>

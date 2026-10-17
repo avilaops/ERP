@@ -46,10 +46,10 @@ test("proposta completa: cadastro, endereço, NCM, peso por quantidade, frete se
 });
 
 test("PIX só para entrada via PIX pendente; valor parcial usa o saldo real e cancelado não cobra", () => {
-  assert.equal(usesCompanyPix("PIX", "17"), true);
-  assert.equal(usesCompanyPix("Link de pagamento - PIX", "17"), false);
-  assert.equal(usesCompanyPix("Cartão", "03"), false);
-  assert.equal(usesCompanyPix("PIX", null), false);
+  assert.equal(usesCompanyPix(true, "17"), true);
+  assert.equal(usesCompanyPix(false, "17"), false);
+  assert.equal(usesCompanyPix(true, "03"), false);
+  assert.equal(usesCompanyPix(true, null), false);
   assert.equal(completeQuote(document, order, { ...context, downPaymentOpen: 10000 }, products).pix?.amount, "R$ 10.000,00");
   assert.equal(completeQuote(document, order, context, products).pix?.name, context.issuer.legalName);
   assert.match(completeQuote(document, order, context, products).footer!.join(" "), /\(17\) 99721-8555/);
@@ -105,6 +105,16 @@ test("normalização remove número repetido, preserva complementos e números l
 test("campos comerciais recusam URLs perigosas, e-mail errado, frete inválido e textos sem limite", () => {
   for (const input of [{ website: "javascript:alert(1)" }, { email: "incorreto" }, { freightMode: "barco" }, { freightAmount: "-1" }, { freightMode: "CIF", freightAmount: "100,00" }, { warranty: "x".repeat(1001) }]) assert.throws(() => checkedProposalDetails(input));
   assert.deepEqual(checkedProposalDetails({ email: "  teste@example.com ", warranty: "  Texto   aprovado. " }), { email: "teste@example.com", warranty: "Texto aprovado." });
+  assert.equal(checkedProposalDetails({website:"httpbin.org"}).website,"httpbin.org");
+  assert.equal(checkedProposalDetails({website:"HTTPS://example.com"}).website,"HTTPS://example.com");
+});
+
+test("contato preservado no pedido prevalece sobre novos padrões da empresa",()=>{
+  const kept=completeQuote(document,order,{...context,orderDetails:{...context.orderDetails,phone:"11999998888",email:"congelado@example.com"}},products);
+  assert.match(kept.issuerLines!.join(" "),/congelado@example.com/);
+  assert.match(kept.footer!.join(" "),/congelado@example.com/);
+  assert.ok(!kept.issuerLines!.join(" ").includes("comercial@example.com"));
+  assert.ok(!kept.footer!.join(" ").includes("comercial@example.com"));
 });
 
 test("PDF completo pagina condições longas, imprime QR e preserva margens em todas as páginas", async () => {

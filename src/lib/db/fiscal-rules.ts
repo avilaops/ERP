@@ -244,21 +244,22 @@ export const PAYMENT_CODES = [
   ["99", "Outros (vai com o nome da forma)"],
 ] as const;
 
-export type PaymentCode = { id: number; label: string; active: boolean; code: string | null };
+export type PaymentCode = { id: number; label: string; active: boolean; code: string | null; companyPix: boolean };
 
 /** Every form of payment of the company with the code it takes in the invoice, or `null` while nobody chose. */
 export async function listPaymentCodes(conn: Queryable): Promise<PaymentCode[]> {
-  const { rows } = await conn.query("SELECT id, label, active, nfe_code, on_delivery FROM payment_methods ORDER BY position, label");
-  return rows.map((row) => ({ id: Number(row.id), label: String(row.label), active: row.active === true, code: row.on_delivery === true ? null : text(row.nfe_code) }));
+  const { rows } = await conn.query("SELECT id, label, active, nfe_code, on_delivery, company_pix FROM payment_methods ORDER BY position, label");
+  return rows.map((row) => ({ id: Number(row.id), label: String(row.label), active: row.active === true, code: row.on_delivery === true ? null : text(row.nfe_code), companyPix:row.company_pix===true }));
 }
 
-export async function savePaymentCode(id: number, value: string | null, updatedBy: string, conn: Queryable): Promise<void> {
+export async function savePaymentCode(id: number, value: string | null, updatedBy: string, conn: Queryable, companyPix?: boolean): Promise<void> {
   if (updatedBy.trim() === "") throw new Error("Falta dizer quem está alterando a forma de pagamento.");
   const chosen = blank(value);
   if (chosen !== null && !PAYMENT_CODES.some(([known]) => known === chosen)) throw new FiscalError("Escolha a forma da nota na lista.");
+  if (companyPix && chosen !== "17") throw new FiscalError("QR da empresa exige meio PIX, código 17.");
   const { rows } = await conn.query(
-    "UPDATE payment_methods SET nfe_code = $2, updated_at = now(), updated_by = $3 WHERE id = $1 AND (NOT on_delivery OR $2::text IS NULL) RETURNING id",
-    [id, chosen, updatedBy],
+    "UPDATE payment_methods SET nfe_code = $2, company_pix = CASE WHEN $2='17' AND NOT on_delivery THEN COALESCE($4::boolean,company_pix) ELSE false END, updated_at = now(), updated_by = $3 WHERE id = $1 AND (NOT on_delivery OR $2::text IS NULL) RETURNING id",
+    [id, chosen, updatedBy, companyPix ?? null],
   );
   if (rows.length === 0) throw new FiscalError("Forma não encontrada ou cadastrada como prazo na entrega. Escolha o meio efetivo no pedido.");
 }

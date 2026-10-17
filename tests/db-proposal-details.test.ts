@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { before, after, test } from "node:test";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { loadProposalDetails, saveProposalDetails } from "@/lib/db/proposal-details";
 import { createOrder, getOrder } from "@/lib/db/orders";
 import { createContract } from "@/lib/db/contracts";
@@ -7,7 +9,7 @@ import { loadParams } from "@/lib/db/params";
 import { publishPriceTable } from "@/lib/db/price-table";
 import { createProduct, listProducts } from "@/lib/db/products";
 import { draftPriceTable } from "@/lib/price-table";
-import { openTestDb, SKIP_WITHOUT_DB } from "./db-helpers.ts";
+import { MIGRATIONS_DIR, openTestDb, SKIP_WITHOUT_DB } from "./db-helpers.ts";
 import type { TestDb } from "./db-helpers.ts";
 
 const skip = SKIP_WITHOUT_DB;
@@ -46,7 +48,33 @@ test("condição do pedido: não altera dinheiro nem revisão comercial; vazio v
 test("documento emitido: contrato já enviado bloqueia alterações sem modificar o PDF guardado", { skip }, async () => {
   const pdf = Buffer.alloc(120, 1);
   const contract = await createContract({ orderId, sequence: 1, title: "Contrato de teste", body: "Texto preservado", pdf, sha256: "a".repeat(64), tokenHash: "b".repeat(64), expiresAt: new Date("2099-01-01"), recipientName: "Cliente de teste", recipientEmail: "cliente@example.com", createdBy: actor }, db.pool);
-  await assert.rejects(() => saveProposalDetails({ actor, orderId, revision: "2", fields: ["installation"], values: { installation: "Inclusa" } }, db.pool), /contrato\/nota emitidos/);
-  assert.deepEqual((await loadProposalDetails(db.pool, orderId)).details, {});
+  const frozen = await loadProposalDetails(db.pool, orderId);
+  await assert.rejects(() => saveProposalDetails({ actor, orderId, revision: frozen.revision, fields: ["installation"], values: { installation: "Inclusa" } }, db.pool), /contrato\/nota emitidos/);
+  assert.equal(frozen.details.warranty,"Termo de garantia fictício");
+  await saveProposalDetails({actor,revision:(await loadProposalDetails(db.pool)).revision,fields:["warranty","installation"],values:{warranty:"Novo padrão",installation:"Novo serviço"}},db.pool);
+  assert.deepEqual((await loadProposalDetails(db.pool, orderId)).details,frozen.details);
   assert.deepEqual((await db.pool.query("SELECT pdf FROM order_contracts WHERE id = $1", [contract.id])).rows[0].pdf, pdf);
+});
+
+test("upgrade: pedido antigo fechado sem documento preserva condições herdadas", {skip}, async()=>{
+  const legacy=await openTestDb("proposal_upgrade",{migrated:false});
+  try {
+    const scripts=readdirSync(MIGRATIONS_DIR).filter(name=>name.endsWith(".sql") && name<"0070_").sort();
+    await legacy.pool.query(scripts.map(name=>readFileSync(join(MIGRATIONS_DIR,name),"utf8")).join("\n"));
+    const product=await createProduct({name:"Equipamento fictício",code:"LD-UP01",advisoryCost:1000},actor,legacy.pool);
+    await publishPriceTable(draftPriceTable(await loadParams(legacy.pool),await listProducts({active:true},legacy.pool)),1,actor,legacy.pool);
+    await createOrder({seller:{email:actor,name:"Teste"},version:1,productId:product.id,quantity:1},()=>"261017-UP01",legacy.pool);
+    const customer=await legacy.pool.query("INSERT INTO customers(kind,document,name,updated_by) VALUES('PJ','48240052000161','Cliente fictício',$1) RETURNING id",[actor]);
+    await legacy.pool.query("UPDATE company_settings SET proposal_details=$1::jsonb",[JSON.stringify({warranty:"Garantia herdada",installation:"Serviço herdado"})]);
+    await legacy.pool.query("UPDATE orders SET status='fechado',closed_at=now(),customer_id=$1,delivery_uf='SP',production_days=30,proposal_details=$2::jsonb",[customer.rows[0].id,JSON.stringify({freightMode:"FOB"})]);
+    assert.equal((await legacy.pool.query("SELECT count(*) FROM order_contracts")).rows[0].count,"0");
+    await legacy.pool.query(readFileSync(join(MIGRATIONS_DIR,"0070_email_da_carta_de_correcao.sql"),"utf8"));
+    await legacy.pool.query(readFileSync(join(MIGRATIONS_DIR,"0071_pix_direto_e_termos_preservados.sql"),"utf8"));
+    await legacy.pool.query("UPDATE company_settings SET proposal_details=$1::jsonb",[JSON.stringify({warranty:"Novo padrão",installation:"Nova instalação"})]);
+    const kept=(await legacy.pool.query("SELECT proposal_details FROM orders")).rows[0].proposal_details;
+    assert.equal(kept.warranty,"Garantia herdada");
+    assert.equal(kept.installation,"Serviço herdado");
+    assert.equal(kept.freightMode,"FOB");
+    assert.equal(kept.cancellation,"");
+  } finally {await legacy.close();}
 });

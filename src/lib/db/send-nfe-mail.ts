@@ -30,6 +30,8 @@ export type SendInvoiceMail = {
   invoiceId: number;
   /** Default sends the current invoice and applicable events; correction sends the latest CC-e. */
   kind?: "correcao";
+  /** Automatic mail binds to the exact registered event; manual resend may choose latest. */
+  eventId?: number;
   /** `null`: the e-mail of the customer of the order. */
   to: string | null;
   sentBy: string;
@@ -41,12 +43,13 @@ export type SendInvoiceMail = {
 };
 
 /**
- * Sends the authorised XML, DANFE and latest CC-e, or the cancellation package.
+ * Sends the authorised XML, DANFE and selected CC-e, or the cancellation package.
  * The original invoice is never rewritten by a correction. Every attempt that reaches a
  * mail server is recorded with its result; what is refused before that (no
  * mailbox, no address) throws `MailError` and nothing is recorded as sent.
  */
 export async function sendInvoiceMail(request: SendInvoiceMail, conn: Queryable): Promise<{ status: "enviado" | "falhou"; recipient: string; detail: string | null }> {
+  if (request.eventId !== undefined && (request.kind !== "correcao" || !Number.isSafeInteger(request.eventId) || request.eventId < 1)) throw new MailError("Evento fiscal inválido para envio.");
   const { rows } = await conn.query(
     `SELECT i.id, i.status, i.number, i.series, i.access_key, i.authorized_xml, c.name AS customer_name, c.email AS customer_email
        FROM fiscal_invoices i JOIN orders o ON o.id = i.order_id LEFT JOIN customers c ON c.id = o.customer_id WHERE i.id = $1`,
@@ -66,7 +69,7 @@ export async function sendInvoiceMail(request: SendInvoiceMail, conn: Queryable)
   const cancelled = invoice.status === "cancelada";
   if (cancelled && request.kind === "correcao") throw new MailError("A nota está cancelada. Envie o cancelamento.");
   const eventKind = cancelled ? "cancelamento" : "correcao";
-  const eventRows = await conn.query("SELECT id, sequence, text, signed_xml, protocol FROM fiscal_invoice_events WHERE invoice_id = $1 AND kind = $2 ORDER BY sequence DESC LIMIT 1", [request.invoiceId, eventKind]);
+  const eventRows = await conn.query("SELECT id, sequence, text, signed_xml, protocol FROM fiscal_invoice_events WHERE invoice_id = $1 AND kind = $2 AND ($3::integer IS NULL OR id=$3) ORDER BY sequence DESC LIMIT 1", [request.invoiceId, eventKind, request.eventId ?? null]);
   const event = eventRows.rows[0];
   if ((cancelled || request.kind === "correcao") && !event) throw new MailError("O evento fiscal ainda não está registrado nesta nota.");
   if (event && (!String(event.signed_xml).includes("<procEventoNFe") || !String(event.signed_xml).includes("<retEvento"))) throw new MailError("O evento antigo não tem o XML completo do recibo. Consulte a SEFAZ para recuperar o arquivo antes de enviar.");

@@ -124,6 +124,10 @@ test("tarefa sem oportunidade pertence ao pedido; confirmação, deduplicação,
   await assert.rejects(ask(SELLER, "tarefa_criar_em_pedido", { confirmar: stale.confirmar }), /não encontrado/);
   assert.equal((await listPendingActivities({ ownerEmail: SELLER.email }, db.pool)).filter((task) => task.orderNumber === number).length, 0);
   assert.equal((await listPendingActivities({ ownerEmail: OTHER.email }, db.pool)).filter((task) => task.orderNumber === number).length, 1);
+  const reassigned=await ask(OTHER,"tarefa_criar_em_pedido",args);
+  const reused=await ask(OTHER,"tarefa_criar_em_pedido",{confirmar:reassigned.confirmar});
+  assert.equal(reused.tarefa_id,created.tarefa_id);
+  assert.equal(reused.criada,false);
   await assert.rejects(setActivityDone(created.tarefa_id, true, SELLER.email, { ownerEmail: SELLER.email }, db.pool), /não encontrada/);
   await setActivityDone(created.tarefa_id, true, OTHER.email, { ownerEmail: OTHER.email }, db.pool);
 });

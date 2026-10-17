@@ -1,4 +1,5 @@
 import type { Queryable } from "@/lib/db/pool";
+import { EMPTY_PROPOSAL_DETAILS } from "@/lib/db/proposal-details";
 
 export type InvoiceStatus = "assinada" | "autorizada" | "rejeitada" | "denegada" | "cancelada";
 type Environment = "homologacao" | "producao";
@@ -59,17 +60,22 @@ export class InvoicePreparationChanged extends Error {}
 export async function saveSignedInvoice(invoice: SignedInvoice, conn: Queryable): Promise<Invoice> {
   const { rows } = await conn.query(
     `WITH preparation AS (
-       UPDATE orders SET nfe_rules_revision = nfe_rules_revision + 1
-        WHERE id = $1 AND status <> 'cancelado' AND ($9::integer IS NULL OR nfe_rules_revision = $9) RETURNING id
-     )
+       SELECT id FROM orders
+        WHERE id = $1 AND status <> 'cancelado' AND ($9::integer IS NULL OR nfe_rules_revision = $9) FOR UPDATE
+     ), saved AS (
      INSERT INTO fiscal_invoices (order_id, environment, series, number, access_key, status, signed_xml, issued_at, created_by)
      SELECT id, $2, $3, $4, $5, 'assinada', $6, $7, $8 FROM preparation
      ON CONFLICT (environment, series, number) DO UPDATE
         SET access_key = EXCLUDED.access_key, status = 'assinada', signed_xml = EXCLUDED.signed_xml, issued_at = EXCLUDED.issued_at,
             status_code = NULL, status_reason = NULL, updated_at = now(), created_by = EXCLUDED.created_by
       WHERE fiscal_invoices.order_id = EXCLUDED.order_id AND fiscal_invoices.status IN ('rejeitada', 'assinada')
-     RETURNING ${COLUMNS}`,
-    [invoice.orderId, invoice.environment, invoice.series, invoice.number, invoice.accessKey, invoice.signedXml, invoice.issuedAt, invoice.createdBy, invoice.rulesRevision ?? null],
+     RETURNING ${COLUMNS}
+     ), bumped AS (
+       UPDATE orders SET nfe_rules_revision=nfe_rules_revision+1,
+           proposal_details=$10::jsonb || (SELECT proposal_details FROM company_settings) || proposal_details, proposal_details_revision=proposal_details_revision+1
+         WHERE id=$1 AND EXISTS (SELECT 1 FROM saved) RETURNING id
+     ) SELECT saved.* FROM saved CROSS JOIN bumped`,
+    [invoice.orderId, invoice.environment, invoice.series, invoice.number, invoice.accessKey, invoice.signedXml, invoice.issuedAt, invoice.createdBy, invoice.rulesRevision ?? null, JSON.stringify(EMPTY_PROPOSAL_DETAILS)],
   );
   if (!rows[0]) {
     const state = await conn.query("SELECT status FROM orders WHERE id=$1", [invoice.orderId]);
@@ -146,21 +152,22 @@ export type RegisteredEvent = { invoiceId: number; kind: InvoiceEvent["kind"]; s
  * cancelled, in the same statement: there is never a cancelled invoice without
  * its event, nor the event without the invoice knowing.
  */
-export async function recordInvoiceEvent(event: RegisteredEvent, conn: Queryable): Promise<void> {
+export async function recordInvoiceEvent(event: RegisteredEvent, conn: Queryable): Promise<number> {
   const { rows } = await conn.query(
     `WITH written AS (
        INSERT INTO fiscal_invoice_events (invoice_id, kind, sequence, text, signed_xml, protocol, status_code, created_by)
        SELECT i.id, $2, $3, $4, $5, $6, $7, $8 FROM fiscal_invoices i WHERE i.id = $1 AND i.status = 'autorizada'
-       RETURNING invoice_id, kind
+       RETURNING id, invoice_id, kind
      ), cancelled AS (
        UPDATE fiscal_invoices SET status = 'cancelada', updated_at = now()
         WHERE id IN (SELECT invoice_id FROM written WHERE kind = 'cancelamento')
        RETURNING id
      )
-     SELECT invoice_id, (SELECT count(*) FROM cancelled) AS cancelled FROM written`,
+     SELECT id, invoice_id, (SELECT count(*) FROM cancelled) AS cancelled FROM written`,
     [event.invoiceId, event.kind, event.sequence, event.text, event.signedXml, event.protocol, event.statusCode, event.createdBy],
   );
   if (!rows[0]) throw new Error("A nota não está mais autorizada; o evento não foi gravado.");
+  return Number(rows[0].id);
 }
 
 /**

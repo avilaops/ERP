@@ -5,6 +5,7 @@ import { contractNumber } from "@/lib/contract/text";
 import { formatDocument } from "@/lib/customer";
 import { pgErrorCode } from "@/lib/db/pool";
 import type { Queryable } from "@/lib/db/pool";
+import { EMPTY_PROPOSAL_DETAILS } from "@/lib/db/proposal-details";
 import { showDateTime } from "@/lib/format";
 
 /** A refusal the user can act on. The message goes to the screen as it is. */
@@ -193,10 +194,13 @@ export const PENDING_EXISTS = "Este pedido já tem um contrato aguardando assina
 export async function createContract(input: NewContract, conn: Queryable): Promise<Contract> {
   try {
     const { rows } = await conn.query(
-      `INSERT INTO order_contracts (order_id, sequence, title, body, pdf, pdf_sha256, token_hash, expires_at, recipient_name, recipient_email, created_by, uploaded, file_name, recipient_phone)
+      `WITH frozen AS (
+         UPDATE orders SET proposal_details = $14::jsonb || (SELECT proposal_details FROM company_settings) || proposal_details, proposal_details_revision=proposal_details_revision+1
+         WHERE id=$1 AND status <> 'cancelado' RETURNING id
+       ) INSERT INTO order_contracts (order_id, sequence, title, body, pdf, pdf_sha256, token_hash, expires_at, recipient_name, recipient_email, created_by, uploaded, file_name, recipient_phone)
        SELECT id, $11, $2, $3, $4, $5, $6, $7, $8, $9, $10, $12::text IS NOT NULL, $12, $13
-         FROM orders WHERE id=$1 AND status <> 'cancelado' FOR SHARE RETURNING id`,
-      [input.orderId, input.title, input.body, Buffer.from(input.pdf), input.sha256, input.tokenHash, input.expiresAt, input.recipientName, input.recipientEmail, input.createdBy, input.sequence, input.fileName ?? null, input.recipientPhone ?? null],
+         FROM frozen RETURNING id`,
+      [input.orderId, input.title, input.body, Buffer.from(input.pdf), input.sha256, input.tokenHash, input.expiresAt, input.recipientName, input.recipientEmail, input.createdBy, input.sequence, input.fileName ?? null, input.recipientPhone ?? null, JSON.stringify(EMPTY_PROPOSAL_DETAILS)],
     );
     if (!rows[0]) throw new ContractError("Pedido não encontrado ou cancelado: contrato não criado.");
     return (await getOrderContract(input.orderId, Number(rows[0].id), conn))!;

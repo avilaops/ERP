@@ -101,6 +101,7 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "0068_confirmacoes_mcp.sql",
     "0069_cancelamento_de_rascunhos.sql",
     "0070_email_da_carta_de_correcao.sql",
+    "0071_pix_direto_e_termos_preservados.sql",
   ]);
 
   const second = await withClient((client) => migrate(client, MIGRATIONS_DIR));
