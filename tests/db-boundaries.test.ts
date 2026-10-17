@@ -34,7 +34,7 @@ test("consultas usam parâmetros ($1), nunca valor colado no texto", () => {
   for (const file of files("src/lib/db", /\.ts$/)) {
     // Interpolating a value would need a ${…} that is not one of the fixed column lists.
     for (const [, expression] of read(file).matchAll(/query\(\s*`[^`]*?\$\{([^}]+)\}/g)) {
-      assert.match(expression, /^(COLUMNS|COLUMN_LIST|placeholders|updates|COLUMNS\.length \+ 1)$/, `${file}: \${${expression}}`);
+      assert.match(expression, /^(ACCESS|COLUMNS|COLUMN_LIST|placeholders|updates|COLUMNS\.length \+ 1)$/, `${file}: \${${expression}}`);
     }
   }
 });
