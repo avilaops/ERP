@@ -168,8 +168,8 @@ própria. As capturas de auditoria não autorizam cancelar pedidos ou enviar men
   altura inicial de uma tela, sem excesso horizontal ou controles abaixo de
   44 px. Lista de ferramentas abre e recolhe pelo teclado. Texto e zoom a 200%
   permitem alcançar os controles; ajustes temporários foram restaurados.
-- Publicação desta etapa ainda pendente; a última produção verificada é
-  `bc9374f`. A descoberta no assistente externo do usuário não foi comprovada.
+- Publicada com a etapa comercial em `703d7ac`, em 17/10/2026. A descoberta
+  no assistente externo do usuário ainda não foi comprovada.
 
 ## Evidências da etapa comercial
 
@@ -197,7 +197,27 @@ própria decisão, e cada registro expõe ações em detalhe; os cinco tamanhos
 foram medidos; Contato, Adicionar atividade e Ações nomeiam o conteúdo
 recolhido; recolher preserva os campos; teclado e ampliação foram conferidos.
 
-A suíte geral e a publicação finais ainda aguardam a verificação desta revisão.
+Verificação final: 743 testes aprovados, sem falhas ou pulos; lint, tipos e build
+aprovados. O job principal do CI também passou no commit `703d7ac`. A varredura
+automática geral de telas ainda estava em execução ao registrar esta evidência;
+as 25 medições manuais das telas afetadas já passaram.
+
+Publicação conjunta: `703d7ac`, em 17/10/2026, às 08:36:05 UTC. Health público
+confirmou o commit e o container ficou `healthy`; migração 0069 aplicada.
+Pacote com 3.274 entradas, delta SHA-256
+`c4236c2d51f8d8626b251fcaaa43954bf4cb5094db8de59db785c4777092dc25`.
+Pacote e imagem anteriores conservados para recuperação.
+
+Antes e depois da publicação: uma conexão ativa, MCP ligado, três clientes,
+sete pedidos, um recebimento, nenhuma conta a pagar, 13 atividades e nenhuma
+nota fiscal. Requisição POST sem token responde 401 e os metadados OAuth
+apontam para o domínio público do ERP. Não foi criada conexão de teste em
+produção. Ambiente fiscal permanece em homologação, com regime informado e
+certificado válido; isso não comprova emissão autorizada pela SEFAZ.
+
+As 29 funções propostas foram implementadas e publicadas. Permanecem para
+aceite a descoberta no Claude do usuário e a validação fiscal operacional.
+PR18 e PR19 ficam abertas para revisão, sem mescla das PRs anteriores.
 
 ## Evidências da primeira entrega
 
