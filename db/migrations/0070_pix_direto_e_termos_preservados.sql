@@ -7,7 +7,7 @@ ALTER TABLE payment_methods ADD CONSTRAINT payment_methods_company_pix
 -- Freeze currently effective terms for already locked orders. This cannot
 -- reconstruct historical defaults that changed before this migration.
 UPDATE orders o SET proposal_details =
-  '{"phone":null,"email":null,"website":null,"warranty":null,"installation":null,"latePayment":null,"cancellation":null,"delayedDownPayment":null,"freightMode":null,"freightAmount":null,"freightTerms":null,"deliveryEstimate":null,"deliveryNotes":null}'::jsonb
+  '{"phone":"","email":"","website":"","warranty":"","installation":"","latePayment":"","cancellation":"","delayedDownPayment":"","freightMode":"","freightAmount":"","freightTerms":"","deliveryEstimate":"","deliveryNotes":""}'::jsonb
   || c.proposal_details || o.proposal_details,
   proposal_details_revision=o.proposal_details_revision+1
 FROM company_settings c
