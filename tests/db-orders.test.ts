@@ -1451,6 +1451,17 @@ test("fila fiscal: clique repetido compartilha a emissão; perda de resposta ret
   const delayed = await db.pool.query("SELECT status, attempts, run_after FROM fiscal_jobs WHERE id = $1", [first.id]);
   assert.deepEqual([delayed.rows[0].status, Number(delayed.rows[0].attempts)], ["pendente", 1]);
 
+  const stillProcessing = async (url: string, _action: string, envelope: string) => {
+    if (/nfeconsultaprotocolo4/.test(url)) {
+      const key = /<chNFe>(\d{44})<\/chNFe>/.exec(envelope)![1];
+      return `<retConsSitNFe versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe"><cStat>217</cStat><xMotivo>NF-e não consta</xMotivo><chNFe>${key}</chNFe></retConsSitNFe>`;
+    }
+    return `<retEnviNFe versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe"><cStat>105</cStat><xMotivo>Lote em processamento</xMotivo></retEnviNFe>`;
+  };
+  assert.equal(await runOneFiscalJob(delayed.rows[0].run_after as Date, { ...dependencies, send: stillProcessing }, db.pool), "retry");
+  const delayedAgain = await db.pool.query("SELECT status, attempts, run_after FROM fiscal_jobs WHERE id = $1", [first.id]);
+  assert.deepEqual([delayedAgain.rows[0].status, Number(delayedAgain.rows[0].attempts)], ["pendente", 2]);
+
   const authorize = async (url: string, _action: string, envelope: string) => {
     if (/nfeconsultaprotocolo4/.test(url)) {
       const key = /<chNFe>(\d{44})<\/chNFe>/.exec(envelope)![1];
@@ -1459,14 +1470,29 @@ test("fila fiscal: clique repetido compartilha a emissão; perda de resposta ret
     const key = /Id="NFe(\d{44})"/.exec(envelope)![1];
     return `<retEnviNFe versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe"><cStat>104</cStat><xMotivo>Lote processado</xMotivo><protNFe versao="4.00"><infProt><chNFe>${key}</chNFe><nProt>135260000000071</nProt><cStat>100</cStat><xMotivo>Autorizado o uso da NF-e</xMotivo></infProt></protNFe></retEnviNFe>`;
   };
-  assert.equal(await runOneFiscalJob(delayed.rows[0].run_after as Date, { ...dependencies, send: authorize }, db.pool), "completed");
+  assert.equal(await runOneFiscalJob(delayedAgain.rows[0].run_after as Date, { ...dependencies, send: authorize }, db.pool), "completed");
   assert.deepEqual((await listOrderInvoices(orderId, db.pool)).map((invoice) => [invoice.status, invoice.number, invoice.protocol]), [["autorizada", 43, "135260000000071"]]);
   assert.deepEqual(mail, ["fila@cliente.test"]);
   const done = await db.pool.query("SELECT status, attempts, lease_until, completed_at FROM fiscal_jobs WHERE id = $1", [first.id]);
   assert.equal(done.rows[0].status, "concluido");
-  assert.equal(Number(done.rows[0].attempts), 2);
+  assert.equal(Number(done.rows[0].attempts), 3);
   assert.equal(done.rows[0].lease_until, null);
   assert.ok(done.rows[0].completed_at);
+
+  // Se o processo cair depois do veredito, a retomada reconhece a nota ligada ao job e não transmite outra vez.
+  const linked = await db.pool.query("SELECT fiscal_job_id FROM fiscal_invoices WHERE order_id = $1", [orderId]);
+  assert.equal(Number(linked.rows[0].fiscal_job_id), first.id);
+  await db.pool.query("UPDATE fiscal_jobs SET status = 'processando', lease_until = $2, completed_at = NULL WHERE id = $1", [first.id, new Date(now.getTime() - 1)]);
+  let recoveredCalls = 0;
+  assert.equal(await runOneFiscalJob(now, { ...dependencies, send: async () => { recoveredCalls += 1; throw new Error("não deve transmitir"); } }, db.pool), "completed");
+  assert.equal(recoveredCalls, 0);
+
+  // Uma quinta tentativa interrompida não estoura o CHECK nem fica presa para sempre.
+  await db.pool.query("UPDATE fiscal_jobs SET status = 'processando', attempts = 5, lease_until = $2, completed_at = NULL WHERE id = $1", [first.id, new Date(now.getTime() - 1)]);
+  assert.equal(await runOneFiscalJob(now, dependencies, db.pool), "none");
+  const exhausted = await db.pool.query("SELECT status, attempts, last_error FROM fiscal_jobs WHERE id = $1", [first.id]);
+  assert.deepEqual([exhausted.rows[0].status, Number(exhausted.rows[0].attempts)], ["revisao_manual", 5]);
+  assert.match(String(exhausted.rows[0].last_error), /cinco tentativas/i);
 });
 
 test("nota autorizada: carta de correção numera 1, 2…; cancelamento grava o evento e a nota vira cancelada; recusa da SEFAZ não grava nada", { skip }, async () => {
@@ -1480,6 +1506,7 @@ test("nota autorizada: carta de correção numera 1, 2…; cancelamento grava o 
   const { id: orderId, number } = closed.rows[0];
   const now = new Date("2026-10-08T15:00:00Z");
   const who = "diretoria@teste.local";
+  const { enqueueNfeEvent } = await import("@/lib/db/fiscal-jobs");
   // O cofre do teste anterior ficou com ele: o certificado é enviado de novo, com uma chave nova.
   const vault = randomBytes(32);
   await saveCertificate(testPfx({ name: "EMPRESA DE TESTE LTDA:11222333000181" }), "senha-de-teste", vault, who, now, db.pool);
@@ -1489,6 +1516,27 @@ test("nota autorizada: carta de correção numera 1, 2…; cancelamento grava o 
     const field = (name: string) => new RegExp(`<${name}>([^<]+)</${name}>`).exec(envelope)![1];
     return `<soap:Envelope xmlns:soap="x"><soap:Body><retEnvEvento versao="1.00" xmlns="http://www.portalfiscal.inf.br/nfe"><cStat>128</cStat><xMotivo>Lote processado</xMotivo><retEvento versao="1.00"><infEvento><tpAmb>${field("tpAmb")}</tpAmb><cStat>${code}</cStat><xMotivo>${reason}</xMotivo><chNFe>${key}</chNFe><tpEvento>${field("tpEvento")}</tpEvento><nSeqEvento>${field("nSeqEvento")}</nSeqEvento>${["135", "136"].includes(code) ? "<nProt>135260000077777</nProt>" : ""}</infEvento></retEvento></retEnvEvento></soap:Body></soap:Envelope>`;
   };
+
+  const queuedCorrection = await enqueueNfeEvent(number, "correcao", "Corrigir o peso bruto informado no transporte.", who, db.pool);
+  const sameCorrection = await enqueueNfeEvent(number, "correcao", "  Corrigir   o peso bruto informado no transporte. ", who, db.pool);
+  assert.deepEqual([sameCorrection.id, sameCorrection.joined], [queuedCorrection.id, true]);
+  await assert.rejects(
+    () => enqueueNfeEvent(number, "correcao", "Corrigir o peso líquido informado no transporte.", who, db.pool),
+    /outra justificativa|outro texto/i,
+  );
+  const intendedInvoice = Number((await db.pool.query("SELECT invoice_id FROM fiscal_jobs WHERE id = $1", [queuedCorrection.id])).rows[0].invoice_id);
+  await db.pool.query("UPDATE fiscal_jobs SET run_after = $2 WHERE id = $1", [queuedCorrection.id, now]);
+  await db.pool.query("UPDATE company_settings SET nfe_environment = 'producao'");
+  const { runOneFiscalJob } = await import("@/lib/db/fiscal-jobs");
+  try {
+    assert.equal(await runOneFiscalJob(now, { vault, check: null, env: {}, send: async (_url, _action, envelope) => answer(envelope, "135", "Evento registrado e vinculado a NF-e") }, db.pool), "completed");
+  } finally {
+    await db.pool.query("UPDATE company_settings SET nfe_environment = 'homologacao'");
+  }
+  const queuedEvent = await db.pool.query("SELECT id, invoice_id FROM fiscal_invoice_events WHERE fiscal_job_id = $1", [queuedCorrection.id]);
+  assert.deepEqual([Number(queuedEvent.rows[0].invoice_id), intendedInvoice], [intendedInvoice, intendedInvoice]);
+  await db.pool.query("DELETE FROM fiscal_invoice_events WHERE id = $1", [queuedEvent.rows[0].id]);
+  await db.pool.query("DELETE FROM fiscal_jobs WHERE id = $1", [queuedCorrection.id]);
   const sent: string[] = [];
   const accept = async (url: string, _action: string, envelope: string) => {
     sent.push(envelope);
@@ -1577,12 +1625,21 @@ test("nota autorizada: carta de correção numera 1, 2…; cancelamento grava o 
   assert.equal((await listOrderInvoiceMails(orderId,db.pool))[0].eventId,firstEvent.id);
   await assert.rejects(()=>sendInvoiceMail({...request,kind:"correcao",eventId:999999},db.pool),/evento fiscal ainda não está registrado/);
 
-  assert.match((await registerOrderNfeEvent(number, "cancelamento", "Cliente desistiu da compra antes da saída.", who, now, vault, accept, db.pool)).message, /cancelada/);
-  // Cancelada: o e-mail leva o XML da nota e o do cancelamento, sem DANFE.
-  await sendInvoiceMail(request, db.pool);
+  await db.pool.query("UPDATE mail_settings SET auto_send = true");
+  const cancellationJob = await enqueueNfeEvent(number, "cancelamento", "Cliente desistiu da compra antes da saída.", who, db.pool);
+  await db.pool.query("UPDATE fiscal_jobs SET run_after = $2 WHERE id = $1", [cancellationJob.id, now]);
+  assert.equal(await runOneFiscalJob(now, { vault, check: null, env, send: accept, mailSend: deliver }, db.pool), "completed");
+  // O automático reutiliza o último destinatário da nota e leva o XML da nota e do cancelamento, sem DANFE.
+  assert.equal(outbox[3].to, "compras@cliente.test");
   assert.match(outbox[3].message, /Subject: =\?UTF-8\?B\?Q2FuY2VsYW1lbnRv/);
   assert.match(outbox[3].message, /filename="Cancelamento-NFe\d{44}\.xml"/);
   assert.doesNotMatch(outbox[3].message, /DANFE-42\.pdf|CCe-2-NFe/);
+  // Se o processo cair depois do evento e do e-mail, a retomada não repete nenhum dos dois.
+  await db.pool.query("UPDATE fiscal_jobs SET status = 'processando', lease_until = $2, completed_at = NULL WHERE id = $1", [cancellationJob.id, new Date(now.getTime() - 1)]);
+  let recoveredEventCalls = 0;
+  const mailsBeforeRecovery = outbox.length;
+  assert.equal(await runOneFiscalJob(now, { vault, check: null, env, send: async () => { recoveredEventCalls += 1; return ""; }, mailSend: deliver }, db.pool), "completed");
+  assert.deepEqual([recoveredEventCalls, outbox.length], [0, mailsBeforeRecovery]);
   await assert.rejects(() => sendInvoiceMail({ ...request, kind: "correcao" }, db.pool), /nota está cancelada/);
   assert.equal((await listOrderInvoiceMails(orderId, db.pool))[0].kind, "cancelamento");
   const rejectedInvoice = await db.pool.query("SELECT id FROM fiscal_invoices WHERE status NOT IN ('autorizada', 'cancelada') LIMIT 1");
@@ -1658,6 +1715,28 @@ test("fila de inutilização: persiste o XML assinado antes da SEFAZ e não dupl
   assert.equal(await runOneNumberVoidJob(now, vault, send, db.pool), "completed");
   assert.deepEqual((await listNumberVoidJobs(db.pool)).slice(0, 1).map((job) => [job.status, job.attempts]), [["concluido", 1]]);
   assert.deepEqual((await listNumberVoids(db.pool)).slice(0, 1).map((item) => [item.first, item.last, item.protocol]), [[available, available, "135260000000010"]]);
+
+  const abandoned = await takeNextNumber(db.pool);
+  const abandonedRange = { series: 1, first: abandoned, last: abandoned, reason: "Numeração reservada para testar recuperação interrompida." };
+  const abandonedJob = await enqueueNumberVoid(abandonedRange, who, now, vault, db.pool);
+  await assert.rejects(
+    () => enqueueNumberVoid({ ...abandonedRange, reason: "Outra justificativa válida para a mesma faixa reservada." }, who, now, vault, db.pool),
+    /outra justificativa/i,
+  );
+  await db.pool.query("UPDATE fiscal_void_jobs SET status = 'processando', attempts = 1, lease_until = $2 WHERE id = $1", [abandonedJob.id, new Date(now.getTime() - 1)]);
+  let retransmissions = 0;
+  assert.equal(await runOneNumberVoidJob(now, vault, async () => { retransmissions += 1; return ""; }, db.pool), "none");
+  assert.equal(retransmissions, 0);
+  assert.deepEqual((await db.pool.query("SELECT status, last_error FROM fiscal_void_jobs WHERE id = $1", [abandonedJob.id])).rows.map((row) => [row.status, /confira a SEFAZ/i.test(row.last_error)]), [["revisao_manual", true]]);
+
+  const guarded = await takeNextNumber(db.pool);
+  const guardedJob = await enqueueNumberVoid({ series: 1, first: guarded, last: guarded, reason: "Numeração reservada para testar concorrência de emissão." }, who, now, vault, db.pool);
+  const order = await db.pool.query("SELECT id FROM orders WHERE status = 'fechado' LIMIT 1");
+  const active = await db.pool.query("INSERT INTO fiscal_jobs (kind, order_id, requested_by, run_after) VALUES ('emitir_nfe', $1, $2, $3) RETURNING id", [order.rows[0].id, who, now]);
+  assert.equal(await runOneNumberVoidJob(now, vault, async () => { retransmissions += 1; return ""; }, db.pool), "manual_review");
+  assert.equal(retransmissions, 0);
+  assert.deepEqual((await db.pool.query("SELECT status, last_error FROM fiscal_void_jobs WHERE id = $1", [guardedJob.id])).rows.map((row) => [row.status, /emissão de NF-e ativa/i.test(row.last_error)]), [["revisao_manual", true]]);
+  await db.pool.query("DELETE FROM fiscal_jobs WHERE id = $1", [active.rows[0].id]);
 });
 
 test("resposta perdida: evento duplicado (573) vem da consulta; número que já é de outra nota na SEFAZ (539) não é reaproveitado; duplicidade (204) traz o protocolo ou espera", { skip }, async () => {
@@ -1814,9 +1893,13 @@ test("excluir pedido com histórico: só a diretoria, e só enquanto nada chegou
   assert.equal((await closeOrder(number, SELLER.email, MINE, db.pool)).status, "fechado");
   const { rows } = await db.pool.query("SELECT id FROM orders WHERE number = $1", [number]);
   const id = Number(rows[0].id);
+  const queued = await db.pool.query("INSERT INTO fiscal_jobs (kind, order_id, requested_by) VALUES ('emitir_nfe', $1, $2) RETURNING id", [id, DIRECTOR]);
   // Fechado não se exclui; reaberto, tem histórico: o vendedor não exclui, a diretoria sim.
   await assert.rejects(() => deleteOrder(number, ALL, db.pool, { withHistory: true }), /fora de negociação/);
   await reopenOrder(number, DIRECTOR, ALL, db.pool);
+  const abandoned = await db.pool.query("SELECT status, last_error FROM fiscal_jobs WHERE id = $1", [queued.rows[0].id]);
+  assert.equal(abandoned.rows[0].status, "revisao_manual");
+  assert.match(String(abandoned.rows[0].last_error), /pedido reaberto/i);
   await assert.rejects(() => deleteOrder(number, MINE, db.pool), /só a diretoria pode excluí-lo/);
   // Com recebimento baixado, nem a diretoria: o dinheiro entrou.
   const expected = await db.pool.query("SELECT id FROM receivables WHERE order_id = $1 ORDER BY number LIMIT 1", [id]);
@@ -1824,7 +1907,7 @@ test("excluir pedido com histórico: só a diretoria, e só enquanto nada chegou
   await assert.rejects(() => deleteOrder(number, ALL, db.pool, { withHistory: true }), /tem recebimento, conta, nota fiscal ou contrato assinado/);
   await db.pool.query("DELETE FROM receipts WHERE receivable_id = $1", [expected.rows[0].id]);
   assert.deepEqual(await deleteOrder(number, ALL, db.pool, { withHistory: true }), { sellerEmail: SELLER.email });
-  for (const tableName of ["orders", "order_items", "order_closings", "order_approvals", "receivables"]) {
+  for (const tableName of ["orders", "order_items", "order_closings", "order_approvals", "receivables", "fiscal_jobs"]) {
     const column = tableName === "orders" ? "id" : "order_id";
     assert.equal(Number((await db.pool.query(`SELECT count(*) FROM ${tableName} WHERE ${column} = $1`, [id])).rows[0].count), 0, tableName);
   }

@@ -145,7 +145,7 @@ export async function countCorrections(invoiceId: number, conn: Queryable): Prom
   return Number(rows[0].total);
 }
 
-export type RegisteredEvent = { invoiceId: number; kind: InvoiceEvent["kind"]; sequence: number; text: string; signedXml: string; protocol: string; statusCode: string; createdBy: string };
+export type RegisteredEvent = { invoiceId: number; kind: InvoiceEvent["kind"]; sequence: number; text: string; signedXml: string; protocol: string; statusCode: string; createdBy: string; fiscalJobId?: number };
 
 /**
  * Writes an event SEFAZ registered. A cancellation also turns the invoice into
@@ -155,8 +155,8 @@ export type RegisteredEvent = { invoiceId: number; kind: InvoiceEvent["kind"]; s
 export async function recordInvoiceEvent(event: RegisteredEvent, conn: Queryable): Promise<number> {
   const { rows } = await conn.query(
     `WITH written AS (
-       INSERT INTO fiscal_invoice_events (invoice_id, kind, sequence, text, signed_xml, protocol, status_code, created_by)
-       SELECT i.id, $2, $3, $4, $5, $6, $7, $8 FROM fiscal_invoices i WHERE i.id = $1 AND i.status = 'autorizada'
+       INSERT INTO fiscal_invoice_events (invoice_id, kind, sequence, text, signed_xml, protocol, status_code, created_by, fiscal_job_id)
+       SELECT i.id, $2, $3, $4, $5, $6, $7, $8, $9 FROM fiscal_invoices i WHERE i.id = $1 AND i.status = 'autorizada'
        RETURNING id, invoice_id, kind
      ), cancelled AS (
        UPDATE fiscal_invoices SET status = 'cancelada', updated_at = now()
@@ -164,7 +164,7 @@ export async function recordInvoiceEvent(event: RegisteredEvent, conn: Queryable
        RETURNING id
      )
      SELECT id, invoice_id, (SELECT count(*) FROM cancelled) AS cancelled FROM written`,
-    [event.invoiceId, event.kind, event.sequence, event.text, event.signedXml, event.protocol, event.statusCode, event.createdBy],
+    [event.invoiceId, event.kind, event.sequence, event.text, event.signedXml, event.protocol, event.statusCode, event.createdBy, event.fiscalJobId ?? null],
   );
   if (!rows[0]) throw new Error("A nota não está mais autorizada; o evento não foi gravado.");
   return Number(rows[0].id);

@@ -105,6 +105,7 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "0072_fila_fiscal.sql",
     "0073_fila_de_eventos_fiscais.sql",
     "0074_fila_inutilizacao_fiscal.sql",
+    "0075_identidade_da_fila_fiscal.sql",
   ]);
 
   const second = await withClient((client) => migrate(client, MIGRATIONS_DIR));
@@ -237,6 +238,7 @@ test("migração: reconhece o PIX já aplicado com o nome anterior sem repetir S
         "0072_fila_fiscal.sql",
         "0073_fila_de_eventos_fiscais.sql",
         "0074_fila_inutilizacao_fiscal.sql",
+        "0075_identidade_da_fila_fiscal.sql",
       ]);
       assert.deepEqual(await migrate(client, MIGRATIONS_DIR), []);
       const flags = await client.query("SELECT 1 FROM payment_methods WHERE company_pix");

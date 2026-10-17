@@ -1,6 +1,7 @@
 import { IssueError, prepareNumberVoid, sendPreparedNumberVoid } from "@/lib/db/issue-nfe";
 import type { NumberVoidRange } from "@/lib/db/issue-nfe";
 import type { Queryable } from "@/lib/db/pool";
+import { usedNumbersIn } from "@/lib/db/invoices";
 import type { Send } from "@/lib/fiscal/channel";
 
 const LEASE_MS = 2 * 60_000;
@@ -35,9 +36,10 @@ export async function enqueueNumberVoid(range: NumberVoidRange, who: string, now
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
      ON CONFLICT (environment, series, first_number, last_number) WHERE status IN ('pendente', 'processando')
      DO UPDATE SET updated_at = now()
-     RETURNING id, (xmax <> 0) AS joined`,
+     RETURNING id, reason, (xmax <> 0) AS joined`,
     [prepared.environment, prepared.issuerUf, prepared.series, prepared.first, prepared.last, prepared.reason, prepared.signedXml, who],
   );
+  if (String(rows[0].reason) !== prepared.reason) throw new IssueError("Já há uma inutilização pendente para esta faixa com outra justificativa. Aguarde a conclusão ou revise a pendência antes de confirmar novamente.");
   return { id: Number(rows[0].id), joined: rows[0].joined === true };
 }
 
@@ -52,11 +54,17 @@ export async function listNumberVoidJobs(conn: Queryable): Promise<FiscalVoidJob
 }
 
 async function claimNumberVoidJob(now: Date, conn: Queryable): Promise<FiscalVoidJob | null> {
+  await conn.query(
+    `UPDATE fiscal_void_jobs
+        SET status = 'revisao_manual', lease_until = NULL,
+            last_error = COALESCE(last_error, 'Processamento interrompido após o envio; confira a SEFAZ antes de qualquer retransmissão.'), updated_at = $1
+      WHERE status = 'processando' AND lease_until <= $1`,
+    [now],
+  );
   const { rows } = await conn.query(
     `WITH candidate AS (
        SELECT id FROM fiscal_void_jobs
-        WHERE (status = 'pendente' AND run_after <= $1)
-           OR (status = 'processando' AND lease_until <= $1)
+        WHERE status = 'pendente' AND run_after <= $1
         ORDER BY run_after, id
         LIMIT 1
         FOR UPDATE SKIP LOCKED
@@ -83,6 +91,20 @@ export async function runOneNumberVoidJob(now: Date, vault: Buffer, send: Send, 
   const job = await claimNumberVoidJob(now, conn);
   if (!job) return "none";
   try {
+    const used = await usedNumbersIn(job.environment, job.range.series, job.range.first, job.range.last, conn);
+    const activeIssue = await conn.query(
+      `SELECT 1 FROM fiscal_jobs j
+        LEFT JOIN fiscal_invoices i ON i.fiscal_job_id = j.id
+       WHERE j.kind = 'emitir_nfe' AND j.status IN ('pendente', 'processando')
+         AND (i.id IS NULL OR (i.environment = $1 AND i.series = $2 AND i.number BETWEEN $3 AND $4))
+       LIMIT 1`,
+      [job.environment, job.range.series, job.range.first, job.range.last],
+    );
+    if (used.length > 0 || activeIssue.rows[0]) {
+      throw new IssueError(used.length > 0
+        ? `A faixa passou a conter nota com veredito da SEFAZ (número ${used.join(", ")}); confira-a manualmente.`
+        : "Há uma emissão de NF-e ativa que pode usar esta faixa; confira-a manualmente antes de inutilizar.");
+    }
     await sendPreparedNumberVoid({ ...job.range, environment: job.environment, issuerUf: job.issuerUf, signedXml: job.signedXml }, job.requestedBy, now, vault, send, conn);
     await conn.query("UPDATE fiscal_void_jobs SET status = 'concluido', completed_at = $2, lease_until = NULL, last_error = NULL, updated_at = $2 WHERE id = $1 AND status = 'processando'", [job.id, now]);
     return "completed";

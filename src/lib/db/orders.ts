@@ -753,6 +753,11 @@ export async function reopenOrder(number: string, who: string, scope: OrderScope
        RETURNING order_contracts.id
      ), noted AS (
        INSERT INTO order_contract_events (contract_id, kind, detail, actor) SELECT id, 'cancelado', 'pedido reaberto', $2 FROM unsigned
+     ), fiscal_review AS (
+       UPDATE fiscal_jobs
+          SET status = 'revisao_manual', lease_until = NULL,
+              last_error = 'Pedido reaberto depois da confirmação da operação fiscal; confirme novamente após fechar o pedido.', updated_at = now()
+         FROM reopened WHERE order_id = reopened.id AND status IN ('pendente', 'processando')
      )
      SELECT id FROM reopened`,
     [number, who, scope.sellerEmail],
@@ -809,6 +814,8 @@ export async function deleteOrder(number: string, scope: OrderScope, conn: Query
      ), unlinked AS (
        -- The opportunity of the funnel that became this order stays; only the link goes.
        UPDATE opportunities SET order_id = NULL FROM free WHERE order_id = free.id RETURNING order_id
+     ), fiscal_jobs_removed AS (
+       DELETE FROM fiscal_jobs USING free WHERE order_id = free.id RETURNING order_id
      ), items AS (
        DELETE FROM order_items USING free WHERE order_id = free.id RETURNING order_id
      ), removed AS (

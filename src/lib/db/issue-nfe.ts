@@ -48,11 +48,11 @@ export type IssueResult = { invoice: Invoice; message: string };
  * The local XSD check is mandatory before numbering and before transmission.
  * `check` may add an external conference; it never replaces the local check.
  */
-export async function issueOrderNfe(orderNumber: string, who: string, now: Date, vault: Buffer, send: Send, conn: Queryable, check: LayoutCheck | null = null): Promise<IssueResult> {
-  return withQueryableConnection(conn, held => issueOnConnection(orderNumber, who, now, vault, send, held, check));
+export async function issueOrderNfe(orderNumber: string, who: string, now: Date, vault: Buffer, send: Send, conn: Queryable, check: LayoutCheck | null = null, fiscalJobId?: number): Promise<IssueResult> {
+  return withQueryableConnection(conn, held => issueOnConnection(orderNumber, who, now, vault, send, held, check, fiscalJobId));
 }
 
-async function prepareOrderInvoice(orderNumber: string, who: string, now: Date, vault: Buffer, send: Send, conn: Queryable, check: LayoutCheck | null) {
+async function prepareOrderInvoice(orderNumber: string, who: string, now: Date, vault: Buffer, send: Send, conn: Queryable, check: LayoutCheck | null, fiscalJobId?: number) {
   await conn.query("BEGIN");
   try {
     // Serialize preparation of this order and roll back its number on any refusal.
@@ -141,6 +141,11 @@ async function prepareOrderInvoice(orderNumber: string, who: string, now: Date, 
       }
     }
 
+    if (fiscalJobId !== undefined) {
+      await conn.query("UPDATE fiscal_invoices SET fiscal_job_id = $2 WHERE id = $1", [invoice.id, fiscalJobId]);
+      await conn.query("UPDATE fiscal_jobs SET invoice_id = $2 WHERE id = $1", [fiscalJobId, invoice.id]);
+    }
+
     await conn.query("COMMIT");
     return { invoice, signedXml, certificate, url, environment, issuerUf:preview.issuerUf };
   } catch (error) {
@@ -149,8 +154,8 @@ async function prepareOrderInvoice(orderNumber: string, who: string, now: Date, 
   }
 }
 
-async function issueOnConnection(orderNumber: string, who: string, now: Date, vault: Buffer, send: Send, conn: Queryable, check: LayoutCheck | null): Promise<IssueResult> {
-  const prepared = await prepareOrderInvoice(orderNumber, who, now, vault, send, conn, check);
+async function issueOnConnection(orderNumber: string, who: string, now: Date, vault: Buffer, send: Send, conn: Queryable, check: LayoutCheck | null, fiscalJobId?: number): Promise<IssueResult> {
+  const prepared = await prepareOrderInvoice(orderNumber, who, now, vault, send, conn, check, fiscalJobId);
   if (prepared.completed) return prepared.completed;
   const { invoice, signedXml, certificate, url, environment, issuerUf } = prepared;
 
@@ -223,11 +228,14 @@ export async function registerOrderNfeEvent(
   vault: Buffer,
   send: Send,
   conn: Queryable,
+  context: { invoiceId?: number; fiscalJobId?: number } = {},
 ): Promise<{ invoiceId: number; eventId: number; message: string }> {
   const order = await getOrder(orderNumber, { sellerEmail: null }, conn);
   if (!order) throw new IssueError("Pedido não encontrado.");
   const settings = await loadFiscalSettings(conn);
-  const invoice = (await listOrderInvoices(order.id, conn)).find((item) => item.status === "autorizada" && item.environment === settings.environment);
+  const invoice = (await listOrderInvoices(order.id, conn)).find((item) =>
+    item.status === "autorizada" && (context.invoiceId === undefined ? item.environment === settings.environment : item.id === context.invoiceId),
+  );
   if (!invoice || !invoice.protocol) throw new IssueError("Este pedido não tem nota autorizada neste ambiente.");
 
   const sealed = await loadSealedCertificate(conn);
@@ -268,7 +276,7 @@ export async function registerOrderNfeEvent(
       throw error;
     }
     if (!found) throw new IssueError(`A SEFAZ não registrou (${result.code}): ${result.reason}. A consulta da nota não trouxe esse evento: confira no portal da SEFAZ.`);
-    const eventId = await recordInvoiceEvent({ invoiceId: invoice.id, kind, sequence, text: found.text, signedXml: found.xml, protocol: found.protocol, statusCode: found.code, createdBy: who }, conn);
+    const eventId = await recordInvoiceEvent({ invoiceId: invoice.id, kind, sequence, text: found.text, signedXml: found.xml, protocol: found.protocol, statusCode: found.code, createdBy: who, fiscalJobId: context.fiscalJobId }, conn);
     if (kind === "cancelamento") return { invoiceId: invoice.id, eventId, message: `A nota ${invoice.number} já estava cancelada na SEFAZ. Protocolo ${found.protocol}.` };
     if (found.text === text.replace(/\s+/g, " ").trim()) return { invoiceId: invoice.id, eventId, message: `A carta de correção ${sequence} já estava registrada na SEFAZ. Protocolo ${found.protocol}.` };
     throw new IssueError(`A carta de correção ${sequence} já estava registrada na SEFAZ com outro texto ("${found.text}", protocolo ${found.protocol}) e foi gravada aqui. Se a correção de agora ainda é necessária, registre de novo: ela sai como a carta ${sequence + 1}.`);
@@ -276,7 +284,7 @@ export async function registerOrderNfeEvent(
   if (!result.registered) throw new IssueError(`A SEFAZ não registrou (${result.code}): ${result.reason}`);
   if (processed === null) throw new IssueError("O recibo completo do evento não foi obtido. Consulte a SEFAZ antes de reenviar.");
 
-  const eventId = await recordInvoiceEvent({ invoiceId: invoice.id, kind, sequence, text: text.replace(/\s+/g, " ").trim(), signedXml: processed, protocol: result.protocol, statusCode: result.code, createdBy: who }, conn);
+  const eventId = await recordInvoiceEvent({ invoiceId: invoice.id, kind, sequence, text: text.replace(/\s+/g, " ").trim(), signedXml: processed, protocol: result.protocol, statusCode: result.code, createdBy: who, fiscalJobId: context.fiscalJobId }, conn);
   return { invoiceId: invoice.id, eventId, message: kind === "cancelamento" ? `Nota ${invoice.number} cancelada. Protocolo ${result.protocol}.` : `Carta de correção ${sequence} registrada. Protocolo ${result.protocol}.` };
 }
 
