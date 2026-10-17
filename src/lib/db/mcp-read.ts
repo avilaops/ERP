@@ -40,10 +40,10 @@ export async function openReceivablesForAssistant(conn: Queryable) {
 
 export async function openPayablesForAssistant(conn: Queryable) {
   const { rows } = await conn.query(
-    `SELECT p.description, s.name AS supplier, p.category, p.due_date::text AS due, p.amount, (p.due_date < current_date) AS late
+    `SELECT p.id, p.description, s.name AS supplier, p.category, p.due_date::text AS due, p.amount, (p.due_date < (now() AT TIME ZONE 'America/Sao_Paulo')::date) AS late
        FROM payables p LEFT JOIN suppliers s ON s.id = p.supplier_id WHERE p.status = 'aberta' ORDER BY p.due_date, p.id LIMIT 100`,
   );
-  return rows.map((row) => ({ descricao: String(row.description), fornecedor: row.supplier === null ? null : String(row.supplier), categoria: row.category === null ? null : String(row.category), vence_em: String(row.due), valor: Number(row.amount), atrasada: row.late === true }));
+  return rows.map((row) => ({ id: Number(row.id), descricao: String(row.description), fornecedor: row.supplier === null ? null : String(row.supplier), categoria: row.category === null ? null : String(row.category), vence_em: String(row.due), valor: Number(row.amount), atrasada: row.late === true }));
 }
 
 export async function customersForAssistant(search: string, conn: Queryable) {

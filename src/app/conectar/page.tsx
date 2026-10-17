@@ -64,7 +64,7 @@ export default async function ConectarPage() {
           ))}
           {tools.length === 0 && <li>Nenhuma ferramenta: o seu perfil não tem telas ligadas ao assistente.</li>}
         </ul>
-        <p className="mt-2 text-sm text-slate-600">Custo e margem exigem o poder de custos da diretoria. Baixas e tarefas em pedidos pedem confirmação no chat. Fechar, aprovar e pagar contas continuam na tela.</p>
+        <p className="mt-2 text-sm text-slate-600">Custos exigem diretoria autorizada. Contas, baixas e tarefas pedem confirmação. Registrar pagamento não transfere dinheiro. Cobranças são rascunhos.</p>
       {mine.length > 0 && (
         <section className={`${CARD} p-4`} aria-label="Meus assistentes conectados">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Conectados por você</h2>

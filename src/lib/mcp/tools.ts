@@ -10,6 +10,9 @@ import { listOpportunityMessages } from "@/lib/db/messages";
 import type { Queryable } from "@/lib/db/pool";
 import { listProductionOrders, listProductionStages } from "@/lib/db/production";
 import { BUSINESS_TOOLS } from "@/lib/mcp/business-tools";
+import { FINANCE_TOOLS } from "@/lib/mcp/finance-tools";
+import { QUERY_TOOLS } from "@/lib/mcp/query-tools";
+import { PayableError } from "@/lib/db/payables";
 import { ConfirmationError } from "@/lib/mcp/confirmation";
 import { ReceivableError } from "@/lib/db/receivables";
 import { ToolError } from "@/lib/mcp/definition";
@@ -33,6 +36,8 @@ const object = (properties: Schema["properties"], required: string[] = []): Sche
 
 export const TOOLS: Tool[] = [
   ...BUSINESS_TOOLS,
+  ...FINANCE_TOOLS,
+  ...QUERY_TOOLS,
   {
     name: "funil_oportunidades", title: "Oportunidades do funil", item: "funil",
     description: "Lista as oportunidades de venda (vendas possíveis, antes do pedido): as da própria pessoa, ou as da equipe para gerência e diretoria. Até 50.",
@@ -178,7 +183,7 @@ export async function callTool(session: Session, conn: Queryable, name: string, 
   try {
     return await tool.run(session, conn, given);
   } catch (error) {
-    if (error instanceof FunnelError || error instanceof ConfirmationError || error instanceof ReceivableError) throw new ToolError(error.message);
+    if (error instanceof FunnelError || error instanceof ConfirmationError || error instanceof ReceivableError || error instanceof PayableError) throw new ToolError(error.message);
     throw error;
   }
 }

@@ -4,6 +4,15 @@
   "members": [],
   "tasks": [
     {
+      "id": "T-20261017-mcp-financeiro-consultas",
+      "title": "Completar financeiro e consultas comerciais e operacionais no MCP",
+      "owner": null,
+      "status": "em-revisao",
+      "acceptance": ["Quinze ferramentas respeitam perfil, tela, poder e empresa", "Contas a pagar exigem previa, confirmacao, revisao e repeticao idempotente", "Relatorios usam dados registrados e explicitam limites sem presumir agenda, custo ou envio", "Banco isolado, HTTP e UI conferidos antes da publicacao"],
+      "evidence": ["https://linear.app/avilaops/issue/AVL-148", "docs/mcp-operacoes.md", "733 testes aprovados; 14 testes MCP repetidos apos ajustes finais; lint e tipos aprovados", "HTTP demo 1.2.0: 15 novas ferramentas, 12 consultas, cobranca rascunho, conta e baixa com confirmacao sem duplicacao", "Conta ficticia de R$ 123,45 conferida como paga na UI; 15 medicoes de uma tela nos cinco tamanhos, controles >=44 px; teclado e texto/zoom 200% conferidos"],
+      "next": "Publicar apos concluir etapa comercial e registrar evidencia. Restam dez mutacoes comerciais na AVL-145; descoberta no assistente externo ainda sem comprovacao."
+    },
+    {
       "id": "T-20261017-mcp-prioridades",
       "title": "Ampliar MCP com baixa, margem, caixa e tarefa em pedido",
       "owner": null,

@@ -2,6 +2,7 @@
 
 Demanda: [AVL-145](https://linear.app/avilaops/issue/AVL-145).
 Primeira entrega: [AVL-146](https://linear.app/avilaops/issue/AVL-146).
+Segunda entrega: [AVL-148](https://linear.app/avilaops/issue/AVL-148).
 
 ## Primeira entrega
 
@@ -68,12 +69,76 @@ O saldo é a diferença prevista do período, não o saldo bancário. Custos e
 despesas ainda não lançados e comissões futuras ainda não geradas não entram.
 Intervalo máximo: 366 dias; semana inicia na segunda-feira.
 
+## Segunda entrega: financeiro e consultas
+
+| Ferramentas | Quem recebe | Comportamento |
+| --- | --- | --- |
+| `contas_a_pagar_lancar`, `contas_a_pagar_dar_baixa` | Contas a pagar | Prévia e confirmação; listas ativas da empresa; baixa registra pagamento já realizado, com valor efetivo, data e meio |
+| `cobranca_gerar_mensagem` | Recebimentos | Rascunho de parcela vencida pelo saldo líquido; não envia mensagem e não presume multa, juros ou chave PIX |
+| `produtos_buscar` | Tabela de preços | Catálogo ativo da última publicação por linha, preços e estoque, sem custo ou fornecedor |
+| `pedido_detalhe` | Pedidos | Itens, condições, produção e expedição; vendedor só alcança seus pedidos |
+| `minhas_comissoes` | Comissões | Previsão, competência, pagamentos e saldo anterior, sempre da própria pessoa |
+| `nota_fiscal_status`, `producao_status` | Relatórios e Pedidos ou Recebimentos | Situação do pedido ao alcance da pessoa; financeiro com Recebimentos consulta a empresa; sem XML, emissão ou movimentação de fábrica |
+| `entregas_agenda` | Estoque | Expedições do período e pendências, com prazo de produção; não inventa agenda de transporte |
+| `compras_estoque_minimo` | Compras | Material abaixo do mínimo e quantidade para repor; não abre compra |
+| `inadimplencia_resumo` | Diretoria com Recebimentos | Saldo líquido vencido por cliente e identidade do vendedor |
+| `vendas_resumo` | Diretoria com Relatórios, Pedidos e poder de ver pedidos da equipe | Venda comercial fechada por mês, vendedor, produto ou UF; não é faturamento fiscal nem caixa |
+| `funil_conversao` | Diretoria com Funil e poder de ver a equipe | Situação atual das oportunidades criadas no intervalo e motivos de perda |
+| `descontos_fora_da_regra`, `pedidos_suspeitos` | Diretoria com Pedidos e poder de ver a equipe | Revisão da política atual e sinais objetivos para conferência humana; sem cancelamento ou exclusão |
+
+As duas novas escritas usam a confirmação de dez minutos descrita acima.
+Prévia não cria conta nem registra pagamento. Confirmação revalida os cadastros
+ativos; baixa também bloqueia a conta e exige a mesma revisão da prévia. Repetir
+o código devolve o resultado original. Autor e horário permanecem nos registros
+de negócio e na confirmação. Não há transferência bancária.
+
+`contas_a_pagar_lancar` sem argumentos lista categorias, meios e fornecedores
+ativos. Os fornecedores são projetados apenas como ID e nome, sem banco ou
+contato. `contas_a_pagar_em_aberto` agora informa o ID utilizado para a baixa.
+
+### Limites dos dados disponíveis
+
+- Prazo de fabricação é informado pelo vendedor no pedido; não existe prazo por
+  produto no catálogo nem limite global desse prazo na política comercial.
+- O ERP registra produção e saída de estoque, mas ainda não agenda transporte.
+  `entregas_agenda` declara essa limitação, inclui pendentes sem data e atrasados
+  anteriores ao intervalo e não transforma fabricação em promessa de entrega.
+- O resumo comercial usa o total do fechamento. Por produto, usa as linhas da
+  tabela congelada, arredondadas como o orçamento; a soma pode diferir em centavos
+  do total do pedido. Registros sem fechamento são contados separadamente.
+- Conversão considera oportunidades criadas no período e sua situação atual.
+  A taxa é ganhas/(ganhas+perdidas); sem decisões, retorna nulo.
+- Revisão de política pagina os pedidos analisados, até 25 por página. Uma página
+  sem infrações ainda pode ter próxima página. Pedidos de teste são apenas
+  sinalizados por texto, falta de cliente/itens ou situação de negociação.
+
 ## Etapas seguintes
 
-A AVL-145 registra a lista completa proposta para vendas, administrativo e
-diretoria. Esta primeira entrega não habilita cancelamentos, aprovações,
-cadastros, emissão fiscal ou envio de cobrança pelo chat. Textos e pedidos
-mostrados nas capturas de auditoria são evidências, não autorizações de execução.
+A AVL-145 registra as 29 funções propostas. Após estas duas entregas, faltam
+dez: `clientes_cadastrar`, `clientes_atualizar`, `orcamento_criar`,
+`pedido_enviar_aprovacao`, `funil_criar_oportunidade`, `funil_mover_etapa`,
+`pedido_cancelar`, `tarefas_limpar_duplicadas`, `aprovacao_aprovar` e
+`aprovacao_reprovar`. Emissão fiscal e envio de cobrança pelo chat não são
+habilitados por esta entrega. Textos e pedidos mostrados nas capturas de
+auditoria são evidências, não autorizações de execução.
+
+## Evidências da segunda entrega
+
+- Suíte completa: 733 testes aprovados, sem falhas ou pulos. Após os ajustes
+  finais de identidade do vendedor, arredondamento e isolamento, os 14 testes
+  de MCP desta etapa passaram novamente. Lint e tipos aprovados.
+- HTTP autenticado em demonstração: handshake 1.2.0, quinze novas ferramentas
+  anunciadas, doze consultas, cobrança em rascunho e lançamento/baixa de conta
+  fictícia com prévia sem escrita e repetição idempotente. Conexão temporária
+  revogada ao finalizar o teste, inclusive em caso de erro.
+- Conta fictícia de R$ 123,45 conferida na aba Pagas pela UI, em 17/10/2026.
+  Nenhuma transferência bancária foi executada.
+- Conectar, autorizar e configurar: quinze medições nos cinco tamanhos,
+  altura inicial de uma tela, sem excesso horizontal ou controles abaixo de
+  44 px. Lista de ferramentas abre e recolhe pelo teclado. Texto e zoom a 200%
+  permitem alcançar os controles; ajustes temporários foram restaurados.
+- Publicação desta etapa ainda pendente; a última produção verificada é
+  `bc9374f`. A descoberta no assistente externo do usuário não foi comprovada.
 
 ## Evidências da primeira entrega
 
