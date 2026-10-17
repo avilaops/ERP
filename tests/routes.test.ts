@@ -374,7 +374,9 @@ const API_DIR = fileURLToPath(new URL("../src/app/api/", import.meta.url));
 const PUBLIC_ROUTES = new Set(["health/route.ts"]);
 
 test("toda rota de src/app/api confere a sessão, e a empresa só sai dela", () => {
-  const routes = readdirSync(API_DIR, { recursive: true, encoding: "utf8" }).filter((file) => /(^|\\)route\.tsx?$/.test(file)).map(projectPath);
+  const routes = readdirSync(API_DIR, { recursive: true, encoding: "utf8" })
+    .filter((file) => /(^|[\\/])route\.tsx?$/.test(file))
+    .map(projectPath);
   assert.ok(routes.includes("produtos/[id]/foto/route.ts"));
   for (const file of PUBLIC_ROUTES) assert.ok(routes.includes(file), `${file} está na lista de rotas públicas e não existe`);
   for (const file of routes) {

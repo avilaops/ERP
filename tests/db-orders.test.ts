@@ -1427,7 +1427,7 @@ test("fila fiscal: clique repetido compartilha a emissão; perda de resposta ret
   const number = await createOrder({ seller: SELLER, version: 1, productId: ID["LD-B001"], quantity: 1 }, numbers("261018-JOB1"), db.pool);
   await linkOrderCustomer(number, customerSp, SELLER.email, MINE, db.pool);
   await saveOrderTerms(number, { ...TERMS, deliveryUf: "SP" }, SELLER.email, MINE, db.pool);
-  await savePayment(number, PAYMENT, SELLER.email, MINE, db.pool);
+  await savePayment(number, { ...PAYMENT, downPayment: 1_000 }, SELLER.email, MINE, db.pool);
   await closeOrder(number, SELLER.email, MINE, db.pool);
   const orderId = Number((await db.pool.query("SELECT id FROM orders WHERE number = $1", [number])).rows[0].id);
   await db.pool.query("UPDATE customers SET email = 'fila@cliente.test' WHERE id = $1", [customerSp]);

@@ -273,7 +273,9 @@ test("MCP no código: nada de custo nas leituras, a chave confere empresa, conex
   const access = read("lib/mcp/access.ts");
   assert.ok(access.indexOf("if (!tenant) return null;") < access.indexOf("tenantDb("));
   assert.ok(access.indexOf("await mcpEnabled(opened.conn)") < access.indexOf("grantOfAccess(") && access.indexOf("grantOfAccess(") < access.indexOf("sessionOf("));
-  const sources = readdirSync(SRC, { recursive: true, encoding: "utf8" }).filter((file) => /\.tsx?$/.test(file));
+  const sources = readdirSync(SRC, { recursive: true, encoding: "utf8" })
+    .filter((file) => /\.tsx?$/.test(file))
+    .map((file) => file.replaceAll("\\", "/"));
   // Só a porta do MCP e a rota das chaves abrem a empresa por um segredo.
   assert.deepEqual(sources.filter((file) => /openMcpTenant\(|mcpAccess\(/.test(read(file)) && file !== "lib/mcp/access.ts").sort(), ["app/mcp/route.ts", "app/oauth/token/route.ts"]);
   // A tela de conectar é de quem está logado, e cada um só desconecta o que é seu.

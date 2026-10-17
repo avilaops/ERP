@@ -118,7 +118,9 @@ const SRC = fileURLToPath(new URL("../src/", import.meta.url));
 const read = (file: string) => readFileSync(SRC + file, "utf8");
 
 test("assistente no código: a chave só é lida num lugar, nunca vai a log, e o que ele lê não passa por custo nem por pedido", () => {
-  const sources = readdirSync(SRC, { recursive: true, encoding: "utf8" }).filter((file) => /\.tsx?$/.test(file));
+  const sources = readdirSync(SRC, { recursive: true, encoding: "utf8" })
+    .filter((file) => /\.tsx?$/.test(file))
+    .map((file) => file.replaceAll("\\", "/"));
   assert.deepEqual(sources.filter((file) => read(file).includes("ERP_ANTHROPIC_API_KEY")), ["lib/ai/client.ts"]);
   const client = read("lib/ai/client.ts");
   assert.doesNotMatch(client, /console\./);
