@@ -109,6 +109,14 @@ test("campos comerciais recusam URLs perigosas, e-mail errado, frete inválido e
   assert.equal(checkedProposalDetails({website:"HTTPS://example.com"}).website,"HTTPS://example.com");
 });
 
+test("contato preservado no pedido prevalece sobre novos padrões da empresa",()=>{
+  const kept=completeQuote(document,order,{...context,orderDetails:{...context.orderDetails,phone:"11999998888",email:"congelado@example.com"}},products);
+  assert.match(kept.issuerLines!.join(" "),/congelado@example.com/);
+  assert.match(kept.footer!.join(" "),/congelado@example.com/);
+  assert.ok(!kept.issuerLines!.join(" ").includes("comercial@example.com"));
+  assert.ok(!kept.footer!.join(" ").includes("comercial@example.com"));
+});
+
 test("PDF completo pagina condições longas, imprime QR e preserva margens em todas as páginas", async () => {
   const full = completeQuote(document, order, { ...context, orderDetails: { ...context.orderDetails, warranty: "Cobertura e exclusões aprovadas. ".repeat(30), cancellation: "Condição de cancelamento aprovada. ".repeat(25) } }, products);
   const bytes = await renderQuotePdf(full, { logo: null, photos: new Map() });
