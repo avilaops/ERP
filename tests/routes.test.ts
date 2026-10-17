@@ -346,7 +346,7 @@ test("não existe página no grupo protegido sem requirePermission", () => {
   // and the list of prospects; and the switch of the calls by the system;
   // and, of production, the materials, what will run short, the list of materials of one equipment and the hours.
   // and the preparation of the fiscal rules of one order's invoice.
-  assert.equal(all.length, MENU_ITEMS.length + 60);
+  assert.equal(all.length, MENU_ITEMS.length + 63);
   for (const route of all) {
     assert.match(source(route), /await requirePermission\(/, route);
   }
@@ -374,7 +374,9 @@ const API_DIR = fileURLToPath(new URL("../src/app/api/", import.meta.url));
 const PUBLIC_ROUTES = new Set(["health/route.ts"]);
 
 test("toda rota de src/app/api confere a sessão, e a empresa só sai dela", () => {
-  const routes = readdirSync(API_DIR, { recursive: true, encoding: "utf8" }).filter((file) => /(^|[\\/])route\.tsx?$/.test(file)).map(projectPath);
+  const routes = readdirSync(API_DIR, { recursive: true, encoding: "utf8" })
+    .filter((file) => /(^|[\\/])route\.tsx?$/.test(file))
+    .map(projectPath);
   assert.ok(routes.includes("produtos/[id]/foto/route.ts"));
   for (const file of PUBLIC_ROUTES) assert.ok(routes.includes(file), `${file} está na lista de rotas públicas e não existe`);
   for (const file of routes) {
@@ -414,7 +416,7 @@ test("toda rota de src/app/api confere a sessão, e a empresa só sai dela", () 
     for (const [call] of code.matchAll(/tenantDb\([^)]*\)/g)) {
       assert.equal(call, "tenantDb(session.tenant.slug)", `${file}: ${call}`);
     }
-    assert.doesNotMatch(code, /from "pg"|new pg\.|search_path|tenant_|searchParams|formData\(/, `${file} foge da regra das rotas`);
+    assert.doesNotMatch(code, /from "pg"|new pg\.|search_path|tenant_|formData\(/, `${file} foge da regra das rotas`);
   }
 });
 

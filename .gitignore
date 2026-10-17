@@ -25,3 +25,8 @@ standalone.tgz
 .shots/
 # Teste das telas (npm run test:telas)
 /test-results/
+
+# Corpus, derived files and Python worker caches are never source code.
+__pycache__/
+*.pyc
+/document-storage/

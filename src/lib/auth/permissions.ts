@@ -26,6 +26,7 @@ const MENU = [
   { key: "parametros", label: "Configurações", href: "/parametros", roles: ["DIRETORIA"] },
   { key: "simulador", label: "Simulador", href: "/simulador", roles: ["DIRETORIA", "GERENTE_COMERCIAL", "VENDEDOR"] },
   { key: "equipe", label: "Equipe e acessos", href: "/equipe", roles: ["DIRETORIA"] },
+  { key: "documentos", label: "Documentos", href: "/documentos", roles: ["DIRETORIA", "GERENTE_COMERCIAL", "VENDEDOR", "FINANCEIRO"] },
 ] as const satisfies readonly {
   key: string;
   label: string;

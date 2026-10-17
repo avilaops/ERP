@@ -135,7 +135,7 @@ export async function renderContractPdf(document: ContractDocument, logo: Uint8A
     }
   }
 
-  footers(pdf, fonts, `${document.company} · ${document.title} nº ${document.number}`);
+  footers(pdf, fonts, `${document.company} · Contrato nº ${document.number}`);
   return pdf.save({ useObjectStreams: false });
 }
 

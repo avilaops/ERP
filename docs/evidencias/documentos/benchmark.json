@@ -1,0 +1,124 @@
+{
+  "generatedAt": "2026-10-17T08:23:55.563Z",
+  "documents": 10000,
+  "chunks": 10000,
+  "concurrency": 1,
+  "transport": "SSH tunnel; client wall time includes network, server plan time is separate",
+  "client": {
+    "cpu": "13th Gen Intel(R) Core(TM) i5-1334U",
+    "memoryBytes": 8216301568
+  },
+  "server": {
+    "version": "PostgreSQL 18.6 (Ubuntu 18.6-0ubuntu0.26.04.1) on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0, 64-bit",
+    "chunks_size": "4280 kB"
+  },
+  "results": [
+    {
+      "query": {
+        "q": ""
+      },
+      "repetitions": 20,
+      "client_including_network": {
+        "p50_ms": 254.14160000000265,
+        "p95_ms": 262.63180000000284
+      },
+      "database_execution": {
+        "p50_ms": 43.085,
+        "p95_ms": 57.795
+      }
+    },
+    {
+      "query": {
+        "q": "rejeição"
+      },
+      "repetitions": 20,
+      "client_including_network": {
+        "p50_ms": 263.3133000000089,
+        "p95_ms": 266.4899000000005
+      },
+      "database_execution": {
+        "p50_ms": 54.659,
+        "p95_ms": 63.734
+      }
+    },
+    {
+      "query": {
+        "q": "cStat"
+      },
+      "repetitions": 20,
+      "client_including_network": {
+        "p50_ms": 262.61530000000494,
+        "p95_ms": 273.83030000000144
+      },
+      "database_execution": {
+        "p50_ms": 51.115,
+        "p95_ms": 58.999
+      }
+    },
+    {
+      "query": {
+        "q": "distribuição",
+        "tipo": "application/xml",
+        "colecao": "1"
+      },
+      "repetitions": 20,
+      "client_including_network": {
+        "p50_ms": 272.23940000000584,
+        "p95_ms": 281.7088999999978
+      },
+      "database_execution": {
+        "p50_ms": 62.862,
+        "p95_ms": 72.341
+      }
+    }
+  ],
+  "plans": {
+    "QUERY PLAN": [
+      {
+        "Plan": {
+          "Node Type": "Seq Scan",
+          "Parallel Aware": false,
+          "Async Capable": false,
+          "Relation Name": "document_chunks",
+          "Alias": "document_chunks",
+          "Startup Cost": 0,
+          "Total Cost": 375,
+          "Plan Rows": 1000,
+          "Plan Width": 8,
+          "Actual Startup Time": 0.031,
+          "Actual Total Time": 9.159,
+          "Actual Rows": 1000,
+          "Actual Loops": 1,
+          "Disabled": false,
+          "Filter": "(search_vector @@ '''rejeiçã'''::tsquery)",
+          "Rows Removed by Filter": 9000,
+          "Shared Hit Blocks": 250,
+          "Shared Read Blocks": 0,
+          "Shared Dirtied Blocks": 0,
+          "Shared Written Blocks": 0,
+          "Local Hit Blocks": 0,
+          "Local Read Blocks": 0,
+          "Local Dirtied Blocks": 0,
+          "Local Written Blocks": 0,
+          "Temp Read Blocks": 0,
+          "Temp Written Blocks": 0
+        },
+        "Planning": {
+          "Shared Hit Blocks": 4,
+          "Shared Read Blocks": 0,
+          "Shared Dirtied Blocks": 0,
+          "Shared Written Blocks": 0,
+          "Local Hit Blocks": 0,
+          "Local Read Blocks": 0,
+          "Local Dirtied Blocks": 0,
+          "Local Written Blocks": 0,
+          "Temp Read Blocks": 0,
+          "Temp Written Blocks": 0
+        },
+        "Planning Time": 0.357,
+        "Triggers": [],
+        "Execution Time": 9.363
+      }
+    ]
+  }
+}

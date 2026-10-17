@@ -204,8 +204,12 @@ operações que ele não faz.
 4. **Alíquotas de 2027 do IBS e da CBS** e a nova composição de `vProd` (NT 2025.002 e NT 2026.008):
    trocar até 31/12/2026.
 5. **Tabela de CST × `cClassTrib`** fora do sistema: código errado só aparece na rejeição.
-6. **ICMS interestadual × origem para contribuinte**: sem o grupo de DIFAL a SEFAZ não confere, e o
-   sistema também não; mercadoria importada (4%) com parâmetro de 7% ou 12% destaca ICMS a mais.
+6. ~~ICMS interestadual × origem para contribuinte~~: corrigido em 15/10/2026. A conferência da
+   alíquota por origem e estados também bloqueia vendas interestaduais com CST 00 sem DIFAL.
+   Os códigos de origem 1, 2, 3 e 8 exigem 4%; os demais seguem 7% ou 12%. Não altera alíquotas
+   cadastradas nem aplica essa conferência a vendas internas, CST sem destaque ou CSOSN.
+   Referência: [Resolução do Senado 13/2012](https://legis.senado.leg.br/norma/586999/publicacao?tipoDocumento=RSF&tipoTexto=ATU).
+   Regressão em `tests/nfe-conformidade.test.ts`, incluindo exceções por origem e itens mistos.
 7. **Dados semeados**: Alagoas com 19% (o serviço fiscal traz 20,5%); FCP 0% em todos os estados.
 8. **Telefone do emitente** no cadastro fiscal (campo mínimo do DANFE).
 9. **Evento guardado sem o `retEvento`**; `card`, `cobr`, `vItem`, `vNFTot`, `vProdLiq`: opcionais

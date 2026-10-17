@@ -198,7 +198,9 @@ test("WhatsApp no código: o aviso só é aceito assinado, a conta nunca vai a l
   assert.doesNotMatch(route, /tenantDb|getSession|cookies\(|console\./);
   const door = read("lib/whatsapp/public.ts");
   assert.ok(door.indexOf("if (!tenant) return null;") < door.indexOf("tenantDb("));
-  const sources = readdirSync(SRC, { recursive: true, encoding: "utf8" }).filter((file) => /\.tsx?$/.test(file));
+  const sources = readdirSync(SRC, { recursive: true, encoding: "utf8" })
+    .filter((file) => /\.tsx?$/.test(file))
+    .map((file) => file.replaceAll("\\", "/"));
   assert.deepEqual(sources.filter((file) => read(file).includes("openWhatsappHook(") && file !== "lib/whatsapp/public.ts"), ["app/whatsapp/[empresa]/route.ts"]);
   const api = read("lib/whatsapp/api.ts");
   assert.doesNotMatch(api, /console\./);

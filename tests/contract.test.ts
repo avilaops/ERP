@@ -108,7 +108,7 @@ test("link de assinatura: o IP é o que o proxy viu, e o endereço público não
 
 const SRC = fileURLToPath(new URL("../src/", import.meta.url));
 const read = (file: string) => readFileSync(SRC + file, "utf8");
-const sources = () => readdirSync(SRC, { recursive: true, encoding: "utf8" }).filter((file) => /\.tsx?$/.test(file));
+const sources = () => readdirSync(SRC, { recursive: true, encoding: "utf8" }).map((file) => file.replaceAll("\\", "/")).filter((file) => /\.tsx?$/.test(file));
 
 test("página de assinatura: sem sessão, só o contrato do link, nunca indexada, e nada de custo", () => {
   const dir = "app/contrato/[empresa]/[token]/";
@@ -302,7 +302,7 @@ test("selo digital: o PDF sai assinado com o certificado da empresa, cobre o arq
       writeFileSync(`${dir}/assinatura.der`, seal.signature);
       writeFileSync(`${dir}/conteudo.bin`, content);
       try {
-        execFileSync("openssl", ["cms", "-verify", "-binary", "-inform", "DER", "-in", `${dir}/assinatura.der`, "-content", `${dir}/conteudo.bin`, "-noverify", "-out", "/dev/null"], { stdio: "ignore" });
+        execFileSync("openssl", ["cms", "-verify", "-binary", "-inform", "DER", "-in", `${dir}/assinatura.der`, "-content", `${dir}/conteudo.bin`, "-noverify", "-out", process.platform === "win32" ? "NUL" : "/dev/null"], { stdio: "ignore" });
         return true;
       } catch {
         return false;

@@ -1,0 +1,407 @@
+[
+  {
+    "width": 360,
+    "height": 640,
+    "path": "/documentos",
+    "overflow": 0,
+    "small": [],
+    "pageHeight": 640,
+    "viewport": 640
+  },
+  {
+    "width": 360,
+    "height": 640,
+    "path": "/documentos/filtros",
+    "overflow": 0,
+    "small": [],
+    "pageHeight": 640,
+    "viewport": 640
+  },
+  {
+    "width": 360,
+    "height": 640,
+    "path": "/documentos/filtros?etapa=2",
+    "overflow": 0,
+    "small": [],
+    "pageHeight": 640,
+    "viewport": 640
+  },
+  {
+    "width": 360,
+    "height": 640,
+    "path": "/documentos/filtros?etapa=3",
+    "overflow": 0,
+    "small": [],
+    "pageHeight": 640,
+    "viewport": 640
+  },
+  {
+    "width": 360,
+    "height": 640,
+    "path": "/documentos/187",
+    "overflow": 0,
+    "small": [],
+    "pageHeight": 640,
+    "viewport": 640
+  },
+  {
+    "width": 360,
+    "height": 640,
+    "path": "/documentos/187?aba=fonte",
+    "overflow": 0,
+    "small": [],
+    "pageHeight": 640,
+    "viewport": 640
+  },
+  {
+    "width": 360,
+    "height": 640,
+    "path": "/documentos/187?aba=historico",
+    "overflow": 0,
+    "small": [],
+    "pageHeight": 640,
+    "viewport": 640
+  },
+  {
+    "width": 360,
+    "height": 640,
+    "path": "/documentos/187?aba=schema",
+    "overflow": 0,
+    "small": [],
+    "pageHeight": 640,
+    "viewport": 640
+  },
+  {
+    "width": 360,
+    "height": 640,
+    "path": "/documentos/coletas",
+    "overflow": 0,
+    "small": [],
+    "pageHeight": 640,
+    "viewport": 640
+  },
+  {
+    "width": 390,
+    "height": 844,
+    "path": "/documentos",
+    "overflow": 0,
+    "small": [],
+    "pageHeight": 844,
+    "viewport": 844
+  },
+  {
+    "width": 390,
+    "height": 844,
+    "path": "/documentos/filtros",
+    "overflow": 0,
+    "small": [],
+    "pageHeight": 844,
+    "viewport": 844
+  },
+  {
+    "width": 390,
+    "height": 844,
+    "path": "/documentos/filtros?etapa=2",
+    "overflow": 0,
+    "small": [],
+    "pageHeight": 844,
+    "viewport": 844
+  },
+  {
+    "width": 390,
+    "height": 844,
+    "path": "/documentos/filtros?etapa=3",
+    "overflow": 0,
+    "small": [],
+    "pageHeight": 844,
+    "viewport": 844
+  },
+  {
+    "width": 390,
+    "height": 844,
+    "path": "/documentos/193",
+    "overflow": 0,
+    "small": [],
+    "pageHeight": 844,
+    "viewport": 844
+  },
+  {
+    "width": 390,
+    "height": 844,
+    "path": "/documentos/193?aba=fonte",
+    "overflow": 0,
+    "small": [],
+    "pageHeight": 844,
+    "viewport": 844
+  },
+  {
+    "width": 390,
+    "height": 844,
+    "path": "/documentos/193?aba=historico",
+    "overflow": 0,
+    "small": [],
+    "pageHeight": 844,
+    "viewport": 844
+  },
+  {
+    "width": 390,
+    "height": 844,
+    "path": "/documentos/193?aba=schema",
+    "overflow": 0,
+    "small": [],
+    "pageHeight": 844,
+    "viewport": 844
+  },
+  {
+    "width": 390,
+    "height": 844,
+    "path": "/documentos/coletas",
+    "overflow": 0,
+    "small": [],
+    "pageHeight": 844,
+    "viewport": 844
+  },
+  {
+    "width": 430,
+    "height": 932,
+    "path": "/documentos",
+    "overflow": 0,
+    "small": [],
+    "pageHeight": 932,
+    "viewport": 932
+  },
+  {
+    "width": 430,
+    "height": 932,
+    "path": "/documentos/filtros",
+    "overflow": 0,
+    "small": [],
+    "pageHeight": 932,
+    "viewport": 932
+  },
+  {
+    "width": 430,
+    "height": 932,
+    "path": "/documentos/filtros?etapa=2",
+    "overflow": 0,
+    "small": [],
+    "pageHeight": 932,
+    "viewport": 932
+  },
+  {
+    "width": 430,
+    "height": 932,
+    "path": "/documentos/filtros?etapa=3",
+    "overflow": 0,
+    "small": [],
+    "pageHeight": 932,
+    "viewport": 932
+  },
+  {
+    "width": 430,
+    "height": 932,
+    "path": "/documentos/197",
+    "overflow": 0,
+    "small": [],
+    "pageHeight": 932,
+    "viewport": 932
+  },
+  {
+    "width": 430,
+    "height": 932,
+    "path": "/documentos/197?aba=fonte",
+    "overflow": 0,
+    "small": [],
+    "pageHeight": 932,
+    "viewport": 932
+  },
+  {
+    "width": 430,
+    "height": 932,
+    "path": "/documentos/197?aba=historico",
+    "overflow": 0,
+    "small": [],
+    "pageHeight": 932,
+    "viewport": 932
+  },
+  {
+    "width": 430,
+    "height": 932,
+    "path": "/documentos/197?aba=schema",
+    "overflow": 0,
+    "small": [],
+    "pageHeight": 932,
+    "viewport": 932
+  },
+  {
+    "width": 430,
+    "height": 932,
+    "path": "/documentos/coletas",
+    "overflow": 0,
+    "small": [],
+    "pageHeight": 932,
+    "viewport": 932
+  },
+  {
+    "width": 1366,
+    "height": 768,
+    "path": "/documentos",
+    "overflow": 0,
+    "small": [],
+    "pageHeight": 768,
+    "viewport": 768
+  },
+  {
+    "width": 1366,
+    "height": 768,
+    "path": "/documentos/filtros",
+    "overflow": 0,
+    "small": [],
+    "pageHeight": 768,
+    "viewport": 768
+  },
+  {
+    "width": 1366,
+    "height": 768,
+    "path": "/documentos/filtros?etapa=2",
+    "overflow": 0,
+    "small": [],
+    "pageHeight": 768,
+    "viewport": 768
+  },
+  {
+    "width": 1366,
+    "height": 768,
+    "path": "/documentos/filtros?etapa=3",
+    "overflow": 0,
+    "small": [],
+    "pageHeight": 768,
+    "viewport": 768
+  },
+  {
+    "width": 1366,
+    "height": 768,
+    "path": "/documentos/201",
+    "overflow": 0,
+    "small": [],
+    "pageHeight": 768,
+    "viewport": 768
+  },
+  {
+    "width": 1366,
+    "height": 768,
+    "path": "/documentos/201?aba=fonte",
+    "overflow": 0,
+    "small": [],
+    "pageHeight": 768,
+    "viewport": 768
+  },
+  {
+    "width": 1366,
+    "height": 768,
+    "path": "/documentos/201?aba=historico",
+    "overflow": 0,
+    "small": [],
+    "pageHeight": 768,
+    "viewport": 768
+  },
+  {
+    "width": 1366,
+    "height": 768,
+    "path": "/documentos/201?aba=schema",
+    "overflow": 0,
+    "small": [],
+    "pageHeight": 768,
+    "viewport": 768
+  },
+  {
+    "width": 1366,
+    "height": 768,
+    "path": "/documentos/coletas",
+    "overflow": 0,
+    "small": [],
+    "pageHeight": 768,
+    "viewport": 768
+  },
+  {
+    "width": 1440,
+    "height": 900,
+    "path": "/documentos",
+    "overflow": 0,
+    "small": [],
+    "pageHeight": 900,
+    "viewport": 900
+  },
+  {
+    "width": 1440,
+    "height": 900,
+    "path": "/documentos/filtros",
+    "overflow": 0,
+    "small": [],
+    "pageHeight": 900,
+    "viewport": 900
+  },
+  {
+    "width": 1440,
+    "height": 900,
+    "path": "/documentos/filtros?etapa=2",
+    "overflow": 0,
+    "small": [],
+    "pageHeight": 900,
+    "viewport": 900
+  },
+  {
+    "width": 1440,
+    "height": 900,
+    "path": "/documentos/filtros?etapa=3",
+    "overflow": 0,
+    "small": [],
+    "pageHeight": 900,
+    "viewport": 900
+  },
+  {
+    "width": 1440,
+    "height": 900,
+    "path": "/documentos/205",
+    "overflow": 0,
+    "small": [],
+    "pageHeight": 900,
+    "viewport": 900
+  },
+  {
+    "width": 1440,
+    "height": 900,
+    "path": "/documentos/205?aba=fonte",
+    "overflow": 0,
+    "small": [],
+    "pageHeight": 900,
+    "viewport": 900
+  },
+  {
+    "width": 1440,
+    "height": 900,
+    "path": "/documentos/205?aba=historico",
+    "overflow": 0,
+    "small": [],
+    "pageHeight": 900,
+    "viewport": 900
+  },
+  {
+    "width": 1440,
+    "height": 900,
+    "path": "/documentos/205?aba=schema",
+    "overflow": 0,
+    "small": [],
+    "pageHeight": 900,
+    "viewport": 900
+  },
+  {
+    "width": 1440,
+    "height": 900,
+    "path": "/documentos/coletas",
+    "overflow": 0,
+    "small": [],
+    "pageHeight": 900,
+    "viewport": 900
+  }
+]
