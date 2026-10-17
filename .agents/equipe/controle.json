@@ -9,8 +9,8 @@
       "owner": null,
       "status": "em-revisao",
       "acceptance": ["Cabecalho do orcamento identifica Ludus Equipamentos como empresa vendedora", "Nome vem da empresa da sessao; vendedor individual permanece somente na assinatura"],
-      "evidence": ["24 testes de documento/PDF aprovados, sem falhas ou pulos", "Teste com logo e duas empresas verifica cabecalho e assinatura separadamente"],
-      "next": "Publicar e conferir o PDF do pedido 261016-HXKP."
+      "evidence": ["24 testes de documento/PDF aprovados, sem falhas ou pulos; lint e build aprovados", "Teste com logo e duas empresas verifica cabecalho e assinatura separadamente", "Publicado em bfd789a, health saudavel; PDF do pedido 261016-HXKP aberto e baixado pela UI: EMPRESA VENDEDORA / Ludus Equipamentos, vendedor individual somente na assinatura"],
+      "next": "PR16 aguarda revisao; correcao publicada e conferida no PDF de producao."
     },
     {
       "id": "T-20261016-meios-pagamento",
