@@ -18,6 +18,8 @@ Frete cobrado pela vendedora exige tratamento no faturamento; a modalidade fisca
 continua sendo conferida na preparação da nota.
 
 O endereço vem da entrega da nota ou do cadastro do cliente, com a origem indicada.
+Se o estado escolhido é diferente do cadastro e não há endereço de entrega, o
+documento pede confirmar o endereço, em vez de imprimir uma entrega no estado errado.
 O peso dos equipamentos multiplica os pesos cadastrados pelas quantidades. Se um
 peso falta, o PDF pede completar o cadastro. Volumes/peso bruto vêm do transporte;
 dimensões do equipamento montado não são tratadas como cubagem de embalagem.
@@ -27,6 +29,7 @@ O PIX da entrada usa a chave configurada em **Configurações → Cobrança por 
 o saldo efetivamente em aberto, descontados recebimentos não estornados. Só aparece
 para entrada via PIX em orçamento em negociação ou pedido fechado. Gera um BR Code
 estático; não chama banco, não registra pagamento e não confirma recebimento.
+PIX por link de pagamento mantém o fluxo do provedor e não ganha um QR direto da empresa.
 
 O documento mostra o estado do pedido, mantém a validade para orçamentos e explicita
 o intervalo em dias das parcelas calculadas. Parcelas personalizadas mantêm as datas
@@ -64,3 +67,6 @@ do hash guardado. Sem contrato enviado, continuam os espaços de assinatura fís
 - Campos fictícios foram usados somente no banco de demonstração.
 - 715 testes aprovados, sem falhas ou testes pulados; 57 testes das áreas alteradas
   conferidos também em execução dirigida. Lint e verificação de tipos aprovados.
+- Depois da revisão de endereço e meio PIX, 16 testes dirigidos passaram sem falhas
+  ou pulos, incluindo complemento de apartamento preservado, entrega em outro estado
+  pendente de endereço e link PIX sem QR direto da empresa.

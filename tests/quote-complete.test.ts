@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { PDFDocument } from "pdf-lib";
 import { addressLine } from "@/lib/contract/text";
 import { normalizedAddress } from "@/lib/address";
-import { completeQuote } from "@/lib/quote/complete";
+import { completeQuote, usesCompanyPix } from "@/lib/quote/complete";
 import type { QuoteContext } from "@/lib/quote/complete";
 import type { QuoteDocument } from "@/lib/quote/document";
 import { renderQuotePdf } from "@/lib/quote/pdf";
@@ -46,11 +46,23 @@ test("proposta completa: cadastro, endereço, NCM, peso por quantidade, frete se
 });
 
 test("PIX só para entrada via PIX pendente; valor parcial usa o saldo real e cancelado não cobra", () => {
+  assert.equal(usesCompanyPix("PIX", "17"), true);
+  assert.equal(usesCompanyPix("Link de pagamento - PIX", "17"), false);
+  assert.equal(usesCompanyPix("Cartão", "03"), false);
+  assert.equal(usesCompanyPix("PIX", null), false);
   assert.equal(completeQuote(document, order, { ...context, downPaymentOpen: 10000 }, products).pix?.amount, "R$ 10.000");
   assert.match(completeQuote(document, order, context, products).pix!.code, /540820000\.00/);
   for (const patch of [{ pix: null }, { downPaymentIsPix: false }, { downPaymentOpen: 0 }]) assert.equal(completeQuote(document, order, { ...context, ...patch }, products).pix, undefined);
   assert.equal(completeQuote(document, { ...order, status: "cancelado" }, context, products).pix, undefined);
   assert.doesNotMatch(completeQuote(document, order, { ...context, downPaymentOpen: 0 }, products).status!, /aguardando entrada/);
+});
+
+test("entrega em outro estado não usa silenciosamente o endereço de cobrança", () => {
+  const customer = { id: 1, kind: "PF" as const, name: "Cliente de teste", document: "42430574861", tradeName: null, contactName: null, stateRegistration: null, rg: null, phone: null, email: null, ...address, uf: "SP" as const };
+  const full = completeQuote({ ...document, delivery: "Bahia" }, { ...order, customer }, { ...context, delivery: null }, products);
+  assert.match(full.sections![0].lines[0], /Local: Bahia/);
+  assert.doesNotMatch(full.sections![0].lines[0], /Rua A|São José do Rio Preto/);
+  assert.match(full.sections![0].lines[0], /confirmar endereço completo/);
 });
 
 test("ausências são explícitas; peso incompleto não vira peso total e parcelas personalizadas não ganham intervalo falso", () => {

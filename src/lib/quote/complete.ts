@@ -7,6 +7,7 @@ import type { Order } from "@/lib/db/orders";
 import type { PixSettings } from "@/lib/db/pix";
 import { parseMoney, showMoney } from "@/lib/format";
 import { pixCode } from "@/lib/pix";
+import { UF_NAMES } from "@/lib/order-form";
 import type { QuoteDocument } from "@/lib/quote/document";
 import type { ProposalDetails } from "@/lib/quote/settings";
 
@@ -24,6 +25,9 @@ export type QuoteContext = {
 };
 export type QuoteMeasures = { weightKg?: number | null; ncm?: string | null };
 
+/** PIX through a payment link keeps the provider's flow instead of a direct company QR. */
+export const usesCompanyPix = (method: string | null, code: string | null): boolean => code === "17" && !/\blink\b/i.test(method ?? "");
+
 /** Only confirmed register data and authored terms; missing commercial terms stay explicit. */
 export function completeQuote(document: QuoteDocument, order: Pick<Order, "number" | "status" | "customer" | "items" | "downPayment" | "customInstallments" | "installmentIntervalDays">, context: QuoteContext, products: Map<number, QuoteMeasures>): QuoteDocument {
   const { issuer, companyDetails: contact, delivery, transport } = context;
@@ -37,7 +41,8 @@ export function completeQuote(document: QuoteDocument, order: Pick<Order, "numbe
     contact.email ?? "E-mail comercial: a cadastrar",
     contact.website ? `Site: ${contact.website}` : "Site: a cadastrar",
   ].filter((line): line is string => Boolean(line));
-  const address = delivery ? addressLine({ ...delivery, streetNumber: delivery.number }) : order.customer ? addressLine(order.customer) : "";
+  const differentState = !delivery && order.customer?.uf && document.delivery && document.delivery !== UF_NAMES[order.customer.uf];
+  const address = delivery ? addressLine({ ...delivery, streetNumber: delivery.number }) : order.customer && !differentState ? addressLine(order.customer) : "";
   const location = address || document.delivery || "a definir";
   const addressSource = delivery ? "endereço de entrega informado no pedido" : address ? "endereço do cadastro do cliente" : "estado informado no pedido; confirmar endereço completo";
   const freight = terms.freightMode === "CIF" ? "CIF: contratação e pagamento pela vendedora."
