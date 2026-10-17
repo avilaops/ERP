@@ -336,11 +336,12 @@ export function nfeProblems(input: NfeInput): string[] {
   need(!carrier || (carrier.kind === "PJ" ? CNPJ_PATTERN : /^\d{11}$/).test(carrier.document), "Transportadora: CNPJ ou CPF completo (Parâmetros → Transportadoras).");
   need(input.items.length > 0, "Pedido sem itens.");
   // Rule NA01-20: with the group of the DIFAL, the rates are the ones the layout checks (NA09-10 to NA09-30 and the schema: 4%, 7% or 12%).
-  const difal = issuer.taxRegime !== 1 && rules.icmsCode === "00" && Boolean(UF_CODES[issuer.uf]) && issuer.uf !== destinationUf(input) && !recipient.taxpayer && rules.finalConsumer;
+  const interstateTaxed = issuer.taxRegime !== 1 && rules.icmsCode === "00" && Boolean(UF_CODES[issuer.uf]) && issuer.uf !== destinationUf(input);
+  const difal = interstateTaxed && !recipient.taxpayer && rules.finalConsumer;
   need(!difal || input.destination.internalIcms > 0, `Parâmetros: falta a alíquota interna do ICMS de ${destinationUf(input)}, para o DIFAL da venda a não contribuinte.`);
   input.items.forEach((item, index) => {
     const which = `Item ${index + 1} (${item.name})`;
-    if (difal && Number.isInteger(item.origin) && item.origin >= 0 && item.origin <= 8) {
+    if (interstateTaxed && Number.isInteger(item.origin) && item.origin >= 0 && item.origin <= 8) {
       const expected = interstateRate(item.origin, issuer.uf, destinationUf(input));
       need(Math.abs(input.icmsRate - expected) < 1e-9, `${which}: a origem ${item.origin} pede ICMS interestadual de ${(expected * 100).toFixed(0)}% de ${issuer.uf} para ${destinationUf(input)}, e os parâmetros do pedido trazem ${(input.icmsRate * 100).toFixed(2).replace(".", ",")}%. Corrija a origem do equipamento ou o ICMS de saída do estado.`);
     }

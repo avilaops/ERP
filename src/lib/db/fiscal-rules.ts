@@ -282,22 +282,3 @@ export async function completeKnownPaymentCodes(updatedBy: string, conn: Queryab
   );
   return rows.length;
 }
-
-/** One atomic batch. Concurrent renames, deletions and manual choices are skipped. */
-export async function completeKnownPaymentCodes(updatedBy: string, conn: Queryable): Promise<number> {
-  if (!updatedBy.trim()) throw new Error("Falta dizer quem está alterando a forma de pagamento.");
-  const suggestions = (await listPaymentCodes(conn)).flatMap((method) => {
-    const code = standardPaymentCode(method.label);
-    return method.code === null && code ? [{ id: method.id, label: method.label, code }] : [];
-  });
-  if (suggestions.length === 0) return 0;
-  const { rows } = await conn.query(
-    `UPDATE payment_methods AS method
-        SET nfe_code = mapping.code, updated_at = now(), updated_by = $4
-       FROM unnest($1::integer[], $2::text[], $3::text[]) AS mapping(id, label, code)
-      WHERE method.id = mapping.id AND method.label = mapping.label AND method.nfe_code IS NULL
-      RETURNING method.id`,
-    [suggestions.map((method) => method.id), suggestions.map((method) => method.label), suggestions.map((method) => method.code), updatedBy],
-  );
-  return rows.length;
-}
