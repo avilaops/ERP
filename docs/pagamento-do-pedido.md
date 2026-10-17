@@ -23,3 +23,13 @@ Avançar e voltar salvam apenas os campos da etapa, preservando os demais. A rev
 705 testes aprovados com PostgreSQL isolado, sem falhas ou pulos. Após reorganizar a apresentação, mais 33 testes de rotas/UX aprovados; lint e tipos conferidos. O runtime inicial do host não tinha suporte a TypeScript; a suíte efetiva rodou na imagem oficial Node 24. As falhas iniciais de arquivos auxiliares ausentes na cópia de teste foram corrigidas antes da execução completa aprovada.
 
 Pela UI do demo isolado, pedido 261017-DM11: entrada de 70% via PIX em 16/10/2026; saldo também PIX, em três parcelas, primeira em 30 dias e intervalo de 30 dias. Entrada negativa recusada sem perder preenchimento; voltar salvou parcelas e preservou entrada/observações. A tentativa de reabrir o pedido fictício DM07 com recebimento foi corretamente bloqueada. Nenhuma cobrança ou nota foi emitida.
+
+## Publicação e exemplo autorizado
+
+Versão `77df694`, build de 17/10/2026 01:32:10 UTC; `/api/health` respondeu com essa revisão e container saudável. Pacote montado de `git archive HEAD`; 3.236 entradas verificadas antes de ativar, com pacote/imagem anteriores preservados. Não houve nova migração nesta mudança. PR16 continua aberto para revisão.
+
+Na Ludus, pela UI publicada: boleto desligado; cartão presencial, link por cartão e link por PIX cadastrados. O botão de completar códigos conhecidos preencheu os três novos cadastros; os links foram conferidos como `03` e `17`. Os pedidos mantêm as opções da empresa, sem listar o prazo legado Na entrega como meio.
+
+O usuário autorizou entrada PIX e saldo parcelado para o pedido de exemplo `261016-HXKP`. Foi reaberto pela UI, mantida entrada de R$ 20.000 em 16/10/2026, escolhido saldo PIX em 3 x R$ 7.608,16, primeira em 30 dias e intervalo de 30 dias. O pedido passou pela aprovação da Diretoria e ficou fechado novamente. Recebimentos previstos conferidos: 15/11/2026, 15/12/2026 e 14/01/2027. A tela financeira publicada mostra a entrada e as parcelas em aberto com cobrança PIX disponível. Nenhuma baixa, cobrança bancária ou nota foi enviada.
+
+A pré-validação do HXKP já não lista pendência de pagamento; ainda exige CSTs de ICMS, PIS/COFINS, IPI e classificação IBS/CBS. AVL-12 e AVL-21 atualizadas, mantendo a etapa fiscal externa pendente. Evidência visual: `pagamento-pix-parcelado-publicado.jpg`, na pasta de visualizações desta tarefa.

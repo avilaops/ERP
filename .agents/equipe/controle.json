@@ -10,7 +10,7 @@
       "status": "em-revisao",
       "acceptance": ["Vendedor escolhe entrada, prazo e meio do saldo independentemente", "PIX, transferência, dinheiro, cartão presencial e link disponíveis; boleto desativado na Ludus", "Pedido de exemplo com entrada PIX e saldo parcelado; NF-e usa os meios efetivos"],
       "evidence": ["docs/pagamento-do-pedido.md", "705 testes aprovados, sem falhas ou pulos; 33 testes de rotas/UX após reorganização", "Três etapas nos cinco tamanhos: 15 amostras de uma tela, sem rolagem lateral e controles >=44 px", "Demo DM11: entrada PIX e saldo PIX em três parcelas; erro preserva campos; voltar salva; prazo separado do meio"],
-      "next": "Publicar, conferir a Ludus e concluir o ajuste do exemplo pela UI. Boleto já desativado na Ludus."
+      "next": "Publicado em 77df694, health saudável. HXKP ajustado, aprovado e fechado pela UI: entrada PIX de R$ 20.000 e saldo PIX de 3 x R$ 7.608,16 a cada 30 dias; títulos conferidos em Recebimentos. Cartão presencial e links cartão/PIX cadastrados com códigos conferidos; boleto desligado. PR16 aguarda revisão. AVL-12 e AVL-21 atualizadas; restam as definições tributárias e etapas externas do fluxo fiscal."
     },
     {
       "id": "T-20261016-nfe-por-nota",
