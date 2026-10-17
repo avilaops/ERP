@@ -124,7 +124,7 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
                   </div>
                   <p className="mt-1 text-xs text-slate-600">{environment(invoice.environment)} · {showDateTime(invoice.issuedAt)}{invoice.protocol ? ` · protocolo ${invoice.protocol}` : ""}</p>
                   <p className="mt-1 break-all text-xs text-slate-600">Chave {invoice.accessKey}</p>
-                  {invoice.statusReason && <p className="mt-1 text-sm text-red-800">{invoice.statusCode ? `${invoice.statusCode}: ` : ""}{invoice.statusReason}</p>}
+                  {invoice.statusReason && <p className="mt-1 text-sm text-red-900">{invoice.statusCode ? `${invoice.statusCode}: ` : ""}{invoice.statusReason}</p>}
                   <p className="mt-2 text-xs text-slate-600">{invoice.mail ? `Último e-mail: ${invoice.mail.status === "enviado" ? "enviado" : "falhou"} para ${invoice.mail.recipient} em ${showDateTime(invoice.mail.sentAt)}.` : "Ainda não há envio por e-mail registrado."}</p>
                   <Link href={`/pedidos/${invoice.orderNumber}?ver=documentos#nota-fiscal`} className={`${SECONDARY} mt-2`}>Abrir nota no pedido</Link>
                 </li>
