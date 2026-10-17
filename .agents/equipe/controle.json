@@ -4,6 +4,15 @@
   "members": [],
   "tasks": [
     {
+      "id": "T-20261016-empresa-no-orcamento",
+      "title": "Identificar a empresa vendedora no cabecalho do PDF",
+      "owner": null,
+      "status": "em-revisao",
+      "acceptance": ["Cabecalho do orcamento identifica Ludus Equipamentos como empresa vendedora", "Nome vem da empresa da sessao; vendedor individual permanece somente na assinatura"],
+      "evidence": ["24 testes de documento/PDF aprovados, sem falhas ou pulos", "Teste com logo e duas empresas verifica cabecalho e assinatura separadamente"],
+      "next": "Publicar e conferir o PDF do pedido 261016-HXKP."
+    },
+    {
       "id": "T-20261016-meios-pagamento",
       "title": "Separar vencimento e meio efetivo de pagamento no pedido",
       "owner": null,

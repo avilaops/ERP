@@ -186,7 +186,7 @@ export async function renderQuotePdf(document: QuoteDocument, { logo, photos }: 
   rule(y);
   y -= 14;
 
-  // Seller and customer, side by side.
+  // Selling company and customer, side by side.
   const half = CONTENT_WIDTH / 2;
   const block = (title: string, lines: (string | null)[], x: number, top: number = y): number => {
     let at = top;
@@ -204,8 +204,7 @@ export async function renderQuotePdf(document: QuoteDocument, { logo, photos }: 
     return at;
   };
   const { customer, seller } = document;
-  // Only the name: the address a seller signs in with is their own and is not the customer's business.
-  const afterSeller = block("Vendedor", [seller.name], MARGIN);
+  const afterSeller = block("Empresa vendedora", [document.company], MARGIN);
   const afterCustomer = customer
     ? block(
         "Cliente",

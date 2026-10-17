@@ -122,6 +122,19 @@ test("sem cliente e sem desconto: 'Cliente: a informar', sem a coluna nem a linh
   assert.doesNotMatch(text, /desconto|Entrega:|Prazo de fabricação|Observações/i);
 });
 
+test("cabeçalho identifica a empresa da sessão, mesmo com logo; vendedor fica na assinatura", async () => {
+  for (const company of ["Ludus Equipamentos", "Outra Empresa de Equipamentos Ltda"]) {
+    const bytes = await renderQuotePdf({ ...DOCUMENT, company }, { ...NOTHING, logo: await logo() });
+    const lines = pdfText(bytes).split("\n");
+    const start = lines.indexOf("EMPRESA VENDEDORA");
+    const end = lines.indexOf("CLIENTE", start + 1);
+    assert.ok(start >= 0 && end > start);
+    assert.equal(lines.slice(start + 1, end).join(" "), company);
+    assert.equal(lines.filter((line) => line === DOCUMENT.seller.name).length, 1);
+    assert.ok(lines.indexOf(DOCUMENT.seller.name) > lines.indexOf("EQUIPAMENTO"));
+  }
+});
+
 test("60 itens: várias páginas, numeradas de 1 a N, com o cabeçalho da tabela em cada uma", async () => {
   const items = Array.from({ length: 60 }, (_, index) => item(index + 1));
   const bytes = await renderQuotePdf({ ...DOCUMENT, items, units: 60 }, NOTHING);
