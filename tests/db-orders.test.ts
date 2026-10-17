@@ -1747,15 +1747,14 @@ test("fila de inutilização: persiste o XML assinado antes da SEFAZ e não dupl
   assert.equal(retransmissions, 0);
   assert.deepEqual((await db.pool.query("SELECT status, attempts, last_error FROM fiscal_void_jobs WHERE id = $1", [guardedJob.id])).rows.map((row) => [row.status, Number(row.attempts), /aguardando a emissão fiscal ativa/i.test(row.last_error)]), [["pendente", 0, true]]);
   await db.pool.query("UPDATE fiscal_jobs SET status = 'revisao_manual' WHERE id = $1", [active.rows[0].id]);
-  const unresolved = await db.pool.query(
-    `INSERT INTO fiscal_invoices (order_id, environment, series, number, access_key, status, signed_xml, issued_at, created_by, fiscal_job_id)
-     VALUES ($1, 'homologacao', 1, $2, $3, 'assinada', '<NFe>aguardando resposta</NFe>', $4, $5, $6) RETURNING id`,
-    [order.rows[0].id, guarded, "9".repeat(44), now, who, active.rows[0].id],
+  await db.pool.query(
+    `INSERT INTO fiscal_invoices (order_id, environment, series, number, access_key, status, signed_xml, issued_at, created_by)
+     VALUES ($1, 'homologacao', 1, $2, $3, 'assinada', '<NFe>aguardando resposta</NFe>', $4, $5)`,
+    [order.rows[0].id, guarded, "9".repeat(44), now, who],
   );
-  await db.pool.query("UPDATE fiscal_jobs SET invoice_id = $2 WHERE id = $1", [active.rows[0].id, unresolved.rows[0].id]);
   assert.equal(await runOneNumberVoidJob(new Date(now.getTime() + 60_000), vault, async () => { retransmissions += 1; return ""; }, db.pool), "manual_review");
   assert.equal(retransmissions, 0);
-  assert.deepEqual((await db.pool.query("SELECT status, last_error FROM fiscal_void_jobs WHERE id = $1", [guardedJob.id])).rows.map((row) => [row.status, /nota assinada .* revisão manual/i.test(row.last_error)]), [["revisao_manual", true]]);
+  assert.deepEqual((await db.pool.query("SELECT status, last_error FROM fiscal_void_jobs WHERE id = $1", [guardedJob.id])).rows.map((row) => [row.status, /nota assinada .* sem veredito/i.test(row.last_error)]), [["revisao_manual", true]]);
 });
 
 test("resposta perdida: evento duplicado (573) vem da consulta; número que já é de outra nota na SEFAZ (539) não é reaproveitado; duplicidade (204) traz o protocolo ou espera", { skip }, async () => {

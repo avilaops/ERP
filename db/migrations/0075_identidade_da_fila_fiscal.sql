@@ -17,7 +17,7 @@ UPDATE fiscal_jobs
        last_error = 'Emissão criada antes da identificação da nota; confira a nota e a SEFAZ antes de emitir novamente.',
        updated_at = now()
  WHERE kind = 'emitir_nfe'
-   AND status IN ('pendente', 'processando')
+   AND (status = 'processando' OR (status = 'pendente' AND attempts > 0))
    AND invoice_id IS NULL;
 
 -- Um evento legado já marcado como processando pode ter sido aceito antes da

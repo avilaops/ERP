@@ -55,6 +55,7 @@
 - [x] Encaminhar eventos legados interrompidos para revisão antes que o worker possa retransmiti-los.
 - [x] Isolar jobs pelo ambiente da nota, renovar o relógio antes da inutilização e ocultar atalhos sem acesso.
 - [x] Vincular autorizações recuperadas por consulta e bloquear inutilização sobre nota assinada em revisão.
+- [x] Preservar emissões legadas nunca iniciadas e bloquear faixas com nota assinada mesmo sem vínculo antigo.
 
 ## Resultado
 

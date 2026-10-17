@@ -30,7 +30,7 @@ A aba **Notas fiscais** mostra número, série, ambiente, situação, chave, pro
 ## Inutilizações
 
 A aba **Inutilizações** separa solicitações em fila ou revisão das faixas já concluídas. Uma inutilização com resultado incerto nunca é repetida automaticamente. Use **Solicitar inutilização** somente depois de confirmar que a faixa não contém nota emitida.
-Uma faixa também é bloqueada quando contém nota assinada ainda sem veredito e em revisão manual.
+Uma faixa também é bloqueada quando contém qualquer nota assinada ainda sem veredito, inclusive registros antigos sem vínculo com a fila.
 
 ## Sequência do pedido fechado
 

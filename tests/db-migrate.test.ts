@@ -31,7 +31,7 @@ async function withClient<T>(fn: (client: pg.PoolClient) => Promise<T>): Promise
 
 test("migração: jobs de evento antigos só recebem uma nota inequívoca", () => {
   const migration = readFileSync(join(MIGRATIONS_DIR, "0075_identidade_da_fila_fiscal.sql"), "utf8");
-  assert.match(migration, /kind = 'emitir_nfe'[\s\S]*status IN \('pendente', 'processando'\)/);
+  assert.match(migration, /kind = 'emitir_nfe'[\s\S]*status = 'processando'[\s\S]*status = 'pendente' AND attempts > 0/);
   assert.match(migration, /Emissão criada antes da identificação da nota; confira a nota e a SEFAZ/);
   assert.match(migration, /Evento legado interrompido durante o processamento; confira a nota e a SEFAZ/);
   assert.match(migration, /kind IN \('correcao_nfe', 'cancelamento_nfe'\)[\s\S]*status = 'processando'[\s\S]*invoice_id IS NULL/);
