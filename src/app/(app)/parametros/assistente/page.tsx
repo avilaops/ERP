@@ -65,7 +65,7 @@ export default async function AssistenteParametrosPage({ searchParams }: { searc
             <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-600">
               <li>O que o assistente ler é enviado ao serviço de inteligência artificial do aplicativo que a pessoa conectou.</li>
               <li>Custo e margem só são enviados à diretoria com poder de custos e acesso ao pedido.</li>
-              <li>Contas, baixas e tarefas têm prévia e confirmação no chat. Registrar pagamento não transfere dinheiro; cobranças são rascunhos.</li>
+              <li>Alterações têm prévia e confirmação no chat. Registrar pagamento não transfere dinheiro; cobranças são rascunhos.</li>
             </ul>
             {mcp && (
               <>

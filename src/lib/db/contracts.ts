@@ -194,9 +194,11 @@ export async function createContract(input: NewContract, conn: Queryable): Promi
   try {
     const { rows } = await conn.query(
       `INSERT INTO order_contracts (order_id, sequence, title, body, pdf, pdf_sha256, token_hash, expires_at, recipient_name, recipient_email, created_by, uploaded, file_name, recipient_phone)
-       VALUES ($1, $11, $2, $3, $4, $5, $6, $7, $8, $9, $10, $12::text IS NOT NULL, $12, $13) RETURNING id`,
+       SELECT id, $11, $2, $3, $4, $5, $6, $7, $8, $9, $10, $12::text IS NOT NULL, $12, $13
+         FROM orders WHERE id=$1 AND status <> 'cancelado' FOR SHARE RETURNING id`,
       [input.orderId, input.title, input.body, Buffer.from(input.pdf), input.sha256, input.tokenHash, input.expiresAt, input.recipientName, input.recipientEmail, input.createdBy, input.sequence, input.fileName ?? null, input.recipientPhone ?? null],
     );
+    if (!rows[0]) throw new ContractError("Pedido não encontrado ou cancelado: contrato não criado.");
     return (await getOrderContract(input.orderId, Number(rows[0].id), conn))!;
   } catch (error) {
     if (pgErrorCode(error) === UNIQUE_VIOLATION) throw new ContractError(PENDING_EXISTS);

@@ -200,10 +200,10 @@ test("criar: número repetido sorteia outro; equipamento fora da versão é recu
 
   const count = async () => Number((await db.pool.query("SELECT count(*) FROM orders")).rows[0].count);
   const before = await count();
-  // Cinco sorteios repetidos: desiste, com o erro do banco.
+  // Cinco sorteios repetidos: desiste sem abortar uma transação do chamador.
   await assert.rejects(
     () => createOrder({ seller: SELLER, version: 1, productId: ID["LD-B001"], quantity: 1 }, numbers("260930-BBMN"), db.pool),
-    /orders_number_key/,
+    /número livre/,
   );
   const create = (productId: number, version = 1, quantity = 1, number = "260930-K62T") =>
     createOrder({ seller: SELLER, version, productId, quantity }, numbers(number), db.pool);

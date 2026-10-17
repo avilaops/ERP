@@ -4,6 +4,15 @@
   "members": [],
   "tasks": [
     {
+      "id": "T-20261017-mcp-comercial",
+      "title": "Concluir cadastros, orcamento, funil e decisoes confirmadas no MCP",
+      "owner": null,
+      "status": "em-andamento",
+      "acceptance": ["Dez acoes comerciais com previa, confirmacao, revisao e autoria", "Solicitar aprovacao nao fecha venda automaticamente", "Cancelamento sem baixa ou efeitos vinculados; concorrencia com baixa, contrato e producao protegida", "Consolidar duplicadas sem apagar historico; escopo de equipe e alçada preservados", "Testes isolados, HTTP, UI, build e publicacao verificados"],
+      "evidence": ["https://linear.app/avilaops/issue/AVL-149", "147 testes afetados aprovados apos ajustes de integracao; lint e tipos aprovados antes do ajuste visual final", "HTTP demo 1.3.0: dez acoes comerciais e fluxo de cliente a recebimento parcial; cancelamento com baixa recusado, tarefa duplicada consolidada com motivo", "25 medicoes finais de UI nos cinco tamanhos sem excesso lateral ou controles menores que 44 px; teclado, rascunho e ampliacao conferidos", "docs/mcp-operacoes.md"],
+      "next": "Concluir suite geral e verificacoes finais; publicar com a etapa financeira AVL-148 e conferir health sem mutacoes reais."
+    },
+    {
       "id": "T-20261017-mcp-financeiro-consultas",
       "title": "Completar financeiro e consultas comerciais e operacionais no MCP",
       "owner": null,

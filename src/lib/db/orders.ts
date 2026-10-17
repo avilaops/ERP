@@ -75,7 +75,6 @@ export class OrderError extends Error {}
 
 const NOT_EDITABLE = "Pedido não encontrado ou já fechado. Reabra o pedido para alterar.";
 
-const UNIQUE_VIOLATION = "23505";
 const FOREIGN_KEY_VIOLATION = "23503";
 
 // The date goes out as text: a `date` read as a JS Date would shift with the server's time zone.
@@ -121,20 +120,21 @@ export async function createOrder(
     const number = newNumber();
     if (!ORDER_NUMBER.test(number)) throw new Error("Número de pedido fora do formato AAMMDD-XXXX.");
     try {
-      await conn.query(
+      const created = await conn.query(
         `WITH created AS (
            INSERT INTO orders (number, seller_email, seller_name, price_table_version, updated_by)
-           VALUES ($1, $2, $3, $4, $2)
+           VALUES ($1, $2, $3, $4, $2) ON CONFLICT (number) DO NOTHING
            RETURNING id, price_table_version
          )
          INSERT INTO order_items (order_id, price_table_version, product_id, quantity)
-         SELECT id, price_table_version, $5::integer, $6::integer FROM created`,
+         SELECT id, price_table_version, $5::integer, $6::integer FROM created RETURNING order_id`,
         [number, seller.email, seller.name, version, productId, quantity],
       );
-      return number;
+      if (created.rows.length) return number;
+      if (attempt >= 5) throw new OrderError("Não foi possível gerar um número livre para o pedido. Tente novamente.");
     } catch (error) {
       if (pgErrorCode(error) === FOREIGN_KEY_VIOLATION) throw notInTable(version);
-      if (pgErrorCode(error) !== UNIQUE_VIOLATION || attempt >= 5) throw error;
+      throw error;
     }
   }
 }

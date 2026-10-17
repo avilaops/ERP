@@ -64,7 +64,7 @@ export default async function ConectarPage() {
           ))}
           {tools.length === 0 && <li>Nenhuma ferramenta: o seu perfil não tem telas ligadas ao assistente.</li>}
         </ul>
-        <p className="mt-2 text-sm text-slate-600">Custos exigem diretoria autorizada. Contas, baixas e tarefas pedem confirmação. Registrar pagamento não transfere dinheiro. Cobranças são rascunhos.</p>
+        <p className="mt-2 text-sm text-slate-600">Custos exigem diretoria autorizada. Alterações têm prévia e confirmação. Registrar pagamento não transfere dinheiro. Cobranças são rascunhos.</p>
       {mine.length > 0 && (
         <section className={`${CARD} p-4`} aria-label="Meus assistentes conectados">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Conectados por você</h2>
@@ -72,7 +72,7 @@ export default async function ConectarPage() {
             {mine.map((connection) => (
               <li key={connection.id} className="flex flex-wrap items-center gap-2 py-2">
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate font-medium">{connection.clientName}</span>
+                  <span className="block break-words font-medium">{connection.clientName}</span>
                   <span className="block text-sm text-slate-600">
                     desde {showDateTime(connection.createdAt)} · {connection.calls} {connection.calls === 1 ? "consulta" : "consultas"}
                   </span>

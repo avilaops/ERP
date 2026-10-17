@@ -15,7 +15,7 @@ export async function payableChoicesForMcp(conn: Queryable, lock = false) {
 /** Public catalogue projection: never selects supplier prices, credits or equipment costs. */
 export async function catalogueForMcp(search: string, page: number, conn: Queryable) {
   const { rows } = await conn.query(
-    `SELECT p.id, p.code, p.name, l.name AS line, v.version, i.table_price, i.table_price_with_ipi,
+    `SELECT p.id, p.code, p.name, p.plate_loaded, l.name AS line, v.version, i.table_price, i.table_price_with_ipi,
             COALESCE((SELECT sum(m.quantity) FROM stock_moves m WHERE m.product_id = p.id), 0) AS physical,
             COALESCE((SELECT sum(d.quantity) FROM order_items d JOIN orders o ON o.id = d.order_id WHERE d.product_id = p.id AND o.status = 'fechado'
               AND NOT EXISTS (SELECT 1 FROM stock_moves m WHERE m.order_id = o.id GROUP BY m.order_id HAVING sum(m.quantity) < 0)), 0) AS committed,
@@ -26,7 +26,7 @@ export async function catalogueForMcp(search: string, page: number, conn: Querya
       WHERE p.active AND ($1 = '' OR p.name ILIKE '%' || $1 || '%' OR p.code ILIKE '%' || $1 || '%')
       ORDER BY p.id LIMIT 51 OFFSET $2`, [search.replace(/[%_\\]/g, ""), (page - 1) * 50],
   );
-  return { pagina: page, tem_mais: rows.length > 50, criterio_prazo: "Prazo de fabricação definido pelo vendedor no pedido; o catálogo não tem prazo por produto.", produtos: rows.slice(0, 50).map((r) => ({ id: Number(r.id), codigo: r.code, nome: r.name, linha: r.line, tabela: Number(r.version), preco_sem_ipi: Number(r.table_price), preco_com_ipi: Number(r.table_price_with_ipi), estoque_fisico: Number(r.physical), comprometido: Number(r.committed), disponivel: Number(r.physical) - Number(r.committed), a_chegar: Number(r.incoming) })) };
+  return { pagina: page, tem_mais: rows.length > 50, criterio_prazo: "Prazo de fabricação definido pelo vendedor no pedido; o catálogo não tem prazo por produto.", produtos: rows.slice(0, 50).map((r) => ({ id: Number(r.id), codigo: r.code, nome: r.name, aceita_anilheiro: r.plate_loaded === true, linha: r.line, tabela: Number(r.version), preco_sem_ipi: Number(r.table_price), preco_com_ipi: Number(r.table_price_with_ipi), estoque_fisico: Number(r.physical), comprometido: Number(r.committed), disponivel: Number(r.physical) - Number(r.committed), a_chegar: Number(r.incoming) })) };
 }
 
 export async function productionForMcp(orderId: number, conn: Queryable) {

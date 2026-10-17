@@ -132,7 +132,7 @@ function toOpportunity(row: Record<string, unknown>): Opportunity {
   };
 }
 
-function checked(input: OpportunityInput): OpportunityInput {
+export function checkedOpportunity(input: OpportunityInput): OpportunityInput {
   const title = blank(input.title) ?? "";
   const company = blank(input.company);
   const email = blank(input.email)?.toLowerCase() ?? null;
@@ -150,7 +150,7 @@ function checked(input: OpportunityInput): OpportunityInput {
 
 /** A new opportunity, in the first stage of the funnel, of who creates it. */
 export async function createOpportunity(input: OpportunityInput, owner: { email: string; name: string }, conn: Queryable): Promise<number> {
-  const data = checked(input);
+  const data = checkedOpportunity(input);
   try {
     const { rows } = await conn.query(
       `INSERT INTO opportunities (title, customer_id, company, contact_name, phone, email, source, estimated_value, notes, stage_id, owner_email, owner_name, created_by, updated_by)
@@ -189,7 +189,7 @@ export async function listOpportunities(scope: FunnelScope, conn: Queryable): Pr
 const NOT_FOUND = "Oportunidade não encontrada. Recarregue a página.";
 
 export async function updateOpportunity(id: number, input: OpportunityInput, who: string, scope: FunnelScope, conn: Queryable): Promise<void> {
-  const data = checked(input);
+  const data = checkedOpportunity(input);
   try {
     const { rows } = await conn.query(
       `UPDATE opportunities SET title = $3, customer_id = $4, company = $5, contact_name = $6, phone = $7, email = $8, source = $9, estimated_value = $10, notes = $11, updated_at = now(), updated_by = $12
@@ -280,11 +280,11 @@ export async function syncOpportunitiesWithOrders(conn: Queryable): Promise<void
 export type ActivityKind = "tarefa" | "ligacao" | "reuniao" | "nota";
 export const ACTIVITY_LABELS: Record<ActivityKind, string> = { tarefa: "Tarefa", ligacao: "Ligação", reuniao: "Reunião", nota: "Anotação" };
 
-export type Activity = { id: number; /** `null` for a reminder of an order with no opportunity. */ opportunityId: number | null; kind: ActivityKind; title: string; dueOn: string | null; doneAt: Date | null; doneBy: string | null; ownerEmail: string; createdAt: Date; createdBy: string };
+export type Activity = { id: number; /** `null` for a reminder of an order with no opportunity. */ opportunityId: number | null; kind: ActivityKind; title: string; dueOn: string | null; doneAt: Date | null; doneBy: string | null; completionNote?: string; ownerEmail: string; createdAt: Date; createdBy: string };
 
 const toActivity = (row: Record<string, unknown>): Activity => ({
   id: Number(row.id), opportunityId: row.opportunity_id === null ? null : Number(row.opportunity_id), kind: row.kind as ActivityKind, title: String(row.title), dueOn: text(row.due_on), doneAt: (row.done_at as Date | null) ?? null,
-  doneBy: text(row.done_by), ownerEmail: String(row.owner_email), createdAt: row.created_at as Date, createdBy: String(row.created_by),
+  doneBy: text(row.done_by), ...(row.completion_note ? { completionNote: String(row.completion_note) } : {}), ownerEmail: String(row.owner_email), createdAt: row.created_at as Date, createdBy: String(row.created_by),
 });
 
 /** Something done or to do on an opportunity within reach. A note has no date; the rest may have one. */
@@ -306,7 +306,7 @@ export async function addActivity(opportunityId: number, input: { kind: string; 
 /** Marks an activity as done, or as not done again. */
 export async function setActivityDone(activityId: number, done: boolean, who: string, scope: FunnelScope, conn: Queryable): Promise<void> {
   const { rows } = await conn.query(
-    `UPDATE opportunity_activities a SET done_at = CASE WHEN $3 THEN now() END, done_by = CASE WHEN $3 THEN $4 END
+    `UPDATE opportunity_activities a SET done_at = CASE WHEN $3 THEN now() END, done_by = CASE WHEN $3 THEN $4 END, completion_note=NULL
       WHERE a.id = $1 AND a.kind <> 'nota'
         AND ($2::text IS NULL OR COALESCE((SELECT o.owner_email FROM opportunities o WHERE o.id = a.opportunity_id), (SELECT d.seller_email FROM orders d WHERE d.id = a.order_id), a.owner_email) = $2) RETURNING a.id`,
     [activityId, scope.ownerEmail, done, who],
@@ -327,7 +327,7 @@ export async function deleteActivity(activityId: number, scope: FunnelScope, con
 
 /** Everything noted on one opportunity, the newest first. The opportunity was already read within the scope. */
 export async function listActivities(opportunityId: number, conn: Queryable): Promise<Activity[]> {
-  const { rows } = await conn.query("SELECT id, opportunity_id, kind, title, due_on::text AS due_on, done_at, done_by, owner_email, created_at, created_by FROM opportunity_activities WHERE opportunity_id = $1 ORDER BY (done_at IS NOT NULL OR kind = 'nota'), due_on NULLS LAST, id DESC", [opportunityId]);
+  const { rows } = await conn.query("SELECT id, opportunity_id, kind, title, due_on::text AS due_on, done_at, done_by, completion_note, owner_email, created_at, created_by FROM opportunity_activities WHERE opportunity_id = $1 ORDER BY (done_at IS NOT NULL OR kind = 'nota'), due_on NULLS LAST, id DESC", [opportunityId]);
   return rows.map(toActivity);
 }
 

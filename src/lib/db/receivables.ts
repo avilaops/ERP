@@ -100,10 +100,14 @@ export async function recordReceipt(id: number, input: ReceiptInput, who: string
   const commission = roundCents(commissionOn(amount, rates));
 
   const { rows } = await conn.query(
-    `WITH settled AS (
+    `WITH parent AS (
+       SELECT o.id FROM orders o JOIN receivables r ON r.order_id=o.id
+        WHERE r.id=$1 AND o.status='fechado' FOR UPDATE OF o
+     ), settled AS (
        -- The write only happens if what is open is still what was read.
        UPDATE receivables r SET status = CASE WHEN $12::boolean THEN 'recebida' ELSE 'aberta' END, updated_at = now(), updated_by = $2
-        WHERE r.id = $1 AND r.status = 'aberta' AND r.amount - (SELECT COALESCE(sum(p.amount), 0) FROM receipts p WHERE p.receivable_id = r.id AND NOT EXISTS (SELECT 1 FROM refund_requests q WHERE q.receipt_id = p.id AND q.status = 'confirmada')) = $13::numeric
+        WHERE r.id = $1 AND EXISTS (SELECT 1 FROM parent WHERE parent.id=r.order_id)
+          AND r.status = 'aberta' AND r.amount - (SELECT COALESCE(sum(p.amount), 0) FROM receipts p WHERE p.receivable_id = r.id AND NOT EXISTS (SELECT 1 FROM refund_requests q WHERE q.receipt_id = p.id AND q.status = 'confirmada')) = $13::numeric
         RETURNING r.id, r.order_id
      ), receipt AS (
        INSERT INTO receipts (receivable_id, received_at, amount, amount_without_ipi, method, note, recorded_by)

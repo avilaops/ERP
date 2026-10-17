@@ -60,7 +60,7 @@ export async function saveSignedInvoice(invoice: SignedInvoice, conn: Queryable)
   const { rows } = await conn.query(
     `WITH preparation AS (
        UPDATE orders SET nfe_rules_revision = nfe_rules_revision + 1
-        WHERE id = $1 AND ($9::integer IS NULL OR nfe_rules_revision = $9) RETURNING id
+        WHERE id = $1 AND status <> 'cancelado' AND ($9::integer IS NULL OR nfe_rules_revision = $9) RETURNING id
      )
      INSERT INTO fiscal_invoices (order_id, environment, series, number, access_key, status, signed_xml, issued_at, created_by)
      SELECT id, $2, $3, $4, $5, 'assinada', $6, $7, $8 FROM preparation
@@ -72,6 +72,8 @@ export async function saveSignedInvoice(invoice: SignedInvoice, conn: Queryable)
     [invoice.orderId, invoice.environment, invoice.series, invoice.number, invoice.accessKey, invoice.signedXml, invoice.issuedAt, invoice.createdBy, invoice.rulesRevision ?? null],
   );
   if (!rows[0]) {
+    const state = await conn.query("SELECT status FROM orders WHERE id=$1", [invoice.orderId]);
+    if (state.rows[0]?.status === "cancelado") throw new InvoicePreparationChanged("O pedido foi cancelado. A nota não pode ser guardada ou enviada.");
     if (invoice.rulesRevision !== undefined) {
       const current = await conn.query("SELECT nfe_rules_revision FROM orders WHERE id = $1", [invoice.orderId]);
       if (Number(current.rows[0]?.nfe_rules_revision) !== invoice.rulesRevision) throw new InvoicePreparationChanged("A preparação fiscal mudou antes de guardar a nota assinada. Confira e tente novamente.");

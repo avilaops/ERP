@@ -23,7 +23,7 @@ export async function ordersForAssistant(filter: { sellerEmail: string | null; s
 export async function pendingApprovalsForAssistant(conn: Queryable) {
   const { rows } = await conn.query(
     `SELECT o.number, COALESCE(c.trade_name, c.name) AS customer, o.seller_name, a.requested_at, a.requested_by
-       FROM order_approvals a JOIN orders o ON o.id = a.order_id LEFT JOIN customers c ON c.id = o.customer_id WHERE a.status = 'pendente' ORDER BY a.requested_at LIMIT 50`,
+       FROM order_approvals a JOIN orders o ON o.id = a.order_id LEFT JOIN customers c ON c.id = o.customer_id WHERE a.status = 'pendente' AND o.status='aguardando_aprovacao' ORDER BY a.requested_at LIMIT 50`,
   );
   return rows.map((row) => ({ pedido: String(row.number), cliente: row.customer === null ? null : String(row.customer), vendedor: String(row.seller_name), pedido_em: iso(row.requested_at), pedido_por: String(row.requested_by) }));
 }

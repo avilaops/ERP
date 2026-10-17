@@ -63,7 +63,7 @@ async function checkMethod(method: string, conn: Queryable) {
 }
 
 const receiptTool: Tool = {
-  name: "recebimento_dar_baixa", title: "Registrar recebimento", item: "recebimentos", writes: true,
+  name: "recebimento_dar_baixa", title: "Registrar recebimento", item: "recebimentos", writes: true, destructive: true,
   description: "Prepara uma baixa parcial ou total de uma parcela. Primeiro informe id, valor, data e forma; mostre o resumo e peça confirmação. Depois use somente confirmar. Repetir o mesmo código devolve o resultado sem nova baixa.",
   inputSchema: object({ id: { type: "number", description: "Id da parcela em recebimentos_em_aberto" }, valor: { type: "number", description: "Valor recebido em reais, maior que zero e com até dois decimais" }, data: field("Dia do recebimento: AAAA-MM-DD"), forma: field("Nome exato do meio ativo na empresa"), observacao: field("Observação opcional, até 300 caracteres"), ...confirmField }),
   async run(session, conn, args) {

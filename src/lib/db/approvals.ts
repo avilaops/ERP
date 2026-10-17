@@ -64,6 +64,13 @@ export type Decider = {
 
 const GONE = "Este pedido não está mais aguardando aprovação. Atualize a página.";
 
+/** Shared by the screen's decision and the assistant's preview. No costs leave this check. */
+export async function assertApprovalAuthority(order: NonNullable<Awaited<ReturnType<typeof getOrder>>>, who: Decider, conn: Queryable): Promise<void> {
+  const { band } = await loadOrderStanding(order, conn);
+  const { managerLimit } = await loadApprovalPolicy(conn);
+  if (band === null || (needsDirector(band, managerLimit) && !who.approvesAtLoss)) throw new OrderError("Este pedido passa da sua alçada: só a diretoria pode aprovar. Você pode recusar, com o motivo.");
+}
+
 /**
  * Approves or refuses. Approved, the order closes, with the closing recorded;
  * refused, it goes back to negotiation with the reason. Order, request and
@@ -76,11 +83,7 @@ export async function decideApproval(number: string, decision: Decision, who: De
 
   const order = await getOrder(number, ALL, conn);
   if (!order || order.status !== "aguardando_aprovacao") throw new OrderError(GONE);
-  const { band } = await loadOrderStanding(order, conn);
-  const { managerLimit } = await loadApprovalPolicy(conn);
-  if (decision.approve && (band === null || (needsDirector(band, managerLimit) && !who.approvesAtLoss))) {
-    throw new OrderError("Este pedido passa da sua alçada: só a diretoria pode aprovar. Você pode recusar, com o motivo.");
-  }
+  if (decision.approve) await assertApprovalAuthority(order, who, conn);
   const table = await loadPublishedTable(order.priceTableVersion, conn);
   if (!table) throw new Error(`Tabela v${order.priceTableVersion} não encontrada.`);
   const sale = saleOf(order, table);
