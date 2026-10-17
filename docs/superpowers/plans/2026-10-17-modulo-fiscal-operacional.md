@@ -52,6 +52,7 @@
 - [x] Renovar o relógio do lote, preservar jobs antigos na migração e adiar inutilização enquanto houver emissão concorrente.
 - [x] Exigir `Pedidos` em perfis que recebem `Fiscal`.
 - [x] Parar emissões antigas sem identidade para revisão e ocultar ações de configuração de quem não acessa `Configurações`.
+- [x] Encaminhar eventos legados interrompidos para revisão antes que o worker possa retransmiti-los.
 
 ## Resultado
 

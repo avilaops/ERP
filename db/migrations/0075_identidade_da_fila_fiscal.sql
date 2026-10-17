@@ -20,7 +20,19 @@ UPDATE fiscal_jobs
    AND status IN ('pendente', 'processando')
    AND invoice_id IS NULL;
 
--- Jobs de evento criados pela versão anterior não guardavam a nota escolhida.
+-- Um evento legado já marcado como processando pode ter sido aceito antes da
+-- queda do worker. Sem fiscal_job_id no evento produzido, não há como provar
+-- que a transmissão ainda não ocorreu; retomar poderia repetir uma CC-e ou um
+-- cancelamento irreversível.
+UPDATE fiscal_jobs
+   SET status = 'revisao_manual', lease_until = NULL,
+       last_error = 'Evento legado interrompido durante o processamento; confira a nota e a SEFAZ antes de confirmar novamente.',
+       updated_at = now()
+ WHERE kind IN ('correcao_nfe', 'cancelamento_nfe')
+   AND status = 'processando'
+   AND invoice_id IS NULL;
+
+-- Jobs pendentes criados pela versão anterior não guardavam a nota escolhida.
 -- Só vinculamos quando há exatamente uma nota autorizada no ambiente atual;
 -- qualquer ambiguidade para antes de uma operação fiscal irreversível.
 WITH candidates AS (
@@ -29,7 +41,7 @@ WITH candidates AS (
       JOIN fiscal_invoices i ON i.order_id = j.order_id AND i.status = 'autorizada'
       JOIN company_settings s ON s.nfe_environment = i.environment
      WHERE j.kind IN ('correcao_nfe', 'cancelamento_nfe')
-       AND j.status IN ('pendente', 'processando')
+       AND j.status = 'pendente'
        AND j.invoice_id IS NULL
      GROUP BY j.id
 )
@@ -43,5 +55,5 @@ UPDATE fiscal_jobs
        last_error = 'Evento criado antes da identificação da nota; confira a nota e confirme novamente.',
        updated_at = now()
  WHERE kind IN ('correcao_nfe', 'cancelamento_nfe')
-   AND status IN ('pendente', 'processando')
+   AND status = 'pendente'
    AND invoice_id IS NULL;

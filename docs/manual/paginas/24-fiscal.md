@@ -16,6 +16,10 @@ Cada pedido fechado aparece com uma situação:
 - **Na fila:** a emissão, carta de correção ou cancelamento está aguardando o processamento.
 - **Revisão manual:** confira o erro e a situação na SEFAZ antes de qualquer nova tentativa.
 
+Na atualização da fila antiga, emissão ou evento encontrado no meio do processamento
+vai para revisão manual. Isso evita repetir uma operação que pode ter sido aceita
+pela SEFAZ antes da interrupção.
+
 O botão **Abrir nota no pedido** leva diretamente à etapa **Documentos e nota fiscal**. Nela ficam a preparação tributária, o transporte, o local de entrega, a conferência do XML e do DANFE, a emissão e os eventos.
 
 ## Notas fiscais
