@@ -231,7 +231,13 @@ test("migração: reconhece o PIX já aplicado com o nome anterior sem repetir S
     try {
       await migrate(client, dir);
       await client.query("UPDATE payment_methods SET company_pix=false");
-      assert.deepEqual(await migrate(client, MIGRATIONS_DIR), ["0070_email_da_carta_de_correcao.sql", current]);
+      assert.deepEqual(await migrate(client, MIGRATIONS_DIR), [
+        "0070_email_da_carta_de_correcao.sql",
+        current,
+        "0072_fila_fiscal.sql",
+        "0073_fila_de_eventos_fiscais.sql",
+        "0074_fila_inutilizacao_fiscal.sql",
+      ]);
       assert.deepEqual(await migrate(client, MIGRATIONS_DIR), []);
       const flags = await client.query("SELECT 1 FROM payment_methods WHERE company_pix");
       assert.equal(flags.rows.length, 0);

@@ -1424,13 +1424,16 @@ test("fila fiscal: clique repetido compartilha a emissão; perda de resposta ret
   const { testPfx } = await import("./fiscal-helpers.ts");
   const { randomBytes } = await import("node:crypto");
 
-  const number = await createOrder({ seller: SELLER, version: 1, productId: ID["LD-B001"], quantity: 1 }, numbers("261018-JOB1"), db.pool);
+  const number = await createOrder({ seller: SELLER, version: 1, productId: ID["LD-B001"], quantity: 2 }, numbers("261018-JOB1"), db.pool);
   await linkOrderCustomer(number, customerSp, SELLER.email, MINE, db.pool);
   await saveOrderTerms(number, { ...TERMS, deliveryUf: "SP" }, SELLER.email, MINE, db.pool);
-  await savePayment(number, PAYMENT, SELLER.email, MINE, db.pool);
+  await savePayment(number, { ...PAYMENT, downPayment: 30000 }, SELLER.email, MINE, db.pool);
   await closeOrder(number, SELLER.email, MINE, db.pool);
   const orderId = Number((await db.pool.query("SELECT id FROM orders WHERE number = $1", [number])).rows[0].id);
-  await db.pool.query("UPDATE customers SET email = 'fila@cliente.test' WHERE id = $1", [customerSp]);
+  await db.pool.query(
+    "UPDATE customers SET email = 'fila@cliente.test', city = 'São José do Rio Preto', cep = '15035000', street = 'Rua A', street_number = '1', district = 'Centro' WHERE id = $1",
+    [customerSp],
+  );
 
   const now = new Date("2026-10-18T12:00:00Z");
   const who = "diretoria@teste.local";
@@ -1591,11 +1594,12 @@ test("nota autorizada: carta de correção numera 1, 2…; cancelamento grava o 
 
   // Cancelada, não aceita mais evento; e o pedido pode ter uma nota nova, com o número seguinte.
   await assert.rejects(() => registerOrderNfeEvent(number, "correcao", "Mais uma correção depois de cancelada.", who, now, vault, accept, db.pool), /não tem nota autorizada/);
+  const nextBeforeAgain = Number((await db.pool.query("SELECT nfe_next_number FROM company_settings")).rows[0].nfe_next_number);
   const again = await issueOrderNfe(number, who, now, vault, async (_u, _a, envelope) => {
     const key = /Id="NFe(\d{44})"/.exec(envelope)![1];
     return `<retEnviNFe versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe"><cStat>104</cStat><xMotivo>ok</xMotivo><protNFe versao="4.00"><infProt><chNFe>${key}</chNFe><nProt>135260000000002</nProt><cStat>100</cStat><xMotivo>Autorizado</xMotivo></infProt></protNFe></retEnviNFe>`;
   }, db.pool);
-  assert.deepEqual([again.invoice.number, again.invoice.status], [43, "autorizada"]);
+  assert.deepEqual([again.invoice.number, again.invoice.status], [nextBeforeAgain, "autorizada"]);
 
   // Nota enviada sem resposta que a SEFAZ, consultada, diz ter autorizado: grava o protocolo e NÃO reenvia.
   const { voidInvoiceNumbers } = await import("@/lib/db/issue-nfe");
@@ -1609,7 +1613,7 @@ test("nota autorizada: carta de correção numera 1, 2…; cancelamento grava o 
     const key = /<chNFe>(\d{44})/.exec(envelope)![1];
     return `<retConsSitNFe versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe"><cStat>100</cStat><xMotivo>Autorizado o uso da NF-e</xMotivo><chNFe>${key}</chNFe><protNFe versao="4.00"><infProt><chNFe>${key}</chNFe><nProt>135260000000003</nProt><cStat>100</cStat><xMotivo>Autorizado o uso da NF-e</xMotivo></infProt></protNFe></retConsSitNFe>`;
   }, db.pool);
-  assert.deepEqual([found.invoice.number, found.invoice.status, found.invoice.protocol], [44, "autorizada", "135260000000003"]);
+  assert.deepEqual([found.invoice.number, found.invoice.status, found.invoice.protocol], [nextBeforeAgain + 1, "autorizada", "135260000000003"]);
   assert.equal(calls.length, 1);
   assert.match(calls[0], /nfeconsultaprotocolo4/);
   assert.match(found.message, /já estava autorizada/);
@@ -1619,11 +1623,12 @@ test("nota autorizada: carta de correção numera 1, 2…; cancelamento grava o 
     assert.ok(envelope.includes("<xServ>INUTILIZAR</xServ>") && envelope.includes("<Signature "));
     return `<retInutNFe versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe"><infInut><cStat>102</cStat><xMotivo>Inutilização de número homologado</xMotivo><nProt>135260000000009</nProt></infInut></retInutNFe>`;
   };
-  await assert.rejects(() => voidInvoiceNumbers({ series: 1, first: 42, last: 44, reason: "Numeração pulada por falha de sistema." }, who, now, vault, voided, db.pool), /veredito da SEFAZ nesta faixa \(número 42, 43, 44\)/);
-  await assert.rejects(() => voidInvoiceNumbers({ series: 1, first: 45, last: 45, reason: "Numeração pulada por falha de sistema." }, who, now, vault, voided, db.pool), /o próximo da empresa é o 45/);
-  assert.equal(await takeNextNumber(db.pool), 45);
-  assert.match((await voidInvoiceNumbers({ series: 1, first: 45, last: 45, reason: "Numeração pulada por falha de sistema." }, who, now, vault, voided, db.pool)).message, /45 a 45 inutilizada/);
-  assert.deepEqual((await listNumberVoids(db.pool)).map((item) => [item.first, item.last, item.protocol]), [[45, 45, "135260000000009"]]);
+  await assert.rejects(() => voidInvoiceNumbers({ series: 1, first: 42, last: nextBeforeAgain + 1, reason: "Numeração pulada por falha de sistema." }, who, now, vault, voided, db.pool), /veredito da SEFAZ nesta faixa/);
+  const available = nextBeforeAgain + 2;
+  await assert.rejects(() => voidInvoiceNumbers({ series: 1, first: available, last: available, reason: "Numeração pulada por falha de sistema." }, who, now, vault, voided, db.pool), new RegExp(`o próximo da empresa é o ${available}`));
+  assert.equal(await takeNextNumber(db.pool), available);
+  assert.match((await voidInvoiceNumbers({ series: 1, first: available, last: available, reason: "Numeração pulada por falha de sistema." }, who, now, vault, voided, db.pool)).message, new RegExp(`${available} a ${available} inutilizada`));
+  assert.deepEqual((await listNumberVoids(db.pool)).map((item) => [item.first, item.last, item.protocol]), [[available, available, "135260000000009"]]);
 });
 
 test("fila de inutilização: persiste o XML assinado antes da SEFAZ e não duplica clique repetido", { skip }, async () => {
@@ -1637,8 +1642,8 @@ test("fila de inutilização: persiste o XML assinado antes da SEFAZ e não dupl
   const who = "diretoria@teste.local";
   const vault = randomBytes(32);
   await saveCertificate(testPfx({ name: "EMPRESA DE TESTE LTDA:11222333000181" }), "senha-de-teste", vault, who, now, db.pool);
-  assert.equal(await takeNextNumber(db.pool), 46);
-  const range = { series: 1, first: 46, last: 46, reason: "Numeração reservada e não utilizada no teste." };
+  const available = await takeNextNumber(db.pool);
+  const range = { series: 1, first: available, last: available, reason: "Numeração reservada e não utilizada no teste." };
   const first = await enqueueNumberVoid(range, who, now, vault, db.pool);
   const repeated = await enqueueNumberVoid(range, who, now, vault, db.pool);
   assert.deepEqual([repeated.id, repeated.joined], [first.id, true]);
@@ -1652,7 +1657,7 @@ test("fila de inutilização: persiste o XML assinado antes da SEFAZ e não dupl
   };
   assert.equal(await runOneNumberVoidJob(now, vault, send, db.pool), "completed");
   assert.deepEqual((await listNumberVoidJobs(db.pool)).slice(0, 1).map((job) => [job.status, job.attempts]), [["concluido", 1]]);
-  assert.deepEqual((await listNumberVoids(db.pool)).slice(0, 1).map((item) => [item.first, item.last, item.protocol]), [[46, 46, "135260000000010"]]);
+  assert.deepEqual((await listNumberVoids(db.pool)).slice(0, 1).map((item) => [item.first, item.last, item.protocol]), [[available, available, "135260000000010"]]);
 });
 
 test("resposta perdida: evento duplicado (573) vem da consulta; número que já é de outra nota na SEFAZ (539) não é reaproveitado; duplicidade (204) traz o protocolo ou espera", { skip }, async () => {
