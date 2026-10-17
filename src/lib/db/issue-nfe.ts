@@ -1,6 +1,6 @@
 import { randomInt } from "node:crypto";
 import { loadFiscalSettings, loadSealedCertificate } from "@/lib/db/fiscal";
-import { countCorrections, isNumberVoided, listOrderInvoices, recordNumberVoid, usedNumbersIn, loadSignedXml, recordInvoiceEvent, recordVerdict, saveSignedInvoice, takeNextNumber } from "@/lib/db/invoices";
+import { countCorrections, isNumberVoided, listOrderInvoices, recordNumberVoid, usedNumbersIn, loadSignedXml, recordInvoiceEvent, recordVerdict, saveSignedInvoice, takeNextNumber, InvoicePreparationChanged } from "@/lib/db/invoices";
 import type { Invoice } from "@/lib/db/invoices";
 import { issueInstant, previewOrderNfe } from "@/lib/db/order-nfe";
 import { getOrder } from "@/lib/db/orders";
@@ -97,7 +97,7 @@ export async function issueOrderNfe(orderNumber: string, who: string, now: Date,
     while (!isAcceptableRandomCode(randomCode, number));
 
     const numbered = await previewOrderNfe(orderNumber, now, conn, { number, randomCode });
-    if (!numbered || numbered.problems.length > 0) throw new IssueError("O pedido mudou enquanto a nota era montada. Tente de novo.");
+    if (!numbered || numbered.problems.length > 0 || numbered.rulesRevision !== preview.rulesRevision) throw new IssueError("O pedido ou a preparação fiscal mudou enquanto a nota era montada. Confira e tente de novo.");
     let built: { key: string; xml: string };
     try {
       built = buildNfeXml(numbered.input);
@@ -106,10 +106,15 @@ export async function issueOrderNfe(orderNumber: string, who: string, now: Date,
       throw error;
     }
     signedXml = signNfeXml(built.xml, signingKeyOf(certificate.pfx, certificate.password));
-    invoice = await saveSignedInvoice(
-      { orderId: preview.orderId, environment, series, number, accessKey: accessKey(numbered.input), signedXml, issuedAt: numbered.input.issuedAt, createdBy: who },
-      conn,
-    );
+    try {
+      invoice = await saveSignedInvoice(
+        { orderId: preview.orderId, environment, series, number, accessKey: accessKey(numbered.input), signedXml, issuedAt: numbered.input.issuedAt, createdBy: who, rulesRevision: numbered.rulesRevision },
+        conn,
+      );
+    } catch (error) {
+      if (error instanceof InvoicePreparationChanged) throw new IssueError(error.message);
+      throw error;
+    }
   }
 
   let answer: string;

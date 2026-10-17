@@ -499,6 +499,9 @@ export default async function PedidoPage({
           <h2 id="nota-fiscal" className="text-sm font-semibold uppercase tracking-wide">
             Nota fiscal
           </h2>
+          <Link href={`/pedidos/${order.number}/fiscal`} className={`${SECONDARY} mt-3`}>
+            Preparar regras desta nota
+          </Link>
           <p className="mt-1 text-slate-600">
             A conferência não envia nada nem consome número. Emitir assina com o certificado da empresa e envia à SEFAZ, no ambiente
             escolhido em Parâmetros → Fiscal ({invoice.input.environment === "producao" ? "produção: nota com valor fiscal" : "homologação: nota de teste, sem valor fiscal"}).

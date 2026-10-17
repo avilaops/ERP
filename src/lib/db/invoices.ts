@@ -47,7 +47,9 @@ export async function takeNextNumber(conn: Queryable): Promise<number> {
   return Number(rows[0].taken);
 }
 
-export type SignedInvoice = { orderId: number; environment: Environment; series: number; number: number; accessKey: string; signedXml: string; issuedAt: string; createdBy: string };
+export type SignedInvoice = { orderId: number; environment: Environment; series: number; number: number; accessKey: string; signedXml: string; issuedAt: string; createdBy: string; rulesRevision?: number };
+
+export class InvoicePreparationChanged extends Error {}
 
 /**
  * Keeps the signed invoice before it is sent: whatever happens to the call, the
@@ -56,16 +58,26 @@ export type SignedInvoice = { orderId: number; environment: Environment; series:
  */
 export async function saveSignedInvoice(invoice: SignedInvoice, conn: Queryable): Promise<Invoice> {
   const { rows } = await conn.query(
-    `INSERT INTO fiscal_invoices (order_id, environment, series, number, access_key, status, signed_xml, issued_at, created_by)
-     VALUES ($1, $2, $3, $4, $5, 'assinada', $6, $7, $8)
+    `WITH preparation AS (
+       UPDATE orders SET nfe_rules_revision = nfe_rules_revision + 1
+        WHERE id = $1 AND ($9::integer IS NULL OR nfe_rules_revision = $9) RETURNING id
+     )
+     INSERT INTO fiscal_invoices (order_id, environment, series, number, access_key, status, signed_xml, issued_at, created_by)
+     SELECT id, $2, $3, $4, $5, 'assinada', $6, $7, $8 FROM preparation
      ON CONFLICT (environment, series, number) DO UPDATE
         SET access_key = EXCLUDED.access_key, status = 'assinada', signed_xml = EXCLUDED.signed_xml, issued_at = EXCLUDED.issued_at,
             status_code = NULL, status_reason = NULL, updated_at = now(), created_by = EXCLUDED.created_by
       WHERE fiscal_invoices.order_id = EXCLUDED.order_id AND fiscal_invoices.status IN ('rejeitada', 'assinada')
      RETURNING ${COLUMNS}`,
-    [invoice.orderId, invoice.environment, invoice.series, invoice.number, invoice.accessKey, invoice.signedXml, invoice.issuedAt, invoice.createdBy],
+    [invoice.orderId, invoice.environment, invoice.series, invoice.number, invoice.accessKey, invoice.signedXml, invoice.issuedAt, invoice.createdBy, invoice.rulesRevision ?? null],
   );
-  if (!rows[0]) throw new Error(`O número ${invoice.number} da série ${invoice.series} já pertence a outra nota.`);
+  if (!rows[0]) {
+    if (invoice.rulesRevision !== undefined) {
+      const current = await conn.query("SELECT nfe_rules_revision FROM orders WHERE id = $1", [invoice.orderId]);
+      if (Number(current.rows[0]?.nfe_rules_revision) !== invoice.rulesRevision) throw new InvoicePreparationChanged("A preparação fiscal mudou antes de guardar a nota assinada. Confira e tente novamente.");
+    }
+    throw new Error(`O número ${invoice.number} da série ${invoice.series} já pertence a outra nota.`);
+  }
   return toInvoice(rows[0]);
 }
 

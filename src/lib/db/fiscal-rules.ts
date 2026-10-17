@@ -122,36 +122,63 @@ const fraction = (value: number, label: string): number => {
   return value;
 };
 
-/** Writes the rules of a line. Blank is allowed, a malformed code is not. One statement. */
-export async function saveFiscalRules(lineId: number, input: FiscalRules, updatedBy: string, conn: Queryable): Promise<void> {
-  if (updatedBy.trim() === "") throw new Error("Falta dizer quem está alterando as regras fiscais.");
+/** Shared normalization for company defaults and the preparation of one invoice. */
+export function normalizeFiscalRules(input: FiscalRules): FiscalRules {
   const nature = blank(input.operationNature);
   if (nature !== null && nature.length > 60) throw new FiscalError("Natureza da operação: até 60 letras.");
   const info = blank(input.additionalInfo);
   if (info !== null && info.length > 2000) throw new FiscalError("Informações complementares: até 2.000 letras.");
+  return {
+    operationNature: nature,
+    cfopInternal: code(input.cfopInternal, /^5\d{3}$/, "CFOP dentro do estado: quatro dígitos, começando por 5."),
+    cfopInterstate: code(input.cfopInterstate, /^6\d{3}$/, "CFOP para outro estado: quatro dígitos, começando por 6."),
+    cfopInterstateNonTaxpayer: code(input.cfopInterstateNonTaxpayer, /^6\d{3}$/, "CFOP para não contribuinte de outro estado: quatro dígitos, começando por 6."),
+    icmsCode: code(input.icmsCode, /^\d{2,3}$/, "ICMS: CST com dois dígitos ou CSOSN com três."),
+    ipiCst: code(input.ipiCst, /^\d{2}$/, "CST do IPI: dois dígitos, ou em branco para nota sem IPI."),
+    ipiFrameCode: code(input.ipiFrameCode, /^\d{3}$/, "Código de enquadramento do IPI: três dígitos.") ?? "999",
+    pisCst: code(input.pisCst, /^\d{2}$/, "CST do PIS: dois dígitos."),
+    pisRate: fraction(input.pisRate, "Alíquota do PIS"),
+    cofinsCst: code(input.cofinsCst, /^\d{2}$/, "CST da COFINS: dois dígitos."),
+    cofinsRate: fraction(input.cofinsRate, "Alíquota da COFINS"),
+    finalConsumer: input.finalConsumer === true,
+    ipiInIcmsBase: input.ipiInIcmsBase === true,
+    additionalInfo: info,
+    ibsCbsCst: code(input.ibsCbsCst, /^\d{3}$/, "CST do IBS/CBS: três dígitos."),
+    ibsCbsClass: code(input.ibsCbsClass, /^\d{6}$/, "Classificação tributária do IBS/CBS: seis dígitos."),
+    ibsStateRate: fraction(input.ibsStateRate, "Alíquota do IBS estadual"),
+    ibsCityRate: fraction(input.ibsCityRate, "Alíquota do IBS municipal"),
+    cbsRate: fraction(input.cbsRate, "Alíquota da CBS"),
+    icmsOutOfContributions: input.icmsOutOfContributions === true,
+  };
+}
+
+/** Writes the rules of a line. Blank is allowed, a malformed code is not. One statement. */
+export async function saveFiscalRules(lineId: number, input: FiscalRules, updatedBy: string, conn: Queryable): Promise<void> {
+  if (updatedBy.trim() === "") throw new Error("Falta dizer quem está alterando as regras fiscais.");
+  const rules = normalizeFiscalRules(input);
   const values = [
     lineId,
-    nature,
-    code(input.cfopInternal, /^5\d{3}$/, "CFOP dentro do estado: quatro dígitos, começando por 5."),
-    code(input.cfopInterstate, /^6\d{3}$/, "CFOP para outro estado: quatro dígitos, começando por 6."),
-    code(input.cfopInterstateNonTaxpayer, /^6\d{3}$/, "CFOP para não contribuinte de outro estado: quatro dígitos, começando por 6."),
-    code(input.icmsCode, /^\d{2,3}$/, "ICMS: CST com dois dígitos ou CSOSN com três."),
-    code(input.ipiCst, /^\d{2}$/, "CST do IPI: dois dígitos, ou em branco para nota sem IPI."),
-    code(input.ipiFrameCode, /^\d{3}$/, "Código de enquadramento do IPI: três dígitos.") ?? "999",
-    code(input.pisCst, /^\d{2}$/, "CST do PIS: dois dígitos."),
-    fraction(input.pisRate, "Alíquota do PIS"),
-    code(input.cofinsCst, /^\d{2}$/, "CST da COFINS: dois dígitos."),
-    fraction(input.cofinsRate, "Alíquota da COFINS"),
-    input.finalConsumer === true,
-    input.ipiInIcmsBase === true,
-    info,
+    rules.operationNature,
+    rules.cfopInternal,
+    rules.cfopInterstate,
+    rules.cfopInterstateNonTaxpayer,
+    rules.icmsCode,
+    rules.ipiCst,
+    rules.ipiFrameCode,
+    rules.pisCst,
+    rules.pisRate,
+    rules.cofinsCst,
+    rules.cofinsRate,
+    rules.finalConsumer,
+    rules.ipiInIcmsBase,
+    rules.additionalInfo,
     updatedBy,
-    code(input.ibsCbsCst, /^\d{3}$/, "CST do IBS/CBS: três dígitos."),
-    code(input.ibsCbsClass, /^\d{6}$/, "Classificação tributária do IBS/CBS: seis dígitos."),
-    fraction(input.ibsStateRate, "Alíquota do IBS estadual"),
-    fraction(input.ibsCityRate, "Alíquota do IBS municipal"),
-    fraction(input.cbsRate, "Alíquota da CBS"),
-    input.icmsOutOfContributions === true,
+    rules.ibsCbsCst,
+    rules.ibsCbsClass,
+    rules.ibsStateRate,
+    rules.ibsCityRate,
+    rules.cbsRate,
+    rules.icmsOutOfContributions,
   ];
   const { rows } = await conn.query(
     `INSERT INTO fiscal_rules

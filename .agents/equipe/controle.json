@@ -2,7 +2,17 @@
   "schemaVersion": 1,
   "application": "avila-erp",
   "members": [],
-  "tasks": [],
+  "tasks": [
+    {
+      "id": "T-20261016-nfe-por-nota",
+      "title": "Personalizar regras fiscais na preparação de cada nota",
+      "owner": null,
+      "status": "em-revisao",
+      "acceptance": ["Preparar regras por pedido sem alterar o padrão da empresa", "Preservar validação fiscal, XML assinado e edições concorrentes", "Conferir UI, persistência e cinco tamanhos"],
+      "evidence": ["https://linear.app/avilaops/issue/AVL-28", "704 testes sem falhas ou pulos; lint e tipos aprovados", "Demo isolado erp_note_rules_demo, pedido 261017-DM07: regras preenchidas pela UI e refletidas na pré-validação", "12 etapas e cinco tamanhos: 60 amostras com uma tela, sem rolagem lateral e áreas de toque >=44 px", "docs/nfe-por-nota.md"],
+      "next": "Acompanhar publicação e aceite na AVL-28. Regras reais devem ser escolhidas pela pessoa autorizada; nenhum código real foi presumido ou emitido."
+    }
+  ],
   "decisions": [],
   "integrations": []
 }

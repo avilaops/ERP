@@ -2,7 +2,8 @@ import { createHash } from "node:crypto";
 import { loadOrderTransport } from "@/lib/db/carriers";
 import { loadFiscalSettings, loadProductFiscal } from "@/lib/db/fiscal";
 import type { ProductFiscal } from "@/lib/db/fiscal";
-import { listPaymentCodes, loadFiscalRules } from "@/lib/db/fiscal-rules";
+import { listPaymentCodes } from "@/lib/db/fiscal-rules";
+import { loadOrderFiscalRules } from "@/lib/db/order-fiscal-rules";
 import { loadOrderDelivery } from "@/lib/db/order-delivery";
 import { getOrder } from "@/lib/db/orders";
 import type { Order } from "@/lib/db/orders";
@@ -46,7 +47,7 @@ export async function previewOrderNfe(orderNumber: string, now: Date, conn: Quer
   if (!table || !snapshot) return null;
 
   const settings = await loadFiscalSettings(conn);
-  const rules = await loadFiscalRules(table.lineId, conn);
+  const { rules, revision: rulesRevision } = await loadOrderFiscalRules(order.id, table.lineId, conn);
   const fiscal = new Map<number, ProductFiscal>();
   for (const item of order.items) {
     const data = await loadProductFiscal(item.productId, conn);
@@ -74,5 +75,5 @@ export async function previewOrderNfe(orderNumber: string, now: Date, conn: Quer
     issuedAt: issueInstant(now),
     software: APP_NAME.normalize("NFD").replace(/[^\x20-\x7e]/g, "").replace(/\s+/g, " ").trim(),
   });
-  return { ...built, orderId: order.id, issuerUf: settings.uf ?? "" };
+  return { ...built, orderId: order.id, issuerUf: settings.uf ?? "", rulesRevision };
 }

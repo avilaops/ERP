@@ -1173,6 +1173,52 @@ test("nota fiscal de conferência: pedido fechado, com os cadastros preenchidos,
   assert.deepEqual(ready.problems, []);
   const { xml, key } = buildNfeXml(ready.input);
   assert.equal(key.length, 44);
+  // A preparação é da nota deste pedido: a empresa e a revisão comercial não mudam.
+  const { loadOrderFiscalRules, saveOrderFiscalRules } = await import("@/lib/db/order-fiscal-rules");
+  const { loadFiscalRules } = await import("@/lib/db/fiscal-rules");
+  const { saveSignedInvoice, InvoicePreparationChanged } = await import("@/lib/db/invoices");
+  const own = (await getOrder(number, ALL, db.pool))!;
+  const defaults = await loadFiscalRules(1, db.pool);
+  const firstDraft = await loadOrderFiscalRules(own.id, 1, db.pool);
+  assert.deepEqual(firstDraft.rules, defaults);
+  assert.equal(firstDraft.customized, false);
+  await saveOrderFiscalRules(own.id, 1, firstDraft.revision, { operationNature: "Venda específica desta nota", pisRate: 0.012 }, DIRECTOR, db.pool);
+  const customized = await previewOrderNfe(number, now, db.pool);
+  assert.equal(customized!.input.rules.operationNature, "Venda específica desta nota");
+  assert.equal(customized!.input.rules.pisRate, 0.012);
+  assert.match(buildNfeXml(customized!.input).xml, /<natOp>Venda específica desta nota<\/natOp>/);
+  assert.deepEqual(await loadFiscalRules(1, db.pool), defaults);
+  const other = await db.pool.query("SELECT id FROM orders WHERE id <> $1 LIMIT 1", [own.id]);
+  assert.deepEqual((await loadOrderFiscalRules(Number(other.rows[0].id), 1, db.pool)).rules, defaults);
+  await saveFiscalRules(1, { ...defaults, additionalInfo: "Padrão atualizado pela contabilidade" }, DIRECTOR, db.pool);
+  assert.equal((await loadOrderFiscalRules(own.id, 1, db.pool)).rules.additionalInfo, "Padrão atualizado pela contabilidade");
+  await saveFiscalRules(1, defaults, DIRECTOR, db.pool);
+  const draft = await loadOrderFiscalRules(own.id, 1, db.pool);
+  await assert.rejects(() => saveOrderFiscalRules(own.id, 1, firstDraft.revision, { pisRate: 0.99 }, DIRECTOR, db.pool), /preparação mudou/);
+  await assert.rejects(() => saveOrderFiscalRules(own.id, 1, draft.revision, { cfopInternal: "6102" }, DIRECTOR, db.pool), /CFOP dentro/);
+  assert.equal((await loadOrderFiscalRules(own.id, 1, db.pool)).revision, draft.revision);
+  await assert.rejects(() => saveSignedInvoice({ orderId: own.id, environment: "homologacao", series: 1, number: 999, accessKey: "1".repeat(44), signedXml: "não pode persistir", issuedAt: now.toISOString(), createdBy: DIRECTOR, rulesRevision: firstDraft.revision }, db.pool), InvoicePreparationChanged);
+  assert.equal((await db.pool.query("SELECT count(*)::int AS n FROM fiscal_invoices WHERE order_id = $1", [own.id])).rows[0].n, 0);
+  const competing = await Promise.allSettled([
+    saveOrderFiscalRules(own.id, 1, draft.revision, { additionalInfo: "Edição A" }, DIRECTOR, db.pool),
+    saveOrderFiscalRules(own.id, 1, draft.revision, { additionalInfo: "Edição B" }, DIRECTOR, db.pool),
+  ]);
+  assert.equal(competing.filter((result) => result.status === "fulfilled").length, 1);
+  const saved = await loadOrderFiscalRules(own.id, 1, db.pool);
+  assert.equal(saved.rules.operationNature, "Venda específica desta nota");
+  await saveOrderFiscalRules(own.id, 1, saved.revision, { icmsCode: null }, DIRECTOR, db.pool);
+  assert.ok((await previewOrderNfe(number, now, db.pool))!.problems.some((problem) => problem.includes("CST do ICMS")));
+  await saveOrderFiscalRules(own.id, 1, (await loadOrderFiscalRules(own.id, 1, db.pool)).revision, null, DIRECTOR, db.pool);
+  assert.deepEqual((await loadOrderFiscalRules(own.id, 1, db.pool)).rules, defaults);
+  assert.equal((await loadOrderFiscalRules(own.id, 1, db.pool)).customized, false);
+  const racing = await loadOrderFiscalRules(own.id, 1, db.pool);
+  const editOrSign = await Promise.allSettled([
+    saveOrderFiscalRules(own.id, 1, racing.revision, { additionalInfo: "Edição durante assinatura" }, DIRECTOR, db.pool),
+    saveSignedInvoice({ orderId: own.id, environment: "homologacao", series: 1, number: 999, accessKey: "2".repeat(44), signedXml: "XML fictício do teste de concorrência", issuedAt: now.toISOString(), createdBy: DIRECTOR, rulesRevision: racing.revision }, db.pool),
+  ]);
+  assert.equal(editOrSign.filter((result) => result.status === "fulfilled").length, 1);
+  await db.pool.query("DELETE FROM fiscal_invoices WHERE order_id = $1 AND number = 999", [own.id]);
+  await saveOrderFiscalRules(own.id, 1, (await loadOrderFiscalRules(own.id, 1, db.pool)).revision, null, DIRECTOR, db.pool);
   assert.ok(xml.includes("<nNF>42</nNF>") && xml.includes("<dhEmi>2026-10-08T10:00:00-03:00</dhEmi>") && xml.includes(`Pedido ${number}`));
   // Transporte: opcional; informado, vai para a nota sem reabrir o pedido nem mudar a revisão dele.
   const { createCarrier, saveOrderTransport } = await import("@/lib/db/carriers");
@@ -1257,6 +1303,9 @@ test("emissão: guarda a nota assinada antes de enviar; rejeitada reemite com o 
   );
   let invoices = await listOrderInvoices(orderId, db.pool);
   assert.deepEqual(invoices.map((invoice) => [invoice.number, invoice.status]), [[42, "assinada"]]);
+  const { loadOrderFiscalRules, saveOrderFiscalRules } = await import("@/lib/db/order-fiscal-rules");
+  let prepared = await loadOrderFiscalRules(orderId, 1, db.pool);
+  await assert.rejects(() => saveOrderFiscalRules(orderId, 1, prepared.revision, { operationNature: "Não pode alterar XML pendente" }, who, db.pool), /nota já foi assinada/);
 
   // 2. De novo: vai a mesma nota, byte a byte, e a SEFAZ rejeita.
   let consulted = 0;
@@ -1287,6 +1336,8 @@ test("emissão: guarda a nota assinada antes de enviar; rejeitada reemite com o 
   const file = await loadAuthorizedXml(orderId, db.pool);
   assert.ok(file?.xml.includes("<nfeProc ") && file.xml.includes("<nProt>135260000000001</nProt>") && file.xml.includes("<Signature "));
   assert.equal(file?.accessKey, authorized.invoice.accessKey);
+  prepared = await loadOrderFiscalRules(orderId, 1, db.pool);
+  await assert.rejects(() => saveOrderFiscalRules(orderId, 1, prepared.revision, null, who, db.pool), /nota já foi assinada/);
 
   // 4. Já autorizada: não emite de novo. O contador da empresa andou uma vez só.
   await assert.rejects(() => issueOrderNfe(number, who, now, vault, never, db.pool), /já tem nota autorizada/);
