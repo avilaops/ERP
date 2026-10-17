@@ -167,6 +167,12 @@ export function orderNfe(source: OrderNfeSource): { input: NfeInput; problems: s
   input.payments = payments;
 
   const problems = nfeProblems(input);
+  for (const receipt of source.receipts) {
+    if (receipt.amount > 0 && receipt.method && !source.paymentCodes.get(receipt.method)) {
+      const message = `Pagamento via "${receipt.method}": escolha o meio efetivo no pedido e confira o código em Parâmetros → Fiscal → Forma de pagamento na nota.`;
+      if (!problems.includes(message)) problems.push(message);
+    }
+  }
   if (!customer) problems.unshift("Pedido sem cliente.");
   if (settings.taxRegime === null) problems.unshift("Empresa: regime tributário (Parâmetros → Fiscal).");
   // The state of delivery of the order formed its price: the invoice has to go to the same state.

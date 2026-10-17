@@ -248,8 +248,8 @@ export type PaymentCode = { id: number; label: string; active: boolean; code: st
 
 /** Every form of payment of the company with the code it takes in the invoice, or `null` while nobody chose. */
 export async function listPaymentCodes(conn: Queryable): Promise<PaymentCode[]> {
-  const { rows } = await conn.query("SELECT id, label, active, nfe_code FROM payment_methods ORDER BY position, label");
-  return rows.map((row) => ({ id: Number(row.id), label: String(row.label), active: row.active === true, code: text(row.nfe_code) }));
+  const { rows } = await conn.query("SELECT id, label, active, nfe_code, on_delivery FROM payment_methods ORDER BY position, label");
+  return rows.map((row) => ({ id: Number(row.id), label: String(row.label), active: row.active === true, code: row.on_delivery === true ? null : text(row.nfe_code) }));
 }
 
 export async function savePaymentCode(id: number, value: string | null, updatedBy: string, conn: Queryable): Promise<void> {
@@ -257,10 +257,10 @@ export async function savePaymentCode(id: number, value: string | null, updatedB
   const chosen = blank(value);
   if (chosen !== null && !PAYMENT_CODES.some(([known]) => known === chosen)) throw new FiscalError("Escolha a forma da nota na lista.");
   const { rows } = await conn.query(
-    "UPDATE payment_methods SET nfe_code = $2, updated_at = now(), updated_by = $3 WHERE id = $1 RETURNING id",
+    "UPDATE payment_methods SET nfe_code = $2, updated_at = now(), updated_by = $3 WHERE id = $1 AND (NOT on_delivery OR $2::text IS NULL) RETURNING id",
     [id, chosen, updatedBy],
   );
-  if (rows.length === 0) throw new FiscalError("Forma de pagamento não encontrada. Recarregue a página.");
+  if (rows.length === 0) throw new FiscalError("Forma não encontrada ou cadastrada como prazo na entrega. Escolha o meio efetivo no pedido.");
 }
 
 /** One atomic batch. Concurrent renames, deletions and manual choices are skipped. */

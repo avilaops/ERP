@@ -78,6 +78,10 @@ test("linha com regras fiscais e sem equipamento sai inteira; forma de pagamento
   assert.equal((await listPaymentCodes(db.pool)).find((method) => method.id === transfer.id)?.code, "99");
   await assert.rejects(() => savePaymentCode(financing.id, "77", WHO, db.pool), FiscalError);
   await assert.rejects(() => savePaymentCode(999999, "17", WHO, db.pool), /não encontrada/);
+  const delivery = codes.get("Na entrega")!;
+  await assert.rejects(() => savePaymentCode(delivery.id, "99", WHO, db.pool), /prazo na entrega/);
+  await db.pool.query("UPDATE payment_methods SET nfe_code = '99' WHERE id = $1", [delivery.id]);
+  assert.equal((await listPaymentCodes(db.pool)).find((method) => method.id === delivery.id)?.code, null);
 });
 
 test("pagamentos em lote: uma falha reverte todas as alterações e o retorno conta apenas gravações efetivas", { skip }, async () => {

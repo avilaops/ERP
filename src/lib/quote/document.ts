@@ -130,7 +130,8 @@ function paymentLines(plan: PaymentPlan, onDelivery: boolean): string[] {
   if (parts.length === 0) {
     if (plan.balance > 0) lines.push(`Saldo de ${showMoney(plan.balance)}: a combinar`);
   } else if (onDelivery) {
-    lines.push(`Saldo de ${showMoney(plan.balance)} na entrega (previsão: ${showIsoDate(parts[0].dueDate)})`);
+    const method = parts[0].method && parts[0].method !== "Na entrega" ? ` via ${parts[0].method}` : "";
+    lines.push(`Saldo de ${showMoney(plan.balance)} na entrega${method} (previsão: ${showIsoDate(parts[0].dueDate)})`);
   } else {
     const method = parts[0].method ? ` via ${parts[0].method}` : "";
     lines.push(`Saldo de ${showMoney(plan.balance)} em ${parts.length} ${parts.length === 1 ? "parcela" : "parcelas"}${method}:`);

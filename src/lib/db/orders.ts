@@ -53,7 +53,7 @@ export type Order = {
   installmentCount: number | null;
   firstInstallmentDays: number | null;
   installmentIntervalDays: number | null;
-  /** The balance is one installment, due on the day the order is ready: the form chosen for it says so. */
+  /** Due on delivery, independently of the payment method. */
   balanceOnDelivery: boolean;
   /** The installments of the balance agreed one by one (date, amount, form). Empty: they are calculated from the count and the days. */
   customInstallments: CustomInstallment[];
@@ -462,6 +462,8 @@ export type OrderPayment = {
   /** `AAAA-MM-DD`, or `null`: on confirmation of the order. */
   downPaymentDate: string | null;
   balanceMethod: string | null;
+  /** Absent only for older callers that used an on_delivery payment-method entry. */
+  balanceOnDelivery?: boolean;
   installmentCount: number | null;
   firstInstallmentDays: number | null;
   installmentIntervalDays: number | null;
@@ -478,9 +480,11 @@ export async function savePayment(
   who: string,
   scope: OrderScope,
   conn: Queryable,
+  revision?: string,
 ): Promise<void> {
   assertWho(who);
   assertAmount(payment.downPayment, "Entrada");
+  if (payment.balanceOnDelivery !== undefined && typeof payment.balanceOnDelivery !== "boolean") throw new OrderError("Escolha quando pagar o saldo.");
   if (payment.downPaymentDate !== null) parseDate(payment.downPaymentDate);
   if (!wholeOrNull(payment.installmentCount, 1)) throw new OrderError("Parcelas: informe um número inteiro maior que zero.");
   if (!wholeOrNull(payment.firstInstallmentDays, 0) || !wholeOrNull(payment.installmentIntervalDays, 0)) {
@@ -499,14 +503,15 @@ export async function savePayment(
   const { rows } = await conn.query(
     `UPDATE orders
         SET down_payment = $2, down_payment_method = $3, down_payment_date = $4, balance_method = $5,
-            -- A form "na entrega" is one installment on the day the order is ready: count and days typed are not kept.
-            balance_on_delivery = EXISTS (SELECT 1 FROM payment_methods m WHERE m.label = $5 AND m.on_delivery),
-            installment_count = CASE WHEN EXISTS (SELECT 1 FROM payment_methods m WHERE m.label = $5 AND m.on_delivery) THEN 1 ELSE $6::integer END,
-            first_installment_days = CASE WHEN EXISTS (SELECT 1 FROM payment_methods m WHERE m.label = $5 AND m.on_delivery) THEN NULL ELSE $7::integer END,
-            installment_interval_days = CASE WHEN EXISTS (SELECT 1 FROM payment_methods m WHERE m.label = $5 AND m.on_delivery) THEN NULL ELSE $8::integer END,
+            -- New forms choose the due condition explicitly; older callers retain their original meaning.
+            balance_on_delivery = COALESCE($12::boolean, EXISTS (SELECT 1 FROM payment_methods m WHERE m.label = $5 AND m.on_delivery)),
+            installment_count = CASE WHEN COALESCE($12::boolean, EXISTS (SELECT 1 FROM payment_methods m WHERE m.label = $5 AND m.on_delivery)) THEN 1 ELSE $6::integer END,
+            first_installment_days = CASE WHEN COALESCE($12::boolean, EXISTS (SELECT 1 FROM payment_methods m WHERE m.label = $5 AND m.on_delivery)) THEN NULL ELSE $7::integer END,
+            installment_interval_days = CASE WHEN COALESCE($12::boolean, EXISTS (SELECT 1 FROM payment_methods m WHERE m.label = $5 AND m.on_delivery)) THEN NULL ELSE $8::integer END,
             payment_notes = $9,
             updated_at = now(), updated_by = $10
       WHERE number = $1 AND status = 'em_negociacao' AND ($11::text IS NULL OR seller_email = $11)
+        AND ($13::text IS NULL OR updated_at::text = $13)
       RETURNING id`,
     [
       number,
@@ -520,11 +525,18 @@ export async function savePayment(
       blankToNull(payment.paymentNotes),
       who,
       scope.sellerEmail,
+      payment.balanceOnDelivery ?? null,
+      revision ?? null,
     ],
   );
-  if (rows.length === 0) throw new OrderError(NOT_EDITABLE);
-  // Saving the form recalculates the installments: what was agreed one by one before is no longer what the form says.
-  await conn.query("DELETE FROM order_installments WHERE order_id = $1", [rows[0].id]);
+  if (rows.length === 0) throw new OrderError("O pedido mudou ou já foi fechado. Recarregue antes de salvar o pagamento.");
+  // Step navigation must not erase individually agreed installments when their plan did not change.
+  const planChanged = payment.balanceOnDelivery === undefined || payment.downPayment !== order.downPayment
+    || payment.downPaymentMethod !== order.downPaymentMethod || payment.downPaymentDate !== order.downPaymentDate
+    || payment.balanceMethod !== order.balanceMethod || payment.balanceOnDelivery !== order.balanceOnDelivery
+    || payment.installmentCount !== order.installmentCount || payment.firstInstallmentDays !== order.firstInstallmentDays
+    || payment.installmentIntervalDays !== order.installmentIntervalDays;
+  if (planChanged) await conn.query("DELETE FROM order_installments WHERE order_id = $1", [rows[0].id]);
 }
 
 /**
@@ -865,6 +877,6 @@ export async function listOrders(scope: OrderScope, conn: Queryable): Promise<Or
 
 /** The payment methods the company offers, in the order of the lists. */
 export async function listPaymentMethods(conn: Queryable): Promise<string[]> {
-  const { rows } = await conn.query("SELECT label FROM payment_methods WHERE active ORDER BY position, label");
+  const { rows } = await conn.query("SELECT label FROM payment_methods WHERE active AND NOT on_delivery ORDER BY position, label");
   return rows.map((row) => String(row.label));
 }

@@ -36,7 +36,6 @@ import { ORIGIN_UF, UFS } from "@/lib/pricing/states";
 import { compareByCode } from "@/lib/products-view";
 import { CopyButton } from "@/components/CopyButton";
 import { DiscountFields } from "@/components/DiscountFields";
-import { DownPaymentFields } from "@/components/DownPaymentFields";
 import { proposalText } from "@/lib/quote/text";
 import { decideApprovalAction } from "../../aprovacoes/actions";
 import { FREIGHT_MODES } from "@/lib/fiscal/nfe";
@@ -54,7 +53,6 @@ import {
   reopenOrderAction,
   saveOrderCustomerAction,
   saveInstallmentsAction,
-  savePaymentAction,
   saveTermsAction,
   setItemOptionsAction,
   setItemQuantityAction,
@@ -1161,150 +1159,19 @@ export default async function PedidoPage({
                   Política: entrada de pelo menos {showPercent(table.minDownPayment, 0)} da nota ({showMoney(plan.policyDownPayment)})
                 </p>
               </div>
-              <ActionForm action={savePaymentAction} className="grid gap-5 p-5 sm:grid-cols-3">
-                <input type="hidden" name="number" value={order.number} />
-                <div className="sm:col-span-3 lg:col-span-1">
-                  <DownPaymentFields key={`${order.downPayment}-${sale.invoiceTotal}`} name="downPayment" amount={order.downPayment === 0 ? "" : formatMoney(order.downPayment)} invoiceTotal={sale.invoiceTotal} />
-                  <p className={HELP}>
-                    {showPercent(plan.downPaymentRate)} da nota ·{" "}
-                    {plan.meetsPolicy ? "dentro da política" : "abaixo da política: precisa de aprovação"}
-                  </p>
-                </div>
-                <div>
-                  <label htmlFor="downPaymentMethod" className="block text-sm font-medium">
-                    Forma da entrada
-                  </label>
-                  <select
-                    key={order.downPaymentMethod ?? ""}
-                    id="downPaymentMethod"
-                    name="downPaymentMethod"
-                    defaultValue={order.downPaymentMethod ?? ""}
-                    className={`${INPUT} mt-1 w-full`}
-                  >
-                    <option value="">—</option>
-                    {methodsWith(order.downPaymentMethod).map((method) => (
-                      <option key={method} value={method}>
-                        {method}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label htmlFor="downPaymentDate" className="block text-sm font-medium">
-                    Data da entrada
-                  </label>
-                  <input
-                    id="downPaymentDate"
-                    name="downPaymentDate"
-                    type="date"
-                    defaultValue={order.downPaymentDate ?? ""}
-                    className={`${INPUT} mt-1 w-full`}
-                  />
-                  <p className={HELP}>Vazio: na confirmação do pedido.</p>
-                </div>
-                <div>
-                  <label htmlFor="installmentCount" className="block text-sm font-medium">
-                    Parcelas do saldo
-                  </label>
-                  <input
-                    id="installmentCount"
-                    name="installmentCount"
-                    type="text"
-                    inputMode="numeric"
-                    defaultValue={order.installmentCount ?? ""}
-                    className={`${INPUT} mt-1 w-24 text-right`}
-                  />
-                  <p className={HELP}>Saldo: {showMoney(plan.balance)}</p>
-                </div>
-                <div>
-                  <label htmlFor="balanceMethod" className="block text-sm font-medium">
-                    Forma do saldo
-                  </label>
-                  <select
-                    key={order.balanceMethod ?? ""}
-                    id="balanceMethod"
-                    name="balanceMethod"
-                    defaultValue={order.balanceMethod ?? ""}
-                    className={`${INPUT} mt-1 w-full`}
-                  >
-                    <option value="">—</option>
-                    {methodsWith(order.balanceMethod).map((method) => (
-                      <option key={method} value={method}>
-                        {method}
-                      </option>
-                    ))}
-                  </select>
-                  {onDelivery.length > 0 && (
-                    <p className={HELP}>
-                      {order.balanceOnDelivery
-                        ? `Saldo na entrega: uma parcela de ${showMoney(plan.balance)} no dia em que o pedido fica pronto${dates.completion ? ` (${showIsoDate(dates.completion)})` : ""}.`
-                        : `Com "${onDelivery[0]}", o saldo vira uma parcela só, no dia em que o pedido fica pronto; parcelas e prazos não são usados.`}
-                    </p>
-                  )}
-                </div>
-                <div className="flex gap-3">
-                  <div>
-                    <label htmlFor="firstInstallmentDays" className="block text-sm font-medium">
-                      1ª parcela em
-                    </label>
-                    <div className="mt-1 flex items-center gap-1">
-                      <input
-                        id="firstInstallmentDays"
-                        name="firstInstallmentDays"
-                        type="text"
-                        inputMode="numeric"
-                        size={1}
-                        defaultValue={order.firstInstallmentDays ?? ""}
-                        className={`${INPUT} w-16 text-right`}
-                      />
-                      <span className="text-xs text-slate-600">dias</span>
-                    </div>
-                  </div>
-                  <div>
-                    <label htmlFor="installmentIntervalDays" className="block text-sm font-medium">
-                      Intervalo
-                    </label>
-                    <div className="mt-1 flex items-center gap-1">
-                      <input
-                        id="installmentIntervalDays"
-                        name="installmentIntervalDays"
-                        type="text"
-                        inputMode="numeric"
-                        size={1}
-                        defaultValue={order.installmentIntervalDays ?? ""}
-                        className={`${INPUT} w-16 text-right`}
-                      />
-                      <span className="text-xs text-slate-600">dias</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="sm:col-span-3">
-                  <label htmlFor="paymentNotes" className="block text-sm font-medium">
-                    Observações do pagamento
-                  </label>
-                  <input
-                    id="paymentNotes"
-                    name="paymentNotes"
-                    type="text"
-                    defaultValue={order.paymentNotes ?? ""}
-                    className={`${INPUT} mt-1 w-full`}
-                  />
-                </div>
-                {editable && (
-                  <div className="sm:col-span-3">
-                    <button type="submit" className={PRIMARY}>
-                      Salvar pagamento
-                    </button>
-                  </div>
-                )}
-              </ActionForm>
+              <div className="grid gap-3 p-4">
+                <p>Entrada: {showMoney(plan.downPayment)}{order.downPaymentMethod ? ` via ${order.downPaymentMethod}` : " · meio a escolher"}.</p>
+                <p>Saldo: {showMoney(plan.balance)} · {order.balanceOnDelivery ? "na entrega" : `${order.installmentCount ?? "—"} parcela(s)`}{order.balanceMethod && !onDelivery.includes(order.balanceMethod) ? ` via ${order.balanceMethod}` : " · meio a escolher"}.</p>
+                {order.paymentNotes && <p className="text-sm text-slate-600">{order.paymentNotes}</p>}
+                {editable && <Link href={`/pedidos/${order.number}/pagamento`} className={PRIMARY}>Escolher prazo e meios de pagamento</Link>}
+              </div>
               {editable && !order.balanceOnDelivery && installmentRows.length > 0 && (
-                <div className="border-t border-slate-200 p-5">
-                  <h3 className="text-sm font-semibold">Parcelas do saldo</h3>
+                <details className="border-t border-slate-200">
+                  <summary className="disclosure-heading">Editar parcelas individualmente<span className="disclosure-marker" aria-hidden="true">+</span></summary>
+                  <div className="p-4">
                   <p className={HELP}>
                     Para mudar a data, o valor ou a forma de uma parcela, edite aqui e salve.{" "}
-                    {agreedInstallments ? "Estas parcelas foram combinadas uma a uma." : "Hoje elas são calculadas pelo número de parcelas e pelos prazos acima."} Salvar o
-                    pagamento acima recalcula tudo.
+                    {agreedInstallments ? "Estas parcelas foram combinadas uma a uma." : "Hoje elas são calculadas pelo número de parcelas e pelos prazos combinados."} Alterar o plano de pagamento recalcula as parcelas.
                   </p>
                   <ActionForm action={saveInstallmentsAction} className="mt-3 flex flex-col gap-2">
                     <input type="hidden" name="number" value={order.number} />
@@ -1341,11 +1208,13 @@ export default async function PedidoPage({
                       </button>
                     </div>
                   </ActionForm>
-                </div>
+                  </div>
+                </details>
               )}
               {plan.receipts.length > 0 && (
-                <div className="relative overflow-x-auto border-t border-slate-200">
-                  <table className="w-full text-sm">
+                <details className="border-t border-slate-200">
+                  <summary className="disclosure-heading">Ver recebimentos previstos<span className="disclosure-marker" aria-hidden="true">+</span></summary>
+                  <table className="stack-sm w-full text-sm">
                     <caption className="px-5 py-2 text-left text-xs text-slate-600">
                       Recebimentos previstos. A comissão é uma previsão: só vale quando o valor entra.
                     </caption>
@@ -1366,16 +1235,16 @@ export default async function PedidoPage({
                     <tbody>
                       {plan.receipts.map((receipt) => (
                         <tr key={receipt.label} className="border-t border-slate-200">
-                          <td className="px-5 py-2 font-medium">{receipt.label}</td>
-                          <td className="px-5 py-2">{showIsoDate(receipt.dueDate)}</td>
-                          <td className="px-5 py-2">{receipt.method ?? NONE}</td>
-                          <td className="whitespace-nowrap px-5 py-2 text-right">{showMoney(receipt.amount)}</td>
-                          <td className="whitespace-nowrap px-5 py-2 text-right">{showMoney(receipt.commission)}</td>
+                          <td data-label="Parcela" className="px-5 py-2 font-medium">{receipt.label}</td>
+                          <td data-label="Vencimento" className="px-5 py-2">{showIsoDate(receipt.dueDate)}</td>
+                          <td data-label="Forma" className="px-5 py-2">{receipt.method ?? NONE}</td>
+                          <td data-label="Valor" className="whitespace-nowrap px-5 py-2 text-right">{showMoney(receipt.amount)}</td>
+                          <td data-label="Comissão" className="whitespace-nowrap px-5 py-2 text-right">{showMoney(receipt.commission)}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
-                </div>
+                </details>
               )}
             </section>
           </div>

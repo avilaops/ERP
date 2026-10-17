@@ -4,6 +4,15 @@
   "members": [],
   "tasks": [
     {
+      "id": "T-20261016-meios-pagamento",
+      "title": "Separar vencimento e meio efetivo de pagamento no pedido",
+      "owner": null,
+      "status": "em-revisao",
+      "acceptance": ["Vendedor escolhe entrada, prazo e meio do saldo independentemente", "PIX, transferência, dinheiro, cartão presencial e link disponíveis; boleto desativado na Ludus", "Pedido de exemplo com entrada PIX e saldo parcelado; NF-e usa os meios efetivos"],
+      "evidence": ["docs/pagamento-do-pedido.md", "705 testes aprovados, sem falhas ou pulos; 33 testes de rotas/UX após reorganização", "Três etapas nos cinco tamanhos: 15 amostras de uma tela, sem rolagem lateral e controles >=44 px", "Demo DM11: entrada PIX e saldo PIX em três parcelas; erro preserva campos; voltar salva; prazo separado do meio"],
+      "next": "Publicar, conferir a Ludus e concluir o ajuste do exemplo pela UI. Boleto já desativado na Ludus."
+    },
+    {
       "id": "T-20261016-nfe-por-nota",
       "title": "Personalizar regras fiscais na preparação de cada nota",
       "owner": null,

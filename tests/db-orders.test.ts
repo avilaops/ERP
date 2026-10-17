@@ -530,9 +530,9 @@ const PAYMENT: OrderPayment = {
 test("formas de pagamento vêm do banco da empresa", { skip }, async () => {
   const methods = await listPaymentMethods(db.pool);
   assert.deepEqual(methods.slice(0, 3), ["PIX", "Boleto", "Transferência"]);
-  // As oito do início e a "Na entrega", que é um prazo para o saldo, não um meio de pagamento.
-  assert.equal(methods.length, 9);
-  assert.ok(methods.includes("Na entrega"));
+  // "Na entrega" is a due condition, never a payment method in new forms.
+  assert.equal(methods.length, 8);
+  assert.ok(!methods.includes("Na entrega"));
   await db.pool.query("UPDATE payment_methods SET active = false WHERE label = 'Cheque'");
   await db.pool.query("INSERT INTO payment_methods (label, position, updated_by) VALUES ('Consórcio', 0, 'x')");
   const changed = await listPaymentMethods(db.pool);
@@ -1618,6 +1618,15 @@ test("saldo na entrega: a forma marcada vira uma parcela só, no dia em que o pe
   const back = await order(number);
   assert.deepEqual([back.balanceOnDelivery, back.installmentCount], [false, 2]);
   assert.equal(paymentOf(back, sale, table, "2026-10-09").receipts.length, 3);
+  await savePayment(number, { ...PAYMENT, downPayment: 10000, balanceMethod: "PIX", balanceOnDelivery: true, installmentCount: 3 }, SELLER.email, MINE, db.pool);
+  const pixDelivery = await order(number);
+  assert.deepEqual([pixDelivery.balanceOnDelivery, pixDelivery.balanceMethod, pixDelivery.installmentCount], [true, "PIX", 1]);
+  assert.equal(paymentOf(pixDelivery, sale, table, "2026-10-09").receipts.at(-1)?.method, "PIX");
+  await savePayment(number, { ...PAYMENT, downPayment: 10000, balanceMethod: "PIX", balanceOnDelivery: false, installmentCount: 3, firstInstallmentDays: 30, installmentIntervalDays: 30 }, SELLER.email, MINE, db.pool, pixDelivery.revision);
+  const split = await order(number);
+  assert.equal(split.balanceOnDelivery, false);
+  assert.equal(paymentOf(split, sale, table, "2026-10-09").receipts.length, 4);
+  await assert.rejects(() => savePayment(number, { ...PAYMENT, downPayment: 10000 }, SELLER.email, MINE, db.pool, pixDelivery.revision), /pedido mudou/);
   await deleteOrder(number, MINE, db.pool);
 });
 
