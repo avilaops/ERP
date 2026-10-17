@@ -123,6 +123,19 @@ conferidos. Nenhum recebimento foi confirmado e nenhum contrato ou nota foi envi
    ao resumo após concluir o fechamento fictício; essas duas verificações na UI
    ainda precisam ser retomadas.
 
+### Publicação desta revisão
+
+Versão `58c97aa` publicada em 17/10/2026; endpoint de saúde confirmou o commit
+e o container ficou `healthy`. Pacote standalone e delta foram verificados por
+manifesto e checksum; migrações já estavam em dia. O PDF revisado HXKP foi gerado
+com uma nova leitura dos dados reais, inspecionado em uma página e seu QR
+decodificado. Valores, chave CNPJ e favorecido legal foram conferidos.
+
+A conferência final da rota publicada pela UI ficou pendente pela desconexão do
+navegador integrado. Não foi apresentado como download pela UI. O arquivo
+`pedido-261016-HXKP-revisado.pdf` foi entregue como artefato local. Permanecem os
+dados comerciais reais a definir pela empresa; não foram preenchidos com exemplos.
+
 Permanecem para preenchimento pela empresa: site, prazo/cobertura de garantia,
 montagem, modalidade/condições do frete, prazo de transporte e condições de
 atraso/cancelamento. O PDF omite essas pendências e a tela permite preenchê-las;
