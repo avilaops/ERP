@@ -9,9 +9,9 @@ export const DEFAULT_ROWS = 4;
 export const MIN_ROWS = 3;
 export const MAX_ROWS = 30;
 
-export function rowsPerPage(cookie: string | undefined): number {
+export function rowsPerPage(cookie: string | undefined, minimum = MIN_ROWS): number {
   if (!cookie || !/^\d{1,2}$/.test(cookie)) return DEFAULT_ROWS;
-  return Math.min(MAX_ROWS, Math.max(MIN_ROWS, Number(cookie)));
+  return Math.min(MAX_ROWS, Math.max(minimum, Number(cookie)));
 }
 
 /** Which slice of a list a page shows. `page` asked beyond the end falls on the last one. */

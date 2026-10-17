@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CARD, DANGER_OUTLINE, INPUT, PRIMARY, SECONDARY } from "@/components/ui";
+import { CARD, DANGER_OUTLINE, INPUT, LABEL, PRIMARY, SECONDARY } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { menuItem } from "@/lib/auth/permissions";
 import { DEFAULT_NFE_BODY, DEFAULT_NFE_SUBJECT, defaultMailbox, loadInboxInfo, loadMailInfo } from "@/lib/db/mail";
@@ -11,8 +11,6 @@ import { removeInboxAction, removeOwnMailboxAction, saveInboxAction, saveMailTex
 
 export const metadata = { title: "E-mail das notas · ERP" };
 export const dynamic = "force-dynamic";
-
-const LABEL = "block text-xs font-medium text-slate-600";
 
 const TABS = [["saida", "Por onde sai"], ["mensagem", "Mensagem"], ["caixa", "Caixa da empresa"], ["entrada", "Respostas"]] as const;
 
@@ -68,8 +66,10 @@ export default async function EmailPage({ searchParams }: { searchParams: Promis
         </p>
         {leavesBy ? (
           <ActionForm action={testMailAction} className="mt-3">
-            <button type="submit" className={SECONDARY}>
-              Enviar mensagem de teste para {session.email}
+            <label htmlFor="testRecipient" className={LABEL}>Enviar teste para</label>
+            <input id="testRecipient" name="testRecipient" type="email" defaultValue={session.email} autoComplete="email" className={`${INPUT} mt-1 max-w-md`} />
+            <button type="submit" className={`${SECONDARY} mt-3`}>
+              Enviar mensagem de teste
             </button>
           </ActionForm>
         ) : null}
@@ -129,7 +129,7 @@ export default async function EmailPage({ searchParams }: { searchParams: Promis
         </h2>
         <p className="mt-1 max-w-3xl text-sm text-slate-600">
           Para a nota sair com o e-mail do seu domínio. Os dados são os do seu provedor de e-mail (servidor de saída, SMTP). Ao salvar, uma mensagem de teste
-          vai para {session.email}: se não sair, nada é gravado. A senha fica guardada cifrada e não aparece mais em tela nenhuma.
+          vai para o destinatário informado abaixo: se não sair, nada é gravado. A senha fica guardada cifrada e não aparece mais em tela nenhuma.
         </p>
         {info.own ? (
           <p className="mt-3 rounded border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
@@ -167,6 +167,10 @@ export default async function EmailPage({ searchParams }: { searchParams: Promis
               Senha da caixa
             </label>
             <input id="password" name="password" type="password" autoComplete="new-password" className={INPUT} />
+          </div>
+          <div className="sm:col-span-4">
+            <label htmlFor="testRecipient" className={LABEL}>Enviar teste para</label>
+            <input id="testRecipient" name="testRecipient" type="email" defaultValue={session.email} autoComplete="email" className={`${INPUT} mt-1 max-w-md`} />
           </div>
           <div className="sm:col-span-4">
             <button type="submit" className={PRIMARY}>

@@ -1,0 +1,16 @@
+{
+  "at": "2026-10-17T08:18:42.031Z",
+  "source": "erp_documents_test",
+  "restoredInto": "erp_documents_restore_7e16c7d7_test",
+  "counts": {
+    "documents": 305,
+    "versions": 306,
+    "chunks": 11364,
+    "elements": 141730
+  },
+  "originalHashesVerified": 294,
+  "originalsCopiedAndVerified": 294,
+  "dumpBytes": 13865895,
+  "productionChanged": false,
+  "temporaryDatabaseRemoved": true
+}

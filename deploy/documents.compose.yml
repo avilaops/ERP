@@ -1,0 +1,30 @@
+# Apply only after reviewing paths/capacity and approving production deployment.
+# ERP and worker must see the SAME persistent root for original downloads.
+# Copy next to the existing compose in /opt/erp and use both -f files there.
+services:
+  erp:
+    environment:
+      ERP_DOCUMENTS_ROOT: /data/documents
+    volumes:
+      - ${ERP_DOCUMENTS_HOST_ROOT:?Set a persistent directory with capacity}:/data/documents:ro
+  documents-worker:
+    profiles: [documents]
+    image: ${ERP_DOCUMENTS_IMAGE:-erp-documents:validated}
+    env_file: [.env]
+    environment:
+      ERP_DOCUMENTS_ROOT: /data/documents
+      ERP_DOCUMENTS_PYTHON: /opt/documents-python/bin/python
+      ERP_DOCUMENTS_PRODUCTION_APPROVED: ${ERP_DOCUMENTS_PRODUCTION_APPROVED:-0}
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    volumes:
+      - ${ERP_DOCUMENTS_HOST_ROOT:?Set a persistent directory with capacity}:/data/documents
+    command: ["node", "--experimental-strip-types", "--import", "./scripts/register.mjs", "scripts/documents.ts", "watch", "${ERP_DOCUMENTS_TENANT:-ludus}"]
+    restart: unless-stopped
+    mem_limit: 768m
+    cpus: 1
+    pids_limit: 96
+    read_only: true
+    tmpfs:
+      - /tmp:size=128m,mode=1777
+    security_opt:
+      - no-new-privileges:true

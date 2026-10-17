@@ -5,6 +5,7 @@ import { danfeData, renderDanfe, usesReformLayout } from "@/lib/fiscal/danfe";
 import { buildMessage, isMailAddress, MailError } from "@/lib/mail/message";
 import type { MailAttachment } from "@/lib/mail/message";
 import type { SmtpConfig } from "@/lib/mail/smtp";
+import { billAttachments, BillError } from "@/lib/db/receivable-bills";
 
 /** How a message is handed to a mail server. The tests give a stand-in. */
 export type MailSender = (config: SmtpConfig, envelope: { from: string; to: string }, message: string) => Promise<void>;
@@ -28,6 +29,8 @@ export const MAIL_NOT_SET = "Envio de e-mail não configurado: cadastre a caixa 
 
 export type SendInvoiceMail = {
   invoiceId: number;
+  /** Selected files only; automatic fiscal sends never include a charge. */
+  billIds?: number[];
   /** `null`: the e-mail of the customer of the order. */
   to: string | null;
   sentBy: string;
@@ -46,7 +49,7 @@ export type SendInvoiceMail = {
  */
 export async function sendInvoiceMail(request: SendInvoiceMail, conn: Queryable): Promise<{ status: "enviado" | "falhou"; recipient: string; detail: string | null }> {
   const { rows } = await conn.query(
-    `SELECT i.id, i.status, i.number, i.series, i.access_key, i.authorized_xml, c.name AS customer_name, c.email AS customer_email
+    `SELECT i.id, i.order_id, i.status, i.number, i.series, i.access_key, i.authorized_xml, c.name AS customer_name, c.email AS customer_email
        FROM fiscal_invoices i JOIN orders o ON o.id = i.order_id LEFT JOIN customers c ON c.id = o.customer_id WHERE i.id = $1`,
     [request.invoiceId],
   );
@@ -62,6 +65,14 @@ export async function sendInvoiceMail(request: SendInvoiceMail, conn: Queryable)
   const xml = String(invoice.authorized_xml);
   const data = danfeData(xml);
   const cancelled = invoice.status === "cancelada";
+  if ((cancelled || data.homologation) && request.billIds?.length) throw new MailError("Boletos só acompanham nota autorizada em produção. Envie notas de teste ou cancelamentos sem cobrança.");
+  let bills;
+  try {
+    bills = await billAttachments(Number(invoice.order_id), request.billIds ?? [], conn);
+  } catch (error) {
+    if (error instanceof BillError) throw new MailError(error.message);
+    throw error;
+  }
   const words = { numero: String(invoice.number), serie: String(invoice.series), empresa: data.issuer.name, cliente: String(invoice.customer_name ?? data.recipient.name), chave: String(invoice.access_key) };
   const attachments: MailAttachment[] = [{ filename: `NFe${invoice.access_key}.xml`, contentType: "application/xml", content: Buffer.from(xml, "utf8") }];
   let subject = fillMailText(settings.subject ?? DEFAULT_NFE_SUBJECT, words);
@@ -75,6 +86,10 @@ export async function sendInvoiceMail(request: SendInvoiceMail, conn: Queryable)
     attachments.push({ filename: `DANFE-${invoice.number}.pdf`, contentType: "application/pdf", content: await renderDanfe(data, { reform: usesReformLayout(data.issuedAt, await loadDanfeReformDate(conn)) }) });
   }
   if (data.homologation) text += "\n\nNOTA EMITIDA EM AMBIENTE DE HOMOLOGAÇÃO: SEM VALOR FISCAL.";
+  if (bills.length > 0) {
+    attachments.push(...bills);
+    text += `\n\nSeguem também ${bills.length} boleto(s) do pedido, em PDF.`;
+  }
 
   const message = buildMessage({ from: channel.from, fromName: data.issuer.name, to: recipient, replyTo: settings.replyTo, subject, text, attachments }, request.now);
   let status: "enviado" | "falhou" = "enviado";
@@ -87,8 +102,8 @@ export async function sendInvoiceMail(request: SendInvoiceMail, conn: Queryable)
     if (!(error instanceof MailError)) console.error("[e-mail] falha inesperada no envio da nota:", error instanceof Error ? error.message : error);
   }
   await conn.query(
-    "INSERT INTO fiscal_invoice_mails (invoice_id, kind, recipient, channel, status, detail, sent_by) VALUES ($1, $2, $3, $4, $5, $6, $7)",
-    [request.invoiceId, cancelled ? "cancelamento" : "nota", recipient, channel.channel, status, detail, request.sentBy],
+    "INSERT INTO fiscal_invoice_mails (invoice_id, kind, recipient, channel, status, detail, sent_by, bill_ids) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+    [request.invoiceId, cancelled ? "cancelamento" : "nota", recipient, channel.channel, status, detail, request.sentBy, bills.map((bill) => bill.id)],
   );
   return { status, recipient, detail };
 }

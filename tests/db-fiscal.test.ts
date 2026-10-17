@@ -58,6 +58,16 @@ test("dados fiscais: começam em branco, em homologação; gravam só dígitos e
   await saveFiscalSettings(FILLED, BOSS, db.pool);
 });
 
+test("consulta fiscal: completa vazios sem sobrescrever alterações concorrentes nem a numeração", { skip }, async () => {
+  await saveFiscalSettings({ ...FILLED, district: null, taxRegime: null }, BOSS, db.pool);
+  const snapshot = await loadFiscalSettings(db.pool);
+  await db.pool.query("UPDATE company_settings SET legal_name = 'Nome conferido durante a consulta', nfe_next_number = 20, nfe_series = 2, nfe_environment = 'producao'");
+  await saveFiscalSettings({ ...snapshot, district: "Centro", taxRegime: 3 }, BOSS, db.pool, true);
+  const filled = await loadFiscalSettings(db.pool);
+  assert.deepEqual([filled.legalName, filled.district, filled.taxRegime, filled.nextNumber, filled.series, filled.environment], ["Nome conferido durante a consulta", "Centro", 3, 20, 2, "producao"]);
+  await saveFiscalSettings(FILLED, BOSS, db.pool);
+});
+
 test("certificado: guardado selado, mostrado sem o arquivo, e só o da própria empresa e em vigor", { skip }, async () => {
   assert.equal(await loadCertificateInfo(db.pool), null);
   const pfx = testPfx();

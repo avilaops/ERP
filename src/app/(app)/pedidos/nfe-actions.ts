@@ -179,7 +179,7 @@ export async function sendNfeMailAction(_previous: ActionState, formData: FormDa
   if (!order || !owned?.rows[0]) return { error: "Nota não encontrada." };
   try {
     const result = await sendInvoiceMail(
-      { invoiceId, to: typeof to === "string" && to.trim() !== "" ? to : null, sentBy: session.email, now: new Date(), env: process.env, key: () => vaultKey(process.env.ERP_CERT_KEY), send: sendMail },
+      { invoiceId, billIds: formData.getAll("billId").map((value) => Number(value)), to: typeof to === "string" && to.trim() !== "" ? to : null, sentBy: session.email, now: new Date(), env: process.env, key: () => vaultKey(process.env.ERP_CERT_KEY), send: sendMail },
       conn,
     );
     revalidatePath(`${menuItem("pedidos").href}/${number}`);

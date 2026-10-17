@@ -1,0 +1,1233 @@
+{
+  "checkedAt": "2026-10-17T07:28:31.476Z",
+  "readOnly": true,
+  "workflows": [
+    {
+      "status": "fulfilled",
+      "value": {
+        "id": "n6lfkOJHwYCucr05",
+        "name": "NOTAS - Verificar formato criacao",
+        "active": false,
+        "versionId": "4f995693-0935-46a5-b8d5-daadc50fa84b",
+        "activeVersionId": null,
+        "settings": {
+          "executionOrder": "v1",
+          "availableInMCP": true
+        },
+        "connections": {
+          "Iniciar teste de parametros": {
+            "main": [
+              [
+                {
+                  "node": "Verificar schema de criacao",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          }
+        },
+        "nodes": [
+          {
+            "name": "Iniciar teste de parametros",
+            "type": "n8n-nodes-base.manualTrigger",
+            "parameters": {},
+            "credentialTypes": []
+          },
+          {
+            "name": "Verificar schema de criacao",
+            "type": "@n8n/n8n-nodes-langchain.mcpClient",
+            "parameters": {
+              "endpointUrl": "https://notas.avilaops.com/mcp",
+              "tool": {
+                "__rl": true,
+                "mode": "id",
+                "value": "update_document"
+              },
+              "mutation": "update_document; payload omitido"
+            },
+            "credentialTypes": [
+              "httpBearerAuth"
+            ]
+          }
+        ],
+        "activeVersionDiffers": false
+      }
+    },
+    {
+      "status": "fulfilled",
+      "value": {
+        "id": "eUYxjZQjnSFAzgiu",
+        "name": "[Pesquisa] Coleta completa com imagens e vídeos — OpenAI",
+        "active": false,
+        "versionId": "f0f9e899-e434-4a98-8b72-611df3405e2a",
+        "activeVersionId": null,
+        "settings": {
+          "executionOrder": "v1",
+          "availableInMCP": true,
+          "saveManualExecutions": true,
+          "saveDataErrorExecution": "all",
+          "saveDataSuccessExecution": "all",
+          "executionTimeout": 3300,
+          "timezone": "America/Sao_Paulo",
+          "binaryMode": "separate"
+        },
+        "connections": {
+          "Executar lote de oito URLs": {
+            "main": [
+              [
+                {
+                  "node": "Continuar enquanto houver URLs",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "Continuar enquanto houver URLs": {
+            "main": [
+              [
+                {
+                  "node": "Intervalo entre lotes",
+                  "type": "main",
+                  "index": 0
+                }
+              ],
+              [
+                {
+                  "node": "Resultado final",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "Intervalo entre lotes": {
+            "main": [
+              [
+                {
+                  "node": "Executar lote de oito URLs",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "Iniciar ou retomar coleta completa": {
+            "main": [
+              [
+                {
+                  "node": "Verificar outras coletas",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "Retomar a cada cinco minutos": {
+            "main": [
+              [
+                {
+                  "node": "Verificar outras coletas",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "Verificar outras coletas": {
+            "main": [
+              [
+                {
+                  "node": "Verificar lote em execução",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "Verificar lote em execução": {
+            "main": [
+              [
+                {
+                  "node": "Decidir execução exclusiva",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "Decidir execução exclusiva": {
+            "main": [
+              [
+                {
+                  "node": "Coleta está livre",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "Coleta está livre": {
+            "main": [
+              [
+                {
+                  "node": "Executar lote de oito URLs",
+                  "type": "main",
+                  "index": 0
+                }
+              ],
+              [
+                {
+                  "node": "Aguardar coleta atual",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          }
+        },
+        "nodes": [
+          {
+            "name": "Iniciar ou retomar coleta completa",
+            "type": "n8n-nodes-base.manualTrigger",
+            "parameters": {},
+            "credentialTypes": []
+          },
+          {
+            "name": "Executar lote de oito URLs",
+            "type": "n8n-nodes-base.executeWorkflow",
+            "parameters": {
+              "workflowId": {
+                "__rl": true,
+                "mode": "list",
+                "value": "X3GNKFEce7M8LWBk",
+                "cachedResultName": "[Pesquisa] Coletar conteúdo e mídia — OpenAI"
+              },
+              "options": {
+                "waitForSubWorkflow": true
+              }
+            },
+            "credentialTypes": []
+          },
+          {
+            "name": "Continuar enquanto houver URLs",
+            "type": "n8n-nodes-base.if",
+            "parameters": {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.pendentes }}",
+                    "rightValue": 0,
+                    "operator": {
+                      "type": "number",
+                      "operation": "gt"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "options": {}
+            },
+            "credentialTypes": []
+          },
+          {
+            "name": "Intervalo entre lotes",
+            "type": "n8n-nodes-base.wait",
+            "parameters": {
+              "amount": 2
+            },
+            "credentialTypes": []
+          },
+          {
+            "name": "Resultado final",
+            "type": "n8n-nodes-base.code",
+            "parameters": {
+              "note": "Código omitido do snapshot compartilhável; consultar versão pelo ID no n8n."
+            },
+            "credentialTypes": []
+          },
+          {
+            "name": "Retomar a cada cinco minutos",
+            "type": "n8n-nodes-base.scheduleTrigger",
+            "parameters": {
+              "rule": {
+                "interval": [
+                  {
+                    "field": "minutes"
+                  }
+                ]
+              },
+              "misfirePolicy": "coalesce"
+            },
+            "credentialTypes": []
+          },
+          {
+            "name": "Verificar outras coletas",
+            "type": "n8n-nodes-base.httpRequest",
+            "parameters": {
+              "url": "https://n8n.avilaops.com/api/v1/executions",
+              "authentication": "predefinedCredentialType",
+              "nodeCredentialType": "n8nApi",
+              "sendQuery": true,
+              "queryParameters": {
+                "parameters": [
+                  {
+                    "name": "workflowId",
+                    "value": "eUYxjZQjnSFAzgiu"
+                  },
+                  {
+                    "name": "status",
+                    "value": "running"
+                  },
+                  {
+                    "name": "limit",
+                    "value": "100"
+                  }
+                ]
+              },
+              "options": {
+                "timeout": 20000
+              }
+            },
+            "credentialTypes": [
+              "n8nApi"
+            ]
+          },
+          {
+            "name": "Verificar lote em execução",
+            "type": "n8n-nodes-base.httpRequest",
+            "parameters": {
+              "url": "https://n8n.avilaops.com/api/v1/executions",
+              "authentication": "predefinedCredentialType",
+              "nodeCredentialType": "n8nApi",
+              "sendQuery": true,
+              "queryParameters": {
+                "parameters": [
+                  {
+                    "name": "workflowId",
+                    "value": "X3GNKFEce7M8LWBk"
+                  },
+                  {
+                    "name": "status",
+                    "value": "running"
+                  },
+                  {
+                    "name": "limit",
+                    "value": "100"
+                  }
+                ]
+              },
+              "options": {
+                "timeout": 20000
+              }
+            },
+            "credentialTypes": [
+              "n8nApi"
+            ]
+          },
+          {
+            "name": "Decidir execução exclusiva",
+            "type": "n8n-nodes-base.code",
+            "parameters": {
+              "note": "Código omitido do snapshot compartilhável; consultar versão pelo ID no n8n."
+            },
+            "credentialTypes": []
+          },
+          {
+            "name": "Coleta está livre",
+            "type": "n8n-nodes-base.if",
+            "parameters": {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.livre }}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "options": {}
+            },
+            "credentialTypes": []
+          },
+          {
+            "name": "Aguardar coleta atual",
+            "type": "n8n-nodes-base.code",
+            "parameters": {
+              "note": "Código omitido do snapshot compartilhável; consultar versão pelo ID no n8n."
+            },
+            "credentialTypes": []
+          },
+          {
+            "name": "Sticky Note",
+            "type": "n8n-nodes-base.stickyNote",
+            "parameters": {},
+            "credentialTypes": []
+          }
+        ],
+        "activeVersionDiffers": false
+      }
+    },
+    {
+      "status": "fulfilled",
+      "value": {
+        "id": "X3GNKFEce7M8LWBk",
+        "name": "[Pesquisa] Coletar conteúdo e mídia — OpenAI",
+        "active": true,
+        "versionId": "263c14b6-5be6-4eae-9800-674beba8609b",
+        "activeVersionId": "5b6ca928-b90e-498c-baaf-e2eab09d0a5c",
+        "settings": {
+          "executionOrder": "v1",
+          "availableInMCP": true,
+          "saveManualExecutions": false,
+          "saveDataErrorExecution": "all",
+          "saveDataSuccessExecution": "none",
+          "executionTimeout": 3600,
+          "callerPolicy": "workflowsFromSameOwner",
+          "binaryMode": "separate"
+        },
+        "connections": {
+          "Executar coleta": {
+            "main": [
+              [
+                {
+                  "node": "Ler progresso",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "Ler progresso": {
+            "main": [
+              [
+                {
+                  "node": "Retomar fila",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "Retomar fila": {
+            "main": [
+              [
+                {
+                  "node": "Há páginas pendentes",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "Há páginas pendentes": {
+            "main": [
+              [
+                {
+                  "node": "Selecionar URL",
+                  "type": "main",
+                  "index": 0
+                }
+              ],
+              [
+                {
+                  "node": "Resumo da coleta",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "Selecionar URL": {
+            "main": [
+              [
+                {
+                  "node": "Controlar frequência",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "Controlar frequência": {
+            "main": [
+              [
+                {
+                  "node": "Obter HTML",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "Obter HTML": {
+            "main": [
+              [
+                {
+                  "node": "Extrair texto imagens e vídeos",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "Extrair texto imagens e vídeos": {
+            "main": [
+              [
+                {
+                  "node": "Normalizar e descobrir subpáginas",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "Normalizar e descobrir subpáginas": {
+            "main": [
+              [
+                {
+                  "node": "Salvar conteúdo e mídia",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "Salvar conteúdo e mídia": {
+            "main": [
+              [
+                {
+                  "node": "Salvar progresso",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "Salvar progresso": {
+            "main": [
+              [
+                {
+                  "node": "Próximo item",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "Próximo item": {
+            "main": [
+              [
+                {
+                  "node": "Há páginas pendentes",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "Receber lote": {
+            "main": [
+              [
+                {
+                  "node": "Ler progresso",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          }
+        },
+        "nodes": [
+          {
+            "name": "Executar coleta",
+            "type": "n8n-nodes-base.manualTrigger",
+            "parameters": {},
+            "credentialTypes": []
+          },
+          {
+            "name": "Ler progresso",
+            "type": "n8n-nodes-base.dataTable",
+            "parameters": {
+              "operation": "get",
+              "dataTableId": {
+                "__rl": true,
+                "mode": "list",
+                "value": "YZUCih7eGR1Ryyyp",
+                "cachedResultName": "OpenAI — Progresso da coleta"
+              },
+              "filters": {
+                "conditions": [
+                  {
+                    "keyName": "chave",
+                    "keyValue": "fila"
+                  }
+                ]
+              },
+              "limit": 1
+            },
+            "credentialTypes": []
+          },
+          {
+            "name": "Retomar fila",
+            "type": "n8n-nodes-base.code",
+            "parameters": {
+              "note": "Código omitido do snapshot compartilhável; consultar versão pelo ID no n8n."
+            },
+            "credentialTypes": []
+          },
+          {
+            "name": "Há páginas pendentes",
+            "type": "n8n-nodes-base.if",
+            "parameters": {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.queue.length }}",
+                    "rightValue": 0,
+                    "operator": {
+                      "type": "number",
+                      "operation": "gt"
+                    }
+                  },
+                  {
+                    "leftValue": "={{ $json.processedThisRun }}",
+                    "rightValue": 8,
+                    "operator": {
+                      "type": "number",
+                      "operation": "lt"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "options": {}
+            },
+            "credentialTypes": []
+          },
+          {
+            "name": "Selecionar URL",
+            "type": "n8n-nodes-base.code",
+            "parameters": {
+              "note": "Código omitido do snapshot compartilhável; consultar versão pelo ID no n8n."
+            },
+            "credentialTypes": []
+          },
+          {
+            "name": "Controlar frequência",
+            "type": "n8n-nodes-base.wait",
+            "parameters": {
+              "amount": "={{ $json.current.fonte === 'developers' || $json.current.tipo === 'sitemap' ? 0.3 : 6 }}"
+            },
+            "credentialTypes": []
+          },
+          {
+            "name": "Obter HTML",
+            "type": "n8n-nodes-base.httpRequest",
+            "parameters": {
+              "url": "={{ $json.current.fonte === 'developers' || $json.current.tipo === 'sitemap' ? $json.current.url : 'https://r.jina.ai/' + $json.current.url }}",
+              "sendHeaders": true,
+              "headerParameters": {
+                "parameters": [
+                  {
+                    "name": "X-Return-Format",
+                    "value": "html"
+                  },
+                  {
+                    "name": "X-No-Cache",
+                    "value": "true"
+                  },
+                  {
+                    "name": "X-Wait-For-Selector",
+                    "value": "={{ $json.current.url.includes('academy.openai.com') ? 'h1' : 'main a, article' }}"
+                  },
+                  {
+                    "name": "X-Timeout",
+                    "value": "40"
+                  }
+                ]
+              },
+              "options": {
+                "response": {
+                  "response": {
+                    "fullResponse": true,
+                    "neverError": true,
+                    "responseFormat": "text",
+                    "outputPropertyName": "body"
+                  }
+                },
+                "timeout": 90000
+              }
+            },
+            "credentialTypes": []
+          },
+          {
+            "name": "Extrair texto imagens e vídeos",
+            "type": "n8n-nodes-base.html",
+            "parameters": {
+              "operation": "extractHtmlContent",
+              "dataPropertyName": "body",
+              "extractionValues": {
+                "values": [
+                  {
+                    "key": "titulo",
+                    "cssSelector": "title"
+                  },
+                  {
+                    "key": "texto",
+                    "cssSelector": "main,article",
+                    "skipSelectors": "script,style,nav,header,footer"
+                  },
+                  {
+                    "key": "fallback",
+                    "cssSelector": "body",
+                    "skipSelectors": "script,style,nav,header,footer"
+                  },
+                  {
+                    "key": "links",
+                    "cssSelector": "main a[href], article a[href]",
+                    "returnValue": "attribute",
+                    "attribute": "href",
+                    "returnArray": true
+                  },
+                  {
+                    "key": "imgs",
+                    "cssSelector": "main img[src],article img[src]",
+                    "returnValue": "attribute",
+                    "attribute": "src",
+                    "returnArray": true
+                  },
+                  {
+                    "key": "lazy",
+                    "cssSelector": "main img[data-src],article img[data-src]",
+                    "returnValue": "attribute",
+                    "attribute": "data-src",
+                    "returnArray": true
+                  },
+                  {
+                    "key": "srcsets",
+                    "cssSelector": "main img[srcset], main source[srcset], article img[srcset]",
+                    "returnValue": "attribute",
+                    "attribute": "srcset",
+                    "returnArray": true
+                  },
+                  {
+                    "key": "posters",
+                    "cssSelector": "video[poster]",
+                    "returnValue": "attribute",
+                    "attribute": "poster",
+                    "returnArray": true
+                  },
+                  {
+                    "key": "videos",
+                    "cssSelector": "video[src],video source[src],source[type^='video/']",
+                    "returnValue": "attribute",
+                    "attribute": "src",
+                    "returnArray": true
+                  },
+                  {
+                    "key": "embeds",
+                    "cssSelector": "iframe[src*='youtube'],iframe[src*='vimeo'],iframe[src*='wistia'],iframe[src*='mux'],iframe[src*='player'],iframe[src*='video']",
+                    "returnValue": "attribute",
+                    "attribute": "src",
+                    "returnArray": true
+                  },
+                  {
+                    "key": "ogimgs",
+                    "cssSelector": "meta[property='og:image']",
+                    "returnValue": "attribute",
+                    "attribute": "content",
+                    "returnArray": true
+                  },
+                  {
+                    "key": "ogvideos",
+                    "cssSelector": "meta[property='og:video'],meta[property='og:video:url'],meta[property='og:video:secure_url']",
+                    "returnValue": "attribute",
+                    "attribute": "content",
+                    "returnArray": true
+                  }
+                ]
+              },
+              "options": {
+                "trimValues": true,
+                "cleanUpText": false
+              }
+            },
+            "credentialTypes": []
+          },
+          {
+            "name": "Normalizar e descobrir subpáginas",
+            "type": "n8n-nodes-base.code",
+            "parameters": {
+              "note": "Código omitido do snapshot compartilhável; consultar versão pelo ID no n8n."
+            },
+            "credentialTypes": []
+          },
+          {
+            "name": "Salvar conteúdo e mídia",
+            "type": "n8n-nodes-base.dataTable",
+            "parameters": {
+              "operation": "upsert",
+              "dataTableId": {
+                "__rl": true,
+                "mode": "list",
+                "value": "NMK4BkflBWKhtqGU",
+                "cachedResultName": "OpenAI — Conteúdo e mídia"
+              },
+              "filters": {
+                "conditions": [
+                  {
+                    "keyName": "url",
+                    "keyValue": "={{ $json.url }}"
+                  }
+                ]
+              },
+              "columns": {
+                "mappingMode": "defineBelow",
+                "value": {
+                  "url": "={{ $json.url }}",
+                  "fonte": "={{ $json.fonte }}",
+                  "titulo": "={{ $json.titulo }}",
+                  "texto": "={{ $json.texto }}",
+                  "html": "={{ $json.html }}",
+                  "imagens": "={{ $json.imagens }}",
+                  "videos": "={{ $json.videos }}",
+                  "links": "={{ $json.links }}",
+                  "status_http": "={{ $json.status_http }}",
+                  "erro": "={{ $json.erro }}",
+                  "coletado_em": "={{ $json.coletado_em }}"
+                }
+              },
+              "options": {}
+            },
+            "credentialTypes": []
+          },
+          {
+            "name": "Salvar progresso",
+            "type": "n8n-nodes-base.dataTable",
+            "parameters": {
+              "operation": "upsert",
+              "dataTableId": {
+                "__rl": true,
+                "mode": "list",
+                "value": "YZUCih7eGR1Ryyyp",
+                "cachedResultName": "OpenAI — Progresso da coleta"
+              },
+              "filters": {
+                "conditions": [
+                  {
+                    "keyName": "chave",
+                    "keyValue": "fila"
+                  }
+                ]
+              },
+              "columns": {
+                "mappingMode": "defineBelow",
+                "value": {
+                  "chave": "fila",
+                  "estado": "={{ $('Normalizar e descobrir subpáginas').first(0, $runIndex).json.estado }}"
+                }
+              },
+              "options": {}
+            },
+            "credentialTypes": []
+          },
+          {
+            "name": "Próximo item",
+            "type": "n8n-nodes-base.code",
+            "parameters": {
+              "note": "Código omitido do snapshot compartilhável; consultar versão pelo ID no n8n."
+            },
+            "credentialTypes": []
+          },
+          {
+            "name": "Resumo da coleta",
+            "type": "n8n-nodes-base.code",
+            "parameters": {
+              "note": "Código omitido do snapshot compartilhável; consultar versão pelo ID no n8n."
+            },
+            "credentialTypes": []
+          },
+          {
+            "name": "Receber lote",
+            "type": "n8n-nodes-base.executeWorkflowTrigger",
+            "parameters": {
+              "inputSource": "passthrough"
+            },
+            "credentialTypes": []
+          },
+          {
+            "name": "Sticky Note",
+            "type": "n8n-nodes-base.stickyNote",
+            "parameters": {},
+            "credentialTypes": []
+          },
+          {
+            "name": "Sticky Note1",
+            "type": "n8n-nodes-base.stickyNote",
+            "parameters": {},
+            "credentialTypes": []
+          }
+        ],
+        "activeVersionDiffers": true
+      }
+    },
+    {
+      "status": "fulfilled",
+      "value": {
+        "id": "pjPx9JqspcXObd5w",
+        "name": "[Pesquisa] Coletar privacidade — Brave",
+        "active": false,
+        "versionId": "1da2aca0-9ff0-4a1a-af09-a6c5346a686d",
+        "activeVersionId": null,
+        "settings": {
+          "executionOrder": "v1",
+          "availableInMCP": true
+        },
+        "connections": {
+          "Executar coleta": {
+            "main": [
+              [
+                {
+                  "node": "Consultar sitemap",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "Consultar sitemap": {
+            "main": [
+              [
+                {
+                  "node": "Descobrir páginas",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "Descobrir páginas": {
+            "main": [
+              [
+                {
+                  "node": "Estado da fila",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "Estado da fila": {
+            "main": [
+              [
+                {
+                  "node": "Intervalo entre páginas",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "Intervalo entre páginas": {
+            "main": [
+              [
+                {
+                  "node": "Baixar página",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "Baixar página": {
+            "main": [
+              [
+                {
+                  "node": "Ler conteúdo e links",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "Ler conteúdo e links": {
+            "main": [
+              [
+                {
+                  "node": "Extrair novas URLs",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "Extrair novas URLs": {
+            "main": [
+              [
+                {
+                  "node": "Salvar página",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "Salvar página": {
+            "main": [
+              [
+                {
+                  "node": "Atualizar fila",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "Atualizar fila": {
+            "main": [
+              [
+                {
+                  "node": "Existem subpáginas",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "Existem subpáginas": {
+            "main": [
+              [
+                {
+                  "node": "Estado da fila",
+                  "type": "main",
+                  "index": 0
+                }
+              ],
+              [
+                {
+                  "node": "Resumo da coleta",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          }
+        },
+        "nodes": [
+          {
+            "name": "Executar coleta",
+            "type": "n8n-nodes-base.manualTrigger",
+            "parameters": {},
+            "credentialTypes": []
+          },
+          {
+            "name": "Consultar sitemap",
+            "type": "n8n-nodes-base.httpRequest",
+            "parameters": {
+              "url": "https://brave.com/en/sitemap.xml",
+              "options": {
+                "timeout": 30000,
+                "response": {
+                  "response": {
+                    "responseFormat": "text",
+                    "outputPropertyName": "data"
+                  }
+                }
+              }
+            },
+            "credentialTypes": []
+          },
+          {
+            "name": "Descobrir páginas",
+            "type": "n8n-nodes-base.code",
+            "parameters": {
+              "note": "Código omitido do snapshot compartilhável; consultar versão pelo ID no n8n."
+            },
+            "credentialTypes": []
+          },
+          {
+            "name": "Estado da fila",
+            "type": "n8n-nodes-base.code",
+            "parameters": {
+              "note": "Código omitido do snapshot compartilhável; consultar versão pelo ID no n8n."
+            },
+            "credentialTypes": []
+          },
+          {
+            "name": "Intervalo entre páginas",
+            "type": "n8n-nodes-base.wait",
+            "parameters": {
+              "resume": "timeInterval",
+              "amount": 1,
+              "unit": "seconds"
+            },
+            "credentialTypes": []
+          },
+          {
+            "name": "Baixar página",
+            "type": "n8n-nodes-base.httpRequest",
+            "parameters": {
+              "url": "={{ $json.url }}",
+              "options": {
+                "timeout": 30000,
+                "response": {
+                  "response": {
+                    "responseFormat": "text",
+                    "outputPropertyName": "data"
+                  }
+                }
+              }
+            },
+            "credentialTypes": []
+          },
+          {
+            "name": "Ler conteúdo e links",
+            "type": "n8n-nodes-base.html",
+            "parameters": {
+              "operation": "extractHtmlContent",
+              "sourceData": "json",
+              "dataPropertyName": "data",
+              "extractionValues": {
+                "values": [
+                  {
+                    "key": "titulo",
+                    "cssSelector": "title",
+                    "returnValue": "text"
+                  },
+                  {
+                    "key": "texto",
+                    "cssSelector": "main",
+                    "returnValue": "text",
+                    "skipSelectors": "script,style,nav"
+                  },
+                  {
+                    "key": "links",
+                    "cssSelector": "a[href]",
+                    "returnValue": "attribute",
+                    "attribute": "href",
+                    "returnArray": true
+                  }
+                ]
+              },
+              "options": {
+                "trimValues": true,
+                "cleanUpText": false
+              }
+            },
+            "credentialTypes": []
+          },
+          {
+            "name": "Extrair novas URLs",
+            "type": "n8n-nodes-base.code",
+            "parameters": {
+              "note": "Código omitido do snapshot compartilhável; consultar versão pelo ID no n8n."
+            },
+            "credentialTypes": []
+          },
+          {
+            "name": "Salvar página",
+            "type": "n8n-nodes-base.dataTable",
+            "parameters": {
+              "resource": "row",
+              "operation": "upsert",
+              "dataTableId": {
+                "__rl": true,
+                "mode": "list",
+                "value": "1FGJBkGYWD3BMnHh",
+                "cachedResultName": "Brave Privacy — Páginas"
+              },
+              "filters": {
+                "conditions": [
+                  {
+                    "keyName": "url",
+                    "condition": "eq",
+                    "keyValue": "={{ $json.url }}"
+                  }
+                ]
+              },
+              "columns": {
+                "mappingMode": "defineBelow",
+                "value": {
+                  "url": "={{ $json.url }}",
+                  "titulo": "={{ $json.titulo }}",
+                  "texto": "={{ $json.texto }}",
+                  "html": "={{ $json.html }}",
+                  "links": "={{ $json.links }}",
+                  "coletado_em": "={{ $json.coletado_em }}"
+                }
+              },
+              "options": {}
+            },
+            "credentialTypes": []
+          },
+          {
+            "name": "Atualizar fila",
+            "type": "n8n-nodes-base.code",
+            "parameters": {
+              "note": "Código omitido do snapshot compartilhável; consultar versão pelo ID no n8n."
+            },
+            "credentialTypes": []
+          },
+          {
+            "name": "Existem subpáginas",
+            "type": "n8n-nodes-base.if",
+            "parameters": {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.queue.length }}",
+                    "rightValue": 0,
+                    "operator": {
+                      "type": "number",
+                      "operation": "gt"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            "credentialTypes": []
+          },
+          {
+            "name": "Resumo da coleta",
+            "type": "n8n-nodes-base.code",
+            "parameters": {
+              "note": "Código omitido do snapshot compartilhável; consultar versão pelo ID no n8n."
+            },
+            "credentialTypes": []
+          }
+        ],
+        "activeVersionDiffers": false
+      }
+    }
+  ]
+}

@@ -15,7 +15,9 @@
     "db:import-supplier-catalog": "node --experimental-strip-types --disable-warning=ExperimentalWarning --env-file-if-exists=.env.local --import ./scripts/register.mjs scripts/db-import-supplier-catalog.ts",
     "db:seed-demo": "node --experimental-strip-types --disable-warning=ExperimentalWarning --env-file-if-exists=.env.local --import ./scripts/register.mjs scripts/db-seed-demo.ts",
     "db:import-products": "node --experimental-strip-types --disable-warning=ExperimentalWarning --env-file-if-exists=.env.local --import ./scripts/register.mjs scripts/db-import-products.ts",
-    "shots": "node docs/revisao-telas/shoot.mjs"
+    "shots": "node docs/revisao-telas/shoot.mjs",
+    "documents": "node --experimental-strip-types --import ./scripts/register.mjs scripts/documents.ts",
+    "documents:benchmark": "node --experimental-strip-types --import ./scripts/register.mjs scripts/documents-benchmark.ts"
   },
   "dependencies": {
     "@types/qrcode": "^1.5.6",

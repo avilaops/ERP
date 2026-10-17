@@ -110,3 +110,13 @@ test("dentro do estado usa o ICMS interno; centavos de diferença entre pagament
   assert.equal(inside.input.payments.at(-1)?.amount, 5530.85);
   assert.equal(inside.totals.difal, 0);
 });
+
+test("prévia com IPI sem CST mantém total do pedido, mas recusa XML até definir a tributação", () => {
+  const source = { ...SOURCE, params: { ...SOURCE.params, ipi: 0.13 }, receipts: [{ method: "PIX", amount: 15741.86 }] };
+  const built = orderNfe(source);
+  assert.equal(built.totals.ipi, 1811.01);
+  assert.equal(built.totals.invoice, 15741.86);
+  assert.ok(built.problems.some((problem) => problem.includes("falta o CST do IPI")));
+  assert.ok(!built.problems.some((problem) => problem.includes("as formas somam")));
+  assert.throws(() => buildNfeXml(built.input), /IPI/);
+});

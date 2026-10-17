@@ -208,8 +208,8 @@ test("regras de negócio conferidas antes de escrever o XML: cada uma evita uma 
   assert.ok(has({ ...BASE, icmsRate: 0.04 }, "pede ICMS interestadual de 7%"));
   assert.ok(has({ ...BASE, icmsRate: 0.07, recipient: { ...BASE.recipient, uf: "RJ", cityCode: "3304557", city: "Rio de Janeiro" } }, "pede ICMS interestadual de 12%"));
   assert.ok(has({ ...BASE, destination: { internalIcms: 0, fcp: 0 } }, "falta a alíquota interna do ICMS de MA"));
-  // Para contribuinte a nota não leva o grupo do DIFAL, e essas regras da SEFAZ não se aplicam.
-  assert.deepEqual(nfeProblems(paid({ ...BASE, icmsRate: 0.04, recipient: { ...BASE.recipient, ...TAXPAYER } })), []);
+  // Without DIFAL the ERP still checks the highlighted interstate ICMS.
+  assert.ok(has({ ...BASE, icmsRate: 0.04, recipient: { ...BASE.recipient, ...TAXPAYER } }, "pede ICMS interestadual de 7%"));
 
   assert.deepEqual([interstateRate(0, "SP", "MA"), interstateRate(0, "SP", "ES"), interstateRate(0, "SP", "RJ"), interstateRate(5, "BA", "SP"), interstateRate(0, "ES", "BA")], [0.07, 0.07, 0.12, 0.12, 0.12]);
   for (const origin of [1, 2, 3, 8]) assert.equal(interstateRate(origin, "SP", "MA"), 0.04);
@@ -219,6 +219,30 @@ test("regras de negócio conferidas antes de escrever o XML: cada uma evita uma 
   const long = `${"a".repeat(55)}@cliente.test`;
   assert.doesNotMatch(buildNfeXml(paid({ ...BASE, recipient: { ...BASE.recipient, email: long } })).xml, /<email>/);
   assert.ok(buildNfeXml(paid(BASE)).xml.includes("<email>compras@academia.test</email>"));
+});
+
+test("ICMS interestadual para contribuinte: origem, destino, exceções e itens mistos são conferidos antes da emissão", () => {
+  const sale: NfeInput = { ...BASE, recipient: { ...BASE.recipient, ...TAXPAYER }, rules: { ...BASE.rules, finalConsumer: false } };
+  for (const origin of [1, 2, 3, 8]) {
+    const imported = { ...sale, items: sale.items.map((item) => ({ ...item, origin })) };
+    for (const icmsRate of [0.07, 0.12]) {
+      assert.throws(() => buildNfeXml(paid({ ...imported, icmsRate })), /pede ICMS interestadual de 4%/);
+    }
+    const { xml } = buildNfeXml(paid({ ...imported, icmsRate: 0.04 }));
+    assert.match(xml, /<pICMS>4.0000<\/pICMS>/);
+    assert.doesNotMatch(xml, /ICMSUFDest/);
+  }
+  for (const origin of [0, 4, 5, 6, 7]) {
+    assert.deepEqual(nfeProblems(paid({ ...sale, items: sale.items.map((item) => ({ ...item, origin })) })), []);
+  }
+  const southeast = { ...sale, recipient: { ...sale.recipient, uf: "RJ", cityCode: "3304557", city: "Rio de Janeiro" } };
+  assert.throws(() => buildNfeXml(paid(southeast)), /pede ICMS interestadual de 12%/);
+  assert.deepEqual(nfeProblems(paid({ ...southeast, icmsRate: 0.12 })), []);
+  assert.throws(() => buildNfeXml(paid({ ...sale, items: sale.items.map((item, index) => ({ ...item, origin: index === 0 ? 1 : 0 })) })), /Item 1.*pede ICMS interestadual de 4%/);
+  const inside = { ...sale, recipient: { ...sale.recipient, uf: "SP", cityCode: "3550308", city: "São Paulo" }, icmsRate: 0.18 };
+  assert.deepEqual(nfeProblems(paid(inside)), []);
+  assert.deepEqual(nfeProblems(paid({ ...sale, icmsRate: 0, rules: { ...sale.rules, icmsCode: "40" } })), []);
+  assert.deepEqual(nfeProblems(paid({ ...sale, icmsRate: 0, issuer: { ...sale.issuer, taxRegime: 1 }, rules: { ...sale.rules, icmsCode: "102" } })), []);
 });
 
 test("resposta da SEFAZ: autorizada com alerta (120, NT 2026.002) vale como autorizada; consumo indevido (656) não é veredito sobre a nota", () => {

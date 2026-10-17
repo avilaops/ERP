@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "application": "avila-erp",
+  "members": [],
+  "tasks": [
+    {
+      "id": "T-AVL-62-plataforma-fiscal",
+      "title": "Planejar plataforma fiscal propria no Linear",
+      "owner": null,
+      "priority": "alta",
+      "status": "concluida",
+      "acceptance": ["Criar plano principal e subtarefas no projeto ERP do Linear", "Registrar prioridades, marcos, dependencias e criterios de aceite", "Relacionar tarefas fiscais existentes sem duplicar implementacoes"],
+      "evidence": ["https://linear.app/avilaops/issue/AVL-62", "Planejamento cadastrado e relido: 25 subtarefas, cinco marcos, todas em Backlog e sem atribuicao", "IDs: AVL-69, AVL-71, AVL-73, AVL-75, AVL-77, AVL-80, AVL-81, AVL-85, AVL-87, AVL-89, AVL-91, AVL-94, AVL-95, AVL-97, AVL-101, AVL-104, AVL-108, AVL-110, AVL-111, AVL-112, AVL-113, AVL-114, AVL-115, AVL-116, AVL-117", "AVL-12, AVL-28, AVL-21 e AVL-14 relacionadas ao plano; configuracao real permanece na AVL-12", "Somente planejamento concluido: nenhuma implementacao, contratacao ou emissao fiscal realizada nesta demanda"],
+      "next": "Primeira tarefa de execucao: AVL-69, arquitetura e matriz de capacidades. Plataforma fiscal permanece em Backlog; responsaveis e datas a definir."
+    },
+    {
+      "id": "T-20261016-e2e-ui",
+      "title": "Testar pela UI o atendimento ao financeiro",
+      "owner": null,
+      "status": "em-revisao",
+      "acceptance": ["Executar cliente, oportunidade, orçamento, aprovação e financeiro pela UI", "Conferir recebimento parcial, estorno, comissão, quitação e exportação", "Registrar falhas e separar integrações externas não executadas"],
+      "evidence": ["https://linear.app/avilaops/issue/AVL-21", "Demo isolado erp_e2e_demo, fontes 612511c; cliente 9, oportunidade 8, pedido 261016-C4HQ", "Pedido fictício quitado; comissão líquida 323,18; estorno de 3000 e ajuste de comissão -53,10 conferidos pela UI", "Falhas anteriores NIC-24 a NIC-27 corrigidas e tarefas concluídas com prefixo atual AVL-24 a AVL-27; CSV corrigido anexado em AVL-26", "Correções publicadas c710ac1 e conferidas na UI real em leitura; 702 testes, lint, tipos e build aprovados no CI", "Erro preserva todos os campos com e sem JavaScript; parcial e estorno fictícios repetidos; controles da baixa 44 px nos cinco tamanhos", "Seis telas medidas nos cinco tamanhos, sem rolagem lateral; controles curtos e rolagem vertical registrados", ".agents/equipe/evidencias/e2e-ui-20261016.md", ".agents/equipe/evidencias/financeiro-correcoes-20261016.md"],
+      "next": "Quatro correções financeiras publicadas e revalidadas. Aceite completo parcial: envio externo, assinatura e NF-e ainda não validados; configuração fiscal e UX restantes nas tarefas AVL-12 e AVL-13. Nenhum lançamento real alterado."
+    },
+    {
+      "id": "T-20261016-fiscal-setup",
+      "title": "Automatizar preparação fiscal e corrigir prévia do IPI",
+      "owner": null,
+      "status": "em-revisao",
+      "acceptance": ["Consulta de CNPJ preenche apenas vazios e informa fonte e enquadramento disponível", "Operação de venda e códigos de pagamento configuráveis sem inventar tributação", "Prévia mantém IPI do pedido e bloqueia XML sem CST"],
+      "evidence": ["40 testes direcionados aprovados sem pulos, incluindo PostgreSQL, rollback, concorrência e XSD; lint, tipos e build aprovados", "https://github.com/avilaops/ERP/pull/14", "Produção /api/health: 612511c; consulta BrasilAPI aplicada pela UI; regime normal salvo e homologação, série 1 e próximo número 1 preservados", "Consulta e pagamentos com confirmação medidos nos cinco tamanhos; controles >=44 px e sem rolagem lateral; lista adaptável de 1 a 7 pagamentos", ".agents/equipe/evidencias/fiscal-20261016.md"],
+      "next": "Confirmar revenda ou produção própria, meio efetivo do saldo e CSTs/alíquotas com a contabilidade. PR #14 aberto; CI de código aprovado e varredura visual geral falhou em controles anteriores do editor de pedido (20 a 38 px), não alterados no PR. Não houve emissão nem envio de NF-e."
+    },
+    {
+      "id": "T-AVL-147-documentos",
+      "title": "Implementar biblioteca DOCUMENTOS e ingestão técnica NF-e",
+      "owner": null,
+      "priority": "alta",
+      "status": "em-revisao",
+      "acceptance": ["Biblioteca com isolamento por empresa, busca, filtros, versões e originais verificáveis", "Coleta incremental com limites, retomada e manifesto real", "Auditar quatro workflows sem alterar os existentes", "Validar banco, extração, UX, performance e backup isolado"],
+      "evidence": ["https://linear.app/avilaops/issue/AVL-147", "Migration 0066 aplicada somente em erp_documents_test; 288 jobs indexados, 12 parciais e seis falhas explícitas", "11.364 trechos e 141.730 elementos XML catalogados; corpus não configura emissão fiscal", "39 testes de funções/rotas/permissões/navegação, nove do extrator e validações de PostgreSQL; 45 medições de UX nos cinco tamanhos", "Download conferido por SHA-256, sessão obrigatória, teclado e texto a 200% verificados", "Backup/restauração isolados: 305 documentos, 306 versões; 294 hashes originais copiados e conferidos; banco temporário removido", "Workflow qWaAmsIZTR4NZZbl criado e validado em rascunho, sem credencial ERP nem publicação", "docs/documentos.md", "docs/documentos-evidencias-20261017.md", "docs/evidencias/documentos/"],
+      "next": "Revisar extrações parciais e DOC legado; preparar capacidade/volume e imagem do worker. Publicação, migration de produção e ativação n8n dependem de autorização específica conforme plano. Sem responsável atribuído."
+    }
+  ],
+  "decisions": [
+    {
+      "id": "D-20261017-pr20",
+      "subject": "Integração final dos eventos fiscais e conferência dos PRs abertos",
+      "status": "mesclado",
+      "decision": "PR20 integrada após resolver conflitos com main e corrigir envio por evento, compatibilidade do ledger da migração PIX e resumo do contrato. Main remota b74a2f56c37f01d21f1596d84b9f761eab008155, árvore idêntica ao commit validado ba438ea793e4c85c88b631174ecb1f4cf23f5cf3. Nenhum PR aberto no ERP na conferência de 17/10/2026 às 09:46 UTC.",
+      "evidence": ["https://github.com/avilaops/ERP/pull/20", "https://github.com/avilaops/ERP/actions/runs/39021362564", "748 testes aprovados, zero falhas/pulos; lint, tipos, build e telas nos cinco tamanhos aprovados", "Três conversas de revisão resolvidas com correções verificadas", "0070_email_da_carta_de_correcao.sql preservada; 0071_pix_direto_e_termos_preservados.sql reconhece nome anterior já aplicado sem repetir SQL; teste de atualização aprovado"],
+      "note": "Supersede a situação de rascunho do registro D-20261017-prs-16-19: PR20 ficou pronta e foi incluída no escopo ERP. PRs 16 a 20 mescladas. Trabalho local preservado. Nenhum deploy ou envio fiscal realizado nesta integração. PRs do CMS não incluídas; pergunta de escopo sem resposta. Aceite fiscal externo continua pendente."
+    },
+    {
+      "id": "D-20261017-prs-16-19",
+      "subject": "Mesclagem da sequência fiscal e MCP do ERP",
+      "status": "mesclado",
+      "decision": "PRs 19, 18, 17 e 16 integrados por commits de merge, preservando a cadeia e as alterações locais do checkout principal. Main remota em 6d70e4b08fa8c928a98cc8d17086092c38e54c68.",
+      "evidence": ["https://github.com/avilaops/ERP/pull/16", "https://github.com/avilaops/ERP/pull/17", "https://github.com/avilaops/ERP/pull/18", "https://github.com/avilaops/ERP/pull/19", "CI 39019449261 aprovado: 746 testes, zero falhas/pulos, lint, tipos, build e varreduras de telas nos cinco tamanhos", "Árvore do código da main conferida idêntica à do commit validado 09748998d845c98a9f7e721edf8ef0c1529816da", "Onze conversas de revisão resolvidas após correções verificadas", ".work/erp-pr-merges-20261017-0915.json"],
+      "note": "Merge não é implantação. Novo PR 20 apareceu depois da foto e está em rascunho com conflitos; inclusão no escopo perguntada ao usuário. Escopo dos PRs do CMS também perguntado, sem resposta nesta rodada."
+    },
+    {
+      "id": "D-20261016-menu",
+      "subject": "Organização do menu do ERP",
+      "status": "publicado",
+      "decision": "Seis grupos recolhíveis, grupo atual aberto, destino ativo destacado e opções pessoais em Minha conta. Permissões e atalhos móveis preservados.",
+      "evidence": [
+        "https://github.com/avilaops/ERP/pull/13",
+        "17 testes locais de navegação, permissões e UX aprovados; typecheck e lint aprovados.",
+        "CI 38965769763: organização do menu nos cinco tamanhos, teclado e texto ampliado aprovados; lint, tipos, testes com banco e build aprovados.",
+        "PR #13 integrado em 78a2029; branch feat/menu-organizado excluída.",
+        "Produção responde /api/health com 78a2029-email-test-20261016; demais fontes da revisão de e-mail preservados por comparação de arquivos.",
+        "docs/menu-ux.md responde às sete perguntas de UX. A varredura geral das demais telas é independente e ainda estava em execução na publicação."
+      ],
+      "note": "Registro sem atribuição de tarefa: não há membros cadastrados. Alterações fiscais, e-mail e boletos do checkout principal preservadas."
+    }
+  ],
+  "integrations": []
+}

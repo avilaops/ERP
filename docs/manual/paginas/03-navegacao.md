@@ -38,6 +38,7 @@ O menu fica à esquerda em todas as telas. Ele mostra apenas os itens liberados 
 | Parâmetros | Impostos, canal e política comercial. |
 | Simulador | Simulação de preço e desconto sem criar pedido. |
 | Equipe e acessos | Usuários e perfis. |
+| Documentos | Biblioteca técnica com busca, originais, versões, fonte e páginas. Coletas administradas pela Diretoria. |
 
 ## Botão Novo pedido
 

@@ -3,7 +3,7 @@ import type { MenuItem } from "@/lib/auth/permissions";
 export type NavigationGroup = { title: string; items: { href: string; label: string }[] };
 
 const GROUPS = [
-  ["Visão geral", ["dashboard", "relatorios"]],
+  ["Visão geral", ["dashboard", "relatorios", "documentos"]],
   ["Vendas", ["pedidos", "funil", "clientes", "aprovacoes"]],
   ["Preços e propostas", ["tabela-precos", "simulador", "precos-metas"]],
   ["Financeiro", ["recebimentos", "contas-pagar", "comissoes"]],
