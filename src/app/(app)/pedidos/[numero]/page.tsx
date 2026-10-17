@@ -88,6 +88,7 @@ const requiredOf = (kind: CustomerKind) =>
   [...CUSTOMER_FIELDS[kind].main, ...CUSTOMER_FIELDS[kind].address].map(({ key }) => key).filter((key) => isRequired(kind, key));
 
 const INVOICE_LABELS = { assinada: "aguardando resposta da SEFAZ", autorizada: "autorizada", rejeitada: "rejeitada", denegada: "denegada", cancelada: "cancelada" } as const;
+const FISCAL_JOB_LABELS = { emitir_nfe: "Emissão", correcao_nfe: "Carta de correção", cancelamento_nfe: "Cancelamento" } as const;
 /** The colours of a contract by how it stands; `vencido` is one sent whose link ran out. */
 const CONTRACT_COLORS: Record<"enviado" | "assinado" | "recusado" | "cancelado" | "vencido", string> = {
   enviado: "border-sky-300 bg-sky-50 text-sky-900",
@@ -367,13 +368,6 @@ export default async function PedidoPage({
             O cliente recebe um link por e-mail, lê o contrato e assina com nome, CPF e um código enviado ao e-mail dele. O PDF assinado sai com o registro das
             assinaturas na última folha.
           </p>
-          {fiscalJobs.filter((job) => job.status !== "concluido").map((job) => (
-            <div key={job.id} className={`mt-3 rounded border px-3 py-2 ${job.status === "revisao_manual" ? "border-amber-300 bg-amber-50 text-amber-950" : "border-sky-300 bg-sky-50 text-sky-950"}`}>
-              <strong>{job.status === "pendente" ? "Emissão aguardando a fila" : job.status === "processando" ? "Emissão em processamento" : "Emissão exige revisão"}</strong>
-              <span className="block text-xs">Tentativa {job.attempts} · próxima verificação {showDateTime(job.runAfter)}</span>
-              {job.lastError && <span className="mt-1 block text-xs">{job.lastError}</span>}
-            </div>
-          ))}
           {contracts.length > 0 && (
             <ul className="mt-3 flex flex-col gap-2">
               {contracts.map((contract) => {
@@ -524,6 +518,16 @@ export default async function PedidoPage({
             A conferência não envia nada nem consome número. Emitir assina com o certificado da empresa e envia à SEFAZ, no ambiente
             escolhido em Parâmetros → Fiscal ({invoice.input.environment === "producao" ? "produção: nota com valor fiscal" : "homologação: nota de teste, sem valor fiscal"}).
           </p>
+          {fiscalJobs.filter((job) => job.status !== "concluido").map((job) => {
+            const label = FISCAL_JOB_LABELS[job.kind];
+            return (
+              <div key={job.id} className={`mt-3 rounded border px-3 py-2 ${job.status === "revisao_manual" ? "border-amber-300 bg-amber-50 text-amber-950" : "border-sky-300 bg-sky-50 text-sky-950"}`}>
+                <strong>{job.status === "pendente" ? `${label} aguardando a fila` : job.status === "processando" ? `${label} em processamento` : `${label} exige revisão`}</strong>
+                <span className="block text-xs">Tentativa {job.attempts} · próxima verificação {showDateTime(job.runAfter)}</span>
+                {job.lastError && <span className="mt-1 block text-xs">{job.lastError}</span>}
+              </div>
+            );
+          })}
           {invoices.length > 0 && (
             <ul className="mt-3 flex flex-col gap-2">
               {invoices.map((item) => (
@@ -586,7 +590,7 @@ export default async function PedidoPage({
                           Carta de correção (não corrige valor, imposto, quantidade, cliente nem data)
                         </label>
                         <textarea id={`correcao-${item.id}`} name="text" rows={2} placeholder="Ex.: Onde se lê Rua A, 10, leia-se Rua B, 20." className={`${INPUT} w-full text-slate-900`} />
-                        <ConfirmButton label="Registrar carta de correção" confirmLabel="Confirmar: enviar à SEFAZ" className={SECONDARY} />
+                        <ConfirmButton label="Registrar carta de correção" confirmLabel="Confirmar: colocar carta na fila fiscal" className={SECONDARY} />
                       </ActionForm>
                       <ActionForm action={registerNfeEventAction} className="mt-3 flex flex-col gap-2">
                         <input type="hidden" name="number" value={order.number} />
@@ -595,7 +599,7 @@ export default async function PedidoPage({
                           Cancelar a nota: motivo (a SEFAZ só aceita dentro do prazo legal, e não tem volta)
                         </label>
                         <input id={`cancelar-${item.id}`} name="text" type="text" placeholder="Ex.: Pedido cancelado pelo cliente antes da saída." className={`${INPUT} w-full text-slate-900`} />
-                        <ConfirmButton label="Cancelar nota fiscal" confirmLabel="Confirmar: cancelar na SEFAZ" className={DANGER_OUTLINE} />
+                        <ConfirmButton label="Cancelar nota fiscal" confirmLabel="Confirmar: colocar cancelamento na fila fiscal" className={DANGER_OUTLINE} />
                       </ActionForm>
                     </details>
                   )}

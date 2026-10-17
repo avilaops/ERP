@@ -1,4 +1,4 @@
-import { IssueError, issueOrderNfe } from "@/lib/db/issue-nfe";
+import { IssueError, issueOrderNfe, registerOrderNfeEvent } from "@/lib/db/issue-nfe";
 import { loadMailInfo } from "@/lib/db/mail";
 import { previewOrderNfe } from "@/lib/db/order-nfe";
 import { getOrder } from "@/lib/db/orders";
@@ -7,6 +7,7 @@ import { sendInvoiceMail } from "@/lib/db/send-nfe-mail";
 import type { Send } from "@/lib/fiscal/channel";
 import type { LayoutCheck } from "@/lib/fiscal/precheck";
 import { vaultKey } from "@/lib/fiscal/certificate";
+import { eventText } from "@/lib/fiscal/events";
 import { sendMail } from "@/lib/mail/smtp";
 import type { MailSender } from "@/lib/db/send-nfe-mail";
 
@@ -19,10 +20,13 @@ export type FiscalJob = {
   orderNumber: string;
   requestedBy: string;
   attempts: number;
+  kind: "emitir_nfe" | "correcao_nfe" | "cancelamento_nfe";
+  eventText: string | null;
 };
 
 export type FiscalJobSummary = {
   id: number;
+  kind: "emitir_nfe" | "correcao_nfe" | "cancelamento_nfe";
   status: "pendente" | "processando" | "concluido" | "revisao_manual";
   attempts: number;
   lastError: string | null;
@@ -32,10 +36,10 @@ export type FiscalJobSummary = {
 /** The order page only needs the work still relevant to the person, never XML or certificate data. */
 export async function listOrderFiscalJobs(orderId: number, conn: Queryable): Promise<FiscalJobSummary[]> {
   const { rows } = await conn.query(
-    "SELECT id, status, attempts, last_error, run_after FROM fiscal_jobs WHERE order_id = $1 ORDER BY id DESC LIMIT 5",
+    "SELECT id, kind, status, attempts, last_error, run_after FROM fiscal_jobs WHERE order_id = $1 ORDER BY id DESC LIMIT 5",
     [orderId],
   );
-  return rows.map((row) => ({ id: Number(row.id), status: row.status as FiscalJobSummary["status"], attempts: Number(row.attempts), lastError: row.last_error === null ? null : String(row.last_error), runAfter: row.run_after as Date }));
+  return rows.map((row) => ({ id: Number(row.id), kind: row.kind as FiscalJobSummary["kind"], status: row.status as FiscalJobSummary["status"], attempts: Number(row.attempts), lastError: row.last_error === null ? null : String(row.last_error), runAfter: row.run_after as Date }));
 }
 
 /** A request is durable before it returns to the screen. Repeated clicks join its active job. */
@@ -48,11 +52,35 @@ export async function enqueueNfeIssue(orderNumber: string, who: string, conn: Qu
   const { rows } = await conn.query(
     `INSERT INTO fiscal_jobs (kind, order_id, requested_by)
      VALUES ('emitir_nfe', $1, $2)
-     ON CONFLICT (kind, order_id) WHERE status IN ('pendente', 'processando')
+     ON CONFLICT (order_id) WHERE status IN ('pendente', 'processando')
      DO UPDATE SET updated_at = now()
-     RETURNING id, (xmax <> 0) AS joined`,
+     RETURNING id, kind, (xmax <> 0) AS joined`,
     [order.id, who],
   );
+  if (rows[0].kind !== "emitir_nfe") throw new IssueError("Há um evento fiscal pendente neste pedido. Aguarde a conclusão ou revise a pendência antes de emitir.");
+  return { id: Number(rows[0].id), joined: rows[0].joined === true };
+}
+
+/** CC-e and cancellation are stored before the screen returns; repeated clicks join the same active event. */
+export async function enqueueNfeEvent(orderNumber: string, kind: "correcao" | "cancelamento", text: string, who: string, conn: Queryable): Promise<{ id: number; joined: boolean }> {
+  const order = await getOrder(orderNumber, { sellerEmail: null }, conn);
+  if (!order) throw new IssueError("Pedido não encontrado.");
+  let detail: string;
+  try {
+    detail = eventText(kind, text);
+  } catch (error) {
+    throw new IssueError(error instanceof Error ? error.message : "O texto do evento não é válido.");
+  }
+  const jobKind = kind === "correcao" ? "correcao_nfe" : "cancelamento_nfe";
+  const { rows } = await conn.query(
+    `INSERT INTO fiscal_jobs (kind, order_id, requested_by, event_text)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (order_id) WHERE status IN ('pendente', 'processando')
+     DO UPDATE SET updated_at = now()
+     RETURNING id, kind, (xmax <> 0) AS joined`,
+    [jobKind, order.id, who, detail],
+  );
+  if (rows[0].kind !== jobKind) throw new IssueError("Já há outra operação fiscal pendente neste pedido. Aguarde a conclusão ou revise a pendência antes de enviar este evento.");
   return { id: Number(rows[0].id), joined: rows[0].joined === true };
 }
 
@@ -72,12 +100,12 @@ export async function claimFiscalJob(now: Date, conn: Queryable): Promise<Fiscal
         SET status = 'processando', attempts = attempts + 1, lease_until = $2, updated_at = $1
        FROM candidate c
       WHERE j.id = c.id
-      RETURNING j.id, j.order_id, j.requested_by, j.attempts,
+      RETURNING j.id, j.order_id, j.requested_by, j.attempts, j.kind, j.event_text,
                 (SELECT number FROM orders WHERE id = j.order_id) AS order_number`,
     [now, leaseUntil],
   );
   const row = rows[0];
-  return row ? { id: Number(row.id), orderId: Number(row.order_id), orderNumber: String(row.order_number), requestedBy: String(row.requested_by), attempts: Number(row.attempts) } : null;
+  return row ? { id: Number(row.id), orderId: Number(row.order_id), orderNumber: String(row.order_number), requestedBy: String(row.requested_by), attempts: Number(row.attempts), kind: row.kind as FiscalJob["kind"], eventText: row.event_text === null ? null : String(row.event_text) } : null;
 }
 
 export async function completeFiscalJob(id: number, now: Date, conn: Queryable): Promise<void> {
@@ -92,32 +120,42 @@ async function awaitingAnswer(orderId: number, conn: Queryable): Promise<boolean
   return rows.length > 0;
 }
 
-async function failFiscalJob(job: FiscalJob, error: unknown, now: Date, conn: Queryable): Promise<void> {
+function isTransientEventError(error: unknown): boolean {
+  return error instanceof IssueError && /não respondeu|não foi possível falar|resposta da SEFAZ não é a esperada|consulta da nota falhou/i.test(error.message);
+}
+
+async function failFiscalJob(job: FiscalJob, error: unknown, now: Date, conn: Queryable): Promise<boolean> {
   const message = error instanceof Error ? error.message.slice(0, 2000) : "Falha inesperada ao processar a nota.";
-  const retry = job.attempts < MAX_ATTEMPTS && (await awaitingAnswer(job.orderId, conn));
+  const retry = job.attempts < MAX_ATTEMPTS && (job.kind === "emitir_nfe" ? await awaitingAnswer(job.orderId, conn) : isTransientEventError(error));
   if (!retry) {
     await conn.query(
       "UPDATE fiscal_jobs SET status = 'revisao_manual', lease_until = NULL, last_error = $2, updated_at = $3 WHERE id = $1 AND status = 'processando'",
       [job.id, message, now],
     );
-    return;
+    return false;
   }
   const delayMinutes = Math.min(30, 2 ** (job.attempts - 1));
   await conn.query(
     "UPDATE fiscal_jobs SET status = 'pendente', run_after = $2, lease_until = NULL, last_error = $3, updated_at = $4 WHERE id = $1 AND status = 'processando'",
     [job.id, new Date(now.getTime() + delayMinutes * 60_000), message, now],
   );
+  return true;
 }
 
 export type FiscalJobDependencies = { vault: Buffer; send: Send; check: LayoutCheck | null; env: Record<string, string | undefined>; mailSend?: MailSender };
 
 /** An e-mail failure never reopens a concluded fiscal job: sendInvoiceMail records its own result. */
-async function sendAutomaticMail(invoiceId: number, sentBy: string, now: Date, dependencies: FiscalJobDependencies, conn: Queryable): Promise<void> {
+async function sendAutomaticMail(kind: "nota" | "correcao" | "cancelamento", invoiceId: number, sentBy: string, now: Date, dependencies: FiscalJobDependencies, conn: Queryable): Promise<void> {
   try {
     if (!(await loadMailInfo(conn)).autoSend) return;
     const prior = await conn.query("SELECT 1 FROM fiscal_invoice_mails WHERE invoice_id = $1 AND kind = 'nota' AND status = 'enviado' LIMIT 1", [invoiceId]);
-    if (prior.rows[0]) return;
-    await sendInvoiceMail({ invoiceId, to: null, sentBy, now, env: dependencies.env, key: () => dependencies.vault, send: dependencies.mailSend ?? sendMail }, conn);
+    if (kind === "nota" && prior.rows[0]) return;
+    if (kind !== "nota" && !prior.rows[0]) return;
+    if (kind === "correcao") {
+      const already = await conn.query("SELECT 1 FROM fiscal_invoice_mails WHERE invoice_id = $1 AND kind = 'correcao' AND status = 'enviado' AND event_id = (SELECT id FROM fiscal_invoice_events WHERE invoice_id = $1 AND kind = 'correcao' ORDER BY sequence DESC LIMIT 1)", [invoiceId]);
+      if (already.rows[0]) return;
+    }
+    await sendInvoiceMail({ invoiceId, ...(kind === "correcao" ? { kind } : {}), to: kind === "nota" ? null : String(prior.rows[0].recipient), sentBy, now, env: dependencies.env, key: () => dependencies.vault, send: dependencies.mailSend ?? sendMail }, conn);
   } catch (error) {
     console.error("[fila fiscal] e-mail automático não enviado:", error instanceof Error ? error.message : error);
   }
@@ -128,13 +166,18 @@ export async function runOneFiscalJob(now: Date, dependencies: FiscalJobDependen
   const job = await claimFiscalJob(now, conn);
   if (!job) return "none";
   try {
-    const result = await issueOrderNfe(job.orderNumber, job.requestedBy, now, dependencies.vault, dependencies.send, conn, dependencies.check);
-    if (result.invoice.status === "autorizada") await sendAutomaticMail(result.invoice.id, job.requestedBy, now, dependencies, conn);
+    if (job.kind === "emitir_nfe") {
+      const result = await issueOrderNfe(job.orderNumber, job.requestedBy, now, dependencies.vault, dependencies.send, conn, dependencies.check);
+      if (result.invoice.status === "autorizada") await sendAutomaticMail("nota", result.invoice.id, job.requestedBy, now, dependencies, conn);
+    } else {
+      const kind = job.kind === "correcao_nfe" ? "correcao" : "cancelamento";
+      const result = await registerOrderNfeEvent(job.orderNumber, kind, job.eventText ?? "", job.requestedBy, now, dependencies.vault, dependencies.send, conn);
+      await sendAutomaticMail(kind, result.invoiceId, job.requestedBy, now, dependencies, conn);
+    }
     await completeFiscalJob(job.id, now, conn);
     return "completed";
   } catch (error) {
-    await failFiscalJob(job, error, now, conn);
-    return (await awaitingAnswer(job.orderId, conn)) && job.attempts < MAX_ATTEMPTS ? "retry" : "manual_review";
+    return (await failFiscalJob(job, error, now, conn)) ? "retry" : "manual_review";
   }
 }
 

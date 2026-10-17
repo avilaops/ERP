@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { SignedXml } from "xml-crypto";
 import { validateXML } from "xmllint-wasm";
-import { eventEnvelope, eventUrl, eventXml, parseEvent, processedEventXml } from "@/lib/fiscal/events";
+import { eventEnvelope, eventText, eventUrl, eventXml, parseEvent, processedEventXml } from "@/lib/fiscal/events";
 import type { NfeEvent } from "@/lib/fiscal/events";
 import { NfeError } from "@/lib/fiscal/nfe";
 import { SefazError } from "@/lib/fiscal/sefaz";
@@ -60,6 +60,12 @@ test("evento: texto curto ou longo demais é recusado com mensagem para a tela; 
   assert.throws(() => eventEnvelope(eventXml(CANCEL).xml, "1"), /assinado/);
   assert.match(eventUrl("SP", "homologacao"), /homologacao\.nfe\.fazenda\.sp\.gov\.br\/ws\/nferecepcaoevento4\.asmx$/);
   assert.throws(() => eventUrl("RJ", "producao"), SefazError);
+});
+
+test("evento: a fila recebe o mesmo texto normalizado que será assinado", () => {
+  assert.equal(eventText("correcao", "  Onde se lê Rua A,\nleia-se Rua B.  "), "Onde se lê Rua A, leia-se Rua B.");
+  assert.throws(() => eventText("cancelamento", "curto"), /pelo menos 15 letras/);
+  assert.throws(() => eventText("cancelamento", "x".repeat(256)), /passa de 255 letras/);
 });
 
 test("evento: leitura da resposta — registrado, recusado com o motivo, lote recusado e resposta sobre outra nota", () => {
