@@ -99,7 +99,7 @@ export default async function PrecosMetasPage({ searchParams }: { searchParams: 
       <p className="mt-1 text-slate-600">Como estão a tabela, as metas de {monthLabel(month)} e o que espera decisão.</p>
       <LineTabs lines={lines} current={line.id} path={menuItem("precos-metas").href} />
 
-      <nav aria-label="Partes de preços e metas" className="mt-3 flex flex-wrap gap-x-1 border-b border-slate-200">
+      <nav aria-label="Partes de preços e metas" className="view-tabs">
         {tabs.map(([key, label]) => (
           <Link
             key={key}
@@ -274,7 +274,7 @@ export default async function PrecosMetasPage({ searchParams }: { searchParams: 
                 <ul className="grid grid-cols-2 gap-x-3 gap-y-1.5 sm:gap-x-8">
                   {director.byState.map((bar) => (
                     <li key={bar.label} className="grid grid-cols-[2.75rem_minmax(0,1fr)_3rem] items-center gap-1.5 text-xs sm:grid-cols-[3.5rem_minmax(0,1fr)_3.25rem] sm:gap-2 sm:text-sm">
-                      <span className="truncate">{bar.label}</span>
+                      <span className="break-words">{bar.label}</span>
                       <span className="relative h-2.5 rounded bg-slate-100">
                         <span
                           className={`block h-full rounded ${bar.value > director.params.freeDiscount + 1e-9 ? "bg-emerald-600" : "bg-slate-500"}`}

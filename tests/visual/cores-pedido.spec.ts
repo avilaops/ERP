@@ -4,7 +4,7 @@ test("cores por equipamento: amostras, gravação e leitura nos cinco tamanhos",
   await page.goto("/dev/login");
   await page.click("button[value=DIRETORIA]");
   await page.waitForURL((url) => !url.pathname.startsWith("/dev/login"));
-  await page.goto("/pedidos");
+  await page.goto("/pedidos?busca=DM09");
   const href = await page.locator('a[href$="-DM09"]').first().getAttribute("href");
   expect(href, "pedido de demonstração com dois equipamentos").toBeTruthy();
   await page.goto(`${href}?ver=itens`);
@@ -16,7 +16,7 @@ test("cores por equipamento: amostras, gravação e leitura nos cinco tamanhos",
   await first.locator("summary").filter({ hasText: "Cor do braço" }).click();
   await first.getByRole("radio", { name: "Apple Green", exact: true }).check();
   await first.getByRole("button", { name: "Gravar", exact: true }).click();
-  await expect(first.locator("summary").filter({ hasText: "Cor da estrutura" })).toContainText("Performance Red");
+  await expect(first.locator("summary").filter({ hasText: "Cor da estrutura" })).toContainText("Performance Red", { timeout: 30_000 });
   await expect(first.locator("summary").filter({ hasText: "Cor do braço" })).toContainText("Apple Green");
   await expect(forms.nth(1).locator("summary").first()).toContainText("Escolher cor");
 

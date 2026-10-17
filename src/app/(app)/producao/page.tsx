@@ -79,7 +79,7 @@ export default async function ProducaoPage({ searchParams }: { searchParams: Pro
           {slice.rows.map((order) => (
             <li key={order.number} className={`${CARD} flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2`}>
               <p className="min-w-0 flex-1">
-                <span className="block truncate font-semibold leading-snug">
+                <span className="block break-words font-semibold leading-snug">
                   #{order.number} · {order.customer}
                 </span>
                 <span className="block text-sm text-slate-600">
@@ -113,11 +113,11 @@ export default async function ProducaoPage({ searchParams }: { searchParams: Pro
               <li key={order.id}>
                 <Link href={`${ITEM.href}/${order.id}`} className="flex min-h-[var(--control)] items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 hover:border-brand">
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate font-semibold leading-snug">
+                    <span className="block break-words font-semibold leading-snug">
                       {order.quantity} × {order.productCode ? `${order.productCode} · ` : ""}
                       {order.productName}
                     </span>
-                    <span className="block truncate text-sm text-slate-600">
+                    <span className="block break-words text-sm text-slate-600">
                       {order.number} · {order.customer}
                     </span>
                   </span>

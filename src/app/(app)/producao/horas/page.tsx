@@ -35,14 +35,14 @@ export default async function HorasPage({ searchParams }: { searchParams: Promis
         </Link>
       </p>
       <PageHeader title="Horas da produção" hint={`${showMinutes(report.total)} apontados nos últimos ${days} dias · ${report.open} ${report.open === 1 ? "pessoa trabalhando" : "pessoas trabalhando"} agora`} />
-      <nav aria-label="Período" className="mt-2 flex flex-wrap gap-2">
+      <nav aria-label="Período" className="view-tabs">
         {PERIODS.map(([key, label]) => (
           <Link key={key} href={`${HERE}?ver=${tab}&dias=${key}`} aria-current={key === days ? "page" : undefined} className={`inline-flex min-h-[var(--control)] items-center rounded-full border px-4 text-sm font-medium ${key === days ? "border-brand bg-brand text-white" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100"}`}>
             {label}
           </Link>
         ))}
       </nav>
-      <nav aria-label="Partes das horas" className="mt-2 flex flex-wrap gap-x-1 border-b border-slate-200">
+      <nav aria-label="Partes das horas" className="view-tabs">
         {TABS.map(([key, label]) => (
           <Link
             key={key}
@@ -63,7 +63,7 @@ export default async function HorasPage({ searchParams }: { searchParams: Promis
           {rows.slice(0, 12).map((row) => (
             <li key={row.label} className="px-3 py-2">
               <p className="flex items-baseline gap-2">
-                <span className="min-w-0 flex-1 truncate font-medium">{row.label}</span>
+                <span className="min-w-0 flex-1 break-words font-medium">{row.label}</span>
                 <span className="whitespace-nowrap text-sm tabular-nums text-slate-700">
                   {showMinutes(row.minutes)} · {row.periods} {row.periods === 1 ? "período" : "períodos"}
                 </span>

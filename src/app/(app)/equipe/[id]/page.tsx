@@ -32,7 +32,7 @@ export default async function PessoaPage({ params }: { params: Promise<{ id: str
         <Link href={menuItem("equipe").href} aria-label="Voltar para Equipe e acessos" className="inline-flex min-h-[var(--control)] shrink-0 items-center rounded-lg bg-brand-soft px-3 text-xl text-brand">
           ←
         </Link>
-        <h1 className="min-w-0 truncate text-2xl font-semibold">{user.name}</h1>
+        <h1 className="min-w-0 break-words text-2xl font-semibold">{user.name}</h1>
       </div>
       {self && <p className="mt-1 text-sm text-slate-600">Este é o seu cadastro: você não muda o próprio tipo de acesso nem tira o próprio acesso.</p>}
       <ActionForm action={saveUserAction} className="mt-3 flex flex-col gap-3">

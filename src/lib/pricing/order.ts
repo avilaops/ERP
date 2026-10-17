@@ -231,7 +231,7 @@ export function orderBand(order: OrderInput, params: PricingParams): DiscountBan
   return discountBand(order.discount, orderMaxDiscounts(order, params));
 }
 
-export type ApprovalReason = "desconto-acima-do-livre" | "fora-da-meta" | "frete-por-nossa-conta" | "entrada-abaixo-da-politica";
+export type ApprovalReason = "desconto-acima-do-livre" | "fora-da-meta" | "frete-por-nossa-conta" | "entrada-abaixo-da-politica" | "solicitacao-manual";
 
 /** How far the commercial manager approves alone: while the order gives profit, or only while it stays on target. */
 export type ManagerLimit = "lucro" | "meta";

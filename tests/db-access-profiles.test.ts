@@ -38,7 +38,7 @@ test("perfil: telas e poderes são só os do tipo de origem; tela que mostra cus
   assert.deepEqual(clean, { name: "Fiscal da casa", baseRole: "FINANCEIRO", items: ["recebimentos"], denied: ["comissoes"] });
   assert.throws(() => cleanProfile({ name: "X", baseRole: "VENDEDOR", items: ["pedidos"], denied: [] }), /de 2 a 40 letras/);
   assert.throws(() => cleanProfile({ name: "Vazio", baseRole: "VENDEDOR", items: ["produtos"], denied: [] }), /pelo menos uma tela/);
-  assert.throws(() => cleanProfile({ name: "Sem custo", baseRole: "DIRETORIA", items: ["pedidos", "produtos", "parametros"], denied: ["custos"] }), (error: unknown) => error instanceof ProfileError && /Produtos e custos e Parâmetros mostram custo/.test(error.message));
+  assert.throws(() => cleanProfile({ name: "Sem custo", baseRole: "DIRETORIA", items: ["pedidos", "produtos", "parametros"], denied: ["custos"] }), (error: unknown) => error instanceof ProfileError && /Produtos e custos e Configurações mostram custo/.test(error.message));
   assert.deepEqual(cleanProfile({ name: "Sem custo", baseRole: "DIRETORIA", items: ["pedidos", "aprovacoes"], denied: ["custos"] }).denied, ["custos"]);
 });
 

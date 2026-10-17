@@ -122,36 +122,63 @@ const fraction = (value: number, label: string): number => {
   return value;
 };
 
-/** Writes the rules of a line. Blank is allowed, a malformed code is not. One statement. */
-export async function saveFiscalRules(lineId: number, input: FiscalRules, updatedBy: string, conn: Queryable): Promise<void> {
-  if (updatedBy.trim() === "") throw new Error("Falta dizer quem está alterando as regras fiscais.");
+/** Shared normalization for company defaults and the preparation of one invoice. */
+export function normalizeFiscalRules(input: FiscalRules): FiscalRules {
   const nature = blank(input.operationNature);
   if (nature !== null && nature.length > 60) throw new FiscalError("Natureza da operação: até 60 letras.");
   const info = blank(input.additionalInfo);
   if (info !== null && info.length > 2000) throw new FiscalError("Informações complementares: até 2.000 letras.");
+  return {
+    operationNature: nature,
+    cfopInternal: code(input.cfopInternal, /^5\d{3}$/, "CFOP dentro do estado: quatro dígitos, começando por 5."),
+    cfopInterstate: code(input.cfopInterstate, /^6\d{3}$/, "CFOP para outro estado: quatro dígitos, começando por 6."),
+    cfopInterstateNonTaxpayer: code(input.cfopInterstateNonTaxpayer, /^6\d{3}$/, "CFOP para não contribuinte de outro estado: quatro dígitos, começando por 6."),
+    icmsCode: code(input.icmsCode, /^\d{2,3}$/, "ICMS: CST com dois dígitos ou CSOSN com três."),
+    ipiCst: code(input.ipiCst, /^\d{2}$/, "CST do IPI: dois dígitos, ou em branco para nota sem IPI."),
+    ipiFrameCode: code(input.ipiFrameCode, /^\d{3}$/, "Código de enquadramento do IPI: três dígitos.") ?? "999",
+    pisCst: code(input.pisCst, /^\d{2}$/, "CST do PIS: dois dígitos."),
+    pisRate: fraction(input.pisRate, "Alíquota do PIS"),
+    cofinsCst: code(input.cofinsCst, /^\d{2}$/, "CST da COFINS: dois dígitos."),
+    cofinsRate: fraction(input.cofinsRate, "Alíquota da COFINS"),
+    finalConsumer: input.finalConsumer === true,
+    ipiInIcmsBase: input.ipiInIcmsBase === true,
+    additionalInfo: info,
+    ibsCbsCst: code(input.ibsCbsCst, /^\d{3}$/, "CST do IBS/CBS: três dígitos."),
+    ibsCbsClass: code(input.ibsCbsClass, /^\d{6}$/, "Classificação tributária do IBS/CBS: seis dígitos."),
+    ibsStateRate: fraction(input.ibsStateRate, "Alíquota do IBS estadual"),
+    ibsCityRate: fraction(input.ibsCityRate, "Alíquota do IBS municipal"),
+    cbsRate: fraction(input.cbsRate, "Alíquota da CBS"),
+    icmsOutOfContributions: input.icmsOutOfContributions === true,
+  };
+}
+
+/** Writes the rules of a line. Blank is allowed, a malformed code is not. One statement. */
+export async function saveFiscalRules(lineId: number, input: FiscalRules, updatedBy: string, conn: Queryable): Promise<void> {
+  if (updatedBy.trim() === "") throw new Error("Falta dizer quem está alterando as regras fiscais.");
+  const rules = normalizeFiscalRules(input);
   const values = [
     lineId,
-    nature,
-    code(input.cfopInternal, /^5\d{3}$/, "CFOP dentro do estado: quatro dígitos, começando por 5."),
-    code(input.cfopInterstate, /^6\d{3}$/, "CFOP para outro estado: quatro dígitos, começando por 6."),
-    code(input.cfopInterstateNonTaxpayer, /^6\d{3}$/, "CFOP para não contribuinte de outro estado: quatro dígitos, começando por 6."),
-    code(input.icmsCode, /^\d{2,3}$/, "ICMS: CST com dois dígitos ou CSOSN com três."),
-    code(input.ipiCst, /^\d{2}$/, "CST do IPI: dois dígitos, ou em branco para nota sem IPI."),
-    code(input.ipiFrameCode, /^\d{3}$/, "Código de enquadramento do IPI: três dígitos.") ?? "999",
-    code(input.pisCst, /^\d{2}$/, "CST do PIS: dois dígitos."),
-    fraction(input.pisRate, "Alíquota do PIS"),
-    code(input.cofinsCst, /^\d{2}$/, "CST da COFINS: dois dígitos."),
-    fraction(input.cofinsRate, "Alíquota da COFINS"),
-    input.finalConsumer === true,
-    input.ipiInIcmsBase === true,
-    info,
+    rules.operationNature,
+    rules.cfopInternal,
+    rules.cfopInterstate,
+    rules.cfopInterstateNonTaxpayer,
+    rules.icmsCode,
+    rules.ipiCst,
+    rules.ipiFrameCode,
+    rules.pisCst,
+    rules.pisRate,
+    rules.cofinsCst,
+    rules.cofinsRate,
+    rules.finalConsumer,
+    rules.ipiInIcmsBase,
+    rules.additionalInfo,
     updatedBy,
-    code(input.ibsCbsCst, /^\d{3}$/, "CST do IBS/CBS: três dígitos."),
-    code(input.ibsCbsClass, /^\d{6}$/, "Classificação tributária do IBS/CBS: seis dígitos."),
-    fraction(input.ibsStateRate, "Alíquota do IBS estadual"),
-    fraction(input.ibsCityRate, "Alíquota do IBS municipal"),
-    fraction(input.cbsRate, "Alíquota da CBS"),
-    input.icmsOutOfContributions === true,
+    rules.ibsCbsCst,
+    rules.ibsCbsClass,
+    rules.ibsStateRate,
+    rules.ibsCityRate,
+    rules.cbsRate,
+    rules.icmsOutOfContributions,
   ];
   const { rows } = await conn.query(
     `INSERT INTO fiscal_rules
@@ -217,23 +244,43 @@ export const PAYMENT_CODES = [
   ["99", "Outros (vai com o nome da forma)"],
 ] as const;
 
-export type PaymentCode = { id: number; label: string; active: boolean; code: string | null };
+export type PaymentCode = { id: number; label: string; active: boolean; code: string | null; companyPix: boolean };
 
 /** Every form of payment of the company with the code it takes in the invoice, or `null` while nobody chose. */
 export async function listPaymentCodes(conn: Queryable): Promise<PaymentCode[]> {
-  const { rows } = await conn.query("SELECT id, label, active, nfe_code FROM payment_methods ORDER BY position, label");
-  return rows.map((row) => ({ id: Number(row.id), label: String(row.label), active: row.active === true, code: text(row.nfe_code) }));
+  const { rows } = await conn.query("SELECT id, label, active, nfe_code, on_delivery, company_pix FROM payment_methods ORDER BY position, label");
+  return rows.map((row) => ({ id: Number(row.id), label: String(row.label), active: row.active === true, code: row.on_delivery === true ? null : text(row.nfe_code), companyPix:row.company_pix===true }));
 }
 
-export async function savePaymentCode(id: number, value: string | null, updatedBy: string, conn: Queryable): Promise<void> {
+export async function savePaymentCode(id: number, value: string | null, updatedBy: string, conn: Queryable, companyPix?: boolean): Promise<void> {
   if (updatedBy.trim() === "") throw new Error("Falta dizer quem está alterando a forma de pagamento.");
   const chosen = blank(value);
   if (chosen !== null && !PAYMENT_CODES.some(([known]) => known === chosen)) throw new FiscalError("Escolha a forma da nota na lista.");
+  if (companyPix && chosen !== "17") throw new FiscalError("QR da empresa exige meio PIX, código 17.");
   const { rows } = await conn.query(
-    "UPDATE payment_methods SET nfe_code = $2, updated_at = now(), updated_by = $3 WHERE id = $1 RETURNING id",
-    [id, chosen, updatedBy],
+    "UPDATE payment_methods SET nfe_code = $2, company_pix = CASE WHEN $2='17' AND NOT on_delivery THEN COALESCE($4::boolean,company_pix) ELSE false END, updated_at = now(), updated_by = $3 WHERE id = $1 AND (NOT on_delivery OR $2::text IS NULL) RETURNING id",
+    [id, chosen, updatedBy, companyPix ?? null],
   );
-  if (rows.length === 0) throw new FiscalError("Forma de pagamento não encontrada. Recarregue a página.");
+  if (rows.length === 0) throw new FiscalError("Forma não encontrada ou cadastrada como prazo na entrega. Escolha o meio efetivo no pedido.");
+}
+
+/** One atomic batch. Concurrent renames, deletions and manual choices are skipped. */
+export async function completeKnownPaymentCodes(updatedBy: string, conn: Queryable): Promise<number> {
+  if (!updatedBy.trim()) throw new Error("Falta dizer quem está alterando a forma de pagamento.");
+  const suggestions = (await listPaymentCodes(conn)).flatMap((method) => {
+    const code = standardPaymentCode(method.label);
+    return method.code === null && code ? [{ id: method.id, label: method.label, code }] : [];
+  });
+  if (suggestions.length === 0) return 0;
+  const { rows } = await conn.query(
+    `UPDATE payment_methods AS method
+        SET nfe_code = mapping.code, updated_at = now(), updated_by = $4
+       FROM unnest($1::integer[], $2::text[], $3::text[]) AS mapping(id, label, code)
+      WHERE method.id = mapping.id AND method.label = mapping.label AND method.nfe_code IS NULL
+      RETURNING method.id`,
+    [suggestions.map((method) => method.id), suggestions.map((method) => method.label), suggestions.map((method) => method.code), updatedBy],
+  );
+  return rows.length;
 }
 
 /** One atomic batch. Concurrent renames, deletions and manual choices are skipped. */

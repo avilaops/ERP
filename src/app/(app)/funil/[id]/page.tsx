@@ -1,6 +1,9 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
-import { CARD, DANGER, INPUT, LABEL, PageHeader, Pill, PRIMARY, QUIET_LINK, SECONDARY, SECTION_TITLE } from "@/components/ui";
+import { FitRows } from "@/components/FitRows";
+import { CARD, DANGER, INPUT, LABEL, Pager, pageOf, PageHeader, Pill, PRIMARY, QUIET_LINK, SECONDARY, SECTION_TITLE } from "@/components/ui";
+import { rowsPerPage } from "@/lib/rows";
 import { requirePermission } from "@/lib/auth";
 import { allows, menuItem, seesAllOrders } from "@/lib/auth/permissions";
 import { listCadences, listEnrollments } from "@/lib/db/cadences";
@@ -55,7 +58,7 @@ export default async function OportunidadePage({ params, searchParams }: { param
   return (
     <div className="mx-auto max-w-3xl">
       <p className="text-sm">
-        <Link href={HERE} className={QUIET_LINK}>
+        <Link href={HERE} className={`${QUIET_LINK} inline-flex min-h-[var(--control)] items-center`}>
           ← Funil
         </Link>
       </p>
@@ -72,7 +75,8 @@ export default async function OportunidadePage({ params, searchParams }: { param
       />
       {item.stageKind === "perdida" && item.lostReason && <p className="mt-1 text-sm text-slate-600">Motivo da perda: {item.lostReason}</p>}
 
-      {/* Where the sale stands is the decision of this screen: one tap moves it. */}
+      <details className={`${CARD} mt-3`}>
+      <summary className="disclosure-heading">Alterar etapa da oportunidade<span className="disclosure-marker" aria-hidden="true">+</span></summary>
       <ActionForm action={moveOpportunityAction} className="mt-3 flex flex-wrap items-end gap-2">
         {hidden}
         <div className="min-w-40 flex-1">
@@ -97,14 +101,15 @@ export default async function OportunidadePage({ params, searchParams }: { param
           Mover
         </button>
       </ActionForm>
+      </details>
 
-      <nav aria-label="Partes da oportunidade" className="mt-4 flex flex-wrap gap-x-1 border-b border-slate-200">
+      <nav aria-label="Partes da oportunidade" className="view-tabs">
         {TABS.map(([key, label]) => (
           <Link
             key={key}
             href={key === "atividades" ? `${HERE}/${item.id}` : `${HERE}/${item.id}?aba=${key}`}
             aria-current={key === tab ? "page" : undefined}
-            className={`inline-flex min-h-[var(--control)] items-center border-b-2 px-3 text-sm font-medium ${key === tab ? "border-brand text-brand" : "border-transparent text-slate-600 hover:text-slate-900"}`}
+            className={`inline-flex min-h-[var(--control)] items-center border-b-2 px-2 text-sm font-medium sm:px-3 ${key === tab ? "border-brand text-brand" : "border-transparent text-slate-600 hover:text-slate-900"}`}
           >
             {label}
           </Link>
@@ -120,44 +125,50 @@ export default async function OportunidadePage({ params, searchParams }: { param
 
   async function Activities() {
     const activities = await listActivities(item!.id, conn);
+    const size = rowsPerPage((await cookies()).get("erp_linhas_atividade")?.value, 1);
+    const slice = pageOf(activities, Array.isArray(query.p) ? query.p[0] : query.p, size);
     const meetings = await listMeetings(item!.id, conn);
     const number = dialable(item!.phone);
     // With the company's official account the conversation happens here; without it, the link opens the person's own WhatsApp.
     const official = (await loadWhatsappInfo(conn)) !== null;
     const assistant = aiConfigured() && (await loadAiSettings(conn)).enabled;
-    const QUICK = "inline-flex min-h-[var(--control)] items-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium hover:bg-slate-50";
     return (
-      <section className="mt-3" aria-label="Atividades">
+      <section className="mt-2" aria-label="Atividades">
+        <details className={`${CARD} mb-2 mr-2 inline-block max-w-full px-3 align-top open:block open:w-full`}>
+        <summary className="min-h-[var(--control)] cursor-pointer py-3 text-sm font-medium">Contato</summary>
         <nav aria-label="Contato" className="mb-2 flex flex-wrap gap-2">
           {number && (
             <>
-              <a href={`tel:+${number}`} className={QUICK}>
+              <a href={`tel:+${number}`} className={SECONDARY}>
                 Ligar
               </a>
               {official ? (
-                <Link href={`${HERE}/${item!.id}/whatsapp`} className={QUICK}>
+                <Link href={`${HERE}/${item!.id}/whatsapp`} className={SECONDARY}>
                   WhatsApp
                 </Link>
               ) : (
-                <a href={`https://wa.me/${number}`} target="_blank" rel="noreferrer" className={QUICK}>
+                <a href={`https://wa.me/${number}`} target="_blank" rel="noreferrer" className={SECONDARY}>
                   WhatsApp
                 </a>
               )}
             </>
           )}
-          <Link href={`${HERE}/${item!.id}/ligacao`} className={QUICK}>
+          <Link href={`${HERE}/${item!.id}/ligacao`} className={SECONDARY}>
             Registrar ligação
           </Link>
-          <Link href={`${HERE}/${item!.id}/reuniao`} className={QUICK}>
+          <Link href={`${HERE}/${item!.id}/reuniao`} className={SECONDARY}>
             Agendar reunião
           </Link>
           {assistant && (
-            <Link href={`${HERE}/${item!.id}/assistente`} className={QUICK}>
+            <Link href={`${HERE}/${item!.id}/assistente`} className={SECONDARY}>
               Assistente
             </Link>
           )}
         </nav>
+        </details>
         {meetings.length > 0 && (
+          <details className={`${CARD} mb-2 px-3`}>
+          <summary className="min-h-[var(--control)] cursor-pointer py-3 text-sm font-medium">Ver reuniões ({meetings.length})</summary>
           <ul className={`${CARD} mb-2 divide-y divide-slate-200`} aria-label="Reuniões">
             {meetings.map((meeting) => (
               <li key={meeting.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
@@ -194,7 +205,10 @@ export default async function OportunidadePage({ params, searchParams }: { param
               </li>
             ))}
           </ul>
+          </details>
         )}
+        <details className={`${CARD} mb-2 inline-block max-w-full px-3 align-top open:block open:w-full`}>
+        <summary className="min-h-[var(--control)] cursor-pointer py-3 font-medium">Adicionar atividade</summary>
         <ActionForm action={addActivityAction} className={`${CARD} grid grid-cols-2 gap-2 p-3 sm:grid-cols-[9rem_minmax(0,1fr)_10rem_auto] sm:items-end`}>
           {hidden}
           <div>
@@ -225,23 +239,27 @@ export default async function OportunidadePage({ params, searchParams }: { param
             Adicionar
           </button>
         </ActionForm>
+        </details>
         {activities.length === 0 ? (
           <p className="mt-3 text-sm text-slate-600">Nada anotado ainda. Registre o próximo passo acima: é ele que aparece no funil e em Tarefas.</p>
         ) : (
-          <ul className={`${CARD} mt-3 divide-y divide-slate-200`}>
-            {activities.map((activity) => {
+          <ul id="atividades-lista" className={`${CARD} mt-2 divide-y divide-slate-200`}>
+            {slice.rows.map((activity) => {
               const due = activity.doneAt ? null : dueLabel(activity.dueOn, today);
               return (
-                <li key={activity.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
+                <li data-row key={activity.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
                   <p className="min-w-0 flex-1">
                     <span className={`block leading-snug ${activity.doneAt ? "text-slate-500 line-through" : "font-medium"}`}>{activity.title}</span>
                     <span className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
                       {ACTIVITY_LABELS[activity.kind]}
                       {due && <Pill tone={due.tone}>{due.text}</Pill>}
-                      {activity.doneAt ? <span>feita em {showDateTime(activity.doneAt)}</span> : activity.kind === "nota" ? <span>{showDateTime(activity.createdAt)}</span> : null}
+                      {activity.doneAt ? activity.completionNote ? <Pill tone="neutral">Duplicada</Pill> : <span>feita em {showDateTime(activity.doneAt)}</span> : activity.kind === "nota" ? <span>{showDateTime(activity.createdAt)}</span> : null}
                     </span>
                   </p>
-                  <ActionForm action={changeActivityAction} className="flex gap-2">
+                  <details className="max-w-full open:basis-full">
+                  <summary className={`${SECONDARY} cursor-pointer`}>Ações</summary>
+                  {activity.completionNote && <p className="my-2 text-sm text-slate-600">{activity.completionNote} Em {showDateTime(activity.doneAt!)}.</p>}
+                  <ActionForm action={changeActivityAction} className="flex flex-wrap gap-2">
                     {hidden}
                     <input type="hidden" name="activityId" value={activity.id} />
                     {activity.kind !== "nota" && (
@@ -253,11 +271,16 @@ export default async function OportunidadePage({ params, searchParams }: { param
                       Remover
                     </button>
                   </ActionForm>
+                  </details>
                 </li>
               );
             })}
           </ul>
         )}
+        {activities.length > 0 && <>
+          <Pager {...slice} noun={["atividade", "atividades"]} hrefFor={(page) => `${HERE}/${item!.id}?aba=atividades${page > 1 ? `&p=${page}` : ""}`} />
+          <FitRows listId="atividades-lista" shown={size} minimum={1} cookieName="erp_linhas_atividade" />
+        </>}
       </section>
     );
   }

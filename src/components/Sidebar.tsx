@@ -24,7 +24,7 @@ const TAB_ORDER: [key: string, label: string, icon: string][] = [
   ["clientes", "Clientes", "M16 20v-1.5a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4V20M9.5 10.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7M21 20v-1.5a4 4 0 0 0-3-3.9M15.5 3.6a3.5 3.5 0 0 1 0 6.8"],
   ["tabela-precos", "Preços", "M3 12V4h8l10 10-8 8zM7.5 7.5h.01"],
   ["simulador", "Simular", "M6 3h12v18H6zM9 7h6M9 12h.01M12 12h.01M15 12h.01M9 16h.01M12 16h.01M15 16h.01"],
-  ["dashboard", "Início", "M4 20V10M10 20V4M16 20v-7M22 20H2"],
+  ["dashboard", "Painel", "M4 20V10M10 20V4M16 20v-7M22 20H2"],
   ["producao", "Produção", "M3 21V10l6 4V10l6 4V4h6v17z"],
   ["recebimentos", "Receber", "M12 3v12M7 10l5 5 5-5M4 21h16"],
   ["contas-pagar", "Pagar", "M12 21V9M7 14l5-5 5 5M4 3h16"],

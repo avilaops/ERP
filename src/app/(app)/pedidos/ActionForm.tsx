@@ -2,6 +2,7 @@
 
 import { startTransition, useActionState, useEffect, useRef } from "react";
 import type { ReactNode } from "react";
+import { ActionFeedbackContext } from "@/components/FormSteps";
 import { IDLE_ACTION } from "@/lib/order-form";
 import type { ActionState } from "@/lib/order-form";
 
@@ -57,7 +58,7 @@ export function ActionForm({
       aria-busy={pending}
       className={`${className ?? ""} aria-busy:pointer-events-none aria-busy:opacity-60`.trim()}
     >
-      {children}
+      <ActionFeedbackContext.Provider value={state}>{children}</ActionFeedbackContext.Provider>
       {state.error && !pending && (
         <p role="alert" className="mt-2 basis-full rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-900">
           <span className="font-semibold">Nada foi gravado.</span> {state.error}

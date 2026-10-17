@@ -36,6 +36,10 @@ export function standardPaymentCode(label: string): string | null {
     pix: "17", dinheiro: "01", cheque: "02", boleto: "15", "boleto bancario": "15",
     "cartao de credito": "03", "cartao de debito": "04", transferencia: "18", "transferencia bancaria": "18",
     "deposito bancario": "16",
+    "cartao de credito (presencial)": "03",
+    "link de pagamento - cartao de credito": "03",
+    "link de pagamento - pix": "17",
+    "link de pagamento - boleto": "15",
   };
   return codes[name] ?? null;
 }

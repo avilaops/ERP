@@ -7,7 +7,7 @@ import { measuresText } from "@/lib/quote/document";
  * under its name (dimensions and weight, as registered today) and the photo.
  * The commercial description of the equipment is not printed: the customer asked for the measures in its place.
  */
-export type QuoteProduct = { description: string | null; photo: Uint8Array | null };
+export type QuoteProduct = { description: string | null; photo: Uint8Array | null; ncm?: string | null; weightKg?: number | null };
 
 /**
  * Description and stored photo of the products asked for, in one query. A product
@@ -19,7 +19,7 @@ export async function loadQuoteProducts(productIds: number[], conn: Queryable): 
   if (ids.length === 0) return new Map();
 
   const { rows } = await conn.query(
-    `SELECT p.id, p.length_mm, p.width_mm, p.height_mm, p.weight_kg, ph.bytes
+    `SELECT p.id, p.length_mm, p.width_mm, p.height_mm, p.weight_kg, p.ncm, ph.bytes
        FROM products p
        LEFT JOIN product_photos ph ON ph.product_id = p.id
       WHERE p.id = ANY($1::integer[])`,
@@ -36,6 +36,8 @@ export async function loadQuoteProducts(productIds: number[], conn: Queryable): 
           weightKg: row.weight_kg === null ? null : Number(row.weight_kg),
         }),
         photo: (row.bytes as Buffer | null) ?? null,
+        ncm: row.ncm === null ? null : String(row.ncm),
+        weightKg: row.weight_kg === null ? null : Number(row.weight_kg),
       },
     ]),
   );

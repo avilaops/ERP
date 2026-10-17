@@ -258,13 +258,13 @@ function address(prefix: "enderEmit" | "enderDest", place: NfeAddress): string {
 export const destinationUf = (input: Pick<NfeInput, "recipient" | "delivery">): string => input.delivery?.uf ?? input.recipient.uf;
 
 /** The CSTs of IPI that carry base, rate and amount; every other one only names itself. */
-const IPI_TAXED_CSTS = ["00", "49", "50", "99"];
+export const IPI_TAXED_CSTS = ["00", "49", "50", "99"];
 /** The CSTs of IPI the schema takes without figures (group IPINT). */
-const IPI_UNTAXED_CSTS = ["01", "02", "03", "04", "05", "51", "52", "53", "54", "55"];
+export const IPI_UNTAXED_CSTS = ["01", "02", "03", "04", "05", "51", "52", "53", "54", "55"];
 /** The CSTs of PIS and COFINS this system writes, as the schema groups them: by rate (01, 02), without figures (04 to 09) and "other operations" (49 to 99). 03 is by quantity: not issued here. */
-const CONTRIBUTION_RATE_CSTS = ["01", "02"];
-const CONTRIBUTION_UNTAXED_CSTS = ["04", "05", "06", "07", "08", "09"];
-const CONTRIBUTION_OTHER_CSTS = ["49", "50", "51", "52", "53", "54", "55", "56", "60", "61", "62", "63", "64", "65", "66", "67", "70", "71", "72", "73", "74", "75", "98", "99"];
+export const CONTRIBUTION_RATE_CSTS = ["01", "02"];
+export const CONTRIBUTION_UNTAXED_CSTS = ["04", "05", "06", "07", "08", "09"];
+export const CONTRIBUTION_OTHER_CSTS = ["49", "50", "51", "52", "53", "54", "55", "56", "60", "61", "62", "63", "64", "65", "66", "67", "70", "71", "72", "73", "74", "75", "98", "99"];
 /** Origins of imported goods: they leave the state at 4% (Resolução do Senado 13/2012; rules NA09-10 and NA09-20). */
 const IMPORTED_ORIGINS = [1, 2, 3, 8];
 /** South and Southeast except Espírito Santo: from them to the other states the rate is 7%, 12% in every other case (rule NA09-30). */
@@ -335,14 +335,12 @@ export function nfeProblems(input: NfeInput): string[] {
   need(!carrier || carrier.stateRegistration === null || Boolean(carrier.uf), "Transportadora: com inscrição estadual, informe a UF (Parâmetros → Transportadoras).");
   need(!carrier || (carrier.kind === "PJ" ? CNPJ_PATTERN : /^\d{11}$/).test(carrier.document), "Transportadora: CNPJ ou CPF completo (Parâmetros → Transportadoras).");
   need(input.items.length > 0, "Pedido sem itens.");
-  // Check the rate whenever ICMS is highlighted in an interstate sale, including
-  // taxpayers without DIFAL: SEFAZ's DIFAL checks alone do not protect those sales.
-  const interstateTaxed = issuer.taxRegime !== 1 && rules.icmsCode === "00" && Boolean(UF_CODES[issuer.uf]) && Boolean(UF_CODES[destinationUf(input)]) && issuer.uf !== destinationUf(input);
-  const difal = interstateTaxed && !recipient.taxpayer && rules.finalConsumer;
+  // Rule NA01-20: with the group of the DIFAL, the rates are the ones the layout checks (NA09-10 to NA09-30 and the schema: 4%, 7% or 12%).
+  const difal = issuer.taxRegime !== 1 && rules.icmsCode === "00" && Boolean(UF_CODES[issuer.uf]) && issuer.uf !== destinationUf(input) && !recipient.taxpayer && rules.finalConsumer;
   need(!difal || input.destination.internalIcms > 0, `Parâmetros: falta a alíquota interna do ICMS de ${destinationUf(input)}, para o DIFAL da venda a não contribuinte.`);
   input.items.forEach((item, index) => {
     const which = `Item ${index + 1} (${item.name})`;
-    if (interstateTaxed && Number.isInteger(item.origin) && item.origin >= 0 && item.origin <= 8) {
+    if (difal && Number.isInteger(item.origin) && item.origin >= 0 && item.origin <= 8) {
       const expected = interstateRate(item.origin, issuer.uf, destinationUf(input));
       need(Math.abs(input.icmsRate - expected) < 1e-9, `${which}: a origem ${item.origin} pede ICMS interestadual de ${(expected * 100).toFixed(0)}% de ${issuer.uf} para ${destinationUf(input)}, e os parâmetros do pedido trazem ${(input.icmsRate * 100).toFixed(2).replace(".", ",")}%. Corrija a origem do equipamento ou o ICMS de saída do estado.`);
     }
@@ -365,9 +363,9 @@ type ItemFigures = { product: number; contributionBase: number; ipi: number; icm
 function figuresOf(item: NfeItem, input: NfeInput): ItemFigures {
   const { rules, issuer, recipient } = input;
   const product = roundCents(item.quantity * item.unitPrice);
-  // The preview keeps the IPI agreed in the order even while its CST is missing.
-  // nfeProblems blocks XML generation until that classification is supplied.
-  const ipi = roundCents(product * item.ipiRate);
+    // Keep the IPI agreed in the order visible while its CST is still missing.
+    // nfeProblems blocks XML generation until that classification is supplied.
+    const ipi = roundCents(product * item.ipiRate);
   const taxed = issuer.taxRegime !== 1 && rules.icmsCode === "00";
   const icmsBase = taxed ? roundCents(product + (rules.finalConsumer && rules.ipiInIcmsBase ? ipi : 0)) : 0;
   const interstate = issuer.uf !== destinationUf(input);

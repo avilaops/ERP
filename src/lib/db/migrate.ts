@@ -7,6 +7,11 @@ export type MigrationClient = {
 };
 
 const FILE_NAME = /^\d{4}_[a-z0-9_]+\.sql$/;
+// The PIX migration was published under this name before the two branches met.
+// Preserve that ledger entry and register its new name without running SQL twice.
+const PREVIOUS_NAMES: Record<string, string> = {
+  "0071_pix_direto_e_termos_preservados.sql": "0070_pix_direto_e_termos_preservados.sql",
+};
 
 /**
  * Applies, in order, every `NNNN_nome.sql` of `dir` not yet recorded in
@@ -30,7 +35,9 @@ export async function migrate(client: MigrationClient, dir: string): Promise<str
     if (done.has(name)) continue;
     await client.query("BEGIN");
     try {
-      await client.query(readFileSync(join(dir, name), "utf8"));
+      if (!done.has(PREVIOUS_NAMES[name])) {
+        await client.query(readFileSync(join(dir, name), "utf8"));
+      }
       await client.query("INSERT INTO schema_migrations (name) VALUES ($1)", [name]);
       await client.query("COMMIT");
     } catch (error) {

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { INPUT, SECONDARY } from "@/components/ui";
+import { INPUT, PRIMARY, SECONDARY } from "@/components/ui";
 
 export type OrderPart = { key: string; label: string; /** `null`: a part with nothing to fill in. */ filled: boolean | null };
 
@@ -19,6 +19,8 @@ const TONE = {
  */
 export function OrderParts({ parts, initial, children }: { parts: OrderPart[]; initial: string; children: ReactNode }) {
   const [part, setPart] = useState(initial);
+  // Closing removes its own step. Show the new summary as soon as the server returns it.
+  const current = parts.some((item) => item.key === part) ? part : initial;
 
   // A link to a title of the page ("Ir para fechar") opens the part the title is in.
   useEffect(() => {
@@ -57,11 +59,11 @@ export function OrderParts({ parts, initial, children }: { parts: OrderPart[]; i
   }
 
   return (
-    <div data-order-part={part}>
-      <nav aria-label="Partes do pedido" className="sticky top-[var(--topbar)] z-10 mt-3 border-b border-slate-200 bg-white py-2 text-sm">
+    <div data-order-part={current}>
+      <nav aria-label="Partes do pedido" className="view-tabs">
         <label className="block md:hidden">
           <span className="font-medium">Etapa do pedido</span>
-          <select className={INPUT} value={part} onChange={(event) => choose(event.target.value)}>
+          <select className={INPUT} value={current} onChange={(event) => choose(event.target.value)}>
             {parts.map(({ key, label, filled }) => <option key={key} value={key}>{label}{filled === null ? "" : filled ? " · completo" : " · pendente"}</option>)}
           </select>
         </label>
@@ -71,10 +73,8 @@ export function OrderParts({ parts, initial, children }: { parts: OrderPart[]; i
             key={key}
             type="button"
             onClick={() => choose(key)}
-            aria-current={key === part ? "page" : undefined}
-            className={`${SECONDARY} ${
-              key === part ? "border-slate-900 bg-slate-900 text-white" : filled === null ? TONE.plain : filled ? TONE.filled : TONE.missing
-            }`}
+            aria-current={key === current ? "page" : undefined}
+            className={key === current ? PRIMARY : `${SECONDARY} ${filled === null ? TONE.plain : filled ? TONE.filled : TONE.missing}`}
           >
             {filled === null ? "" : filled ? "✓ " : "• "}
             {label}

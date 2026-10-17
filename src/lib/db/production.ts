@@ -106,11 +106,12 @@ export async function sendToProduction(orderNumber: string, who: string, conn: Q
   const due = completionDate(String(order.closed), order.production_days === null ? null : Number(order.production_days), order.production_unit === "uteis" ? "uteis" : "corridos");
   try {
     const { rows } = await conn.query(
-      `WITH first AS (SELECT id, name FROM production_stages WHERE kind = 'andamento' ORDER BY position, id LIMIT 1),
+      `WITH parent AS (SELECT id FROM orders WHERE id=$1 AND status='fechado' FOR UPDATE),
+            first AS (SELECT id, name FROM production_stages WHERE kind = 'andamento' ORDER BY position, id LIMIT 1),
             made AS (
               INSERT INTO production_orders (number, order_id, product_id, quantity, stage_id, due_on, created_by, updated_by)
               SELECT $2 || '/' || row_number() OVER (ORDER BY p.code, p.id), $1, i.product_id, i.quantity, first.id, $3::date, $4, $4
-                FROM order_items i JOIN products p ON p.id = i.product_id, first WHERE i.order_id = $1 RETURNING id, stage_id),
+                FROM order_items i JOIN products p ON p.id = i.product_id, first, parent WHERE i.order_id = parent.id RETURNING id, stage_id),
             walked AS (INSERT INTO production_moves (production_order_id, stage_id, stage_name, moved_by) SELECT made.id, made.stage_id, first.name, $4 FROM made, first)
        SELECT id FROM made`,
       [order.id, orderNumber, due, who],

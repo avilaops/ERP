@@ -30,7 +30,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
         <Link href="/produtos/catalogo-fornecedor" aria-label="Voltar para o catálogo do fornecedor" className="inline-flex min-h-[var(--control)] shrink-0 items-center rounded-lg bg-brand-soft px-3 text-xl text-brand">
           ←
         </Link>
-        <h1 className="min-w-0 truncate text-2xl font-semibold">{item.code} · {item.name}</h1>
+        <h1 className="min-w-0 break-words text-2xl font-semibold">{item.code} · {item.name}</h1>
       </div>
       <ActionForm action={updateSupplierItemAction} className="mt-4 flex flex-col gap-4">
         <input type="hidden" name="id" value={item.id} />

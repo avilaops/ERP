@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CARD, DANGER } from "@/components/ui";
+import { CARD, DANGER, QUIET_LINK } from "@/components/ui";
 import { PublicForm } from "@/app/contrato/[empresa]/[token]/PublicForm";
 import { requireSession } from "@/lib/auth";
 import { ROLE_LABELS } from "@/lib/auth/roles";
@@ -31,9 +31,9 @@ export default async function ConectarPage() {
   const serverUrl = resourceUrl();
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-xl flex-col gap-4 bg-slate-50 px-4 py-6">
+    <main className="mx-auto flex min-h-screen max-w-xl flex-col gap-3 bg-slate-50 px-4 py-4">
       <p className="text-sm">
-        <Link href="/" className="text-brand underline">
+        <Link href="/" className={`${QUIET_LINK} inline-flex min-h-[var(--control)] items-center`}>
           ← Voltar ao ERP
         </Link>
       </p>
@@ -41,7 +41,7 @@ export default async function ConectarPage() {
         <p className="text-lg font-semibold text-slate-900">{session.tenant.name}</p>
         <h1 className="text-xl font-semibold">Conectar um assistente</h1>
         <p className="mt-1 text-slate-700">
-          Ligue o seu assistente de inteligência artificial ao ERP. Ele entra como <strong>{session.name}</strong> ({session.profile ?? ROLE_LABELS[session.role]}) e enxerga só o que as suas telas permitem.
+          Seu assistente usará o acesso de <strong>{session.name}</strong> ({session.profile ?? ROLE_LABELS[session.role]}).
         </p>
       </div>
 
@@ -54,7 +54,7 @@ export default async function ConectarPage() {
       )}
 
       <details className={`${CARD} p-4`}>
-        <summary className="cursor-pointer font-medium">O que o assistente vai poder fazer ({tools.length})</summary>
+        <summary className="min-h-[var(--control)] cursor-pointer font-medium">O que o assistente vai poder fazer ({tools.length})</summary>
         <ul className="mt-2 text-sm text-slate-800">
           {tools.map((tool) => (
             <li key={tool.name} className="py-0.5">
@@ -64,17 +64,16 @@ export default async function ConectarPage() {
           ))}
           {tools.length === 0 && <li>Nenhuma ferramenta: o seu perfil não tem telas ligadas ao assistente.</li>}
         </ul>
-        <p className="mt-2 text-xs text-slate-600">Custo e margem nunca são enviados. Fechar pedido, aprovar, receber e pagar continuam só na tela.</p>
+        <p className="mt-2 text-sm text-slate-600">Custos exigem diretoria autorizada. Alterações têm prévia e confirmação. Registrar pagamento não transfere dinheiro. Cobranças são rascunhos.</p>
       </details>
-
       {mine.length > 0 && (
-        <section className={`${CARD} p-4`} aria-label="Meus assistentes conectados">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Conectados por você</h2>
+        <details className={`${CARD} p-4`} aria-label="Meus assistentes conectados">
+          <summary className="min-h-[var(--control)] cursor-pointer font-medium">Assistentes conectados ({mine.length})</summary>
           <ul className="mt-2 divide-y divide-slate-200">
             {mine.map((connection) => (
               <li key={connection.id} className="flex flex-wrap items-center gap-2 py-2">
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate font-medium">{connection.clientName}</span>
+                  <span className="block break-words font-medium">{connection.clientName}</span>
                   <span className="block text-sm text-slate-600">
                     desde {showDateTime(connection.createdAt)} · {connection.calls} {connection.calls === 1 ? "consulta" : "consultas"}
                   </span>
@@ -88,7 +87,7 @@ export default async function ConectarPage() {
               </li>
             ))}
           </ul>
-        </section>
+        </details>
       )}
     </main>
   );

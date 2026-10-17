@@ -6,6 +6,7 @@ import type { Customer } from "@/lib/db/customers";
 import { pgErrorCode } from "@/lib/db/pool";
 import type { Queryable } from "@/lib/db/pool";
 import { loadPublishedSnapshot, loadPublishedTable } from "@/lib/db/price-table";
+import { loadClosingProposal, EMPTY_PROPOSAL_DETAILS } from "@/lib/db/proposal-details";
 import { isoDate } from "@/lib/format";
 import { isPlates } from "@/lib/plates";
 import type { Plates } from "@/lib/plates";
@@ -53,7 +54,7 @@ export type Order = {
   installmentCount: number | null;
   firstInstallmentDays: number | null;
   installmentIntervalDays: number | null;
-  /** The balance is one installment, due on the day the order is ready: the form chosen for it says so. */
+  /** Due on delivery, independently of the payment method. */
   balanceOnDelivery: boolean;
   /** The installments of the balance agreed one by one (date, amount, form). Empty: they are calculated from the count and the days. */
   customInstallments: CustomInstallment[];
@@ -74,7 +75,6 @@ export class OrderError extends Error {}
 
 const NOT_EDITABLE = "Pedido não encontrado ou já fechado. Reabra o pedido para alterar.";
 
-const UNIQUE_VIOLATION = "23505";
 const FOREIGN_KEY_VIOLATION = "23503";
 
 // The date goes out as text: a `date` read as a JS Date would shift with the server's time zone.
@@ -120,20 +120,21 @@ export async function createOrder(
     const number = newNumber();
     if (!ORDER_NUMBER.test(number)) throw new Error("Número de pedido fora do formato AAMMDD-XXXX.");
     try {
-      await conn.query(
+      const created = await conn.query(
         `WITH created AS (
            INSERT INTO orders (number, seller_email, seller_name, price_table_version, updated_by)
-           VALUES ($1, $2, $3, $4, $2)
+           VALUES ($1, $2, $3, $4, $2) ON CONFLICT (number) DO NOTHING
            RETURNING id, price_table_version
          )
          INSERT INTO order_items (order_id, price_table_version, product_id, quantity)
-         SELECT id, price_table_version, $5::integer, $6::integer FROM created`,
+         SELECT id, price_table_version, $5::integer, $6::integer FROM created RETURNING order_id`,
         [number, seller.email, seller.name, version, productId, quantity],
       );
-      return number;
+      if (created.rows.length) return number;
+      if (attempt >= 5) throw new OrderError("Não foi possível gerar um número livre para o pedido. Tente novamente.");
     } catch (error) {
       if (pgErrorCode(error) === FOREIGN_KEY_VIOLATION) throw notInTable(version);
-      if (pgErrorCode(error) !== UNIQUE_VIOLATION || attempt >= 5) throw error;
+      throw error;
     }
   }
 }
@@ -462,6 +463,8 @@ export type OrderPayment = {
   /** `AAAA-MM-DD`, or `null`: on confirmation of the order. */
   downPaymentDate: string | null;
   balanceMethod: string | null;
+  /** Absent only for older callers that used an on_delivery payment-method entry. */
+  balanceOnDelivery?: boolean;
   installmentCount: number | null;
   firstInstallmentDays: number | null;
   installmentIntervalDays: number | null;
@@ -478,9 +481,11 @@ export async function savePayment(
   who: string,
   scope: OrderScope,
   conn: Queryable,
+  revision?: string,
 ): Promise<void> {
   assertWho(who);
   assertAmount(payment.downPayment, "Entrada");
+  if (payment.balanceOnDelivery !== undefined && typeof payment.balanceOnDelivery !== "boolean") throw new OrderError("Escolha quando pagar o saldo.");
   if (payment.downPaymentDate !== null) parseDate(payment.downPaymentDate);
   if (!wholeOrNull(payment.installmentCount, 1)) throw new OrderError("Parcelas: informe um número inteiro maior que zero.");
   if (!wholeOrNull(payment.firstInstallmentDays, 0) || !wholeOrNull(payment.installmentIntervalDays, 0)) {
@@ -499,14 +504,15 @@ export async function savePayment(
   const { rows } = await conn.query(
     `UPDATE orders
         SET down_payment = $2, down_payment_method = $3, down_payment_date = $4, balance_method = $5,
-            -- A form "na entrega" is one installment on the day the order is ready: count and days typed are not kept.
-            balance_on_delivery = EXISTS (SELECT 1 FROM payment_methods m WHERE m.label = $5 AND m.on_delivery),
-            installment_count = CASE WHEN EXISTS (SELECT 1 FROM payment_methods m WHERE m.label = $5 AND m.on_delivery) THEN 1 ELSE $6::integer END,
-            first_installment_days = CASE WHEN EXISTS (SELECT 1 FROM payment_methods m WHERE m.label = $5 AND m.on_delivery) THEN NULL ELSE $7::integer END,
-            installment_interval_days = CASE WHEN EXISTS (SELECT 1 FROM payment_methods m WHERE m.label = $5 AND m.on_delivery) THEN NULL ELSE $8::integer END,
+            -- New forms choose the due condition explicitly; older callers retain their original meaning.
+            balance_on_delivery = COALESCE($12::boolean, EXISTS (SELECT 1 FROM payment_methods m WHERE m.label = $5 AND m.on_delivery)),
+            installment_count = CASE WHEN COALESCE($12::boolean, EXISTS (SELECT 1 FROM payment_methods m WHERE m.label = $5 AND m.on_delivery)) THEN 1 ELSE $6::integer END,
+            first_installment_days = CASE WHEN COALESCE($12::boolean, EXISTS (SELECT 1 FROM payment_methods m WHERE m.label = $5 AND m.on_delivery)) THEN NULL ELSE $7::integer END,
+            installment_interval_days = CASE WHEN COALESCE($12::boolean, EXISTS (SELECT 1 FROM payment_methods m WHERE m.label = $5 AND m.on_delivery)) THEN NULL ELSE $8::integer END,
             payment_notes = $9,
             updated_at = now(), updated_by = $10
       WHERE number = $1 AND status = 'em_negociacao' AND ($11::text IS NULL OR seller_email = $11)
+        AND ($13::text IS NULL OR updated_at::text = $13)
       RETURNING id`,
     [
       number,
@@ -520,11 +526,18 @@ export async function savePayment(
       blankToNull(payment.paymentNotes),
       who,
       scope.sellerEmail,
+      payment.balanceOnDelivery ?? null,
+      revision ?? null,
     ],
   );
-  if (rows.length === 0) throw new OrderError(NOT_EDITABLE);
-  // Saving the form recalculates the installments: what was agreed one by one before is no longer what the form says.
-  await conn.query("DELETE FROM order_installments WHERE order_id = $1", [rows[0].id]);
+  if (rows.length === 0) throw new OrderError("O pedido mudou ou já foi fechado. Recarregue antes de salvar o pagamento.");
+  // Step navigation must not erase individually agreed installments when their plan did not change.
+  const planChanged = payment.balanceOnDelivery === undefined || payment.downPayment !== order.downPayment
+    || payment.downPaymentMethod !== order.downPaymentMethod || payment.downPaymentDate !== order.downPaymentDate
+    || payment.balanceMethod !== order.balanceMethod || payment.balanceOnDelivery !== order.balanceOnDelivery
+    || payment.installmentCount !== order.installmentCount || payment.firstInstallmentDays !== order.firstInstallmentDays
+    || payment.installmentIntervalDays !== order.installmentIntervalDays;
+  if (planChanged) await conn.query("DELETE FROM order_installments WHERE order_id = $1", [rows[0].id]);
 }
 
 /**
@@ -625,7 +638,8 @@ export async function closeOrder(
   if (!table) throw new Error(`Tabela v${order.priceTableVersion} não encontrada.`);
   const sale = saleOf(order, table);
 
-  const missing = closingProblems(order, sale);
+  const proposal = await loadClosingProposal(order.id, conn);
+  const missing = [...closingProblems(order, sale), ...proposal.missing];
   if (missing.length > 0) return { status: order.status, reasons: [], missing };
   const { policy } = await loadOrderStanding(order, conn);
   if (!policy) throw new Error("Pedido sem estado de entrega chegou à política.");
@@ -638,9 +652,13 @@ export async function closeOrder(
   const { rows } = await conn.query(
     `WITH closed AS (
        UPDATE orders
-          SET status = $2, closed_at = CASE WHEN $2 = 'fechado' THEN now() END, updated_at = now(), updated_by = $3
+          SET status = $2, closed_at = CASE WHEN $2 = 'fechado' THEN now() END, updated_at = now(), updated_by = $3,
+              proposal_details = CASE WHEN $2 = 'fechado' THEN ($17::jsonb || (SELECT proposal_details FROM company_settings) || proposal_details) ELSE proposal_details END,
+              proposal_details_revision = proposal_details_revision + CASE WHEN $2 = 'fechado' THEN 1 ELSE 0 END
         WHERE number = $1 AND status = 'em_negociacao' AND updated_at::text = $4
           AND ($5::text IS NULL OR seller_email = $5)
+          AND proposal_details_revision = $15::bigint
+          AND EXISTS (SELECT 1 FROM company_settings WHERE proposal_details_revision = $16::bigint)
         RETURNING id, status
      ), recorded AS (
        INSERT INTO order_closings (order_id, closed_by, invoice_total)
@@ -682,6 +700,9 @@ export async function closeOrder(
       plan.amounts,
       plan.methods,
       selfApproved,
+      proposal.orderRevision,
+      proposal.companyRevision,
+      JSON.stringify(EMPTY_PROPOSAL_DETAILS),
     ],
   );
   if (rows.length === 0) throw new OrderError(CHANGED);
@@ -828,7 +849,7 @@ export type OrderSummary = {
 };
 
 /** Every order the scope reaches, newest change first, each with the table price of its own version. */
-export async function listOrders(scope: OrderScope, conn: Queryable): Promise<OrderSummary[]> {
+export async function listOrders(scope: OrderScope, conn: Queryable, pagination?: { limit: number; offset: number }): Promise<OrderSummary[]> {
   const { rows } = await conn.query(
     `SELECT o.number, o.status, o.seller_email, o.seller_name, c.name AS customer_name, c.trade_name,
             c.document AS customer_document, o.delivery_uf, o.taxpayer, o.discount, v.ipi, o.updated_at, o.closed_at,
@@ -840,8 +861,8 @@ export async function listOrders(scope: OrderScope, conn: Queryable): Promise<Or
        JOIN price_table_versions v ON v.version = o.price_table_version
        LEFT JOIN customers c ON c.id = o.customer_id
       WHERE ($1::text IS NULL OR o.seller_email = $1)
-      ORDER BY o.updated_at DESC, o.id DESC`,
-    [scope.sellerEmail],
+      ORDER BY o.updated_at DESC, o.id DESC LIMIT $2::integer OFFSET $3::integer`,
+    [scope.sellerEmail, pagination ? Math.max(1, Math.min(100, Math.trunc(pagination.limit))) : null, pagination ? Math.max(0, Math.trunc(pagination.offset)) : 0],
   );
   return rows.map((row) => ({
     number: String(row.number),
@@ -865,6 +886,6 @@ export async function listOrders(scope: OrderScope, conn: Queryable): Promise<Or
 
 /** The payment methods the company offers, in the order of the lists. */
 export async function listPaymentMethods(conn: Queryable): Promise<string[]> {
-  const { rows } = await conn.query("SELECT label FROM payment_methods WHERE active ORDER BY position, label");
+  const { rows } = await conn.query("SELECT label FROM payment_methods WHERE active AND NOT on_delivery ORDER BY position, label");
   return rows.map((row) => String(row.label));
 }

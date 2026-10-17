@@ -103,7 +103,7 @@ test("2 itens: PDF de uma página A4 com o que o cliente lê", async () => {
   assert.doesNotMatch(text, /custo|lucro|comiss|DIFAL|faixa/i);
 });
 
-test("sem cliente e sem desconto: 'Cliente: a informar', sem a coluna nem a linha do desconto", async () => {
+test("sem cliente e sem desconto: campos ausentes não aparecem no PDF", async () => {
   const bytes = await renderQuotePdf(
     {
       ...DOCUMENT,
@@ -118,8 +118,21 @@ test("sem cliente e sem desconto: 'Cliente: a informar', sem a coluna nem a linh
     NOTHING,
   );
   const text = pdfText(bytes);
-  assert.ok(text.includes("Cliente: a informar"));
+  assert.ok(!text.includes("Cliente: a informar"));
   assert.doesNotMatch(text, /desconto|Entrega:|Prazo de fabricação|Observações/i);
+});
+
+test("cabeçalho identifica a empresa da sessão, mesmo com logo; vendedor fica na assinatura", async () => {
+  for (const company of ["Ludus Equipamentos", "Outra Empresa de Equipamentos Ltda"]) {
+    const bytes = await renderQuotePdf({ ...DOCUMENT, company }, { ...NOTHING, logo: await logo() });
+    const lines = pdfText(bytes).split("\n");
+    const start = lines.indexOf("EMPRESA VENDEDORA");
+    const end = lines.indexOf("CLIENTE", start + 1);
+    assert.ok(start >= 0 && end > start);
+    assert.equal(lines.slice(start + 1, end).join(" "), company);
+    assert.equal(lines.filter((line) => line === DOCUMENT.seller.name).length, 1);
+    assert.ok(lines.indexOf(DOCUMENT.seller.name) > lines.indexOf("EQUIPAMENTO"));
+  }
 });
 
 test("60 itens: várias páginas, numeradas de 1 a N, com o cabeçalho da tabela em cada uma", async () => {

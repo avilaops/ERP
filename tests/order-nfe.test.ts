@@ -60,6 +60,17 @@ test("pedido fechado vira nota: preço com o desconto do pedido, ICMS de saída 
   assert.equal(orderNfe({ ...SOURCE, freightMode: "9" }).input.freightMode, "9");
 });
 
+test("meios de pagamento: entrada e parcelas usam seus códigos; prazo na entrega sem meio bloqueia a nota", () => {
+  const receipts = [{ method: "PIX", amount: 8400 }, { method: "Transferência", amount: 2765.43 }, { method: "Link de pagamento - cartão de crédito", amount: 2765.42 }];
+  const paymentCodes = new Map([["PIX", "17"], ["Transferência", "18"], ["Link de pagamento - cartão de crédito", "03"]]);
+  const mapped = orderNfe({ ...SOURCE, receipts, paymentCodes });
+  assert.deepEqual(mapped.problems, []);
+  assert.deepEqual(mapped.input.payments.map((payment) => payment.code), ["17", "18", "03"]);
+  const pending = orderNfe({ ...SOURCE, receipts: [{ method: "Na entrega", amount: 13930.85 }], paymentCodes: new Map([["Na entrega", null]]) });
+  assert.ok(pending.problems.some((problem) => problem.includes('via "Na entrega"') && problem.includes("meio efetivo")));
+  assert.throws(() => buildNfeXml(pending.input));
+});
+
 test("o que falta nos cadastros aparece como pendência, com o lugar onde se corrige; nada é inventado", () => {
   const { problems } = orderNfe({
     ...SOURCE,

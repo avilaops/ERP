@@ -40,7 +40,7 @@ export default async function NecessidadesPage({ searchParams }: { searchParams:
             {slice.rows.map((need) => (
               <li key={need.materialId} className={`${CARD} flex items-center gap-3 px-3 py-2`}>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate font-semibold leading-snug">{need.name}</span>
+                  <span className="block break-words font-semibold leading-snug">{need.name}</span>
                   <span className="block text-sm text-slate-600">
                     precisa de {show(need.needed)} {MATERIAL_UNITS[need.unit]} em {need.orders} {need.orders === 1 ? "ordem" : "ordens"} · tem {show(need.stock)}
                   </span>

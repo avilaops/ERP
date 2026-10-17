@@ -22,6 +22,10 @@
   --tabbar: calc(3.5rem + env(safe-area-inset-bottom));
   /* The height of anything a finger has to hit. */
   --control: 2.75rem;
+  --radius-control: 0.5rem;
+  --radius-surface: 0.75rem;
+  --action-ink: #ffffff;
+  --field-border: #7a8798;
 }
 @media (min-width: 48rem) {
   :root {
@@ -38,6 +42,8 @@
  * the choice of the person (data-theme) and, without a choice, the device.
  */
 html[data-theme="dark"] {
+  --action-ink: #101526;
+  --field-border: #7b8986;
   color-scheme: dark;
   --page-bg: #0f1413;
   --page-ink: #e8ecea;
@@ -78,6 +84,8 @@ html[data-theme="dark"] {
 }
 @media (prefers-color-scheme: dark) {
   html:not([data-theme]) {
+    --action-ink: #101526;
+    --field-border: #7b8986;
     color-scheme: dark;
     --page-bg: #0f1413;
     --page-ink: #e8ecea;
@@ -122,6 +130,7 @@ body {
   background: var(--page-bg);
   color: var(--page-ink);
   font-variant-numeric: tabular-nums;
+  line-height: 1.5;
 }
 
 /*
@@ -158,10 +167,16 @@ input[type="date"]::-webkit-date-and-time-value {
   [data-order-part="cliente"] [data-part]:not([data-part~="cliente"]),
   [data-order-part="entrega"] [data-part]:not([data-part~="entrega"]),
   [data-order-part="pagamento"] [data-part]:not([data-part~="pagamento"]),
-  [data-order-part="documentos"] [data-part]:not([data-part~="documentos"]),
-  [data-order-part="contrato"] [data-part]:not([data-part~="contrato"]),
-  [data-order-part="nota"] [data-part]:not([data-part~="nota"]),
-  [data-order-part="cobranca"] [data-part]:not([data-part~="cobranca"]) {
+  [data-order-part="fechar"] [data-part]:not([data-part~="fechar"]),
+  [data-order-part="documentos"] [data-part]:not([data-part~="documentos"]) {
+    display: none;
+  }
+  /* Closing is its own decision: hide the editing tools and their empty wrappers. */
+  main:has([data-order-part="fechar"]) [data-order-context],
+  [data-order-part="fechar"] > fieldset,
+  [data-order-part="fechar"] > [data-order-total],
+  [data-order-part="documentos"] > fieldset,
+  [data-order-part="documentos"] > [data-order-total] {
     display: none;
   }
 }
@@ -169,6 +184,84 @@ input[type="date"]::-webkit-date-and-time-value {
 /* A section reached by its link stops below the bars fixed at the top of a phone. */
 h2[id] {
   scroll-margin-top: calc(var(--topbar) + 4rem);
+}
+
+/* Common interaction and layout contracts, shared by every module. */
+main :is(button, summary, select, textarea, input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="range"])) {
+  min-height: var(--control);
+}
+main button {
+  min-width: var(--control);
+}
+main label:has(> input:is([type="checkbox"], [type="radio"])) {
+  display: inline-flex;
+  min-height: var(--control);
+  align-items: center;
+  gap: 0.5rem;
+}
+.bg-brand.text-white {
+  color: var(--action-ink);
+}
+main :is(input, select, textarea, button, a).border-slate-300,
+main .border-slate-300:has(> input) {
+  border-color: var(--field-border);
+}
+.view-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 0.75rem;
+  border-bottom: 1px solid var(--color-slate-200);
+}
+.view-tabs > a {
+  display: inline-flex;
+  min-height: var(--control);
+  min-width: var(--control);
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-slate-600);
+  font-size: 0.875rem;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.view-tabs > a[aria-current="page"] {
+  border-bottom-color: var(--color-brand);
+  color: var(--color-brand);
+}
+.disclosure-heading {
+  display: flex;
+  min-height: var(--control);
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+details[open] > summary > .disclosure-marker {
+  transform: rotate(45deg);
+}
+main :is(input, select, textarea) {
+  scroll-margin-block: calc(var(--topbar) + 1rem) calc(var(--tabbar) + 6rem);
+}
+main :is(input, select, textarea)[class] {
+  font-size: 1rem;
+}
+main :is(h1, h2, label) {
+  overflow-wrap: anywhere;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0s !important;
+    animation-duration: 0s !important;
+    animation-iteration-count: 1 !important;
+  }
 }
 
 @media (min-width: 48rem) {

@@ -4,7 +4,7 @@ import { test } from "node:test";
 import type { Customer } from "@/lib/db/customers";
 import type { Order } from "@/lib/db/orders";
 import type { PublishedTable } from "@/lib/db/price-table";
-import { showMoney } from "@/lib/format";
+import { quoteMoney as showMoney } from "@/lib/quote/document";
 import { dueDates, paymentOf, saleOf } from "@/lib/order-quote";
 import { quoteSale } from "@/lib/pricing/order";
 import { measuresText, QuoteError, quoteDocument } from "@/lib/quote/document";
@@ -153,7 +153,7 @@ test("pedido fechado: o documento se chama Pedido e não tem validade; em negoci
 test("sem desconto: some a linha do desconto e a coluna dos itens", () => {
   const document = build({ ...ORDER, discount: 0 });
   assert.equal(document.hasDiscount, false);
-  assert.deepEqual(document.totals.map((row) => row.label), ["Total de tabela", "Valor sem IPI", "IPI (13%)", "Total da nota"]);
+  assert.deepEqual(document.totals.map((row) => row.label), ["Valor sem IPI", "IPI (13%)", "Total da nota"]);
   assert.deepEqual(document.items.map((item) => item.unitDiscount), [null, null]);
 });
 
@@ -253,7 +253,7 @@ test("condições de pagamento e assinatura: entrada com percentual, saldo em pa
   const parcelled = quoteDocument({ ...input, order: paying, sale, place: " Votuporanga/SP ", manager: "DANILO RODRIGUES", payment: { plan: paymentOf(paying, sale, POLICY, TODAY), onDelivery: false } });
   assert.equal(parcelled.signedAt, "Votuporanga/SP, 6 de outubro de 2026");
   assert.equal(parcelled.payment.length, 4);
-  assert.match(parcelled.payment[0], /^Entrada de R\$ 5\.000(,00)? \(\d{1,2},\d%\) via PIX em 06\/10\/2026$/);
+  assert.match(parcelled.payment[0], /^Entrada de R\$ 5\.000,00 \(\d{1,2},\d%\) via PIX em 06\/10\/2026$/);
   assert.match(parcelled.payment[1], /^Saldo de R\$ [\d.]+,\d{2} em 2 parcelas via Boleto:$/);
   assert.match(parcelled.payment[2], /^1\/2: R\$ [\d.]+,\d{2} em 05\/11\/2026$/);
 

@@ -7,6 +7,7 @@ const ROOT = fileURLToPath(new URL("../", import.meta.url));
 
 function files(dir: string, pattern: RegExp): string[] {
   return readdirSync(ROOT + dir, { recursive: true, encoding: "utf8" })
+    .map((file) => file.replaceAll("\\", "/"))
     .filter((file) => pattern.test(file))
     .map((file) => `${dir}/${file}`);
 }

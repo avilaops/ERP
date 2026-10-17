@@ -71,7 +71,7 @@ export function MobileMenu({ brand, tabs, more, children }: { brand: ReactNode; 
             className={`${TAB} ${current === tab.href ? "text-brand" : "text-slate-600"}`}
           >
             {tab.icon}
-            <span className="max-w-full truncate">{tab.label}</span>
+            <span className="max-w-full break-words text-center">{tab.label}</span>
           </Link>
         ))}
         <button

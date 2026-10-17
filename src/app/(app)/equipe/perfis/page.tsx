@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CARD, DANGER, INPUT, PRIMARY, SECONDARY } from "@/components/ui";
+import { CARD, DANGER, INPUT, PRIMARY, SECONDARY, PageHeader, SectionDisclosure } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { COST_SCREENS, menuFor, menuItem, powersOf } from "@/lib/auth/permissions";
 import { isRole, ROLE_LABELS, ROLES } from "@/lib/auth/roles";
@@ -24,6 +24,7 @@ function Choices({ role, items, denied, prefix }: { role: Role; items: readonly 
     <>
       <fieldset className="sm:col-span-2">
         <legend className="text-xs font-medium text-slate-600">Telas que o perfil abre (as de {ROLE_LABELS[role]})</legend>
+        <SectionDisclosure title={`Revisar telas permitidas (${items === null ? menuFor(role).length : items.length})`} className="mt-2">
         <div className="mt-1 grid grid-cols-2 gap-x-4 rounded border border-slate-200 px-3 py-1.5 md:grid-cols-3">
           {menuFor(role).map((item) => (
             <label key={item.key} className={BOX}>
@@ -35,10 +36,12 @@ function Choices({ role, items, denied, prefix }: { role: Role; items: readonly 
             </label>
           ))}
         </div>
+        </SectionDisclosure>
       </fieldset>
       {powers.length > 0 && (
         <fieldset className="sm:col-span-2">
           <legend className="text-xs font-medium text-slate-600">O que o perfil pode, além de abrir telas</legend>
+          <SectionDisclosure title={`Revisar poderes (${powers.filter((power) => !denied.includes(power.key)).length} permitidos)`} className="mt-2">
           <div className="mt-1 grid gap-x-4 rounded border border-slate-200 px-3 py-1.5 md:grid-cols-2">
             {powers.map((power) => (
               <label key={power.key} className={BOX}>
@@ -48,6 +51,7 @@ function Choices({ role, items, denied, prefix }: { role: Role; items: readonly 
               </label>
             ))}
           </div>
+          </SectionDisclosure>
         </fieldset>
       )}
     </>
@@ -69,17 +73,13 @@ export default async function PerfisPage({ searchParams }: { searchParams: Promi
           ← {menuItem("equipe").label}
         </Link>
       </p>
-      <h1 className="mt-2 text-2xl font-semibold">Perfis da empresa</h1>
-      <p className="mt-1 max-w-3xl text-slate-600">
-        Além dos quatro tipos do sistema, crie os perfis da sua empresa (por exemplo, &quot;Fiscal&quot; ou &quot;Vendedor sem comissões&quot;). Cada perfil parte de um tipo e
-        escolhe quais telas e poderes dele ficam: um perfil nunca alcança mais do que o tipo de origem. Mudou o perfil, muda para todas as pessoas que o têm.
-      </p>
+      <PageHeader title="Perfis da empresa" hint="Defina as telas e os poderes de cada perfil. As mudanças valem para todas as pessoas que o usam." />
 
       <section className={`${CARD} mt-6 p-5`} aria-labelledby="novo">
         <h2 id="novo" className={TITLE}>
           Criar perfil
         </h2>
-        <p className="mt-2 text-xs font-medium text-slate-600">Parte de qual tipo de acesso</p>
+        <p className="mt-2 text-sm text-slate-600">Escolha a origem e revise as permissões antes de criar.</p>
         <nav aria-label="Tipo de origem" className="mt-1 flex flex-wrap gap-2">
           {ROLES.map((role) => (
             <Link

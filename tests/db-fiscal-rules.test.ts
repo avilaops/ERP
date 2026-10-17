@@ -78,6 +78,81 @@ test("linha com regras fiscais e sem equipamento sai inteira; forma de pagamento
   assert.equal((await listPaymentCodes(db.pool)).find((method) => method.id === transfer.id)?.code, "99");
   await assert.rejects(() => savePaymentCode(financing.id, "77", WHO, db.pool), FiscalError);
   await assert.rejects(() => savePaymentCode(999999, "17", WHO, db.pool), /não encontrada/);
+  const delivery = codes.get("Na entrega")!;
+  await assert.rejects(() => savePaymentCode(delivery.id, "99", WHO, db.pool), /prazo na entrega/);
+  await db.pool.query("UPDATE payment_methods SET nfe_code = '99' WHERE id = $1", [delivery.id]);
+  assert.equal((await listPaymentCodes(db.pool)).find((method) => method.id === delivery.id)?.code, null);
+});
+
+test("pagamentos em lote: uma falha reverte todas as alterações e o retorno conta apenas gravações efetivas", { skip }, async () => {
+  const deposit = await createPaymentMethod("Depósito bancário", WHO, db.pool);
+  const bankSlip = await createPaymentMethod("Boleto bancário", WHO, db.pool);
+  await savePaymentCode(deposit.id, null, WHO, db.pool);
+  await savePaymentCode(bankSlip.id, null, WHO, db.pool);
+  await db.pool.query("ALTER TABLE payment_methods ADD CONSTRAINT refuse_test_mapping CHECK (label <> 'Depósito bancário' OR nfe_code IS NULL)");
+  await assert.rejects(() => completeKnownPaymentCodes(WHO, db.pool), /refuse_test_mapping/);
+  let methods = await listPaymentCodes(db.pool);
+  assert.equal(methods.find((method) => method.id === deposit.id)?.code, null);
+  assert.equal(methods.find((method) => method.id === bankSlip.id)?.code, null);
+  await db.pool.query("ALTER TABLE payment_methods DROP CONSTRAINT refuse_test_mapping");
+  assert.equal(await completeKnownPaymentCodes(WHO, db.pool), 2);
+  methods = await listPaymentCodes(db.pool);
+  assert.equal(methods.find((method) => method.id === deposit.id)?.code, "16");
+  assert.equal(methods.find((method) => method.id === bankSlip.id)?.code, "15");
+  assert.equal(await completeKnownPaymentCodes(WHO, db.pool), 0);
+});
+
+test("pagamentos em lote: exclusão, renomeação e escolha manual durante a leitura são preservadas", { skip }, async () => {
+  const methods = await listPaymentCodes(db.pool);
+  const pix = methods.find((method) => method.label === "PIX")!;
+  const boleto = methods.find((method) => method.label === "Boleto")!;
+  const cheque = methods.find((method) => method.label === "Cheque")!;
+  const cash = methods.find((method) => method.label === "Dinheiro")!;
+  for (const method of [pix, boleto, cheque, cash]) await savePaymentCode(method.id, null, WHO, db.pool);
+  let changed = false;
+  const racing: Queryable = {
+    async query(sql, values) {
+      const result = await db.pool.query(sql, values);
+      if (!changed && sql.startsWith("SELECT id, label, active, nfe_code")) {
+        changed = true;
+        await db.pool.query("DELETE FROM payment_methods WHERE id = $1", [boleto.id]);
+        await db.pool.query("UPDATE payment_methods SET label = 'Pagamento combinado' WHERE id = $1", [cheque.id]);
+        await savePaymentCode(pix.id, "99", WHO, db.pool);
+      }
+      return result;
+    },
+  };
+  assert.equal(await completeKnownPaymentCodes(WHO, racing), 1);
+  const after = await listPaymentCodes(db.pool);
+  assert.equal(after.find((method) => method.id === pix.id)?.code, "99");
+  assert.equal(after.find((method) => method.id === cheque.id)?.code, null);
+  assert.equal(after.some((method) => method.id === boleto.id), false);
+  assert.equal(after.find((method) => method.id === cash.id)?.code, "01");
+});
+
+test("QR da empresa: adesão explícita, independente do rótulo do provedor", {skip}, async()=>{
+  const provider=await createPaymentMethod("Mercado Pago - PIX",WHO,db.pool);
+  await savePaymentCode(provider.id,"17",WHO,db.pool);
+  assert.equal((await listPaymentCodes(db.pool)).find(m=>m.id===provider.id)?.companyPix,false);
+  await savePaymentCode(provider.id,"17",WHO,db.pool,true);
+  assert.equal((await listPaymentCodes(db.pool)).find(m=>m.id===provider.id)?.companyPix,true);
+  await assert.rejects(()=>savePaymentCode(provider.id,"03",WHO,db.pool,true),/exige meio PIX/);
+  await updatePaymentMethod(provider.id,{label:"Cartão de teste",position:20,active:true},WHO,db.pool);
+  assert.equal((await listPaymentCodes(db.pool)).find(m=>m.id===provider.id)?.companyPix,false);
+});
+
+test("operação de venda: cria somente os CFOPs; completar vazios preserva impostos e escolhas atuais do contador", { skip }, async () => {
+  const line = await createLine("Operação automática", 1, WHO, db.pool);
+  await completeSaleOperation(line.id, saleOperationCodes("revenda"), WHO, db.pool);
+  assert.deepEqual(await loadFiscalRules(line.id, db.pool), { ...EMPTY_FISCAL_RULES, ...saleOperationCodes("revenda") });
+  await saveFiscalRules(line.id, { ...NATIONAL, operationNature: null, cfopInternal: null }, WHO, db.pool);
+  await db.pool.query("UPDATE fiscal_rules SET icms_code = '40', pis_rate = 0.0165, final_consumer = false WHERE line_id = $1", [line.id]);
+  const accountant = await loadFiscalRules(line.id, db.pool);
+  await completeSaleOperation(line.id, saleOperationCodes("producao"), WHO, db.pool);
+  const expected = { ...accountant, operationNature: saleOperationCodes("producao").operationNature, cfopInternal: "5101" };
+  assert.deepEqual(await loadFiscalRules(line.id, db.pool), expected);
+  await completeSaleOperation(line.id, saleOperationCodes("revenda"), WHO, db.pool);
+  assert.deepEqual(await loadFiscalRules(line.id, db.pool), expected);
 });
 
 test("pagamentos em lote: uma falha reverte todas as alterações e o retorno conta apenas gravações efetivas", { skip }, async () => {

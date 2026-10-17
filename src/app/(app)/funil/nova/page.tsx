@@ -48,8 +48,10 @@ export default async function NovaOportunidadePage({ searchParams }: { searchPar
 
   return (
     <div className="mx-auto max-w-2xl">
-      <PageHeader title="Nova oportunidade" hint="Uma venda possível, de cliente ou de quem ainda não é. Ela começa na primeira etapa do funil, no seu nome." />
-      <form method="get" role="search" className="mt-3 flex items-end gap-2">
+      <PageHeader title="Nova oportunidade" hint="Registre uma venda antes do pedido." />
+      <details className={`${CARD} mt-3`} open={typed !== ""}>
+      <summary className="disclosure-heading">Preencher pelo CNPJ<span className="disclosure-marker" aria-hidden="true">+</span></summary>
+      <form method="get" role="search" className="flex flex-wrap items-end gap-2 border-t border-slate-200 p-3">
         <label className="min-w-0 flex-1 text-sm font-medium text-slate-700">
           CNPJ da empresa (opcional)
           <input type="text" name="cnpj" inputMode="numeric" defaultValue={typed} placeholder="00.000.000/0000-00" autoComplete="off" className={INPUT} />
@@ -58,6 +60,7 @@ export default async function NovaOportunidadePage({ searchParams }: { searchPar
           Buscar na Receita
         </button>
       </form>
+      </details>
       {refused && (
         <p role="alert" className="mt-2 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
           {refused}

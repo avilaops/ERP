@@ -1,33 +1,32 @@
 import type { Session } from "@/lib/auth/access";
 import { allows, seesAllOrders } from "@/lib/auth/permissions";
-import type { MenuItemKey } from "@/lib/auth/permissions";
 import { customerTimeline } from "@/lib/db/customer-timeline";
-import { getCustomer } from "@/lib/db/customers";
-import { addActivity, FunnelError, getOpportunity, listActivities, listOpportunities, listPendingActivities, opportunityParty } from "@/lib/db/funnel";
+import { CustomerError, getCustomer } from "@/lib/db/customers";
+import { OrderError } from "@/lib/db/orders";
+import { ProposalSettingsError } from "@/lib/quote/settings";
+import { FunnelError, getOpportunity, listActivities, listOpportunities, listPendingActivities, opportunityParty } from "@/lib/db/funnel";
 import { listInbox } from "@/lib/db/inbox";
 import { listMaterials, materialNeeds, MATERIAL_UNITS } from "@/lib/db/materials";
 import { customersForAssistant, openPayablesForAssistant, openReceivablesForAssistant, ordersForAssistant, pendingApprovalsForAssistant } from "@/lib/db/mcp-read";
 import { listOpportunityMessages } from "@/lib/db/messages";
 import type { Queryable } from "@/lib/db/pool";
 import { listProductionOrders, listProductionStages } from "@/lib/db/production";
-
-/** A refusal the assistant can explain to the person. The message goes back as it is. */
-export class ToolError extends Error {}
+import { BUSINESS_TOOLS } from "@/lib/mcp/business-tools";
+import { FINANCE_TOOLS } from "@/lib/mcp/finance-tools";
+import { QUERY_TOOLS } from "@/lib/mcp/query-tools";
+import { CUSTOMER_TOOLS } from "@/lib/mcp/customer-tools";
+import { FUNNEL_TOOLS } from "@/lib/mcp/funnel-tools";
+import { ORDER_CREATE_TOOL } from "@/lib/mcp/order-create-tool";
+import { ORDER_DECISION_TOOLS } from "@/lib/mcp/order-decision-tools";
+import { PayableError } from "@/lib/db/payables";
+import { ConfirmationError } from "@/lib/mcp/confirmation";
+import { ReceivableError } from "@/lib/db/receivables";
+import { ToolError } from "@/lib/mcp/definition";
+import type { Tool, Schema } from "@/lib/mcp/definition";
+export { ToolError } from "@/lib/mcp/definition";
+export type { Tool, Schema } from "@/lib/mcp/definition";
 
 type Args = Record<string, unknown>;
-type Schema = { type: "object"; properties: Record<string, { type: string; description: string; enum?: string[] }>; required?: string[]; additionalProperties: false };
-
-export type Tool = {
-  name: string;
-  title: string;
-  description: string;
-  /** The screen of the ERP this tool is the same thing as: who does not have the screen does not have the tool. */
-  item: MenuItemKey;
-  /** Changes something in the ERP. The others only read. */
-  writes?: boolean;
-  inputSchema: Schema;
-  run(session: Session, conn: Queryable, args: Args): Promise<unknown>;
-};
 
 const text = (args: Args, key: string, max = 300): string => (typeof args[key] === "string" ? (args[key] as string).trim().slice(0, max) : "");
 const id = (args: Args, key = "id"): number => {
@@ -42,6 +41,13 @@ const scopeOf = (session: Session) => ({ ownerEmail: seesAllOrders(session) ? nu
 const object = (properties: Schema["properties"], required: string[] = []): Schema => ({ type: "object", properties, required, additionalProperties: false });
 
 export const TOOLS: Tool[] = [
+  ...BUSINESS_TOOLS,
+  ...FINANCE_TOOLS,
+  ...QUERY_TOOLS,
+  ...CUSTOMER_TOOLS,
+  ...FUNNEL_TOOLS,
+  ORDER_CREATE_TOOL,
+  ...ORDER_DECISION_TOOLS,
   {
     name: "funil_oportunidades", title: "Oportunidades do funil", item: "funil",
     description: "Lista as oportunidades de venda (vendas possíveis, antes do pedido): as da própria pessoa, ou as da equipe para gerência e diretoria. Até 50.",
@@ -66,7 +72,7 @@ export const TOOLS: Tool[] = [
       return {
         id: item.id, titulo: item.title, empresa: opportunityParty(item), contato: item.contactName, telefone: item.phone, email: item.email, origem: item.source, etapa: item.stageName, valor_estimado: item.estimatedValue,
         responsavel: item.ownerName, pedido: item.orderNumber, motivo_da_perda: item.lostReason, observacoes: item.notes, criada_em: day(item.createdAt),
-        atividades: activities.slice(0, 25).map((activity) => ({ tipo: activity.kind, texto: activity.title, para: activity.dueOn, feita_em: day(activity.doneAt) })),
+        atividades: activities.slice(0, 25).map((activity) => ({ tipo: activity.kind, texto: activity.title, para: activity.dueOn, feita_em: day(activity.doneAt), conclusao: activity.completionNote ?? null })),
         emails_enviados: sent.filter((message) => message.status === "enviado").slice(0, 5).map((message) => ({ em: day(message.sentAt), assunto: message.subject, texto: message.body.slice(0, 1500) })),
         emails_recebidos: received.slice(0, 5).map((message) => ({ em: day(message.receivedAt), de: message.sender, assunto: message.subject, texto: message.body.slice(0, 1500) })),
       };
@@ -78,24 +84,6 @@ export const TOOLS: Tool[] = [
     inputSchema: object({}),
     async run(session, conn) {
       return (await listPendingActivities(scopeOf(session), conn)).slice(0, 80).map((task) => ({ oportunidade_id: task.opportunityId, pedido: task.orderNumber, sobre: task.subject, empresa: task.party, tipo: task.kind, texto: task.title, para: task.dueOn, responsavel: task.ownerName }));
-    },
-  },
-  {
-    name: "funil_criar_tarefa", title: "Criar tarefa", item: "funil", writes: true,
-    description: "Cria uma tarefa, ligação ou reunião a fazer numa oportunidade ao alcance da pessoa.",
-    inputSchema: object({ id: { type: "number", description: "O id da oportunidade" }, texto: { type: "string", description: "O que fazer" }, tipo: { type: "string", description: "tarefa (padrão), ligacao ou reuniao", enum: ["tarefa", "ligacao", "reuniao"] }, para: { type: "string", description: "Data, como 2026-10-15 (opcional)" } }, ["id", "texto"]),
-    async run(session, conn, args) {
-      await addActivity(id(args), { kind: text(args, "tipo") || "tarefa", title: text(args, "texto"), dueOn: text(args, "para", 10) || null }, session.email, scopeOf(session), conn);
-      return { criada: true };
-    },
-  },
-  {
-    name: "funil_anotar", title: "Anotar na oportunidade", item: "funil", writes: true,
-    description: "Guarda uma anotação numa oportunidade ao alcance da pessoa.",
-    inputSchema: object({ id: { type: "number", description: "O id da oportunidade" }, texto: { type: "string", description: "A anotação" } }, ["id", "texto"]),
-    async run(session, conn, args) {
-      await addActivity(id(args), { kind: "nota", title: text(args, "texto"), dueOn: null }, session.email, scopeOf(session), conn);
-      return { anotada: true };
     },
   },
   {
@@ -123,7 +111,7 @@ export const TOOLS: Tool[] = [
   },
   {
     name: "aprovacoes_pendentes", title: "Aprovações pendentes", item: "aprovacoes",
-    description: "Lista os pedidos que esperam aprovação. Aprovar e reprovar continuam sendo feitos na tela do ERP.",
+    description: "Lista os pedidos que esperam aprovação. Os perfis autorizados podem decidir com prévia e confirmação usando aprovacao_aprovar/reprovar.",
     inputSchema: object({}),
     run: async (_session, conn) => pendingApprovalsForAssistant(conn),
   },
@@ -171,7 +159,7 @@ export const TOOLS: Tool[] = [
 ];
 
 /** The tools a person has: the ones of the screens their profile reaches, nothing else. */
-export const toolsOf = (session: Session): Tool[] => TOOLS.filter((tool) => allows(session, tool.item));
+export const toolsOf = (session: Session): Tool[] => TOOLS.filter((tool) => allows(session, tool.item) && (tool.available?.(session) ?? true));
 
 /**
  * Runs one tool for a person. A tool of a screen the person does not have is
@@ -187,7 +175,7 @@ export async function callTool(session: Session, conn: Queryable, name: string, 
   try {
     return await tool.run(session, conn, given);
   } catch (error) {
-    if (error instanceof FunnelError) throw new ToolError(error.message);
+    if (error instanceof FunnelError || error instanceof ConfirmationError || error instanceof ReceivableError || error instanceof PayableError || error instanceof CustomerError || error instanceof OrderError || error instanceof ProposalSettingsError) throw new ToolError(error.message);
     throw error;
   }
 }

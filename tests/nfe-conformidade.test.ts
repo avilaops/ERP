@@ -273,6 +273,9 @@ test("consulta da nota: traz os eventos que a SEFAZ registrou (cancelamento e ca
   ]);
   assert.ok(events[1].xml.startsWith("<procEventoNFe") && events[1].xml.includes("<nProt>135260000000012</nProt>"));
   assert.deepEqual(consultEvents("<retConsSitNFe><cStat>100</cStat></retConsSitNFe>", key), []);
+  assert.deepEqual(consultEvents(answer.replaceAll("<cStat>135", "<cStat>136").replaceAll("<cStat>155", "<cStat>136"), key), []);
+  assert.deepEqual(consultEvents(answer.replaceAll("<retEvento versao=\"1.00\"><infEvento><tpAmb>1", "<retEvento versao=\"1.00\"><infEvento><tpAmb>2"), key), []);
+  assert.match(events[0].xml, /<procEventoNFe xmlns="http:\/\/www.portalfiscal.inf.br\/nfe"/);
 });
 
 test("CNPJ alfanumérico nos outros pedidos (PL_010d v1.03, NT 2026.004): evento, consulta e inutilização passam no esquema e a assinatura confere", async () => {

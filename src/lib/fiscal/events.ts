@@ -88,8 +88,8 @@ export type EventResult = { registered: true; code: string; reason: string; prot
 
 const pick = (xml: string, name: string) => new RegExp(`<(?:\\w+:)?${name}>([^<]*)</(?:\\w+:)?${name}>`).exec(xml)?.[1] ?? null;
 const unescape = (text: string) => text.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&amp;/g, "&");
-/** Registered and linked to the invoice (135), registered (136), cancellation accepted outside the deadline (155). */
-const REGISTERED = new Set(["135", "136", "155"]);
+/** Only a linked event changes the invoice. 136 is registered without linkage. */
+const REGISTERED = new Set(["135", "155"]);
 
 /** Reads the answer about the event of `accessKey`. Anything that is not an answer of SEFAZ throws. */
 export function parseEvent(response: string, accessKey: string): EventResult {
@@ -105,4 +105,19 @@ export function parseEvent(response: string, accessKey: string): EventResult {
   const reason = unescape(pick(result, "xMotivo") ?? "");
   const protocol = pick(result, "nProt");
   return REGISTERED.has(code) && protocol ? { registered: true, code, reason, protocol } : { registered: false, code, reason };
+}
+
+/** Distributable event: the signed request and the authority's actual receipt. */
+export function processedEventXml(signed: string, response: string): string {
+  const accessKey = pick(signed, "chNFe");
+  if (!accessKey || !ACCESS_KEY_PATTERN.test(accessKey)) throw new SefazError("Evento assinado sem chave válida.");
+  const result = parseEvent(response, accessKey);
+  if (!result.registered) throw new SefazError("O evento não foi vinculado à nota pela SEFAZ.");
+  if (pick(signed, "tpEvento") === "110110" && result.code !== "135") throw new SefazError("A SEFAZ não confirmou a carta de correção vinculada à nota.");
+  const receipt = /<retEvento\b[\s\S]*?<\/retEvento>/.exec(response)?.[0];
+  if (!receipt) throw new SefazError("A SEFAZ não devolveu o recibo do evento.");
+  for (const field of ["tpAmb", "chNFe", "tpEvento", "nSeqEvento"]) {
+    if (pick(receipt, field) !== pick(signed, field)) throw new SefazError("O recibo da SEFAZ não corresponde ao evento enviado. Confira a situação antes de tentar novamente.");
+  }
+  return `<?xml version="1.0" encoding="UTF-8"?><procEventoNFe xmlns="${NFE_NS}" versao="1.00">${signed.replace(/^<\?xml[^?]*\?>\s*/, "")}${receipt}</procEventoNFe>`;
 }

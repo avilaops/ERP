@@ -110,8 +110,8 @@ export function ProductRow({
                   abrir
                 </a>
               </div>
-              {row.supplier && <span className="mt-1 block truncate text-xs text-slate-500">{row.supplier}</span>}
-              <span className="mt-0.5 block truncate text-xs text-slate-500">{row.ncm}</span>
+              {row.supplier && <span className="mt-1 block break-words text-xs text-slate-500">{row.supplier}</span>}
+              <span className="mt-0.5 block break-words text-xs text-slate-500">{row.ncm}</span>
             </div>
           </div>
         </td>

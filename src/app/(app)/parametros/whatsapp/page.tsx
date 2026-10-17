@@ -66,7 +66,7 @@ export default async function WhatsappParametrosPage({ searchParams }: { searchP
         </Link>
       </p>
       <PageHeader title="WhatsApp" hint="A conta oficial da sua empresa na Meta (WhatsApp Business). Com ela, as conversas com os clientes ficam no funil." />
-      <nav aria-label="Partes do WhatsApp" className="mt-2 flex flex-wrap gap-x-1 border-b border-slate-200">
+      <nav aria-label="Partes do WhatsApp" className="view-tabs">
         {TABS.map(([key, label]) => (
           <Link
             key={key}
@@ -149,7 +149,7 @@ export default async function WhatsappParametrosPage({ searchParams }: { searchP
                   <summary className="flex min-h-[var(--control)] cursor-pointer items-center gap-3 px-3 py-2">
                     <span className="min-w-0 flex-1">
                       <span className="block font-semibold leading-snug">{template.name}</span>
-                      <span className="block truncate text-sm text-slate-600">{template.preview}</span>
+                      <span className="block break-words text-sm text-slate-600">{template.preview}</span>
                     </span>
                     <span className="text-slate-500 transition-transform group-open:rotate-90" aria-hidden="true">
                       ›

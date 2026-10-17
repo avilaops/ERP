@@ -25,7 +25,7 @@ const TABS = [["inicio", "Cadastros"], ["precos", "Regra de preço"], ["resultad
 
 /** Every register of the company, by subject. Each opens a screen of its own. */
 const GROUPS: [title: string, links: [href: string, label: string, hint: string][]][] = [
-  ["Vendas", [["/parametros/linhas", "Linhas de produto", "Grupos de equipamento, cada um com a sua regra de preço"], ["/parametros/formas-de-pagamento", "Formas de pagamento", "Pix, boleto, cartão e as taxas de cada uma"], ["/parametros/cores", "Cores dos equipamentos", "As cores de estrutura e de braço que o pedido oferece"], ["/parametros/transportadoras", "Transportadoras", "Quem entrega, para a nota fiscal"], ["/parametros/contrato", "Contrato", "O modelo, a assinatura e a segurança"]]],
+  ["Vendas", [["/parametros/proposta", "Dados da proposta", "Contato, garantia, serviços e condições comerciais"], ["/parametros/linhas", "Linhas de produto", "Grupos de equipamento, cada um com a sua regra de preço"], ["/parametros/formas-de-pagamento", "Formas de pagamento", "Pix, boleto, cartão e as taxas de cada uma"], ["/parametros/cores", "Cores dos equipamentos", "As cores de estrutura e de braço que o pedido oferece"], ["/parametros/transportadoras", "Transportadoras", "Quem entrega, para a nota fiscal"], ["/parametros/contrato", "Contrato", "O modelo, a assinatura e a segurança"]]],
   ["Funil e clientes", [["/parametros/funil", "Etapas do funil", "Por onde a venda passa antes do pedido"], ["/parametros/mensagens", "Modelos de mensagem", "Textos prontos de e-mail"], ["/parametros/cadencias", "Cadências", "Sequências de e-mails e tarefas"], ["/parametros/automacoes", "Lembretes automáticos", "Orçamento parado, parcela vencendo"]]],
   ["Comunicação", [["/parametros/email", "E-mail", "Caixa de saída, texto da nota e respostas dos clientes"], ["/parametros/whatsapp", "WhatsApp", "A conta oficial da empresa na Meta"], ["/parametros/telefonia", "Telefonia", "Ligação pelo sistema"], ["/parametros/assistente", "Assistente", "Conexão com o Claude e inteligência artificial"]]],
   ["Financeiro e fiscal", [["/parametros/fiscal", "Fiscal e certificado", "Quem emite a nota e o certificado digital"], ["/parametros/cobranca", "Cobrança por PIX", "A chave da empresa para o PIX copia e cola das parcelas"], ["/parametros/categorias-de-contas", "Categorias de contas", "Como as contas a pagar são agrupadas"], ["/parametros/despesas-fixas", "Despesas fixas", "O que a empresa paga todo mês"]]],
@@ -112,7 +112,7 @@ export default async function ParametrosPage({ searchParams }: { searchParams: P
     <>
       <h1 className="text-2xl font-semibold">{menuItem("parametros").label}</h1>
       <p className="mt-1 text-slate-600">Impostos, canal e política. Tudo que muda aqui recalcula a tabela inteira.</p>
-      <nav aria-label="Partes dos parâmetros" className="mt-2 flex flex-wrap gap-x-1 border-b border-slate-200">
+      <nav aria-label="Partes dos parâmetros" className="view-tabs">
         {TABS.map(([key, label]) => (
           <Link
             key={key}

@@ -68,11 +68,11 @@ export default async function ClientePage({
       <>
         {back}
         <h1 className="mt-2 text-2xl font-semibold">{kind === "PJ" ? "Novo cliente PJ" : "Novo cliente PF"}</h1>
-        <p className="mt-1 text-slate-600">
-          Para gravar bastam o {kind === "PJ" ? "CNPJ e a razão social" : "CPF e o nome"}; o resto pode ser completado depois.
-        </p>
+        <p className="mt-1 text-sm text-slate-600">Informe {kind === "PJ" ? "CNPJ e razão social" : "CPF e nome"} para cadastrar.</p>
         {kind === "PJ" && (
-          <form method="get" role="search" className="mt-4 flex max-w-xl items-end gap-2">
+          <details className="mt-2 max-w-xl rounded-xl border border-slate-200 bg-white" open={typed !== ""}>
+          <summary className="disclosure-heading">Preencher pelo CNPJ<span className="disclosure-marker" aria-hidden="true">+</span></summary>
+          <form method="get" role="search" className="flex flex-wrap items-end gap-2 border-t border-slate-200 p-3">
             <label className="min-w-0 flex-1 text-sm font-medium text-slate-700">
               Preencher pelo CNPJ
               <input type="text" name="cnpj" inputMode="numeric" defaultValue={typed} placeholder="00.000.000/0000-00" autoComplete="off" className="mt-1 block min-h-[var(--control)] w-full rounded-lg border border-slate-300 bg-white px-3 text-base outline-none focus:ring-2 focus:ring-brand" />
@@ -81,6 +81,7 @@ export default async function ClientePage({
               Buscar na Receita
             </button>
           </form>
+          </details>
         )}
         {refused && (
           <p role="alert" className="mt-2 max-w-xl rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
@@ -92,7 +93,7 @@ export default async function ClientePage({
             {companySummary(found)}. Confira os dados abaixo e complete o que faltar antes de gravar.
           </p>
         )}
-        <div className="mt-6 max-w-4xl">
+        <div className="mt-3 max-w-4xl">
           <CustomerForm key={found?.cnpj ?? "vazio"} kind={kind} id={null} saved={filled} required={requiredOf(kind)} cepNote={null} action={saveCustomerAction} />
         </div>
       </>
