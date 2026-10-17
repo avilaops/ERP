@@ -21,6 +21,7 @@ const MENU = [
   { key: "contas-pagar", label: "Contas a pagar", href: "/contas-pagar", roles: ["DIRETORIA", "FINANCEIRO"] },
   { key: "fornecedores", label: "Fornecedores", href: "/fornecedores", roles: ["DIRETORIA", "FINANCEIRO"] },
   { key: "comissoes", label: "Comissões", href: "/comissoes", roles: ["DIRETORIA", "VENDEDOR", "FINANCEIRO"] },
+  { key: "fiscal", label: "Fiscal", href: "/fiscal", roles: ["DIRETORIA"] },
   { key: "tabela-precos", label: "Tabela de preços", href: "/tabela-precos", roles: ["DIRETORIA", "GERENTE_COMERCIAL", "VENDEDOR"] },
   { key: "produtos", label: "Produtos e custos", href: "/produtos", roles: ["DIRETORIA"] },
   { key: "parametros", label: "Configurações", href: "/parametros", roles: ["DIRETORIA"] },

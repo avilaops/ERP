@@ -16,9 +16,9 @@ Esses ajustes de integração ainda dependem de implantação própria.
 1. Cliente e atendimento: conferir documento, endereço, contato e e-mail de quem assina.
 2. Orçamento: equipamentos, opções, quantidades, entrega, pagamento e PDF.
 3. Pedido: garantia, montagem, frete e demais termos; solicitar aprovação e fechar.
-4. Contrato e nota → Contrato: conferir o modelo e o PDF, enviar o link e acompanhar
+4. Documentos e nota fiscal → Contrato: conferir o modelo e o PDF, enviar o link e acompanhar
    a assinatura. Assinatura real pertence à pessoa autorizada.
-5. Contrato e nota → Nota fiscal → Preparar regras desta nota: conferir operação,
+5. Documentos e nota fiscal → Nota fiscal → Preparar regras desta nota: conferir operação,
    tributos, produtos e meios de pagamento com as escolhas aprovadas pelo contador.
 6. Conferir XML e DANFE sem consumir número. Emitir somente no ambiente confirmado;
    registrar chave, situação e protocolo do autorizador.

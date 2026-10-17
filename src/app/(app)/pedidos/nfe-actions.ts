@@ -22,11 +22,11 @@ const FAILED = "Não foi possível emitir agora. Confira a situação da nota ab
 const FAILED_TO_SAVE = "Não foi possível gravar agora. Tente de novo.";
 
 /**
- * "Emitir nota fiscal" of a closed order. Only who edits the fiscal parameters
- * issues: the invoice binds the company before the tax authority.
+ * "Emitir nota fiscal" of a closed order. Only who operates Fiscal issues it:
+ * the invoice binds the company before the tax authority.
  */
 export async function issueNfeAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
-  const session = await requirePermission("parametros");
+  const session = await requirePermission("fiscal");
   const conn = tenantDb(session.tenant.slug);
   const number = formData.get("number");
   if (typeof number !== "string" || !ORDER_NUMBER.test(number)) return { error: "Pedido não encontrado." };
@@ -46,7 +46,7 @@ export async function issueNfeAction(_previous: ActionState, formData: FormData)
 
 /** "Registrar carta de correção" and "Cancelar nota fiscal" of the authorised invoice of an order. Same hands as issuing. */
 export async function registerNfeEventAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
-  const session = await requirePermission("parametros");
+  const session = await requirePermission("fiscal");
   const conn = tenantDb(session.tenant.slug);
   const number = formData.get("number");
   const kind = formData.get("kind");
@@ -67,7 +67,7 @@ export async function registerNfeEventAction(_previous: ActionState, formData: F
 
 /** The transport of the invoice: the way of freight (one of the options of the layout), who carries and the volumes. */
 export async function saveTransportAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
-  const session = await requirePermission("parametros");
+  const session = await requirePermission("fiscal");
   const conn = tenantDb(session.tenant.slug);
   const text = (key: string) => {
     const value = formData.get(key);
@@ -103,7 +103,7 @@ export async function saveTransportAction(_previous: ActionState, formData: Form
  * `clear` and takes it away.
  */
 export async function saveDeliveryAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
-  const session = await requirePermission("parametros");
+  const session = await requirePermission("fiscal");
   const conn = tenantDb(session.tenant.slug);
   const text = (key: string) => {
     const value = formData.get(key);
@@ -135,7 +135,7 @@ export async function saveDeliveryAction(_previous: ActionState, formData: FormD
 
 /** "Enviar por e-mail" of an authorised or cancelled invoice, to the address typed (the customer's when blank). */
 export async function sendNfeMailAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
-  const session = await requirePermission("parametros");
+  const session = await requirePermission("fiscal");
   const conn = tenantDb(session.tenant.slug);
   const number = formData.get("number");
   const invoiceId = Number(formData.get("invoiceId"));
@@ -146,7 +146,7 @@ export async function sendNfeMailAction(_previous: ActionState, formData: FormDa
   if (!order || !owned?.rows[0]) return { error: "Nota não encontrada." };
   try {
     const result = await sendInvoiceMail(
-      { invoiceId, billIds: formData.getAll("billId").map((value) => Number(value)), to: typeof to === "string" && to.trim() !== "" ? to : null, sentBy: session.email, now: new Date(), env: process.env, key: () => vaultKey(process.env.ERP_CERT_KEY), send: sendMail },
+      { invoiceId, to: typeof to === "string" && to.trim() !== "" ? to : null, sentBy: session.email, now: new Date(), env: process.env, key: () => vaultKey(process.env.ERP_CERT_KEY), send: sendMail },
       conn,
     );
     revalidatePath(`${menuItem("pedidos").href}/${number}`);

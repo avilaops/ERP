@@ -4,6 +4,15 @@
   "members": [],
   "tasks": [
     {
+      "id": "T-20261017-modulo-fiscal-operacional",
+      "title": "Concluir o módulo Fiscal operacional",
+      "owner": null,
+      "status": "em-andamento",
+      "acceptance": ["Menu Fiscal visível para a Diretoria", "Pedidos fechados, fila, revisões, notas, e-mails e inutilizações consultáveis por empresa", "Resumo do pedido indica contrato, emissão e envio ao contato", "Lint, tipos, testes, build e telas nos cinco tamanhos aprovados no GitHub Actions"],
+      "evidence": ["docs/superpowers/plans/2026-10-17-modulo-fiscal-operacional.md", "https://github.com/avilaops/ERP/pull/21"],
+      "next": "Enviar a implementação ao GitHub, corrigir o CI até ficar verde e inspecionar os prints de Fiscal nos cinco tamanhos."
+    },
+    {
       "id": "T-20261017-validacao-fiscal-local",
       "title": "Conferir XML fiscal localmente antes da transmissao",
       "owner": null,

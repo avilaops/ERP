@@ -226,8 +226,8 @@ export default async function PedidoPage({
           throw error;
         })
       : null;
-  // The conference of the invoice: only for a closed order and for who edits the fiscal parameters.
-  const invoice = order.status === "fechado" && allows(session, "parametros") ? await previewOrderNfe(order.number, new Date(), conn) : null;
+  // The conference of the invoice: only for a closed order and for who operates Fiscal.
+  const invoice = order.status === "fechado" && allows(session, "fiscal") ? await previewOrderNfe(order.number, new Date(), conn) : null;
   const invoices = invoice ? await listOrderInvoices(order.id, conn) : [];
   const events = invoice ? await listOrderInvoiceEvents(order.id, conn) : [];
   const mails = invoice ? await listOrderInvoiceMails(order.id, conn) : [];
@@ -279,7 +279,7 @@ export default async function PedidoPage({
     { key: "entrega", label: "Entrega", filled: order.deliveryUf !== null && order.productionDays !== null },
     { key: "pagamento", label: "Pagamento", filled: plan.balance === 0 || (order.installmentCount !== null && order.balanceMethod !== null) },
     ...(editable ? [{ key: "fechar", label: "Fechar", filled: missing.length === 0 }] : []),
-    ...(hasDocuments ? [{ key: "documentos", label: "Contrato e nota", filled: null }] : []),
+    ...(hasDocuments ? [{ key: "documentos", label: "Documentos e nota fiscal", filled: null }] : []),
   ];
   // It opens where the work is: the first part still to fill in while the order is open, the summary after.
   const asksPart = first(query.ver);
@@ -794,6 +794,56 @@ export default async function PedidoPage({
             </ActionForm>
           )}
         </div>
+      )}
+
+      {order.status === "fechado" && (
+        <section data-part="resumo" className={`${CARD} mt-3 p-4`} aria-labelledby="proximos-passos">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <h2 id="proximos-passos" className={TITLE}>Próximos passos</h2>
+              <p className="mt-1 text-sm text-slate-600">O fechamento preserva o pedido. Contrato e nota fiscal continuam nas etapas abaixo.</p>
+            </div>
+            {invoice && <Link href="/fiscal" className={SECONDARY}>Abrir módulo Fiscal</Link>}
+          </div>
+          <ol className="mt-3 grid gap-3 sm:grid-cols-2">
+            <li className="rounded border border-slate-200 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">1 · Contrato</p>
+              <p className="mt-1 text-sm">
+                {contracts[0]
+                  ? `Situação: ${standingText(contracts[0], now)}.`
+                  : "Prepare e envie o contrato para assinatura do cliente."}
+              </p>
+              <a href="#contrato" className={`${contracts[0]?.status === "assinado" ? SECONDARY : PRIMARY} mt-2`}>
+                {contracts[0]?.status === "assinado" ? "Abrir contrato assinado" : contracts[0] ? "Acompanhar contrato" : "Enviar contrato"}
+              </a>
+            </li>
+            {invoice && (
+              <li className="rounded border border-slate-200 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">2 · Nota fiscal</p>
+                <p className="mt-1 text-sm">
+                  {fiscalJobs.some((job) => job.status === "revisao_manual")
+                    ? "A fila parou para revisão manual. Confira a situação antes de repetir."
+                    : fiscalJobs.some((job) => job.status === "pendente" || job.status === "processando")
+                      ? "A emissão ou o evento está na fila fiscal."
+                      : invoices[0]?.status === "autorizada"
+                        ? (mails.some((mail) => mail.invoiceId === invoices[0].id && mail.status === "enviado") ? "Nota autorizada e enviada por e-mail." : "Nota autorizada. Baixe os arquivos ou envie ao contato.")
+                        : invoices[0]?.status === "cancelada"
+                          ? "Nota cancelada. O XML e o e-mail do cancelamento ficam no histórico."
+                          : invoices[0]?.status === "denegada"
+                            ? "Nota denegada pela SEFAZ. Consulte o motivo registrado."
+                            : invoices[0]?.status === "rejeitada"
+                              ? "Nota rejeitada. Corrija a preparação e emita novamente."
+                              : invoices[0]?.status === "assinada"
+                                ? "Nota assinada sem resposta final gravada. Confira a situação na SEFAZ."
+                                : "Confira a preparação e emita a nota fiscal."}
+                </p>
+                <a href="#nota-fiscal" className={`${invoices[0]?.status === "autorizada" ? SECONDARY : PRIMARY} mt-2`}>
+                  {invoices[0]?.status === "autorizada" ? "Baixar ou enviar nota por e-mail" : "Preparar ou emitir nota fiscal"}
+                </a>
+              </li>
+            )}
+          </ol>
+        </section>
       )}
 
       <fieldset disabled={!editable} className="mt-6 flex min-w-0 flex-col gap-6">

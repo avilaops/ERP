@@ -113,11 +113,11 @@ export async function loadSignedXml(id: number, conn: Queryable): Promise<string
   return rows[0] ? String(rows[0].signed_xml) : null;
 }
 
-/** The file of the authorised invoice of an order (nfeProc), or `null`. `environment` filters; without it, production first. */
+/** The authorised file of an order (nfeProc), including an invoice later cancelled. */
 export async function loadAuthorizedXml(orderId: number, conn: Queryable): Promise<{ xml: string; accessKey: string } | null> {
   const { rows } = await conn.query(
     `SELECT authorized_xml, access_key FROM fiscal_invoices
-      WHERE order_id = $1 AND status = 'autorizada' ORDER BY (environment = 'producao') DESC, id DESC LIMIT 1`,
+      WHERE order_id = $1 AND status IN ('autorizada', 'cancelada') ORDER BY (environment = 'producao') DESC, id DESC LIMIT 1`,
     [orderId],
   );
   return rows[0] ? { xml: String(rows[0].authorized_xml), accessKey: String(rows[0].access_key) } : null;

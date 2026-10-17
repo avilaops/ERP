@@ -7,6 +7,7 @@ const GROUPS = [
   ["Vendas", ["pedidos", "funil", "clientes", "aprovacoes"]],
   ["Preços e propostas", ["tabela-precos", "simulador", "precos-metas"]],
   ["Financeiro", ["recebimentos", "contas-pagar", "comissoes"]],
+  ["Fiscal", ["fiscal"]],
   ["Produtos e operação", ["produtos", "estoque", "compras", "fornecedores", "producao"]],
   ["Administração", ["equipe", "parametros"]],
 ] as const;

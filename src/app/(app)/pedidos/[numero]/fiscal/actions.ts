@@ -13,7 +13,7 @@ import type { ActionState } from "@/lib/order-form";
 import { ORDER_NUMBER } from "@/lib/order-number";
 
 export async function saveNoteRulesAction(_previous: ActionState, form: FormData): Promise<ActionState> {
-  const session = await requirePermission("parametros");
+  const session = await requirePermission("fiscal");
   const conn = tenantDb(session.tenant.slug);
   const read = (key: string) => typeof form.get(key) === "string" ? String(form.get(key)).trim() : "";
   const number = read("number");

@@ -1497,7 +1497,7 @@ test("fila fiscal: clique repetido compartilha a emissão; perda de resposta ret
 
 test("nota autorizada: carta de correção numera 1, 2…; cancelamento grava o evento e a nota vira cancelada; recusa da SEFAZ não grava nada", { skip }, async () => {
   const { registerOrderNfeEvent, issueOrderNfe, IssueError } = await import("@/lib/db/issue-nfe");
-  const { listOrderInvoiceEvents, listOrderInvoices } = await import("@/lib/db/invoices");
+  const { listOrderInvoiceEvents, listOrderInvoices, loadAuthorizedXml } = await import("@/lib/db/invoices");
   const { saveCertificate } = await import("@/lib/db/fiscal");
   const { testPfx } = await import("./fiscal-helpers.ts");
   const { randomBytes } = await import("node:crypto");
@@ -1647,6 +1647,7 @@ test("nota autorizada: carta de correção numera 1, 2…; cancelamento grava o 
 
   assert.ok(sent.at(-1)!.includes("<tpEvento>110111</tpEvento>") && sent.at(-1)!.includes("<nProt>135260000000001</nProt>"));
   assert.equal((await listOrderInvoices(orderId, db.pool))[0].status, "cancelada");
+  assert.equal((await loadAuthorizedXml(orderId, db.pool))?.accessKey.length, 44, "o XML autorizado continua disponível depois do cancelamento");
   assert.deepEqual((await listOrderInvoiceEvents(orderId, db.pool)).map((event) => [event.kind, event.sequence]), [["correcao", 1], ["correcao", 2], ["cancelamento", 1]]);
 
   // Cancelada, não aceita mais evento; e o pedido pode ter uma nota nova, com o número seguinte.

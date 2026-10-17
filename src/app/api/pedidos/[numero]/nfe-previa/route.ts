@@ -21,7 +21,7 @@ const text = (message: string, status: number) =>
 export async function GET(_request: Request, context: Context): Promise<Response> {
   const session = await getSession();
   if (!session) return text("Entre no sistema para continuar.", 401);
-  if (!allows(session, "parametros")) return text("Seu perfil não acessa a conferência da nota fiscal.", 403);
+  if (!allows(session, "fiscal")) return text("Seu perfil não acessa a conferência da nota fiscal.", 403);
 
   const { numero } = await context.params;
   if (!ORDER_NUMBER.test(numero)) return text("Pedido não encontrado.", 404);

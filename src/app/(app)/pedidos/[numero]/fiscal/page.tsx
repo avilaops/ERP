@@ -22,7 +22,7 @@ export const metadata = { title: "Preparar nota fiscal · ERP" };
 export default async function NoteRulesPage({ params, searchParams }: {
   params: Promise<{ numero: string }>; searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const session = await requirePermission("parametros");
+  const session = await requirePermission("fiscal");
   const conn = tenantDb(session.tenant.slug);
   const { numero } = await params;
   if (!ORDER_NUMBER.test(numero)) notFound();
