@@ -68,7 +68,8 @@ test("upgrade: pedido antigo fechado sem documento preserva condições herdadas
     await legacy.pool.query("UPDATE company_settings SET proposal_details=$1::jsonb",[JSON.stringify({warranty:"Garantia herdada",installation:"Serviço herdado"})]);
     await legacy.pool.query("UPDATE orders SET status='fechado',closed_at=now(),customer_id=$1,delivery_uf='SP',production_days=30,proposal_details=$2::jsonb",[customer.rows[0].id,JSON.stringify({freightMode:"FOB"})]);
     assert.equal((await legacy.pool.query("SELECT count(*) FROM order_contracts")).rows[0].count,"0");
-    await legacy.pool.query(readFileSync(join(MIGRATIONS_DIR,"0070_pix_direto_e_termos_preservados.sql"),"utf8"));
+    await legacy.pool.query(readFileSync(join(MIGRATIONS_DIR,"0070_email_da_carta_de_correcao.sql"),"utf8"));
+    await legacy.pool.query(readFileSync(join(MIGRATIONS_DIR,"0071_pix_direto_e_termos_preservados.sql"),"utf8"));
     await legacy.pool.query("UPDATE company_settings SET proposal_details=$1::jsonb",[JSON.stringify({warranty:"Novo padrão",installation:"Nova instalação"})]);
     const kept=(await legacy.pool.query("SELECT proposal_details FROM orders")).rows[0].proposal_details;
     assert.equal(kept.warranty,"Garantia herdada");

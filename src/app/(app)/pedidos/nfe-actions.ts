@@ -30,15 +30,20 @@ const send = sendToSefaz;
  * when the company wants it so and the customer has an e-mail. A failure here
  * never undoes what was authorised: it is recorded, and the screen offers to send again.
  */
-async function mailAfter(kind: "nota" | "cancelamento", invoiceId: number, sentBy: string, conn: ReturnType<typeof tenantDb>): Promise<string | null> {
+async function mailAfter(kind: "nota" | "cancelamento" | "correcao", invoiceId: number, sentBy: string, conn: ReturnType<typeof tenantDb>, eventId?: number): Promise<string | null> {
   try {
     if (!(await loadMailInfo(conn)).autoSend) return null;
     // Once per invoice: issuing again an invoice already authorised does not write to the customer twice.
     const sent = await conn.query("SELECT recipient FROM fiscal_invoice_mails WHERE invoice_id = $1 AND kind = 'nota' AND status = 'enviado' ORDER BY id DESC LIMIT 1", [invoiceId]);
     if (kind === "nota" && sent.rows[0]) return null;
     // The cancellation goes to who received the invoice; if nobody did, there is nobody to warn by here.
-    if (kind === "cancelamento" && !sent.rows[0]) return null;
-    const result = await sendInvoiceMail({ invoiceId, to: kind === "cancelamento" ? String(sent.rows[0].recipient) : null, sentBy, now: new Date(), env: process.env, key: () => vaultKey(process.env.ERP_CERT_KEY), send: sendMail }, conn);
+    if (kind !== "nota" && !sent.rows[0]) return null;
+    if (kind === "correcao") {
+      if (!eventId) throw new MailError("A CC-e registrada não informou o evento para envio.");
+      const already = await conn.query("SELECT 1 FROM fiscal_invoice_mails WHERE invoice_id = $1 AND kind = 'correcao' AND status = 'enviado' AND event_id=$2", [invoiceId,eventId]);
+      if (already.rows[0]) return null;
+    }
+    const result = await sendInvoiceMail({ invoiceId, ...(kind === "correcao" ? { kind,eventId } : {}), to: kind !== "nota" ? String(sent.rows[0].recipient) : null, sentBy, now: new Date(), env: process.env, key: () => vaultKey(process.env.ERP_CERT_KEY), send: sendMail }, conn);
     return result.status === "enviado" ? `E-mail enviado para ${result.recipient}.` : `O e-mail para ${result.recipient} não saiu: ${result.detail ?? "falha no envio"}`;
   } catch (error) {
     // No address, no mailbox: said on the screen of the order, not an error of the issuing.
@@ -88,7 +93,7 @@ export async function registerNfeEventAction(_previous: ActionState, formData: F
   try {
     const result = await registerOrderNfeEvent(number, kind, typeof text === "string" ? text : "", session.email, new Date(), vaultKey(process.env.ERP_CERT_KEY), send, conn);
     console.info(`[nfe] pedido ${number}: ${result.message} Por ${session.email}`);
-    if (kind === "cancelamento") notice = await mailAfter("cancelamento", result.invoiceId, session.email, conn);
+    notice = await mailAfter(kind, result.invoiceId, session.email, conn, result.eventId);
   } catch (error) {
     if (error instanceof IssueError) return { error: error.message };
     console.error("[nfe] falha ao registrar evento:", error instanceof Error ? error.message : error);

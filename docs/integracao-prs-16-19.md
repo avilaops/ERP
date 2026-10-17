@@ -31,5 +31,9 @@ Tipos, lint e testes de proposta aprovados. Teste PostgreSQL de termos preservad
 aprovado. Suíte de pedidos e CI do conjunto devem concluir antes da mesclagem.
 Nenhuma NF-e, recebimento ou envio real é usado nesses testes.
 
-O trabalho trata integração Git. Publicação da nova migration 0070 e das correções
+O trabalho trata integração Git. Publicação da migration de PIX/termos e das correções
 precisa de implantação própria; merge não comprova publicação em produção.
+
+Na integração do PR 20, a migration de PIX/termos foi renumerada para 0071.
+A 0070 de e-mail da CC-e já constava no ledger de produção e foi preservada
+com seu nome original; a de PIX/termos ainda não constava nesse ledger.

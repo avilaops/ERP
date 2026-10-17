@@ -14,7 +14,7 @@ import {
   AUTHORIZATION_ACTION, CONSULT_ACTION, NUMBER_TAKEN, SefazError, VOID_ACTION, authorizationEnvelope, authorizationUrl, consultEnvelope, consultEvents, consultUrl, nfeProcXml,
   parseAuthorization, parseConsult, parseVoid, voidEnvelope, voidUrl, voidXml,
 } from "@/lib/fiscal/sefaz";
-import { EVENT_ACTION, eventEnvelope, eventUrl, eventXml, parseEvent } from "@/lib/fiscal/events";
+import { EVENT_ACTION, eventEnvelope, eventUrl, eventXml, parseEvent, processedEventXml } from "@/lib/fiscal/events";
 import { UF_CODES } from "@/lib/fiscal/nfe";
 import { signEventXml, signingKeyOf, signNfeXml, signVoidXml } from "@/lib/fiscal/sign";
 
@@ -209,7 +209,7 @@ export async function registerOrderNfeEvent(
   vault: Buffer,
   send: Send,
   conn: Queryable,
-): Promise<{ invoiceId: number; message: string }> {
+): Promise<{ invoiceId: number; eventId: number; message: string }> {
   const order = await getOrder(orderNumber, { sellerEmail: null }, conn);
   if (!order) throw new IssueError("Pedido não encontrado.");
   const settings = await loadFiscalSettings(conn);
@@ -232,9 +232,11 @@ export async function registerOrderNfeEvent(
   }
 
   let result;
+  let processed: string | null = null;
   try {
     const answer = await send(eventUrl(settings.uf ?? "", invoice.environment), EVENT_ACTION, eventEnvelope(signed, String(invoice.id)), { pfx: certificate.pfx, passphrase: certificate.password });
     result = parseEvent(answer, invoice.accessKey);
+    if (result.registered) processed = processedEventXml(signed, answer);
   } catch (error) {
     if (error instanceof SefazError) throw new IssueError(`${error.message} Nada foi gravado: confira a nota na SEFAZ antes de tentar de novo.`);
     throw error;
@@ -251,15 +253,16 @@ export async function registerOrderNfeEvent(
       throw error;
     }
     if (!found) throw new IssueError(`A SEFAZ não registrou (${result.code}): ${result.reason}. A consulta da nota não trouxe esse evento: confira no portal da SEFAZ.`);
-    await recordInvoiceEvent({ invoiceId: invoice.id, kind, sequence, text: found.text, signedXml: found.xml, protocol: found.protocol, statusCode: found.code, createdBy: who }, conn);
-    if (kind === "cancelamento") return { invoiceId: invoice.id, message: `A nota ${invoice.number} já estava cancelada na SEFAZ. Protocolo ${found.protocol}.` };
-    if (found.text === text.replace(/\s+/g, " ").trim()) return { invoiceId: invoice.id, message: `A carta de correção ${sequence} já estava registrada na SEFAZ. Protocolo ${found.protocol}.` };
+    const eventId = await recordInvoiceEvent({ invoiceId: invoice.id, kind, sequence, text: found.text, signedXml: found.xml, protocol: found.protocol, statusCode: found.code, createdBy: who }, conn);
+    if (kind === "cancelamento") return { invoiceId: invoice.id, eventId, message: `A nota ${invoice.number} já estava cancelada na SEFAZ. Protocolo ${found.protocol}.` };
+    if (found.text === text.replace(/\s+/g, " ").trim()) return { invoiceId: invoice.id, eventId, message: `A carta de correção ${sequence} já estava registrada na SEFAZ. Protocolo ${found.protocol}.` };
     throw new IssueError(`A carta de correção ${sequence} já estava registrada na SEFAZ com outro texto ("${found.text}", protocolo ${found.protocol}) e foi gravada aqui. Se a correção de agora ainda é necessária, registre de novo: ela sai como a carta ${sequence + 1}.`);
   }
   if (!result.registered) throw new IssueError(`A SEFAZ não registrou (${result.code}): ${result.reason}`);
+  if (processed === null) throw new IssueError("O recibo completo do evento não foi obtido. Consulte a SEFAZ antes de reenviar.");
 
-  await recordInvoiceEvent({ invoiceId: invoice.id, kind, sequence, text: text.replace(/\s+/g, " ").trim(), signedXml: signed, protocol: result.protocol, statusCode: result.code, createdBy: who }, conn);
-  return { invoiceId: invoice.id, message: kind === "cancelamento" ? `Nota ${invoice.number} cancelada. Protocolo ${result.protocol}.` : `Carta de correção ${sequence} registrada. Protocolo ${result.protocol}.` };
+  const eventId = await recordInvoiceEvent({ invoiceId: invoice.id, kind, sequence, text: text.replace(/\s+/g, " ").trim(), signedXml: processed, protocol: result.protocol, statusCode: result.code, createdBy: who }, conn);
+  return { invoiceId: invoice.id, eventId, message: kind === "cancelamento" ? `Nota ${invoice.number} cancelada. Protocolo ${result.protocol}.` : `Carta de correção ${sequence} registrada. Protocolo ${result.protocol}.` };
 }
 
 /**

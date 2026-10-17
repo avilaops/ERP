@@ -237,9 +237,12 @@ export function consultEvents(response: string, accessKey: string): ConsultedEve
     const protocol = pick(answer, "nProt");
     const sequence = Number(pick(sent, "nSeqEvento"));
     const code = pick(answer, "cStat") ?? "";
-    if (pick(sent, "chNFe") !== accessKey || !protocol || !Number.isInteger(sequence) || !["135", "136", "155"].includes(code)) continue;
-    if (type === "110111") events.push({ kind: "cancelamento", sequence, protocol, code, text: unescape(pick(sent, "xJust") ?? ""), xml });
-    if (type === "110110") events.push({ kind: "correcao", sequence, protocol, code, text: unescape(pick(sent, "xCorrecao") ?? ""), xml });
+    if (pick(sent, "chNFe") !== accessKey || pick(answer, "chNFe") !== accessKey || !protocol || !Number.isInteger(sequence) || sequence < 1 || sequence > 20 || !["135", "155"].includes(code)) continue;
+    if (["tpAmb", "tpEvento", "nSeqEvento"].some((field) => !pick(sent, field) || pick(sent, field) !== pick(answer, field))) continue;
+    // The namespace may have been inherited from retConsSitNFe. Keep it in the standalone file.
+    const file = /<procEventoNFe\b[^>]*\sxmlns=/.test(xml) ? xml : xml.replace("<procEventoNFe", `<procEventoNFe xmlns="${NFE_NS}"`);
+    if (type === "110111" && sequence === 1) events.push({ kind: "cancelamento", sequence, protocol, code, text: unescape(pick(sent, "xJust") ?? ""), xml: file });
+    if (type === "110110" && code === "135") events.push({ kind: "correcao", sequence, protocol, code, text: unescape(pick(sent, "xCorrecao") ?? ""), xml: file });
   }
   return events;
 }

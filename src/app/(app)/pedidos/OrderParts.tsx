@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { INPUT, SECONDARY } from "@/components/ui";
+import { INPUT, PRIMARY, SECONDARY } from "@/components/ui";
 
 export type OrderPart = { key: string; label: string; /** `null`: a part with nothing to fill in. */ filled: boolean | null };
 
@@ -74,9 +74,7 @@ export function OrderParts({ parts, initial, children }: { parts: OrderPart[]; i
             type="button"
             onClick={() => choose(key)}
             aria-current={key === current ? "page" : undefined}
-            className={`${SECONDARY} ${
-              key === current ? "border-slate-900 bg-slate-900 text-white" : filled === null ? TONE.plain : filled ? TONE.filled : TONE.missing
-            }`}
+            className={key === current ? PRIMARY : `${SECONDARY} ${filled === null ? TONE.plain : filled ? TONE.filled : TONE.missing}`}
           >
             {filled === null ? "" : filled ? "✓ " : "• "}
             {label}
