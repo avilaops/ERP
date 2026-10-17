@@ -78,6 +78,10 @@ test("linha com regras fiscais e sem equipamento sai inteira; forma de pagamento
   assert.equal((await listPaymentCodes(db.pool)).find((method) => method.id === transfer.id)?.code, "99");
   await assert.rejects(() => savePaymentCode(financing.id, "77", WHO, db.pool), FiscalError);
   await assert.rejects(() => savePaymentCode(999999, "17", WHO, db.pool), /não encontrada/);
+  const delivery = codes.get("Na entrega")!;
+  await assert.rejects(() => savePaymentCode(delivery.id, "99", WHO, db.pool), /prazo na entrega/);
+  await db.pool.query("UPDATE payment_methods SET nfe_code = '99' WHERE id = $1", [delivery.id]);
+  assert.equal((await listPaymentCodes(db.pool)).find((method) => method.id === delivery.id)?.code, null);
 });
 
 test("pagamentos em lote: uma falha reverte todas as alterações e o retorno conta apenas gravações efetivas", { skip }, async () => {
@@ -124,6 +128,17 @@ test("pagamentos em lote: exclusão, renomeação e escolha manual durante a lei
   assert.equal(after.find((method) => method.id === cheque.id)?.code, null);
   assert.equal(after.some((method) => method.id === boleto.id), false);
   assert.equal(after.find((method) => method.id === cash.id)?.code, "01");
+});
+
+test("QR da empresa: adesão explícita, independente do rótulo do provedor", {skip}, async()=>{
+  const provider=await createPaymentMethod("Mercado Pago - PIX",WHO,db.pool);
+  await savePaymentCode(provider.id,"17",WHO,db.pool);
+  assert.equal((await listPaymentCodes(db.pool)).find(m=>m.id===provider.id)?.companyPix,false);
+  await savePaymentCode(provider.id,"17",WHO,db.pool,true);
+  assert.equal((await listPaymentCodes(db.pool)).find(m=>m.id===provider.id)?.companyPix,true);
+  await assert.rejects(()=>savePaymentCode(provider.id,"03",WHO,db.pool,true),/exige meio PIX/);
+  await updatePaymentMethod(provider.id,{label:"Cartão de teste",position:20,active:true},WHO,db.pool);
+  assert.equal((await listPaymentCodes(db.pool)).find(m=>m.id===provider.id)?.companyPix,false);
 });
 
 test("operação de venda: cria somente os CFOPs; completar vazios preserva impostos e escolhas atuais do contador", { skip }, async () => {

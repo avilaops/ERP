@@ -28,6 +28,10 @@ test("cadastro fiscal: completa vazios, preserva dados e numeração; regime aus
 });
 
 test("preparação fiscal: códigos conhecidos são exatos; prazo ou nome desconhecido não inventa meio de pagamento", () => {
+  assert.equal(standardPaymentCode("Cartão de crédito (presencial)"), "03");
+  assert.equal(standardPaymentCode("Link de pagamento - cartão de crédito"), "03");
+  assert.equal(standardPaymentCode("Link de pagamento - PIX"), "17");
+  assert.equal(standardPaymentCode("Link de pagamento"), null);
   assert.equal(standardPaymentCode(" PIX "), "17");
   assert.equal(standardPaymentCode("Cartão de crédito"), "03");
   for (const label of ["Na entrega", "Financiamento", "PIX ou cartão", "Outra forma"]) assert.equal(standardPaymentCode(label), null);

@@ -3,6 +3,7 @@ import type { CustomerInput, CustomerKind } from "@/lib/customer";
 import { pgErrorCode } from "@/lib/db/pool";
 import type { Queryable } from "@/lib/db/pool";
 import type { Uf } from "@/lib/pricing/states";
+import { normalizedAddress } from "@/lib/address";
 
 export type { CustomerInput } from "@/lib/customer";
 
@@ -73,6 +74,7 @@ const duplicate = (kind: CustomerKind) => new CustomerError(`Já existe cliente 
 
 /** One record per CNPJ or CPF. Takes what `parseCustomerForm` returns. */
 export async function createCustomer(input: CustomerInput, updatedBy: string, conn: Queryable): Promise<Customer> {
+  input = normalizedAddress(input);
   const name = assertInput(input, updatedBy);
   if (!isValidDocument(input.kind, input.document)) {
     throw new CustomerError(`${input.kind === "PJ" ? "CNPJ" : "CPF"} inválido.`);
@@ -104,6 +106,7 @@ export async function updateCustomer(
   updatedBy: string,
   conn: Queryable,
 ): Promise<Customer> {
+  input = normalizedAddress(input);
   const name = assertInput(input, updatedBy);
   const current = await getCustomer(id, conn);
   if (!current) throw new CustomerError("Cliente não encontrado.");

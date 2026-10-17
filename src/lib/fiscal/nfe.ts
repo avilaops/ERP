@@ -258,13 +258,13 @@ function address(prefix: "enderEmit" | "enderDest", place: NfeAddress): string {
 export const destinationUf = (input: Pick<NfeInput, "recipient" | "delivery">): string => input.delivery?.uf ?? input.recipient.uf;
 
 /** The CSTs of IPI that carry base, rate and amount; every other one only names itself. */
-const IPI_TAXED_CSTS = ["00", "49", "50", "99"];
+export const IPI_TAXED_CSTS = ["00", "49", "50", "99"];
 /** The CSTs of IPI the schema takes without figures (group IPINT). */
-const IPI_UNTAXED_CSTS = ["01", "02", "03", "04", "05", "51", "52", "53", "54", "55"];
+export const IPI_UNTAXED_CSTS = ["01", "02", "03", "04", "05", "51", "52", "53", "54", "55"];
 /** The CSTs of PIS and COFINS this system writes, as the schema groups them: by rate (01, 02), without figures (04 to 09) and "other operations" (49 to 99). 03 is by quantity: not issued here. */
-const CONTRIBUTION_RATE_CSTS = ["01", "02"];
-const CONTRIBUTION_UNTAXED_CSTS = ["04", "05", "06", "07", "08", "09"];
-const CONTRIBUTION_OTHER_CSTS = ["49", "50", "51", "52", "53", "54", "55", "56", "60", "61", "62", "63", "64", "65", "66", "67", "70", "71", "72", "73", "74", "75", "98", "99"];
+export const CONTRIBUTION_RATE_CSTS = ["01", "02"];
+export const CONTRIBUTION_UNTAXED_CSTS = ["04", "05", "06", "07", "08", "09"];
+export const CONTRIBUTION_OTHER_CSTS = ["49", "50", "51", "52", "53", "54", "55", "56", "60", "61", "62", "63", "64", "65", "66", "67", "70", "71", "72", "73", "74", "75", "98", "99"];
 /** Origins of imported goods: they leave the state at 4% (Resolução do Senado 13/2012; rules NA09-10 and NA09-20). */
 const IMPORTED_ORIGINS = [1, 2, 3, 8];
 /** South and Southeast except Espírito Santo: from them to the other states the rate is 7%, 12% in every other case (rule NA09-30). */

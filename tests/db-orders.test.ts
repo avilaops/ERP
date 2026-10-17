@@ -53,7 +53,11 @@ let customerMa = 0;
 let customerSp = 0;
 
 before(async () => {
-  if (!skip) db = await openTestDb("orders");
+  if (!skip) {
+    db = await openTestDb("orders");
+    // Explicit fictitious business terms for the finance/approval fixtures, never production defaults.
+    await db.pool.query("UPDATE company_settings SET proposal_details = $1::jsonb", [JSON.stringify({ warranty: "12 meses contra defeitos de fabricação (teste fictício).", installation: "Não inclusa (teste fictício).", freightMode: "FOB" })]);
+  }
 });
 after(async () => {
   if (!skip) await db.close();
@@ -196,10 +200,10 @@ test("criar: número repetido sorteia outro; equipamento fora da versão é recu
 
   const count = async () => Number((await db.pool.query("SELECT count(*) FROM orders")).rows[0].count);
   const before = await count();
-  // Cinco sorteios repetidos: desiste, com o erro do banco.
+  // Cinco sorteios repetidos: desiste sem abortar uma transação do chamador.
   await assert.rejects(
     () => createOrder({ seller: SELLER, version: 1, productId: ID["LD-B001"], quantity: 1 }, numbers("260930-BBMN"), db.pool),
-    /orders_number_key/,
+    /número livre/,
   );
   const create = (productId: number, version = 1, quantity = 1, number = "260930-K62T") =>
     createOrder({ seller: SELLER, version, productId, quantity }, numbers(number), db.pool);
@@ -530,14 +534,28 @@ const PAYMENT: OrderPayment = {
 test("formas de pagamento vêm do banco da empresa", { skip }, async () => {
   const methods = await listPaymentMethods(db.pool);
   assert.deepEqual(methods.slice(0, 3), ["PIX", "Boleto", "Transferência"]);
-  // As oito do início e a "Na entrega", que é um prazo para o saldo, não um meio de pagamento.
-  assert.equal(methods.length, 9);
-  assert.ok(methods.includes("Na entrega"));
+  // "Na entrega" is a due condition, never a payment method in new forms.
+  assert.equal(methods.length, 8);
+  assert.ok(!methods.includes("Na entrega"));
   await db.pool.query("UPDATE payment_methods SET active = false WHERE label = 'Cheque'");
   await db.pool.query("INSERT INTO payment_methods (label, position, updated_by) VALUES ('Consórcio', 0, 'x')");
   const changed = await listPaymentMethods(db.pool);
   assert.equal(changed[0], "Consórcio");
   assert.ok(!changed.includes("Cheque"));
+});
+
+test("fechamento bloqueia condições ausentes e aceita padrão da empresa com frete próprio", { skip }, async () => {
+  const N = "260930-BBMN";
+  await savePayment(N, PAYMENT, SELLER.email, MINE, db.pool);
+  const original = (await db.pool.query("SELECT proposal_details FROM company_settings")).rows[0].proposal_details;
+  await db.pool.query("UPDATE company_settings SET proposal_details = '{}'::jsonb, proposal_details_revision = proposal_details_revision + 1");
+  const result = await closeOrder(N, SELLER.email, MINE, db.pool);
+  assert.equal(result.status, "em_negociacao");
+  assert.equal(result.missing.length, 3);
+  assert.ok(result.missing.every((line) => line.includes("Dados do PDF")));
+  assert.equal(Number((await db.pool.query("SELECT count(*) FROM order_approvals")).rows[0].count), 0);
+  assert.equal(Number((await db.pool.query("SELECT count(*) FROM receivables")).rows[0].count), 0);
+  await db.pool.query("UPDATE company_settings SET proposal_details = $1::jsonb, proposal_details_revision = proposal_details_revision + 1", [JSON.stringify(original)]);
 });
 
 test("pagamento do print: entrada de 25.000 fica abaixo da política e manda o pedido para aprovação", { skip }, async () => {
@@ -574,6 +592,17 @@ test("pagamento do print: entrada de 25.000 fica abaixo da política e manda o p
     reasons: ["entrada-abaixo-da-politica"],
     missing: [],
   });
+  const defaults = (await db.pool.query("SELECT proposal_details FROM company_settings")).rows[0].proposal_details;
+  await db.pool.query("UPDATE company_settings SET proposal_details = '{}'::jsonb, proposal_details_revision = proposal_details_revision + 1");
+  await assert.rejects(() => decideApproval(N, { approve: true, comment: null }, { email: DIRECTOR, role: "DIRETORIA", approvesAtLoss: true }, db.pool), /Garantia.*Dados do PDF/);
+  assert.equal((await order(N)).status, "aguardando_aprovacao");
+  assert.equal(Number((await db.pool.query("SELECT count(*) FROM receivables")).rows[0].count), 0);
+  await db.pool.query("UPDATE company_settings SET proposal_details = $1::jsonb, proposal_details_revision = proposal_details_revision + 1", [JSON.stringify(defaults)]);
+  const racingApproval = { query: async (text: string, values?: unknown[]) => {
+    if (text.includes("WITH target AS")) await db.pool.query("UPDATE company_settings SET proposal_details_revision = proposal_details_revision + 1");
+    return db.pool.query(text, values);
+  } } as typeof db.pool;
+  await assert.rejects(() => decideApproval(N, { approve: true, comment: null }, { email: DIRECTOR, role: "DIRETORIA", approvesAtLoss: true }, racingApproval), /não está mais aguardando aprovação/);
   const waiting = await order(N);
   assert.deepEqual([waiting.status, waiting.closedAt], ["aguardando_aprovacao", null]);
   const asked = await db.pool.query("SELECT requested_by, reasons, status, revision_hash FROM order_approvals");
@@ -672,6 +701,13 @@ test("fechar: se o pedido mudou entre a leitura e a gravação, nada é gravado"
   await assert.rejects(() => closeOrder(N, SELLER.email, MINE, racing), /foi alterado por outra pessoa/);
   const after = await order(N);
   assert.deepEqual([after.status, after.closedAt, after.discount], ["em_negociacao", null, 0.5]);
+  await db.pool.query("UPDATE orders SET discount = 0, updated_at = now() WHERE number = $1", [N]);
+  const racingProposal = { query: async (text: string, values?: unknown[]) => {
+    if (text.includes("WITH closed AS")) await db.pool.query("UPDATE orders SET proposal_details_revision = proposal_details_revision + 1 WHERE number = $1", [N]);
+    return db.pool.query(text, values);
+  } } as typeof db.pool;
+  await assert.rejects(() => closeOrder(N, SELLER.email, MINE, racingProposal), /foi alterado por outra pessoa/);
+  assert.equal((await order(N)).status, "em_negociacao");
 });
 
 test("excluir: pedido em negociação sai com os itens, e a tabela publicada fica como estava", { skip }, async () => {
@@ -1173,6 +1209,57 @@ test("nota fiscal de conferência: pedido fechado, com os cadastros preenchidos,
   assert.deepEqual(ready.problems, []);
   const { xml, key } = buildNfeXml(ready.input);
   assert.equal(key.length, 44);
+  // A preparação é da nota deste pedido: a empresa e a revisão comercial não mudam.
+  const { loadOrderFiscalRules, saveOrderFiscalRules } = await import("@/lib/db/order-fiscal-rules");
+  const { loadFiscalRules } = await import("@/lib/db/fiscal-rules");
+  const { saveSignedInvoice, InvoicePreparationChanged } = await import("@/lib/db/invoices");
+  const own = (await getOrder(number, ALL, db.pool))!;
+  const defaults = await loadFiscalRules(1, db.pool);
+  const firstDraft = await loadOrderFiscalRules(own.id, 1, db.pool);
+  assert.deepEqual(firstDraft.rules, defaults);
+  assert.equal(firstDraft.customized, false);
+  await saveOrderFiscalRules(own.id, 1, firstDraft.revision, { operationNature: "Venda específica desta nota", pisRate: 0.012 }, DIRECTOR, db.pool);
+  const customized = await previewOrderNfe(number, now, db.pool);
+  assert.equal(customized!.input.rules.operationNature, "Venda específica desta nota");
+  assert.equal(customized!.input.rules.pisRate, 0.012);
+  assert.match(buildNfeXml(customized!.input).xml, /<natOp>Venda específica desta nota<\/natOp>/);
+  assert.deepEqual(await loadFiscalRules(1, db.pool), defaults);
+  const other = await db.pool.query("SELECT id FROM orders WHERE id <> $1 AND status <> 'cancelado' LIMIT 1", [own.id]);
+  assert.deepEqual((await loadOrderFiscalRules(Number(other.rows[0].id), 1, db.pool)).rules, defaults);
+  await saveFiscalRules(1, { ...defaults, additionalInfo: "Padrão atualizado pela contabilidade" }, DIRECTOR, db.pool);
+  assert.equal((await loadOrderFiscalRules(own.id, 1, db.pool)).rules.additionalInfo, "Padrão atualizado pela contabilidade");
+  await saveFiscalRules(1, defaults, DIRECTOR, db.pool);
+  const draft = await loadOrderFiscalRules(own.id, 1, db.pool);
+  await assert.rejects(() => saveOrderFiscalRules(own.id, 1, firstDraft.revision, { pisRate: 0.99 }, DIRECTOR, db.pool), /preparação mudou/);
+  await assert.rejects(() => saveOrderFiscalRules(own.id, 1, draft.revision, { cfopInternal: "6102" }, DIRECTOR, db.pool), /CFOP dentro/);
+  assert.equal((await loadOrderFiscalRules(own.id, 1, db.pool)).revision, draft.revision);
+  await assert.rejects(() => saveSignedInvoice({ orderId: own.id, environment: "homologacao", series: 1, number: 999, accessKey: "1".repeat(44), signedXml: "não pode persistir", issuedAt: now.toISOString(), createdBy: DIRECTOR, rulesRevision: firstDraft.revision }, db.pool), InvoicePreparationChanged);
+  assert.equal((await db.pool.query("SELECT count(*)::int AS n FROM fiscal_invoices WHERE order_id = $1", [own.id])).rows[0].n, 0);
+  const competing = await Promise.allSettled([
+    saveOrderFiscalRules(own.id, 1, draft.revision, { additionalInfo: "Edição A" }, DIRECTOR, db.pool),
+    saveOrderFiscalRules(own.id, 1, draft.revision, { additionalInfo: "Edição B" }, DIRECTOR, db.pool),
+  ]);
+  assert.equal(competing.filter((result) => result.status === "fulfilled").length, 1);
+  const saved = await loadOrderFiscalRules(own.id, 1, db.pool);
+  assert.equal(saved.rules.operationNature, "Venda específica desta nota");
+  await saveOrderFiscalRules(own.id, 1, saved.revision, { icmsCode: null }, DIRECTOR, db.pool);
+  assert.ok((await previewOrderNfe(number, now, db.pool))!.problems.some((problem) => problem.includes("CST do ICMS")));
+  await saveOrderFiscalRules(own.id, 1, (await loadOrderFiscalRules(own.id, 1, db.pool)).revision, null, DIRECTOR, db.pool);
+  assert.deepEqual((await loadOrderFiscalRules(own.id, 1, db.pool)).rules, defaults);
+  assert.equal((await loadOrderFiscalRules(own.id, 1, db.pool)).customized, false);
+  const racing = await loadOrderFiscalRules(own.id, 1, db.pool);
+  const occupied=await saveSignedInvoice({orderId:Number(other.rows[0].id),environment:"homologacao",series:1,number:998,accessKey:"3".repeat(44),signedXml:"XML de teste",issuedAt:now.toISOString(),createdBy:DIRECTOR},db.pool);
+  try {
+    await assert.rejects(()=>saveSignedInvoice({orderId:own.id,environment:"homologacao",series:1,number:998,accessKey:"4".repeat(44),signedXml:"Colisão",issuedAt:now.toISOString(),createdBy:DIRECTOR,rulesRevision:racing.revision},db.pool), /já pertence a outra nota/);
+    assert.equal((await loadOrderFiscalRules(own.id,1,db.pool)).revision,racing.revision);
+  } finally {await db.pool.query("DELETE FROM fiscal_invoices WHERE id=$1",[occupied.id]);}
+  const editOrSign = await Promise.allSettled([
+    saveOrderFiscalRules(own.id, 1, racing.revision, { additionalInfo: "Edição durante assinatura" }, DIRECTOR, db.pool),
+    saveSignedInvoice({ orderId: own.id, environment: "homologacao", series: 1, number: 999, accessKey: "2".repeat(44), signedXml: "XML fictício do teste de concorrência", issuedAt: now.toISOString(), createdBy: DIRECTOR, rulesRevision: racing.revision }, db.pool),
+  ]);
+  assert.equal(editOrSign.filter((result) => result.status === "fulfilled").length, 1);
+  await db.pool.query("DELETE FROM fiscal_invoices WHERE order_id = $1 AND number = 999", [own.id]);
+  await saveOrderFiscalRules(own.id, 1, (await loadOrderFiscalRules(own.id, 1, db.pool)).revision, null, DIRECTOR, db.pool);
   assert.ok(xml.includes("<nNF>42</nNF>") && xml.includes("<dhEmi>2026-10-08T10:00:00-03:00</dhEmi>") && xml.includes(`Pedido ${number}`));
   // Transporte: opcional; informado, vai para a nota sem reabrir o pedido nem mudar a revisão dele.
   const { createCarrier, saveOrderTransport } = await import("@/lib/db/carriers");
@@ -1251,12 +1338,27 @@ test("emissão: guarda a nota assinada antes de enviar; rejeitada reemite com o 
   assert.equal((await db.pool.query("SELECT nfe_next_number FROM company_settings")).rows[0].nfe_next_number, 42);
 
   // 1. A rede cai: a nota fica guardada, aguardando resposta, com o número 42.
+  const held = await db.pool.connect();
+  try {
+    await assert.rejects(() => issueOrderNfe(number, who, now, vault, never, {
+      async query(sql,values) {
+        const result=await held.query(sql,values);
+        if(sql.startsWith("UPDATE company_settings SET nfe_next_number"))throw new Error("Falha após reservar número");
+        return result;
+      },
+    }), /Falha após reservar número/);
+  } finally {held.release();}
+  assert.equal((await db.pool.query("SELECT nfe_next_number FROM company_settings")).rows[0].nfe_next_number,42);
+  assert.deepEqual(await listOrderInvoices(orderId,db.pool),[]);
   await assert.rejects(
     () => issueOrderNfe(number, who, now, vault, async (_url, _action, envelope) => { sent.push(envelope); throw new SefazError("A SEFAZ não respondeu a tempo."); }, db.pool),
     (error: Error) => error instanceof IssueError && /aguardando resposta/.test(error.message),
   );
   let invoices = await listOrderInvoices(orderId, db.pool);
   assert.deepEqual(invoices.map((invoice) => [invoice.number, invoice.status]), [[42, "assinada"]]);
+  const { loadOrderFiscalRules, saveOrderFiscalRules } = await import("@/lib/db/order-fiscal-rules");
+  let prepared = await loadOrderFiscalRules(orderId, 1, db.pool);
+  await assert.rejects(() => saveOrderFiscalRules(orderId, 1, prepared.revision, { operationNature: "Não pode alterar XML pendente" }, who, db.pool), /nota já foi assinada/);
 
   // 2. De novo: vai a mesma nota, byte a byte, e a SEFAZ rejeita.
   let consulted = 0;
@@ -1287,6 +1389,8 @@ test("emissão: guarda a nota assinada antes de enviar; rejeitada reemite com o 
   const file = await loadAuthorizedXml(orderId, db.pool);
   assert.ok(file?.xml.includes("<nfeProc ") && file.xml.includes("<nProt>135260000000001</nProt>") && file.xml.includes("<Signature "));
   assert.equal(file?.accessKey, authorized.invoice.accessKey);
+  prepared = await loadOrderFiscalRules(orderId, 1, db.pool);
+  await assert.rejects(() => saveOrderFiscalRules(orderId, 1, prepared.revision, null, who, db.pool), /nota já foi assinada/);
 
   // 4. Já autorizada: não emite de novo. O contador da empresa andou uma vez só.
   await assert.rejects(() => issueOrderNfe(number, who, now, vault, never, db.pool), /já tem nota autorizada/);
@@ -1567,6 +1671,15 @@ test("saldo na entrega: a forma marcada vira uma parcela só, no dia em que o pe
   const back = await order(number);
   assert.deepEqual([back.balanceOnDelivery, back.installmentCount], [false, 2]);
   assert.equal(paymentOf(back, sale, table, "2026-10-09").receipts.length, 3);
+  await savePayment(number, { ...PAYMENT, downPayment: 10000, balanceMethod: "PIX", balanceOnDelivery: true, installmentCount: 3 }, SELLER.email, MINE, db.pool);
+  const pixDelivery = await order(number);
+  assert.deepEqual([pixDelivery.balanceOnDelivery, pixDelivery.balanceMethod, pixDelivery.installmentCount], [true, "PIX", 1]);
+  assert.equal(paymentOf(pixDelivery, sale, table, "2026-10-09").receipts.at(-1)?.method, "PIX");
+  await savePayment(number, { ...PAYMENT, downPayment: 10000, balanceMethod: "PIX", balanceOnDelivery: false, installmentCount: 3, firstInstallmentDays: 30, installmentIntervalDays: 30 }, SELLER.email, MINE, db.pool, pixDelivery.revision);
+  const split = await order(number);
+  assert.equal(split.balanceOnDelivery, false);
+  assert.equal(paymentOf(split, sale, table, "2026-10-09").receipts.length, 4);
+  await assert.rejects(() => savePayment(number, { ...PAYMENT, downPayment: 10000 }, SELLER.email, MINE, db.pool, pixDelivery.revision), /pedido mudou/);
   await deleteOrder(number, MINE, db.pool);
 });
 

@@ -33,11 +33,11 @@ export default async function AssistenteParametrosPage({ searchParams }: { searc
   return (
     <div className="mx-auto max-w-3xl">
       <p className="text-sm">
-        <Link href={menuItem("parametros").href} className={QUIET_LINK}>
+        <Link href={menuItem("parametros").href} className={`${QUIET_LINK} inline-flex min-h-[var(--control)] items-center`}>
           ← {menuItem("parametros").label}
         </Link>
       </p>
-      <PageHeader title="Assistente" hint="Inteligência artificial que resume cada venda do funil, sugere o próximo passo e rascunha a resposta ao cliente." />
+      <PageHeader title="Assistente" hint={tab === "conexao" ? "Conexão dos assistentes da equipe." : "Resumos e rascunhos para cada venda do funil."} />
       <nav aria-label="Partes do assistente" className="view-tabs">
         {TABS.map(([key, label]) => (
           <Link
@@ -58,12 +58,14 @@ export default async function AssistenteParametrosPage({ searchParams }: { searc
               <Pill tone={mcp ? "good" : "neutral"}>{mcp ? "Ligada" : "Desligada"}</Pill>
             </div>
             <p className="mt-2 text-sm text-slate-700">
-              Com a conexão ligada, cada pessoa da equipe pode ligar o próprio assistente (o Claude, por exemplo) ao ERP, entrando com o próprio login. O assistente enxerga e faz só o que as telas daquela pessoa permitem: vendedor vê as próprias vendas, financeiro vê o que há a receber e a pagar, e assim por diante.
+              Cada pessoa conecta seu assistente com o próprio acesso do ERP.
             </p>
+            <details className="mt-2">
+              <summary className="min-h-[var(--control)] cursor-pointer py-3 text-sm font-medium">Ver permissões e como conectar</summary>
             <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-600">
               <li>O que o assistente ler é enviado ao serviço de inteligência artificial do aplicativo que a pessoa conectou.</li>
-              <li>Custo, margem, tabela de custos e alçada de desconto nunca são enviados.</li>
-              <li>Pelo assistente dá para consultar, criar tarefa e anotar numa oportunidade. Fechar pedido, aprovar, receber e pagar continuam só na tela.</li>
+              <li>Custo e margem só são enviados à diretoria com poder de custos e acesso ao pedido.</li>
+              <li>Alterações têm prévia e confirmação no chat. Registrar pagamento não transfere dinheiro; cobranças são rascunhos.</li>
             </ul>
             {mcp && (
               <>
@@ -80,6 +82,8 @@ export default async function AssistenteParametrosPage({ searchParams }: { searc
                 </div>
               </>
             )}
+            {connections.length > 0 && <p className="mt-2 text-sm text-slate-600">{connections.length} conexões ativas. Consulte os aplicativos abaixo.</p>}
+            </details>
             <ActionForm action={setMcpAction} className="mt-3">
               {mcp ? (
                 <ConfirmButton label="Desligar a conexão" confirmLabel="Confirmar: desligar e desconectar todos" className={SECONDARY} />
@@ -91,6 +95,8 @@ export default async function AssistenteParametrosPage({ searchParams }: { searc
             </ActionForm>
           </section>
           {connections.length > 0 && (
+            <details className={`${CARD} mt-3 p-3`}>
+              <summary className="min-h-[var(--control)] cursor-pointer py-3 text-sm font-medium">Aplicativos conectados ({connections.length})</summary>
             <ul className="mt-3 flex flex-col gap-2" aria-label="Aplicativos conectados">
               {connections.map((connection) => (
                 <li key={connection.id} className={`${CARD} flex flex-wrap items-center gap-2 px-3 py-2`}>
@@ -110,6 +116,7 @@ export default async function AssistenteParametrosPage({ searchParams }: { searc
                 </li>
               ))}
             </ul>
+            </details>
           )}
         </>
       )}

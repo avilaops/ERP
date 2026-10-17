@@ -7,6 +7,7 @@ import { tenantDb } from "@/lib/db/pool";
 import { resourceUrl } from "@/lib/mcp/http";
 import { resolveClient } from "@/lib/mcp/client";
 import { toolsOf } from "@/lib/mcp/tools";
+import { PRIMARY, SECONDARY } from "@/components/ui";
 import { decideAuthorizationAction } from "./actions";
 
 /**
@@ -44,29 +45,32 @@ export default async function AuthorizePage({ searchParams }: { searchParams: Pr
       <p className="text-lg font-semibold text-slate-900">{session.tenant.name}</p>
       <h1 className="text-xl font-semibold">Permitir que {client.name} use o ERP por você?</h1>
       <p className="text-slate-700">
-        Você está como <strong>{session.name}</strong> ({session.profile ?? ROLE_LABELS[session.role]}). O aplicativo, que responde em <strong>{where}</strong>, vai enxergar e fazer só o que as suas telas permitem:
+        Como <strong>{session.name}</strong> ({session.profile ?? ROLE_LABELS[session.role]}), você permite as ferramentas do seu perfil ao aplicativo em <strong className="break-words">{where}</strong>.
       </p>
-      <ul className="rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-800">
-        {tools.map((tool) => (
-          <li key={tool.name} className="py-0.5">
-            {tool.writes ? "✎" : "•"} {tool.title}
-            {tool.writes ? " (grava)" : ""}
-          </li>
-        ))}
-        {tools.length === 0 && <li>Nenhuma ferramenta: o seu perfil não tem telas ligadas ao assistente.</li>}
-      </ul>
-      <p className="text-sm text-slate-600">Custo e margem nunca são enviados. O que o aplicativo ler vai para o serviço de inteligência artificial dele. Você pode desfazer a qualquer hora no menu → Conectar assistente.</p>
+      <details className="rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800">
+        <summary className="min-h-[var(--control)] cursor-pointer py-3 font-medium">Ver ferramentas permitidas ({tools.length})</summary>
+        <ul className="pb-3">
+          {tools.map((tool) => (
+            <li key={tool.name} className="py-0.5">
+              {tool.writes ? "✎" : "•"} {tool.title}
+              {tool.writes ? " (grava)" : ""}
+            </li>
+          ))}
+          {tools.length === 0 && <li>Nenhuma ferramenta: o seu perfil não tem telas ligadas ao assistente.</li>}
+        </ul>
+      </details>
+      <p className="text-sm text-slate-600">Os dados lidos vão para a IA do aplicativo. Custos exigem diretoria autorizada. Alterações pedem prévia e confirmação; não há transferência bancária. Revogue em Conectar assistente.</p>
       {!on && <p className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">A conexão com assistentes está desligada para esta empresa. Quem liga é a diretoria, em Parâmetros → Assistente.</p>}
       <PublicForm action={decideAuthorizationAction} className="flex flex-col gap-2">
         {Object.entries(params).map(([name, value]) => (
           <input key={name} type="hidden" name={name} value={value} />
         ))}
         {on && (
-          <button type="submit" name="what" value="permitir" className="w-full rounded bg-brand px-4 py-3 text-base font-semibold text-white hover:opacity-90">
+          <button type="submit" name="what" value="permitir" className={`${PRIMARY} w-full`}>
             Permitir
           </button>
         )}
-        <button type="submit" name="what" value="negar" className="w-full rounded border border-slate-300 bg-white px-4 py-3 text-base font-medium text-slate-800 hover:bg-slate-100">
+        <button type="submit" name="what" value="negar" className={`${SECONDARY} w-full`}>
           Não permitir
         </button>
       </PublicForm>

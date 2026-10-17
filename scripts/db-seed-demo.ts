@@ -204,6 +204,8 @@ async function seed(conn: Queryable): Promise<string[]> {
       const order = await getOrder(number, ALL, conn);
       if (!order) throw new Error(`Pedido ${number} não encontrado.`);
       const total = saleOf(order, table).invoiceTotal;
+      // Fictitious terms belong to each demo order, never to a real company's defaults.
+      await conn.query("UPDATE orders SET proposal_details = $1::jsonb WHERE id = $2", [JSON.stringify({ warranty: "12 meses contra defeitos de fabricação (demonstração fictícia).", installation: "Não inclusa (demonstração fictícia).", freightMode: "FOB" }), order.id]);
       // 70% of entrada closes within the policy; 30% sends the order to approval.
       const share = plan.outcome === "fechado" ? 0.7 : 0.3;
       await savePayment(

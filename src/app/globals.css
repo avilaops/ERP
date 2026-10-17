@@ -167,7 +167,14 @@ input[type="date"]::-webkit-date-and-time-value {
   [data-order-part="cliente"] [data-part]:not([data-part~="cliente"]),
   [data-order-part="entrega"] [data-part]:not([data-part~="entrega"]),
   [data-order-part="pagamento"] [data-part]:not([data-part~="pagamento"]),
+  [data-order-part="fechar"] [data-part]:not([data-part~="fechar"]),
   [data-order-part="documentos"] [data-part]:not([data-part~="documentos"]) {
+    display: none;
+  }
+  /* Closing is its own decision: hide the editing tools and their empty wrappers. */
+  main:has([data-order-part="fechar"]) [data-order-context],
+  [data-order-part="fechar"] > fieldset,
+  [data-order-part="fechar"] > [data-order-total] {
     display: none;
   }
 }

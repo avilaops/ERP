@@ -116,6 +116,7 @@ export function parseOrderPayment(read: (key: PaymentField) => string | null, me
 
 /** Why an order waits for approval, in the words of the screen. No limit and no profit here. */
 export const REASON_TEXT: Record<ApprovalReason, string> = {
+  "solicitacao-manual": "foi solicitada uma aprovação antes de confirmar a venda",
   "desconto-acima-do-livre": "o desconto passa do que a equipe pode dar sem aprovação",
   "fora-da-meta": "o lucro do pedido fica abaixo da meta",
   "frete-por-nossa-conta": "o frete fica por conta da empresa",

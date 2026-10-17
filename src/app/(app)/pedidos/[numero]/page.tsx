@@ -20,6 +20,7 @@ import { listOrderInvoiceEvents, listOrderInvoices } from "@/lib/db/invoices";
 import { previewOrderNfe } from "@/lib/db/order-nfe";
 import { findCustomerByDocument } from "@/lib/db/customers";
 import { getOrder, listPaymentMethods, loadOrderStanding } from "@/lib/db/orders";
+import { loadClosingProposal } from "@/lib/db/proposal-details";
 import { ContractError, isOpen, listOrderContracts, loadContractSettings, standingText } from "@/lib/db/contracts";
 import { draftOrderContract } from "@/lib/db/send-contract";
 import { contractNumber } from "@/lib/contract/text";
@@ -36,7 +37,6 @@ import { ORIGIN_UF, UFS } from "@/lib/pricing/states";
 import { compareByCode } from "@/lib/products-view";
 import { CopyButton } from "@/components/CopyButton";
 import { DiscountFields } from "@/components/DiscountFields";
-import { DownPaymentFields } from "@/components/DownPaymentFields";
 import { proposalText } from "@/lib/quote/text";
 import { decideApprovalAction } from "../../aprovacoes/actions";
 import { FREIGHT_MODES } from "@/lib/fiscal/nfe";
@@ -54,7 +54,6 @@ import {
   reopenOrderAction,
   saveOrderCustomerAction,
   saveInstallmentsAction,
-  savePaymentAction,
   saveTermsAction,
   setItemOptionsAction,
   setItemQuantityAction,
@@ -148,7 +147,8 @@ export default async function PedidoPage({
   // The installments of the balance, as they stand: the rows the seller may change one by one.
   const installmentRows = plan.receipts.filter((receipt) => receipt.label !== "Entrada");
   const agreedInstallments = order.customInstallments.length > 0 && installmentRows.length === order.customInstallments.length;
-  const missing = editable ? closingProblems(order, sale) : [];
+  const commercialMissing = editable ? (await loadClosingProposal(order.id, conn)).missing : [];
+  const missing = editable ? [...closingProblems(order, sale), ...commercialMissing] : [];
   // The forms of payment are the company's own list; one already used and since turned off still shows.
   const methods = await listPaymentMethods(conn);
   // The forms that mean "the balance is paid at delivery".
@@ -275,6 +275,7 @@ export default async function PedidoPage({
     { key: "cliente", label: "Cliente", filled: linked !== null && isComplete(linked) },
     { key: "entrega", label: "Entrega", filled: order.deliveryUf !== null && order.productionDays !== null },
     { key: "pagamento", label: "Pagamento", filled: plan.balance === 0 || (order.installmentCount !== null && order.balanceMethod !== null) },
+    ...(editable ? [{ key: "fechar", label: "Fechar", filled: missing.length === 0 }] : []),
     ...(hasDocuments ? [{ key: "documentos", label: "Contrato e nota", filled: null }] : []),
   ];
   // It opens where the work is: the first part still to fill in while the order is open, the summary after.
@@ -288,11 +289,11 @@ export default async function PedidoPage({
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">Pedido #{order.number}</h1>
-          <p className="mt-1 text-sm text-slate-600">
+          <p data-order-context className="mt-1 text-sm text-slate-600">
             De {order.sellerEmail === session.email ? "Você" : order.sellerName} · atualizado {showDateTime(order.updatedAt)}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2 text-sm">
+        <div data-order-context className="flex flex-wrap items-center gap-2 text-sm">
           <span className="rounded-full bg-slate-200 px-3 py-1 font-medium">{STATUS_LABELS[order.status]}</span>
           <span className="rounded-full border border-slate-300 px-3 py-1">Tabela v{table.version}</span>
           {order.items.length > 0 && (
@@ -301,6 +302,7 @@ export default async function PedidoPage({
             </a>
           )}
           {order.items.length > 0 && <CopyButton text={proposal} label="Copiar proposta" className={BUTTON} />}
+          <Link href={`/pedidos/${order.number}/proposta`} className={BUTTON}>Dados do PDF</Link>
         </div>
       </div>
       {latest && latest.version !== table.version && (
@@ -499,6 +501,9 @@ export default async function PedidoPage({
           <h2 id="nota-fiscal" className="text-sm font-semibold uppercase tracking-wide">
             Nota fiscal
           </h2>
+          <Link href={`/pedidos/${order.number}/fiscal`} className={`${SECONDARY} mt-3`}>
+            Preparar regras desta nota
+          </Link>
           <p className="mt-1 text-slate-600">
             A conferência não envia nada nem consome número. Emitir assina com o certificado da empresa e envia à SEFAZ, no ambiente
             escolhido em Parâmetros → Fiscal ({invoice.input.environment === "producao" ? "produção: nota com valor fiscal" : "homologação: nota de teste, sem valor fiscal"}).
@@ -1158,150 +1163,19 @@ export default async function PedidoPage({
                   Política: entrada de pelo menos {showPercent(table.minDownPayment, 0)} da nota ({showMoney(plan.policyDownPayment)})
                 </p>
               </div>
-              <ActionForm action={savePaymentAction} className="grid gap-5 p-5 sm:grid-cols-3">
-                <input type="hidden" name="number" value={order.number} />
-                <div className="sm:col-span-3 lg:col-span-1">
-                  <DownPaymentFields key={`${order.downPayment}-${sale.invoiceTotal}`} name="downPayment" amount={order.downPayment === 0 ? "" : formatMoney(order.downPayment)} invoiceTotal={sale.invoiceTotal} />
-                  <p className={HELP}>
-                    {showPercent(plan.downPaymentRate)} da nota ·{" "}
-                    {plan.meetsPolicy ? "dentro da política" : "abaixo da política: precisa de aprovação"}
-                  </p>
-                </div>
-                <div>
-                  <label htmlFor="downPaymentMethod" className="block text-sm font-medium">
-                    Forma da entrada
-                  </label>
-                  <select
-                    key={order.downPaymentMethod ?? ""}
-                    id="downPaymentMethod"
-                    name="downPaymentMethod"
-                    defaultValue={order.downPaymentMethod ?? ""}
-                    className={`${INPUT} mt-1 w-full`}
-                  >
-                    <option value="">—</option>
-                    {methodsWith(order.downPaymentMethod).map((method) => (
-                      <option key={method} value={method}>
-                        {method}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label htmlFor="downPaymentDate" className="block text-sm font-medium">
-                    Data da entrada
-                  </label>
-                  <input
-                    id="downPaymentDate"
-                    name="downPaymentDate"
-                    type="date"
-                    defaultValue={order.downPaymentDate ?? ""}
-                    className={`${INPUT} mt-1 w-full`}
-                  />
-                  <p className={HELP}>Vazio: na confirmação do pedido.</p>
-                </div>
-                <div>
-                  <label htmlFor="installmentCount" className="block text-sm font-medium">
-                    Parcelas do saldo
-                  </label>
-                  <input
-                    id="installmentCount"
-                    name="installmentCount"
-                    type="text"
-                    inputMode="numeric"
-                    defaultValue={order.installmentCount ?? ""}
-                    className={`${INPUT} mt-1 w-24 text-right`}
-                  />
-                  <p className={HELP}>Saldo: {showMoney(plan.balance)}</p>
-                </div>
-                <div>
-                  <label htmlFor="balanceMethod" className="block text-sm font-medium">
-                    Forma do saldo
-                  </label>
-                  <select
-                    key={order.balanceMethod ?? ""}
-                    id="balanceMethod"
-                    name="balanceMethod"
-                    defaultValue={order.balanceMethod ?? ""}
-                    className={`${INPUT} mt-1 w-full`}
-                  >
-                    <option value="">—</option>
-                    {methodsWith(order.balanceMethod).map((method) => (
-                      <option key={method} value={method}>
-                        {method}
-                      </option>
-                    ))}
-                  </select>
-                  {onDelivery.length > 0 && (
-                    <p className={HELP}>
-                      {order.balanceOnDelivery
-                        ? `Saldo na entrega: uma parcela de ${showMoney(plan.balance)} no dia em que o pedido fica pronto${dates.completion ? ` (${showIsoDate(dates.completion)})` : ""}.`
-                        : `Com "${onDelivery[0]}", o saldo vira uma parcela só, no dia em que o pedido fica pronto; parcelas e prazos não são usados.`}
-                    </p>
-                  )}
-                </div>
-                <div className="flex gap-3">
-                  <div>
-                    <label htmlFor="firstInstallmentDays" className="block text-sm font-medium">
-                      1ª parcela em
-                    </label>
-                    <div className="mt-1 flex items-center gap-1">
-                      <input
-                        id="firstInstallmentDays"
-                        name="firstInstallmentDays"
-                        type="text"
-                        inputMode="numeric"
-                        size={1}
-                        defaultValue={order.firstInstallmentDays ?? ""}
-                        className={`${INPUT} w-16 text-right`}
-                      />
-                      <span className="text-xs text-slate-600">dias</span>
-                    </div>
-                  </div>
-                  <div>
-                    <label htmlFor="installmentIntervalDays" className="block text-sm font-medium">
-                      Intervalo
-                    </label>
-                    <div className="mt-1 flex items-center gap-1">
-                      <input
-                        id="installmentIntervalDays"
-                        name="installmentIntervalDays"
-                        type="text"
-                        inputMode="numeric"
-                        size={1}
-                        defaultValue={order.installmentIntervalDays ?? ""}
-                        className={`${INPUT} w-16 text-right`}
-                      />
-                      <span className="text-xs text-slate-600">dias</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="sm:col-span-3">
-                  <label htmlFor="paymentNotes" className="block text-sm font-medium">
-                    Observações do pagamento
-                  </label>
-                  <input
-                    id="paymentNotes"
-                    name="paymentNotes"
-                    type="text"
-                    defaultValue={order.paymentNotes ?? ""}
-                    className={`${INPUT} mt-1 w-full`}
-                  />
-                </div>
-                {editable && (
-                  <div className="sm:col-span-3">
-                    <button type="submit" className={PRIMARY}>
-                      Salvar pagamento
-                    </button>
-                  </div>
-                )}
-              </ActionForm>
+              <div className="grid gap-3 p-4">
+                <p>Entrada: {showMoney(plan.downPayment)}{order.downPaymentMethod ? ` via ${order.downPaymentMethod}` : " · meio a escolher"}.</p>
+                <p>Saldo: {showMoney(plan.balance)} · {order.balanceOnDelivery ? "na entrega" : `${order.installmentCount ?? "—"} parcela(s)`}{order.balanceMethod && !onDelivery.includes(order.balanceMethod) ? ` via ${order.balanceMethod}` : " · meio a escolher"}.</p>
+                {order.paymentNotes && <p className="text-sm text-slate-600">{order.paymentNotes}</p>}
+                {editable && <Link href={`/pedidos/${order.number}/pagamento`} className={PRIMARY}>Escolher prazo e meios de pagamento</Link>}
+              </div>
               {editable && !order.balanceOnDelivery && installmentRows.length > 0 && (
-                <div className="border-t border-slate-200 p-5">
-                  <h3 className="text-sm font-semibold">Parcelas do saldo</h3>
+                <details className="border-t border-slate-200">
+                  <summary className="disclosure-heading">Editar parcelas individualmente<span className="disclosure-marker" aria-hidden="true">+</span></summary>
+                  <div className="p-4">
                   <p className={HELP}>
                     Para mudar a data, o valor ou a forma de uma parcela, edite aqui e salve.{" "}
-                    {agreedInstallments ? "Estas parcelas foram combinadas uma a uma." : "Hoje elas são calculadas pelo número de parcelas e pelos prazos acima."} Salvar o
-                    pagamento acima recalcula tudo.
+                    {agreedInstallments ? "Estas parcelas foram combinadas uma a uma." : "Hoje elas são calculadas pelo número de parcelas e pelos prazos combinados."} Alterar o plano de pagamento recalcula as parcelas.
                   </p>
                   <ActionForm action={saveInstallmentsAction} className="mt-3 flex flex-col gap-2">
                     <input type="hidden" name="number" value={order.number} />
@@ -1338,11 +1212,13 @@ export default async function PedidoPage({
                       </button>
                     </div>
                   </ActionForm>
-                </div>
+                  </div>
+                </details>
               )}
               {plan.receipts.length > 0 && (
-                <div className="relative overflow-x-auto border-t border-slate-200">
-                  <table className="w-full text-sm">
+                <details className="border-t border-slate-200">
+                  <summary className="disclosure-heading">Ver recebimentos previstos<span className="disclosure-marker" aria-hidden="true">+</span></summary>
+                  <table className="stack-sm w-full text-sm">
                     <caption className="px-5 py-2 text-left text-xs text-slate-600">
                       Recebimentos previstos. A comissão é uma previsão: só vale quando o valor entra.
                     </caption>
@@ -1363,16 +1239,16 @@ export default async function PedidoPage({
                     <tbody>
                       {plan.receipts.map((receipt) => (
                         <tr key={receipt.label} className="border-t border-slate-200">
-                          <td className="px-5 py-2 font-medium">{receipt.label}</td>
-                          <td className="px-5 py-2">{showIsoDate(receipt.dueDate)}</td>
-                          <td className="px-5 py-2">{receipt.method ?? NONE}</td>
-                          <td className="whitespace-nowrap px-5 py-2 text-right">{showMoney(receipt.amount)}</td>
-                          <td className="whitespace-nowrap px-5 py-2 text-right">{showMoney(receipt.commission)}</td>
+                          <td data-label="Parcela" className="px-5 py-2 font-medium">{receipt.label}</td>
+                          <td data-label="Vencimento" className="px-5 py-2">{showIsoDate(receipt.dueDate)}</td>
+                          <td data-label="Forma" className="px-5 py-2">{receipt.method ?? NONE}</td>
+                          <td data-label="Valor" className="whitespace-nowrap px-5 py-2 text-right">{showMoney(receipt.amount)}</td>
+                          <td data-label="Comissão" className="whitespace-nowrap px-5 py-2 text-right">{showMoney(receipt.commission)}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
-                </div>
+                </details>
               )}
             </section>
           </div>
@@ -1479,7 +1355,7 @@ export default async function PedidoPage({
       </fieldset>
 
       {/* On a phone the total stays in sight, with the way to the closing. */}
-      <div className="sticky bottom-[var(--tabbar)] z-10 -mx-4 mt-6 flex items-center justify-between gap-3 border-t border-slate-200 bg-white px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:hidden">
+      <div data-order-total className="sticky bottom-[var(--tabbar)] z-10 -mx-4 mt-6 flex items-center justify-between gap-3 border-t border-slate-200 bg-white px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:hidden">
         <span>
           <span className="block text-xs text-slate-600">Total da nota</span>
           <span className="block text-lg font-bold leading-tight">{showMoney(sale.invoiceTotal)}</span>
@@ -1494,15 +1370,17 @@ export default async function PedidoPage({
       </div>
 
       {editable && (
-        <section data-part="resumo" className={`${CARD} mt-6 scroll-mt-20 p-5`} aria-labelledby="fechar">
+        <section data-part="fechar" className={`${CARD} mt-3 scroll-mt-20 p-5`} aria-labelledby="fechar">
           <h2 id="fechar" className={`${TITLE} scroll-mt-24`}>
             Fechar pedido
           </h2>
+          <p className="mt-1 text-sm text-slate-700">Total da nota: <strong>{showMoney(sale.invoiceTotal)}</strong></p>
           {missing.length > 0 ? (
             <ul className="mt-3 list-disc pl-5 text-sm text-slate-700">
-              {missing.map((item) => (
+              {missing.filter((item) => !commercialMissing.includes(item)).map((item) => (
                 <li key={item}>{item}</li>
               ))}
+              {commercialMissing.length > 0 && <li>Dados do PDF: {commercialMissing.map((item) => item.replace(": preencha em Dados do PDF.", "")).join("; ")}.</li>}
             </ul>
           ) : (
             <p className="mt-3 text-sm text-slate-700">
@@ -1511,13 +1389,18 @@ export default async function PedidoPage({
                 : "Dentro da política: fecha na hora."}
             </p>
           )}
-          <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
+          <div className="mt-4 flex flex-wrap items-start gap-2">
+            {commercialMissing.length > 0 && <Link href={`/pedidos/${order.number}/proposta`} className={`${PRIMARY} w-full sm:w-auto`}>Completar dados do PDF</Link>}
             <ActionForm action={closeOrderAction}>
               <input type="hidden" name="number" value={order.number} />
-              <button type="submit" disabled={missing.length > 0} className={`${PRIMARY} disabled:cursor-not-allowed disabled:opacity-50`}>
+              <button type="submit" disabled={missing.length > 0} className={`${missing.length > 0 ? SECONDARY : PRIMARY} disabled:cursor-not-allowed disabled:opacity-50`}>
                 {reasons.length > 0 && missing.length === 0 ? "Enviar para aprovação" : "Fechar pedido"}
               </button>
             </ActionForm>
+          </div>
+        </section>
+      )}
+      {editable && <div data-part="resumo" className="mt-4">
             <ActionForm action={deleteOrderAction}>
               <input type="hidden" name="number" value={order.number} />
               <ConfirmButton
@@ -1526,9 +1409,7 @@ export default async function PedidoPage({
                 className={DANGER_OUTLINE}
               />
             </ActionForm>
-          </div>
-        </section>
-      )}
+      </div>}
       </OrderParts>
     </>
   );

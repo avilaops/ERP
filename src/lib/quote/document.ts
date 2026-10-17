@@ -3,7 +3,7 @@ import { withOptions } from "@/lib/plates";
 import { formatDocument, formatPhone } from "@/lib/customer";
 import type { Order } from "@/lib/db/orders";
 import type { PublishedTable } from "@/lib/db/price-table";
-import { formatPercent, showIsoDate, showMoney, showPercent } from "@/lib/format";
+import { formatMoney, formatPercent, showIsoDate, showPercent } from "@/lib/format";
 import { UF_NAMES } from "@/lib/order-form";
 import { productionText } from "@/lib/order-quote";
 import type { DueDates, PaymentPlan } from "@/lib/order-quote";
@@ -79,6 +79,12 @@ export type QuoteDocument = {
   totals: QuoteTotal[];
   /** Sum of the quantities. */
   units: number;
+  issuerLines?: string[];
+  status?: string;
+  footer?: string[];
+  sections?: { title: string; lines: string[] }[];
+  pix?: { key: string; name: string; amount: string; code: string };
+  electronicAcceptance?: boolean;
 };
 
 type QuoteInput = {
@@ -100,6 +106,9 @@ type QuoteInput = {
 };
 
 const blankToNull = (value: string | null | undefined) => (value?.trim() ? value.trim() : null);
+
+/** Customer documents always display the cents, including whole amounts. */
+export const quoteMoney = (value: number): string => `R$ ${formatMoney(value)}`;
 
 const MONTHS = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
 /** `2026-10-08` → `8 de outubro de 2026`. */
@@ -126,15 +135,16 @@ function paymentLines(plan: PaymentPlan, onDelivery: boolean): string[] {
   const down = first.label === "Entrada" ? first : null;
   const parts = down ? rest : plan.receipts;
   const lines: string[] = [];
-  if (down) lines.push(`Entrada de ${showMoney(down.amount)} (${showPercent(plan.downPaymentRate)})${down.method ? ` via ${down.method}` : ""} em ${showIsoDate(down.dueDate)}`);
+  if (down) lines.push(`Entrada de ${quoteMoney(down.amount)} (${showPercent(plan.downPaymentRate)})${down.method ? ` via ${down.method}` : ""} em ${showIsoDate(down.dueDate)}`);
   if (parts.length === 0) {
-    if (plan.balance > 0) lines.push(`Saldo de ${showMoney(plan.balance)}: a combinar`);
+    if (plan.balance > 0) lines.push(`Saldo de ${quoteMoney(plan.balance)}: a combinar`);
   } else if (onDelivery) {
-    lines.push(`Saldo de ${showMoney(plan.balance)} na entrega (previsão: ${showIsoDate(parts[0].dueDate)})`);
+    const method = parts[0].method && parts[0].method !== "Na entrega" ? ` via ${parts[0].method}` : "";
+    lines.push(`Saldo de ${quoteMoney(plan.balance)} na entrega${method} (previsão: ${showIsoDate(parts[0].dueDate)})`);
   } else {
     const method = parts[0].method ? ` via ${parts[0].method}` : "";
-    lines.push(`Saldo de ${showMoney(plan.balance)} em ${parts.length} ${parts.length === 1 ? "parcela" : "parcelas"}${method}:`);
-    for (const part of parts) lines.push(`${part.label}: ${showMoney(part.amount)} em ${showIsoDate(part.dueDate)}`);
+    lines.push(`Saldo de ${quoteMoney(plan.balance)} em ${parts.length} ${parts.length === 1 ? "parcela" : "parcelas"}${method}:`);
+    for (const part of parts) lines.push(`${part.label}: ${quoteMoney(part.amount)} em ${showIsoDate(part.dueDate)}`);
   }
   return lines;
 }
@@ -166,21 +176,21 @@ export function quoteDocument({ company, order, table, sale, dates, products, to
       name: withOptions(product.name, options),
       description: blankToNull(products.get(productId)?.description),
       quantity,
-      unitPrice: showMoney(line.unitPrice),
-      unitDiscount: hasDiscount ? showMoney(line.unitDiscount) : null,
-      unitIpi: showMoney(line.unitIpi),
-      unitWithIpi: showMoney(line.unitWithIpi),
-      totalWithIpi: showMoney(line.totalWithIpi),
+      unitPrice: quoteMoney(line.unitPrice),
+      unitDiscount: hasDiscount ? quoteMoney(line.unitDiscount) : null,
+      unitIpi: quoteMoney(line.unitIpi),
+      unitWithIpi: quoteMoney(line.unitWithIpi),
+      totalWithIpi: quoteMoney(line.totalWithIpi),
     }));
 
   const { customer } = order;
   const totals: QuoteTotal[] = [
-    { label: "Total de tabela", value: showMoney(sale.tableTotal), strong: false },
-    { label: `Desconto (${showPercent(sale.discount)})`, value: `– ${showMoney(sale.tableTotal - sale.netSale)}`, strong: false },
-    { label: "Valor sem IPI", value: showMoney(sale.netSale), strong: false },
-    { label: `IPI (${formatPercent(table.ipi)}%)`, value: showMoney(sale.ipi), strong: false },
-    { label: "Total da nota", value: showMoney(sale.invoiceTotal), strong: true },
-  ].filter((_, index) => (hasDiscount || index !== 1) && (hasIpi || (index !== 2 && index !== 3)));
+    { label: "Total de tabela", value: quoteMoney(sale.tableTotal), strong: false },
+    { label: `Desconto (${showPercent(sale.discount)})`, value: `– ${quoteMoney(sale.tableTotal - sale.netSale)}`, strong: false },
+    { label: "Valor sem IPI", value: quoteMoney(sale.netSale), strong: false },
+    { label: `IPI (${formatPercent(table.ipi)}%)`, value: quoteMoney(sale.ipi), strong: false },
+    { label: "Total da nota", value: quoteMoney(sale.invoiceTotal), strong: true },
+  ].filter((_, index) => (hasDiscount || index !== 1) && (hasIpi || (index !== 2 && index !== 3)) && (hasDiscount || !hasIpi || index !== 0));
 
   return {
     company,

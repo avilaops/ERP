@@ -42,7 +42,7 @@ const PERSON: CustomerInput = { ...blank, kind: "PF", document: "52998224725", n
 
 test("empresa do print: grava e volta igual, por id e por documento", { skip }, async () => {
   const created = await createCustomer(COMPANY, WHO, db.pool);
-  assert.deepEqual(created, { ...COMPANY, id: created.id });
+  assert.deepEqual(created, { ...COMPANY, district: "Teste", id: created.id });
   assert.deepEqual(await getCustomer(created.id, db.pool), created);
   assert.deepEqual(await findCustomerByDocument("48240052000161", db.pool), created);
   assert.equal(await findCustomerByDocument("00000000000000", db.pool), null);
@@ -85,6 +85,7 @@ test("alterar: grava a ficha e quem alterou; tipo e documento não mudam", { ski
   );
   assert.deepEqual(updated, {
     ...COMPANY,
+    district: "Teste",
     id: current.id,
     name: "Academia Teste Ltda",
     stateRegistration: "123456789110",
