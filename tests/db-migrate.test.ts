@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -210,6 +210,35 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "whatsapp_settings",
     "whatsapp_templates",
   ]);
+});
+
+test("migração: reconhece o PIX já aplicado com o nome anterior sem repetir SQL", { skip }, async () => {
+  const dir = mkdtempSync(join(tmpdir(), "erp-pix-anterior-"));
+  const other = await openTestDb("migrate_pix_anterior", { migrated: false });
+  try {
+    for (const name of readdirSync(MIGRATIONS_DIR).filter((name) => name < "0070")) {
+      writeFileSync(join(dir, name), readFileSync(join(MIGRATIONS_DIR, name)));
+    }
+    const previous = "0070_pix_direto_e_termos_preservados.sql";
+    const current = "0071_pix_direto_e_termos_preservados.sql";
+    writeFileSync(join(dir, previous), readFileSync(join(MIGRATIONS_DIR, current)));
+    const client = await other.pool.connect();
+    try {
+      await migrate(client, dir);
+      await client.query("UPDATE payment_methods SET company_pix=false");
+      assert.deepEqual(await migrate(client, MIGRATIONS_DIR), ["0070_email_da_carta_de_correcao.sql", current]);
+      assert.deepEqual(await migrate(client, MIGRATIONS_DIR), []);
+      const flags = await client.query("SELECT 1 FROM payment_methods WHERE company_pix");
+      assert.equal(flags.rows.length, 0);
+      const ledger = await client.query("SELECT name FROM schema_migrations WHERE name=$1 OR name=$2 ORDER BY name", [previous, current]);
+      assert.deepEqual(ledger.rows.map((row) => row.name), [previous, current]);
+    } finally {
+      client.release();
+    }
+  } finally {
+    await other.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test("migração: os parâmetros e as alíquotas que existiam passam a ser os da linha 1, a única", { skip }, async () => {

@@ -354,7 +354,12 @@ export default async function PedidoPage({
         <details data-part="documentos" className="mt-3 rounded-lg border border-slate-200 bg-white p-4 text-sm" aria-labelledby="contrato">
           <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-2">
             <h2 id="contrato" className="text-sm font-semibold uppercase tracking-wide">Contrato</h2>
-            <span className="text-slate-600">Ver modelo, envio e assinatura</span>
+            <span className="text-slate-600">
+              {contracts[0] ? standingText(contracts[0], now) : "Preparar envio"}
+              {contracts[0] && (contracts[0].status === "enviado" || contracts[0].status === "assinado") &&
+                !contracts[0].companySignatures.some((signature) => signature.email === session.email) &&
+                " · Sua assinatura pendente"}
+            </span>
           </summary>
           <p className="mt-1 text-slate-600">
             O cliente recebe um link por e-mail, lê o contrato e assina com nome, CPF e um código enviado ao e-mail dele. O PDF assinado sai com o registro das
