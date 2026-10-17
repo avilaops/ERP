@@ -351,10 +351,11 @@ export default async function PedidoPage({
         </section>
       )}
       {(contracts.length > 0 || contractDraft !== null) && (
-        <section data-part="documentos" className="mt-3 rounded-lg border border-slate-200 bg-white p-4 text-sm" aria-labelledby="contrato">
-          <h2 id="contrato" className="text-sm font-semibold uppercase tracking-wide">
-            Contrato
-          </h2>
+        <details data-part="documentos" className="mt-3 rounded-lg border border-slate-200 bg-white p-4 text-sm" aria-labelledby="contrato">
+          <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-2">
+            <h2 id="contrato" className="text-sm font-semibold uppercase tracking-wide">Contrato</h2>
+            <span className="text-slate-600">Ver modelo, envio e assinatura</span>
+          </summary>
           <p className="mt-1 text-slate-600">
             O cliente recebe um link por e-mail, lê o contrato e assina com nome, CPF e um código enviado ao e-mail dele. O PDF assinado sai com o registro das
             assinaturas na última folha.
@@ -386,7 +387,7 @@ export default async function PedidoPage({
                       </span>
                     ))}
                     <span className="mt-1 flex flex-wrap items-start gap-x-4 gap-y-2 text-slate-900">
-                      <a href={`/api/pedidos/${order.number}/contrato/${contract.id}`} target="_blank" rel="noopener" className="font-medium underline">
+                      <a href={`/api/pedidos/${order.number}/contrato/${contract.id}`} target="_blank" rel="noopener" className={SECONDARY}>
                         {contract.status === "assinado" ? "Contrato assinado (PDF)" : "Abrir o contrato (PDF)"}
                       </a>
                       {live && !mine && (
@@ -486,7 +487,7 @@ export default async function PedidoPage({
                   <input id="recipientPhone" name="recipientPhone" type="tel" inputMode="tel" defaultValue={order.customer?.phone ?? ""} placeholder="(17) 99999-8888" autoComplete="off" className={`${INPUT} w-full`} />
                 </div>
               )}
-              <a href={`/api/pedidos/${order.number}/contrato-previa`} target="_blank" rel="noopener" className="py-2 font-medium text-brand underline">
+              <a href={`/api/pedidos/${order.number}/contrato-previa`} target="_blank" rel="noopener" className={SECONDARY}>
                 Conferir o contrato (PDF)
               </a>
               <button type="submit" className={PRIMARY}>
@@ -494,13 +495,14 @@ export default async function PedidoPage({
               </button>
             </ActionForm>
           )}
-        </section>
+        </details>
       )}
       {invoice && (
-        <section data-part="documentos" className="mt-3 rounded-lg border border-slate-200 bg-white p-4 text-sm" aria-labelledby="nota-fiscal">
-          <h2 id="nota-fiscal" className="text-sm font-semibold uppercase tracking-wide">
-            Nota fiscal
-          </h2>
+        <details data-part="documentos" className="mt-3 rounded-lg border border-slate-200 bg-white p-4 text-sm" aria-labelledby="nota-fiscal">
+          <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-2">
+            <h2 id="nota-fiscal" className="text-sm font-semibold uppercase tracking-wide">Nota fiscal</h2>
+            <span className="text-slate-600">{invoices[0] ? `Nº ${invoices[0].number} · ${INVOICE_LABELS[invoices[0].status]} · ${invoices[0].environment === "homologacao" ? "homologação" : "produção"}` : "Ver preparação e emissão"}</span>
+          </summary>
           <Link href={`/pedidos/${order.number}/fiscal`} className={`${SECONDARY} mt-3`}>
             Preparar regras desta nota
           </Link>
@@ -529,10 +531,10 @@ export default async function PedidoPage({
                     ))}
                   {item.status === "autorizada" && (
                     <span className="flex flex-wrap gap-x-4">
-                      <a href={`/api/pedidos/${order.number}/danfe`} target="_blank" rel="noopener" className="font-medium underline">
+                      <a href={`/api/pedidos/${order.number}/danfe`} target="_blank" rel="noopener" className={SECONDARY}>
                         DANFE (PDF)
                       </a>
-                      <a href={`/api/pedidos/${order.number}/nfe`} className="font-medium underline">
+                      <a href={`/api/pedidos/${order.number}/nfe`} className={SECONDARY}>
                         Baixar XML autorizado
                       </a>
                     </span>
@@ -541,8 +543,8 @@ export default async function PedidoPage({
                     .filter((mail) => mail.invoiceId === item.id)
                     .map((mail) => (
                       <span key={mail.id} className="mt-1 block border-t border-current/20 pt-1 text-xs">
-                        E-mail {mail.kind === "cancelamento" ? "do cancelamento" : "da nota"} para {mail.recipient} · {showDateTime(mail.sentAt)} ·{" "}
-                        {mail.status === "enviado" ? "enviado" : `não saiu: ${mail.detail ?? "falha"}`} · pela caixa {mail.channel === "empresa" ? "da empresa" : "da Ávila Ops"}
+                        E-mail {mail.kind === "cancelamento" ? "do cancelamento" : mail.kind === "correcao" ? "da carta de correção" : "da nota"} para {mail.recipient} · {showDateTime(mail.sentAt)} ·{" "}
+                        {mail.status === "enviado" ? "aceito pelo servidor de e-mail" : `não saiu: ${mail.detail ?? "falha"}`} · pela caixa {mail.channel === "empresa" ? "da empresa" : "da Ávila Ops"}
                       </span>
                     ))}
                   {(item.status === "autorizada" || item.status === "cancelada") && (
@@ -551,7 +553,7 @@ export default async function PedidoPage({
                       <input type="hidden" name="invoiceId" value={item.id} />
                       <div>
                         <label htmlFor={`email-${item.id}`} className="block text-xs font-medium">
-                          Enviar {item.status === "cancelada" ? "o cancelamento" : "XML e DANFE"} por e-mail para
+                          Enviar {item.status === "cancelada" ? "o cancelamento" : "XML, DANFE e última CC-e, se houver"} por e-mail para
                         </label>
                         <input key={order.customer?.email ?? ""} id={`email-${item.id}`} name="to" type="email" defaultValue={order.customer?.email ?? ""} autoComplete="off" className={`${INPUT} mt-1 w-72 max-w-full`} />
                       </div>
@@ -604,7 +606,7 @@ export default async function PedidoPage({
             <div className="sm:col-span-2">
               <label htmlFor="carrierId" className="block text-xs font-medium text-slate-600">
                 Transportadora (opcional) ·{" "}
-                <Link href="/parametros/transportadoras" className="text-brand underline">
+                <Link href="/parametros/transportadoras" className={SECONDARY}>
                   cadastrar
                 </Link>
               </label>
@@ -734,12 +736,12 @@ export default async function PedidoPage({
                 ))}
               </dl>
               <p className="mt-3">
-                <a href={`/api/pedidos/${order.number}/nfe-previa`} className="font-medium text-brand underline">
+                <a href={`/api/pedidos/${order.number}/nfe-previa`} className={SECONDARY}>
                   Baixar XML de conferência
                 </a>{" "}
                 <span className="text-slate-600">(sem assinatura e sem valor fiscal)</span>
                 {" · "}
-                <a href={`/api/pedidos/${order.number}/danfe-previa`} target="_blank" rel="noopener" className="font-medium text-brand underline">
+                <a href={`/api/pedidos/${order.number}/danfe-previa`} target="_blank" rel="noopener" className={SECONDARY}>
                   DANFE de conferência
                 </a>
               </p>
@@ -755,7 +757,7 @@ export default async function PedidoPage({
               )}
             </>
           )}
-        </section>
+        </details>
       )}
       {!editable && (
         <div data-part="resumo" className="mt-3 rounded border border-slate-300 bg-slate-100 px-4 py-3 text-sm text-slate-700">

@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { SignedXml } from "xml-crypto";
 import { validateXML } from "xmllint-wasm";
-import { eventEnvelope, eventUrl, eventXml, parseEvent } from "@/lib/fiscal/events";
+import { eventEnvelope, eventUrl, eventXml, parseEvent, processedEventXml } from "@/lib/fiscal/events";
 import type { NfeEvent } from "@/lib/fiscal/events";
 import { NfeError } from "@/lib/fiscal/nfe";
 import { SefazError } from "@/lib/fiscal/sefaz";
@@ -70,4 +70,28 @@ test("evento: leitura da resposta — registrado, recusado com o motivo, lote re
   assert.deepEqual(parseEvent(answer("<cStat>215</cStat><xMotivo>Rejeição: Falha no schema XML</xMotivo>"), KEY), { registered: false, code: "215", reason: "Rejeição: Falha no schema XML" });
   assert.throws(() => parseEvent(answer(event("135", "ok", "9".repeat(44))), KEY), /outra nota/);
   assert.throws(() => parseEvent("<html/>", KEY), SefazError);
+});
+
+test("evento distribuído: conserva retorno real, valida no XSD e recusa recibo de outra sequência/ambiente/tipo", async () => {
+  const signed = signEventXml(eventXml(LETTER).xml, key);
+  const receipt = `<retEvento versao="1.00"><infEvento><tpAmb>1</tpAmb><verAplic>SP_NFE</verAplic><cOrgao>35</cOrgao><cStat>135</cStat><xMotivo>Evento registrado e vinculado a NF-e</xMotivo><chNFe>${KEY}</chNFe><tpEvento>110110</tpEvento><nSeqEvento>2</nSeqEvento><dhRegEvento>2026-10-08T11:00:05-03:00</dhRegEvento><nProt>135260000099999</nProt></infEvento></retEvento>`;
+  const answer = `<retEnvEvento xmlns="http://www.portalfiscal.inf.br/nfe" versao="1.00"><cStat>128</cStat>${receipt}</retEnvEvento>`;
+  const processed = processedEventXml(signed, answer);
+  assert.ok(processed.includes(signed) && processed.includes(receipt));
+  const folder = "PL_010d_v1.03/Evento/";
+  const schema = "procEventoNFe_v1.00.xsd";
+  const validation = await validateXML({
+    xml: [{ fileName: "evento.xml", contents: processed }],
+    schema: [{ fileName: schema, contents: fixture(folder + schema) }],
+    preload: ["leiauteEvento_v1.00.xsd", "tiposBasico_v1.03.xsd", "xmldsig-core-schema_v1.01.xsd"].map((fileName) => ({ fileName, contents: fixture(folder + fileName) })),
+  });
+  assert.deepEqual(validation.errors.map((error) => error.message), []);
+  assert.equal(verifies(processed), true);
+  for (const [before, after] of [["<tpAmb>1", "<tpAmb>2"], ["<tpEvento>110110", "<tpEvento>110111"], ["<nSeqEvento>2", "<nSeqEvento>1"], [`<chNFe>${KEY}`, `<chNFe>${"9".repeat(44)}`]]) {
+    assert.throws(() => processedEventXml(signed, answer.replace(before, after)), SefazError);
+  }
+  const unlinked = answer.replace("<cStat>135", "<cStat>136");
+  assert.equal(parseEvent(unlinked, KEY).registered, false);
+  assert.throws(() => processedEventXml(signed, unlinked), /não foi vinculado/);
+  assert.throws(() => processedEventXml(signed, answer.replace("<cStat>135", "<cStat>155")), /não confirmou/);
 });

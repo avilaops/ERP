@@ -4,6 +4,15 @@
   "members": [],
   "tasks": [
     {
+      "id": "T-20261017-fluxo-fiscal-eventos",
+      "title": "Retomar fluxo completo e distribuir CC-e com protocolo do evento",
+      "owner": null,
+      "status": "em-andamento",
+      "acceptance": ["Evento novo conserva XML assinado e recibo real coerentes", "CC-e integra envio fiscal existente e registra ID efetivo; evento 136 nao cancela nota", "Testes isolados, UI nos cinco tamanhos e build verificados", "Homologacao externa e envio real distinguidos de simulacao"],
+      "evidence": ["https://linear.app/avilaops/issue/AVL-154", "https://linear.app/avilaops/issue/AVL-77", "docs/fluxo-completo-fiscal.md", "744 testes aprovados sem falhas ou pulos; lint e tipos aprovados antes dos ajustes visuais finais", "UI isolada RRS7, nota 9001 serie 909 explicitamente simulada, sem transmissao ou entrega de e-mail", "Cinco medidas da selecao inicial em uma tela e cinco do detalhe sem excesso lateral ou controles abaixo de 44 px; teclado, rascunho e ampliacao conferidos"],
+      "next": "Concluir verificacoes finais e publicacao. UI real HXKP aguarda usuario entrar na aba aberta; nao escolher tributacao nem declarar autorizacao fiscal com base no demo."
+    },
+    {
       "id": "T-20261017-mcp-comercial",
       "title": "Concluir cadastros, orcamento, funil e decisoes confirmadas no MCP",
       "owner": null,

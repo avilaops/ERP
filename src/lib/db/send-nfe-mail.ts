@@ -9,17 +9,17 @@ import type { SmtpConfig } from "@/lib/mail/smtp";
 /** How a message is handed to a mail server. The tests give a stand-in. */
 export type MailSender = (config: SmtpConfig, envelope: { from: string; to: string }, message: string) => Promise<void>;
 
-export type InvoiceMail = { id: number; invoiceId: number; kind: "nota" | "cancelamento"; recipient: string; channel: "empresa" | "avilaops"; status: "enviado" | "falhou"; detail: string | null; sentAt: Date; sentBy: string };
+export type InvoiceMail = { id: number; invoiceId: number; eventId: number | null; kind: "nota" | "cancelamento" | "correcao"; recipient: string; channel: "empresa" | "avilaops"; status: "enviado" | "falhou"; detail: string | null; sentAt: Date; sentBy: string };
 
 /** Every attempt of sending the invoices of an order, the latest first. */
 export async function listOrderInvoiceMails(orderId: number, conn: Queryable): Promise<InvoiceMail[]> {
   const { rows } = await conn.query(
-    `SELECT m.id, m.invoice_id, m.kind, m.recipient, m.channel, m.status, m.detail, m.sent_at, m.sent_by
+    `SELECT m.id, m.invoice_id, m.event_id, m.kind, m.recipient, m.channel, m.status, m.detail, m.sent_at, m.sent_by
        FROM fiscal_invoice_mails m JOIN fiscal_invoices i ON i.id = m.invoice_id WHERE i.order_id = $1 ORDER BY m.id DESC`,
     [orderId],
   );
   return rows.map((row) => ({
-    id: Number(row.id), invoiceId: Number(row.invoice_id), kind: row.kind as InvoiceMail["kind"], recipient: String(row.recipient), channel: row.channel as InvoiceMail["channel"],
+    id: Number(row.id), invoiceId: Number(row.invoice_id), eventId: row.event_id === null ? null : Number(row.event_id), kind: row.kind as InvoiceMail["kind"], recipient: String(row.recipient), channel: row.channel as InvoiceMail["channel"],
     status: row.status as InvoiceMail["status"], detail: row.detail === null ? null : String(row.detail), sentAt: row.sent_at as Date, sentBy: String(row.sent_by),
   }));
 }
@@ -28,6 +28,8 @@ export const MAIL_NOT_SET = "Envio de e-mail não configurado: cadastre a caixa 
 
 export type SendInvoiceMail = {
   invoiceId: number;
+  /** Default sends the current invoice and applicable events; correction sends the latest CC-e. */
+  kind?: "correcao";
   /** `null`: the e-mail of the customer of the order. */
   to: string | null;
   sentBy: string;
@@ -39,8 +41,8 @@ export type SendInvoiceMail = {
 };
 
 /**
- * Sends an invoice to the customer: the authorised XML and the DANFE, or, for a
- * cancelled invoice, the XML of the cancellation. Every attempt that reaches a
+ * Sends the authorised XML, DANFE and latest CC-e, or the cancellation package.
+ * The original invoice is never rewritten by a correction. Every attempt that reaches a
  * mail server is recorded with its result; what is refused before that (no
  * mailbox, no address) throws `MailError` and nothing is recorded as sent.
  */
@@ -62,17 +64,31 @@ export async function sendInvoiceMail(request: SendInvoiceMail, conn: Queryable)
   const xml = String(invoice.authorized_xml);
   const data = danfeData(xml);
   const cancelled = invoice.status === "cancelada";
+  if (cancelled && request.kind === "correcao") throw new MailError("A nota está cancelada. Envie o cancelamento.");
+  const eventKind = cancelled ? "cancelamento" : "correcao";
+  const eventRows = await conn.query("SELECT id, sequence, text, signed_xml, protocol FROM fiscal_invoice_events WHERE invoice_id = $1 AND kind = $2 ORDER BY sequence DESC LIMIT 1", [request.invoiceId, eventKind]);
+  const event = eventRows.rows[0];
+  if ((cancelled || request.kind === "correcao") && !event) throw new MailError("O evento fiscal ainda não está registrado nesta nota.");
+  if (event && (!String(event.signed_xml).includes("<procEventoNFe") || !String(event.signed_xml).includes("<retEvento"))) throw new MailError("O evento antigo não tem o XML completo do recibo. Consulte a SEFAZ para recuperar o arquivo antes de enviar.");
   const words = { numero: String(invoice.number), serie: String(invoice.series), empresa: data.issuer.name, cliente: String(invoice.customer_name ?? data.recipient.name), chave: String(invoice.access_key) };
   const attachments: MailAttachment[] = [{ filename: `NFe${invoice.access_key}.xml`, contentType: "application/xml", content: Buffer.from(xml, "utf8") }];
   let subject = fillMailText(settings.subject ?? DEFAULT_NFE_SUBJECT, words);
   let text = fillMailText(settings.body ?? DEFAULT_NFE_BODY, words);
   if (cancelled) {
-    const event = await conn.query("SELECT signed_xml, protocol FROM fiscal_invoice_events WHERE invoice_id = $1 AND kind = 'cancelamento' ORDER BY id DESC LIMIT 1", [request.invoiceId]);
     subject = `Cancelamento da nota fiscal nº ${words.numero} - ${words.empresa}`;
-    text = `Olá,\n\nA nota fiscal eletrônica nº ${words.numero}, série ${words.serie}, emitida por ${words.empresa} para ${words.cliente}, foi CANCELADA.\n\nChave de acesso: ${words.chave}${event.rows[0] ? `\nProtocolo do cancelamento: ${event.rows[0].protocol}` : ""}\n\nO XML da nota e o do cancelamento estão em anexo.`;
-    if (event.rows[0]) attachments.push({ filename: `Cancelamento-NFe${invoice.access_key}.xml`, contentType: "application/xml", content: Buffer.from(String(event.rows[0].signed_xml), "utf8") });
+    text = `Olá,\n\nA nota fiscal eletrônica nº ${words.numero}, série ${words.serie}, emitida por ${words.empresa} para ${words.cliente}, foi CANCELADA.\n\nChave de acesso: ${words.chave}\nProtocolo do cancelamento: ${event.protocol}\n\nO XML da nota e o do cancelamento estão em anexo.`;
+    attachments.push({ filename: `Cancelamento-NFe${invoice.access_key}.xml`, contentType: "application/xml", content: Buffer.from(String(event.signed_xml), "utf8") });
   } else {
     attachments.push({ filename: `DANFE-${invoice.number}.pdf`, contentType: "application/pdf", content: await renderDanfe(data, { reform: usesReformLayout(data.issuedAt, await loadDanfeReformDate(conn)) }) });
+    if (event) {
+      attachments.push({ filename: `CCe-${event.sequence}-NFe${invoice.access_key}.xml`, contentType: "application/xml", content: Buffer.from(String(event.signed_xml), "utf8") });
+      const correctionText = `\n\nCarta de correção nº ${event.sequence}, protocolo ${event.protocol}:\n${event.text}\n\nO XML da CC-e e seu recibo estão em anexo. A carta complementa a nota; o XML autorizado e o DANFE preservam os dados originais.`;
+      if (request.kind === "correcao") {
+        subject = `Carta de correção da nota fiscal nº ${words.numero} - ${words.empresa}`;
+        text = `Olá,\n\nSegue a carta de correção da NF-e nº ${words.numero}, série ${words.serie}.\nChave de acesso: ${words.chave}`;
+      }
+      text += correctionText;
+    }
   }
   if (data.homologation) text += "\n\nNOTA EMITIDA EM AMBIENTE DE HOMOLOGAÇÃO: SEM VALOR FISCAL.";
 
@@ -87,8 +103,8 @@ export async function sendInvoiceMail(request: SendInvoiceMail, conn: Queryable)
     if (!(error instanceof MailError)) console.error("[e-mail] falha inesperada no envio da nota:", error instanceof Error ? error.message : error);
   }
   await conn.query(
-    "INSERT INTO fiscal_invoice_mails (invoice_id, kind, recipient, channel, status, detail, sent_by) VALUES ($1, $2, $3, $4, $5, $6, $7)",
-    [request.invoiceId, cancelled ? "cancelamento" : "nota", recipient, channel.channel, status, detail, request.sentBy],
+    "INSERT INTO fiscal_invoice_mails (invoice_id, kind, recipient, channel, status, detail, sent_by, event_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+    [request.invoiceId, cancelled ? "cancelamento" : request.kind ?? "nota", recipient, channel.channel, status, detail, request.sentBy, event ? Number(event.id) : null],
   );
   return { status, recipient, detail };
 }

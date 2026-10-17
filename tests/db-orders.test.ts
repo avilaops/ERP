@@ -1401,7 +1401,8 @@ test("nota autorizada: carta de correção numera 1, 2…; cancelamento grava o 
 
   const answer = (envelope: string, code: string, reason: string) => {
     const key = /<chNFe>(\d{44})<\/chNFe>/.exec(envelope)![1];
-    return `<soap:Envelope xmlns:soap="x"><soap:Body><retEnvEvento versao="1.00" xmlns="http://www.portalfiscal.inf.br/nfe"><cStat>128</cStat><xMotivo>Lote processado</xMotivo><retEvento versao="1.00"><infEvento><cStat>${code}</cStat><xMotivo>${reason}</xMotivo><chNFe>${key}</chNFe>${code === "135" ? "<nProt>135260000077777</nProt>" : ""}</infEvento></retEvento></retEnvEvento></soap:Body></soap:Envelope>`;
+    const field = (name: string) => new RegExp(`<${name}>([^<]+)</${name}>`).exec(envelope)![1];
+    return `<soap:Envelope xmlns:soap="x"><soap:Body><retEnvEvento versao="1.00" xmlns="http://www.portalfiscal.inf.br/nfe"><cStat>128</cStat><xMotivo>Lote processado</xMotivo><retEvento versao="1.00"><infEvento><tpAmb>${field("tpAmb")}</tpAmb><cStat>${code}</cStat><xMotivo>${reason}</xMotivo><chNFe>${key}</chNFe><tpEvento>${field("tpEvento")}</tpEvento><nSeqEvento>${field("nSeqEvento")}</nSeqEvento>${["135", "136"].includes(code) ? "<nProt>135260000077777</nProt>" : ""}</infEvento></retEvento></retEnvEvento></soap:Body></soap:Envelope>`;
   };
   const sent: string[] = [];
   const accept = async (url: string, _action: string, envelope: string) => {
@@ -1423,6 +1424,11 @@ test("nota autorizada: carta de correção numera 1, 2…; cancelamento grava o 
   );
   assert.equal((await listOrderInvoices(orderId, db.pool))[0].status, "autorizada");
 
+  // 136 has a receipt but is NOT linked to this invoice: it must not cancel it.
+  await assert.rejects(() => registerOrderNfeEvent(number, "cancelamento", "Cliente desistiu da compra antes da saída.", who, now, vault, async (_u, _a, envelope) => answer(envelope, "136", "Evento registrado, mas não vinculado"), db.pool), /136/);
+  assert.equal((await listOrderInvoices(orderId, db.pool))[0].status, "autorizada");
+  assert.equal((await listOrderInvoiceEvents(orderId, db.pool)).length, 2);
+
   // E-mail da nota: sem caixa nenhuma não envia nem registra; com a caixa padrão, vai o XML e o DANFE e a tentativa fica registrada.
   const { sendInvoiceMail, listOrderInvoiceMails, MAIL_NOT_SET } = await import("@/lib/db/send-nfe-mail");
   const { loadMailInfo, mailChannel, removeOwnMailbox, saveMailTexts, saveOwnMailbox, MailSettingsError } = await import("@/lib/db/mail");
@@ -1443,6 +1449,7 @@ test("nota autorizada: carta de correção numera 1, 2…; cancelamento grava o 
   assert.match(outbox[0].message, /^From: "Empresa de Teste Ltda" <notas@avilaops\.com>\r\n/);
   assert.match(outbox[0].message, /filename="NFe\d{44}\.xml"/);
   assert.match(outbox[0].message, /filename="DANFE-42\.pdf"/);
+  assert.match(outbox[0].message, /filename="CCe-2-NFe\d{44}\.xml"/);
   assert.ok(!outbox[0].message.includes("segredo-padrao"));
 
   // Texto e resposta da empresa; e a caixa própria passa a ser a de saída, com a senha cifrada no banco.
@@ -1469,12 +1476,22 @@ test("nota autorizada: carta de correção numera 1, 2…; cancelamento grava o 
   assert.equal((await mailChannel(db.pool, env, () => vault))?.channel, "avilaops");
   assert.equal((await loadMailInfo(db.pool)).subject, "NF {numero} da {empresa}");
 
+  await sendInvoiceMail({ ...request, kind: "correcao" }, db.pool);
+  const correctionMail = (await listOrderInvoiceMails(orderId, db.pool))[0];
+  assert.equal(correctionMail.kind, "correcao");
+  assert.equal(correctionMail.eventId, (await listOrderInvoiceEvents(orderId, db.pool))[1].id);
+  assert.match(outbox[2].message, /filename="CCe-2-NFe\d{44}\.xml"/);
+  const archived = await db.pool.query("SELECT signed_xml FROM fiscal_invoice_events WHERE id = $1", [correctionMail.eventId]);
+  assert.match(archived.rows[0].signed_xml, /<procEventoNFe[\s\S]*<retEvento[\s\S]*<nProt>135260000077777<\/nProt>/);
+  assert.ok(outbox[2].message.includes(Buffer.from(archived.rows[0].signed_xml).toString("base64").slice(0, 60)));
+
   assert.match((await registerOrderNfeEvent(number, "cancelamento", "Cliente desistiu da compra antes da saída.", who, now, vault, accept, db.pool)).message, /cancelada/);
   // Cancelada: o e-mail leva o XML da nota e o do cancelamento, sem DANFE.
   await sendInvoiceMail(request, db.pool);
-  assert.match(outbox[2].message, /Subject: =\?UTF-8\?B\?Q2FuY2VsYW1lbnRv/);
-  assert.match(outbox[2].message, /filename="Cancelamento-NFe\d{44}\.xml"/);
-  assert.doesNotMatch(outbox[2].message, /DANFE-42\.pdf/);
+  assert.match(outbox[3].message, /Subject: =\?UTF-8\?B\?Q2FuY2VsYW1lbnRv/);
+  assert.match(outbox[3].message, /filename="Cancelamento-NFe\d{44}\.xml"/);
+  assert.doesNotMatch(outbox[3].message, /DANFE-42\.pdf|CCe-2-NFe/);
+  await assert.rejects(() => sendInvoiceMail({ ...request, kind: "correcao" }, db.pool), /nota está cancelada/);
   assert.equal((await listOrderInvoiceMails(orderId, db.pool))[0].kind, "cancelamento");
   const rejectedInvoice = await db.pool.query("SELECT id FROM fiscal_invoices WHERE status NOT IN ('autorizada', 'cancelada') LIMIT 1");
   if (rejectedInvoice.rows[0]) await assert.rejects(() => sendInvoiceMail({ ...request, invoiceId: Number(rejectedInvoice.rows[0].id) }, db.pool), /Só nota autorizada ou cancelada/);
@@ -1539,8 +1556,8 @@ test("resposta perdida: evento duplicado (573) vem da consulta; número que já 
   // O que a SEFAZ guarda da nota: os eventos registrados em chamadas cuja resposta nunca chegou.
   const atSefaz: string[] = [];
   const registered = (type: "110110" | "110111", sequence: number, detail: string, protocol: string) =>
-    `<procEventoNFe versao="1.00"><evento versao="1.00"><infEvento Id="ID${type}${key}0${sequence}"><chNFe>${key}</chNFe><tpEvento>${type}</tpEvento><nSeqEvento>${sequence}</nSeqEvento><detEvento versao="1.00">${detail}</detEvento></infEvento></evento>` +
-    `<retEvento versao="1.00"><infEvento><cStat>135</cStat><xMotivo>Evento registrado e vinculado a NF-e</xMotivo><chNFe>${key}</chNFe><nProt>${protocol}</nProt></infEvento></retEvento></procEventoNFe>`;
+    `<procEventoNFe versao="1.00"><evento versao="1.00"><infEvento Id="ID${type}${key}0${sequence}"><tpAmb>2</tpAmb><chNFe>${key}</chNFe><tpEvento>${type}</tpEvento><nSeqEvento>${sequence}</nSeqEvento><detEvento versao="1.00">${detail}</detEvento></infEvento></evento>` +
+    `<retEvento versao="1.00"><infEvento><tpAmb>2</tpAmb><cStat>135</cStat><xMotivo>Evento registrado e vinculado a NF-e</xMotivo><chNFe>${key}</chNFe><tpEvento>${type}</tpEvento><nSeqEvento>${sequence}</nSeqEvento><nProt>${protocol}</nProt></infEvento></retEvento></procEventoNFe>`;
   const duplicated = async (url: string, _action: string, envelope: string) => {
     if (/nfeconsultaprotocolo4/.test(url)) return `<retConsSitNFe versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe"><cStat>100</cStat><xMotivo>Autorizado o uso da NF-e</xMotivo><chNFe>${key}</chNFe>${atSefaz.join("")}</retConsSitNFe>`;
     assert.match(url, /nferecepcaoevento4/);
