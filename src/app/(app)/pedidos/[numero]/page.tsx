@@ -20,6 +20,7 @@ import { listOrderInvoiceEvents, listOrderInvoices } from "@/lib/db/invoices";
 import { previewOrderNfe } from "@/lib/db/order-nfe";
 import { findCustomerByDocument } from "@/lib/db/customers";
 import { getOrder, listPaymentMethods, loadOrderStanding } from "@/lib/db/orders";
+import { loadClosingProposal } from "@/lib/db/proposal-details";
 import { ContractError, isOpen, listOrderContracts, loadContractSettings, standingText } from "@/lib/db/contracts";
 import { draftOrderContract } from "@/lib/db/send-contract";
 import { contractNumber } from "@/lib/contract/text";
@@ -146,7 +147,8 @@ export default async function PedidoPage({
   // The installments of the balance, as they stand: the rows the seller may change one by one.
   const installmentRows = plan.receipts.filter((receipt) => receipt.label !== "Entrada");
   const agreedInstallments = order.customInstallments.length > 0 && installmentRows.length === order.customInstallments.length;
-  const missing = editable ? closingProblems(order, sale) : [];
+  const commercialMissing = editable ? (await loadClosingProposal(order.id, conn)).missing : [];
+  const missing = editable ? [...closingProblems(order, sale), ...commercialMissing] : [];
   // The forms of payment are the company's own list; one already used and since turned off still shows.
   const methods = await listPaymentMethods(conn);
   // The forms that mean "the balance is paid at delivery".
@@ -273,6 +275,7 @@ export default async function PedidoPage({
     { key: "cliente", label: "Cliente", filled: linked !== null && isComplete(linked) },
     { key: "entrega", label: "Entrega", filled: order.deliveryUf !== null && order.productionDays !== null },
     { key: "pagamento", label: "Pagamento", filled: plan.balance === 0 || (order.installmentCount !== null && order.balanceMethod !== null) },
+    ...(editable ? [{ key: "fechar", label: "Fechar", filled: missing.length === 0 }] : []),
     ...(hasDocuments ? [{ key: "documentos", label: "Contrato e nota", filled: null }] : []),
   ];
   // It opens where the work is: the first part still to fill in while the order is open, the summary after.
@@ -286,11 +289,11 @@ export default async function PedidoPage({
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">Pedido #{order.number}</h1>
-          <p className="mt-1 text-sm text-slate-600">
+          <p data-order-context className="mt-1 text-sm text-slate-600">
             De {order.sellerEmail === session.email ? "Você" : order.sellerName} · atualizado {showDateTime(order.updatedAt)}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2 text-sm">
+        <div data-order-context className="flex flex-wrap items-center gap-2 text-sm">
           <span className="rounded-full bg-slate-200 px-3 py-1 font-medium">{STATUS_LABELS[order.status]}</span>
           <span className="rounded-full border border-slate-300 px-3 py-1">Tabela v{table.version}</span>
           {order.items.length > 0 && (
@@ -1352,7 +1355,7 @@ export default async function PedidoPage({
       </fieldset>
 
       {/* On a phone the total stays in sight, with the way to the closing. */}
-      <div className="sticky bottom-[var(--tabbar)] z-10 -mx-4 mt-6 flex items-center justify-between gap-3 border-t border-slate-200 bg-white px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:hidden">
+      <div data-order-total className="sticky bottom-[var(--tabbar)] z-10 -mx-4 mt-6 flex items-center justify-between gap-3 border-t border-slate-200 bg-white px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:hidden">
         <span>
           <span className="block text-xs text-slate-600">Total da nota</span>
           <span className="block text-lg font-bold leading-tight">{showMoney(sale.invoiceTotal)}</span>
@@ -1367,15 +1370,17 @@ export default async function PedidoPage({
       </div>
 
       {editable && (
-        <section data-part="resumo" className={`${CARD} mt-6 scroll-mt-20 p-5`} aria-labelledby="fechar">
+        <section data-part="fechar" className={`${CARD} mt-3 scroll-mt-20 p-5`} aria-labelledby="fechar">
           <h2 id="fechar" className={`${TITLE} scroll-mt-24`}>
             Fechar pedido
           </h2>
+          <p className="mt-1 text-sm text-slate-700">Total da nota: <strong>{showMoney(sale.invoiceTotal)}</strong></p>
           {missing.length > 0 ? (
             <ul className="mt-3 list-disc pl-5 text-sm text-slate-700">
-              {missing.map((item) => (
+              {missing.filter((item) => !commercialMissing.includes(item)).map((item) => (
                 <li key={item}>{item}</li>
               ))}
+              {commercialMissing.length > 0 && <li>Dados do PDF: {commercialMissing.map((item) => item.replace(": preencha em Dados do PDF.", "")).join("; ")}.</li>}
             </ul>
           ) : (
             <p className="mt-3 text-sm text-slate-700">
@@ -1384,13 +1389,18 @@ export default async function PedidoPage({
                 : "Dentro da política: fecha na hora."}
             </p>
           )}
-          <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
+          <div className="mt-4 flex flex-wrap items-start gap-2">
+            {commercialMissing.length > 0 && <Link href={`/pedidos/${order.number}/proposta`} className={`${PRIMARY} w-full sm:w-auto`}>Completar dados do PDF</Link>}
             <ActionForm action={closeOrderAction}>
               <input type="hidden" name="number" value={order.number} />
-              <button type="submit" disabled={missing.length > 0} className={`${PRIMARY} disabled:cursor-not-allowed disabled:opacity-50`}>
+              <button type="submit" disabled={missing.length > 0} className={`${missing.length > 0 ? SECONDARY : PRIMARY} disabled:cursor-not-allowed disabled:opacity-50`}>
                 {reasons.length > 0 && missing.length === 0 ? "Enviar para aprovação" : "Fechar pedido"}
               </button>
             </ActionForm>
+          </div>
+        </section>
+      )}
+      {editable && <div data-part="resumo" className="mt-4">
             <ActionForm action={deleteOrderAction}>
               <input type="hidden" name="number" value={order.number} />
               <ConfirmButton
@@ -1399,9 +1409,7 @@ export default async function PedidoPage({
                 className={DANGER_OUTLINE}
               />
             </ActionForm>
-          </div>
-        </section>
-      )}
+      </div>}
       </OrderParts>
     </>
   );

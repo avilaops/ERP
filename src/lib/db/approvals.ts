@@ -3,6 +3,7 @@ import { getOrder, listOrders, loadOrderStanding, OrderError } from "@/lib/db/or
 import type { OrderSummary } from "@/lib/db/orders";
 import type { Queryable } from "@/lib/db/pool";
 import { loadPublishedTable } from "@/lib/db/price-table";
+import { loadClosingProposal } from "@/lib/db/proposal-details";
 import { isoDate } from "@/lib/format";
 import { paymentOf, receivableColumns, saleOf } from "@/lib/order-quote";
 import { needsDirector } from "@/lib/pricing/order";
@@ -83,6 +84,8 @@ export async function decideApproval(number: string, decision: Decision, who: De
   const table = await loadPublishedTable(order.priceTableVersion, conn);
   if (!table) throw new Error(`Tabela v${order.priceTableVersion} não encontrada.`);
   const sale = saleOf(order, table);
+  const proposal = decision.approve ? await loadClosingProposal(order.id, conn) : null;
+  if (proposal?.missing.length) throw new OrderError(`${proposal.missing.join(" ")} Reabra o pedido para completar as condições e solicitar aprovação novamente.`);
   const { invoiceTotal } = sale;
   const plan = receivableColumns(paymentOf(order, sale, table, isoDate(new Date())));
 
@@ -91,6 +94,8 @@ export async function decideApproval(number: string, decision: Decision, who: De
        UPDATE orders
           SET status = $2, closed_at = CASE WHEN $2 = 'fechado' THEN now() END, updated_at = now(), updated_by = $3
         WHERE number = $1 AND status = 'aguardando_aprovacao' AND updated_at::text = $4
+          AND ($14::bigint IS NULL OR (proposal_details_revision = $14::bigint
+            AND EXISTS (SELECT 1 FROM company_settings WHERE proposal_details_revision = $15::bigint)))
         RETURNING id, status
      ), decided AS (
        UPDATE order_approvals a
@@ -128,6 +133,8 @@ export async function decideApproval(number: string, decision: Decision, who: De
       plan.dueDates,
       plan.amounts,
       plan.methods,
+      proposal?.orderRevision ?? null,
+      proposal?.companyRevision ?? null,
     ],
   );
   if (rows.length === 0) throw new OrderError(GONE);

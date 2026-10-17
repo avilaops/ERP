@@ -15,7 +15,7 @@ import { closeTenantPools, tenantDb } from "@/lib/db/pool";
 import { loadPublishedTable, publishPriceTable } from "@/lib/db/price-table";
 import { saveProductPhoto } from "@/lib/db/product-photos";
 import { createProduct, listProducts } from "@/lib/db/products";
-import { showMoney } from "@/lib/format";
+import { quoteMoney as showMoney } from "@/lib/quote/document";
 import { saleOf } from "@/lib/order-quote";
 import { draftPriceTable } from "@/lib/price-table";
 import { MIGRATIONS_DIR, SKIP_WITHOUT_DB, testDatabaseUrl } from "./db-helpers.ts";
@@ -168,7 +168,7 @@ test("vendedor dono, gerente e diretoria recebem o PDF do pedido", { skip }, asy
     assert.equal(response.headers.get("content-length"), String(bytes.length));
     assert.equal(Buffer.from(bytes.subarray(0, 5)).toString("latin1"), "%PDF-");
     const pdf = await PDFDocument.load(bytes, { updateMetadata: false });
-    assert.equal(pdf.getPageCount(), 2);
+    assert.equal(pdf.getPageCount(), 1);
     assert.equal(pdf.getTitle(), `Orçamento #${ORDER}`);
     // A empresa é a da sessão: sem logo cadastrada, o nome dela vai no cabeçalho.
     assert.equal(pdf.getAuthor(), "Empresa A");
@@ -185,7 +185,6 @@ test("vendedor dono, gerente e diretoria recebem o PDF do pedido", { skip }, asy
       "Desconto (5,0%)",
       invoiceTotal,
       "Local: Maranhão",
-      "Cliente: a informar",
       // O vendedor é o do pedido, quem quer que gere o arquivo.
       "Vera Vendedora",
     ]) {

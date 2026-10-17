@@ -53,7 +53,11 @@ let customerMa = 0;
 let customerSp = 0;
 
 before(async () => {
-  if (!skip) db = await openTestDb("orders");
+  if (!skip) {
+    db = await openTestDb("orders");
+    // Explicit fictitious business terms for the finance/approval fixtures, never production defaults.
+    await db.pool.query("UPDATE company_settings SET proposal_details = $1::jsonb", [JSON.stringify({ warranty: "12 meses contra defeitos de fabricação (teste fictício).", installation: "Não inclusa (teste fictício).", freightMode: "FOB" })]);
+  }
 });
 after(async () => {
   if (!skip) await db.close();
@@ -540,6 +544,20 @@ test("formas de pagamento vêm do banco da empresa", { skip }, async () => {
   assert.ok(!changed.includes("Cheque"));
 });
 
+test("fechamento bloqueia condições ausentes e aceita padrão da empresa com frete próprio", { skip }, async () => {
+  const N = "260930-BBMN";
+  await savePayment(N, PAYMENT, SELLER.email, MINE, db.pool);
+  const original = (await db.pool.query("SELECT proposal_details FROM company_settings")).rows[0].proposal_details;
+  await db.pool.query("UPDATE company_settings SET proposal_details = '{}'::jsonb, proposal_details_revision = proposal_details_revision + 1");
+  const result = await closeOrder(N, SELLER.email, MINE, db.pool);
+  assert.equal(result.status, "em_negociacao");
+  assert.equal(result.missing.length, 3);
+  assert.ok(result.missing.every((line) => line.includes("Dados do PDF")));
+  assert.equal(Number((await db.pool.query("SELECT count(*) FROM order_approvals")).rows[0].count), 0);
+  assert.equal(Number((await db.pool.query("SELECT count(*) FROM receivables")).rows[0].count), 0);
+  await db.pool.query("UPDATE company_settings SET proposal_details = $1::jsonb, proposal_details_revision = proposal_details_revision + 1", [JSON.stringify(original)]);
+});
+
 test("pagamento do print: entrada de 25.000 fica abaixo da política e manda o pedido para aprovação", { skip }, async () => {
   const N = "260930-BBMN";
   await savePayment(N, PAYMENT, SELLER.email, MINE, db.pool);
@@ -574,6 +592,17 @@ test("pagamento do print: entrada de 25.000 fica abaixo da política e manda o p
     reasons: ["entrada-abaixo-da-politica"],
     missing: [],
   });
+  const defaults = (await db.pool.query("SELECT proposal_details FROM company_settings")).rows[0].proposal_details;
+  await db.pool.query("UPDATE company_settings SET proposal_details = '{}'::jsonb, proposal_details_revision = proposal_details_revision + 1");
+  await assert.rejects(() => decideApproval(N, { approve: true, comment: null }, { email: DIRECTOR, role: "DIRETORIA", approvesAtLoss: true }, db.pool), /Garantia.*Dados do PDF/);
+  assert.equal((await order(N)).status, "aguardando_aprovacao");
+  assert.equal(Number((await db.pool.query("SELECT count(*) FROM receivables")).rows[0].count), 0);
+  await db.pool.query("UPDATE company_settings SET proposal_details = $1::jsonb, proposal_details_revision = proposal_details_revision + 1", [JSON.stringify(defaults)]);
+  const racingApproval = { query: async (text: string, values?: unknown[]) => {
+    if (text.includes("WITH target AS")) await db.pool.query("UPDATE company_settings SET proposal_details_revision = proposal_details_revision + 1");
+    return db.pool.query(text, values);
+  } } as typeof db.pool;
+  await assert.rejects(() => decideApproval(N, { approve: true, comment: null }, { email: DIRECTOR, role: "DIRETORIA", approvesAtLoss: true }, racingApproval), /não está mais aguardando aprovação/);
   const waiting = await order(N);
   assert.deepEqual([waiting.status, waiting.closedAt], ["aguardando_aprovacao", null]);
   const asked = await db.pool.query("SELECT requested_by, reasons, status, revision_hash FROM order_approvals");
@@ -672,6 +701,13 @@ test("fechar: se o pedido mudou entre a leitura e a gravação, nada é gravado"
   await assert.rejects(() => closeOrder(N, SELLER.email, MINE, racing), /foi alterado por outra pessoa/);
   const after = await order(N);
   assert.deepEqual([after.status, after.closedAt, after.discount], ["em_negociacao", null, 0.5]);
+  await db.pool.query("UPDATE orders SET discount = 0, updated_at = now() WHERE number = $1", [N]);
+  const racingProposal = { query: async (text: string, values?: unknown[]) => {
+    if (text.includes("WITH closed AS")) await db.pool.query("UPDATE orders SET proposal_details_revision = proposal_details_revision + 1 WHERE number = $1", [N]);
+    return db.pool.query(text, values);
+  } } as typeof db.pool;
+  await assert.rejects(() => closeOrder(N, SELLER.email, MINE, racingProposal), /foi alterado por outra pessoa/);
+  assert.equal((await order(N)).status, "em_negociacao");
 });
 
 test("excluir: pedido em negociação sai com os itens, e a tabela publicada fica como estava", { skip }, async () => {

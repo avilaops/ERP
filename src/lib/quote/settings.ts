@@ -18,6 +18,18 @@ export const PROPOSAL_FIELDS = {
 } as const;
 export type ProposalField = keyof typeof PROPOSAL_FIELDS;
 export type ProposalDetails = Partial<Record<ProposalField, string>>;
+
+/** Empty placeholders do not constitute an agreed commercial condition. */
+export function hasProposalValue(value: string | undefined): boolean {
+  return Boolean(value?.trim() && !/^(a definir|a cadastrar|a informar|pendente)[.!]?$/i.test(value.trim()));
+}
+
+/** Company defaults count; an order may replace them with its own agreed terms. */
+export function closingProposalProblems(details: ProposalDetails): string[] {
+  return (["warranty", "freightMode", "installation"] as const)
+    .filter((field) => !hasProposalValue(details[field]) || (field === "freightMode" && !["CIF", "FOB", "retirada"].includes(details[field]!)))
+    .map((field) => `${PROPOSAL_FIELDS[field].label}: preencha em Dados do PDF.`);
+}
 export type ProposalStep = { title: string; fields: ProposalField[]; hint: string };
 export const COMPANY_PROPOSAL_STEPS: ProposalStep[] = [
   { title: "Contato da empresa", fields: ["phone", "email"], hint: "CNPJ, inscrição estadual e endereço vêm do cadastro Fiscal." },

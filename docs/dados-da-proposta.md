@@ -3,8 +3,17 @@
 O PDF passa a identificar a vendedora pelo cadastro Fiscal (razão social, CNPJ,
 inscrição estadual e endereço). Contato, site, garantia, montagem e condições de
 atraso/cancelamento são preenchidos em **Configurações → Dados da proposta**.
-Campos vazios ficam identificados como pendentes no documento; nenhum prazo de
-garantia, cobertura, multa ou contratação de serviço é presumido.
+Campos e blocos sem dados ficam ocultos no documento; nenhum prazo de garantia,
+cobertura, multa ou contratação de serviço é presumido. Não são impressos
+“a definir”, “a cadastrar”, validade não aplicável ou a origem interna do endereço.
+
+O fechamento exige garantia (prazo e cobertura), modalidade de frete e condições
+de montagem/instalação. O padrão da empresa pode fornecer garantia e montagem;
+o vendedor pode substituí-los em **Dados do PDF**. Sem esses dados, o botão fica
+indisponível e a tela indica onde preencher. O servidor repete a validação no
+fechamento direto, no envio para aprovação e na decisão de aprovação. A gravação
+confere as revisões dos termos do pedido e da empresa para recusar alterações
+concorrentes. Pedidos já fechados não são reabertos automaticamente.
 
 Em **Pedido → Dados do PDF**, oito etapas registram frete, previsão de transporte,
 instruções de entrega e condições específicas. Condições vazias herdam o padrão
@@ -17,11 +26,11 @@ não altera o total dos equipamentos, impostos ou títulos. Só FOB aceita esse 
 Frete cobrado pela vendedora exige tratamento no faturamento; a modalidade fiscal
 continua sendo conferida na preparação da nota.
 
-O endereço vem da entrega da nota ou do cadastro do cliente, com a origem indicada.
+O endereço vem da entrega da nota ou do cadastro do cliente.
 Se o estado escolhido é diferente do cadastro e não há endereço de entrega, o
-documento pede confirmar o endereço, em vez de imprimir uma entrega no estado errado.
+documento mostra apenas o estado informado, sem usar uma entrega no estado errado.
 O peso dos equipamentos multiplica os pesos cadastrados pelas quantidades. Se um
-peso falta, o PDF pede completar o cadastro. Volumes/peso bruto vêm do transporte;
+peso falta, o PDF omite o peso total. Volumes/peso bruto vêm do transporte;
 dimensões do equipamento montado não são tratadas como cubagem de embalagem.
 NCM vem do cadastro de cada produto, sem escolher classificação fiscal.
 
@@ -30,6 +39,13 @@ o saldo efetivamente em aberto, descontados recebimentos não estornados. Só ap
 para entrada via PIX em orçamento em negociação ou pedido fechado. Gera um BR Code
 estático; não chama banco, não registra pagamento e não confirma recebimento.
 PIX por link de pagamento mantém o fluxo do provedor e não ganha um QR direto da empresa.
+O favorecido impresso usa a razão social do cadastro Fiscal; o nome abreviado do
+BR Code continua respeitando seu limite de caracteres. Valores monetários no PDF
+sempre têm duas casas decimais. O telefone comercial usa a máscara brasileira.
+
+Entrega e fabricação curtas ocupam o espaço ao lado dos totais; pagamento e QR
+compartilham um bloco. Condições extensas e muitos itens continuam paginados sem
+diminuir as fontes. O exemplo HXKP cabe em uma página após omitir os campos vazios.
 
 O documento mostra o estado do pedido, mantém a validade para orçamentos e explicita
 o intervalo em dias das parcelas calculadas. Parcelas personalizadas mantêm as datas
@@ -80,6 +96,34 @@ duas páginas inspecionadas; leitura do QR confirmou chave e R$ 20.000 da entrad
 Total dos equipamentos de R$ 42.824,48, NCM, peso de 455 kg, endereço e periodicidade
 conferidos. Nenhum recebimento foi confirmado e nenhum contrato ou nota foi enviado.
 
+## Revisão de apresentação e fechamento
+
+- Prévia real HXKP: uma página inspecionada, QR decodificado com chave CNPJ e
+  R$ 20.000,00. Favorecido legal, centavos e telefone conferidos.
+- Suíte de 719 testes: 717 passaram na primeira execução. Dois cenários de teste
+  foram ajustados (restaurar desconto antes da segunda simulação de concorrência;
+  usar exemplo sem observação adicional na regressão de uma página). Os 76 testes
+  afetados passaram na repetição, incluindo fechamento e aprovação. Os demais
+  resultados da suíte permanecem válidos.
+- Após separar a etapa de fechamento, lint, tipos e 37 testes de rotas, tema e UX
+  passaram. Não foram alterados preços, recebimentos ou emissão fiscal reais.
+
+### Sete perguntas da etapa Fechar
+
+1. O título e o número do pedido identificam a decisão de fechamento.
+2. Total, pendências e acesso ao preenchimento aparecem na primeira tela.
+3. Uma ação principal: completar os dados ou fechar/enviar para aprovação.
+4. Dois estados nos cinco tamanhos (10 medições): uma tela, sem rolagem lateral,
+   controles de pelo menos 44 px. Três campos comerciais e duas pendências de
+   pagamento ficaram visíveis em 360×640.
+5. Editar, consultar PDF e excluir ficam nas outras etapas; não ocupam o fechamento.
+6. O servidor recusa dados ausentes e alterações concorrentes antes de gerar títulos.
+7. A navegação, o link de preenchimento e os botões usam controles nativos. A
+   conexão do navegador caiu antes da conferência final de teclado e do retorno
+   ao resumo após concluir o fechamento fictício; essas duas verificações na UI
+   ainda precisam ser retomadas.
+
 Permanecem para preenchimento pela empresa: site, prazo/cobertura de garantia,
 montagem, modalidade/condições do frete, prazo de transporte e condições de
-atraso/cancelamento. O PDF informa essas pendências e a tela permite preenchê-las.
+atraso/cancelamento. O PDF omite essas pendências e a tela permite preenchê-las;
+garantia, montagem e modalidade de frete são obrigatórias para novos fechamentos.

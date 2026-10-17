@@ -4,6 +4,15 @@
   "members": [],
   "tasks": [
     {
+      "id": "T-20261017-refinar-proposta",
+      "title": "Ocultar campos vazios e exigir condicoes comerciais antes de fechar",
+      "owner": null,
+      "status": "em-andamento",
+      "acceptance": ["PDF sem placeholders ou informacoes internas, favorecido legal e valores com centavos", "Garantia, frete e montagem exigidos no fechamento e na aprovacao", "HXKP legivel em uma pagina, QR valido e publicacao conferida pela UI"],
+      "evidence": ["Previa real HXKP em uma pagina, inspecionada visualmente; QR decodificado com entrada de R$ 20.000,00", "Validacao no servidor e na UI, incluindo revisoes concorrentes; sem condicoes reais inventadas"],
+      "next": "Concluir verificacoes, publicar e baixar o PDF pela UI; manter PR16 em revisao."
+    },
+    {
       "id": "T-20261017-proposta-completa",
       "title": "Completar informacoes comerciais e fiscais do PDF com configuracao pela UI",
       "owner": null,

@@ -7,7 +7,7 @@ import { completeQuote, usesCompanyPix } from "@/lib/quote/complete";
 import type { QuoteContext } from "@/lib/quote/complete";
 import type { QuoteDocument } from "@/lib/quote/document";
 import { renderQuotePdf } from "@/lib/quote/pdf";
-import { checkedProposalDetails } from "@/lib/quote/settings";
+import { checkedProposalDetails, closingProposalProblems } from "@/lib/quote/settings";
 import { pdfImages, pdfPieces, pdfText } from "./pdf-helpers.ts";
 
 const document: QuoteDocument = {
@@ -50,7 +50,9 @@ test("PIX só para entrada via PIX pendente; valor parcial usa o saldo real e ca
   assert.equal(usesCompanyPix("Link de pagamento - PIX", "17"), false);
   assert.equal(usesCompanyPix("Cartão", "03"), false);
   assert.equal(usesCompanyPix("PIX", null), false);
-  assert.equal(completeQuote(document, order, { ...context, downPaymentOpen: 10000 }, products).pix?.amount, "R$ 10.000");
+  assert.equal(completeQuote(document, order, { ...context, downPaymentOpen: 10000 }, products).pix?.amount, "R$ 10.000,00");
+  assert.equal(completeQuote(document, order, context, products).pix?.name, context.issuer.legalName);
+  assert.match(completeQuote(document, order, context, products).footer!.join(" "), /\(17\) 99721-8555/);
   assert.match(completeQuote(document, order, context, products).pix!.code, /540820000\.00/);
   for (const patch of [{ pix: null }, { downPaymentIsPix: false }, { downPaymentOpen: 0 }]) assert.equal(completeQuote(document, order, { ...context, ...patch }, products).pix, undefined);
   assert.equal(completeQuote(document, { ...order, status: "cancelado" }, context, products).pix, undefined);
@@ -62,14 +64,35 @@ test("entrega em outro estado não usa silenciosamente o endereço de cobrança"
   const full = completeQuote({ ...document, delivery: "Bahia" }, { ...order, customer }, { ...context, delivery: null }, products);
   assert.match(full.sections![0].lines[0], /Local: Bahia/);
   assert.doesNotMatch(full.sections![0].lines[0], /Rua A|São José do Rio Preto/);
-  assert.match(full.sections![0].lines[0], /confirmar endereço completo/);
+  assert.doesNotMatch(full.sections![0].lines[0], /cadastro|confirmar/);
 });
 
-test("ausências são explícitas; peso incompleto não vira peso total e parcelas personalizadas não ganham intervalo falso", () => {
+test("campos e blocos vazios ficam ocultos; peso incompleto e intervalo não são inventados", () => {
   const complete = completeQuote(document, { ...order, customInstallments: [{ number: 1, dueDate: "2026-11-15", amount: 100, method: "PIX" }] }, { ...context, orderDetails: {}, companyDetails: {} }, new Map([[1, products.get(1)!]]));
-  assert.match(complete.sections!.flatMap((s) => s.lines).join(" "), /prazo e cobertura a definir/);
-  assert.match(complete.sections![0].lines.join(" "), /Peso total: completar/);
+  assert.deepEqual(complete.sections!.map((section) => section.title), ["Entrega e transporte"]);
+  assert.doesNotMatch(JSON.stringify(complete), /a definir|a cadastrar|a informar|não se aplica|endereço do cadastro|Peso total dos equipamentos/);
   assert.doesNotMatch(complete.payment.join(" "), /a cada/);
+});
+
+test("fechamento exige garantia, frete e montagem; placeholders não valem como condições", () => {
+  assert.equal(closingProposalProblems({}).length, 3);
+  assert.equal(closingProposalProblems({ warranty: "a definir", installation: " ", freightMode: "barco" }).length, 3);
+  assert.deepEqual(closingProposalProblems({ warranty: "12 meses para defeitos de fabricação (teste).", installation: "Não inclusa.", freightMode: "retirada" }), []);
+});
+
+test("pedido com duas linhas e PIX: uma página, favorecido legal inteiro e ausência de campos internos", async () => {
+  const full = completeQuote({ ...document, notes: null, customer: { name: "Cliente de demonstração", document: "CPF de teste", address: "Rua de demonstração, 81 - Jardim Vitória Régia, São José do Rio Preto/SP", tradeName: null, contactName: null, phone: "(17) 99999-9999", email: "cliente@example.com", cityUf: "São José do Rio Preto/SP" },
+    payment: ["Entrada de R$ 20.000,00 (46,7%) via PIX em 16/10/2026", "Saldo de R$ 22.824,48 em 3 parcelas via PIX:", "1/3: R$ 7.608,16 em 15/11/2026", "2/3: R$ 7.608,16 em 15/12/2026", "3/3: R$ 7.608,16 em 14/01/2027"],
+    items: [document.items[0], { ...document.items[0], productId: 2, code: "LD-A005", name: "Puxada Alta Frontal (anilheiro standard, estrutura Piano Black, braço Piano Black)", description: "Dimensões (C x L x A): 1,66 x 1,05 x 2,04 m · Peso: 143 kg" }],
+  }, order, { ...context, issuer: { ...context.issuer, legalName: "LUDUS EQUIPAMENTOS PARA MUSCULAÇÃO LTDA" }, companyDetails: { phone: "17997218555", email: "comercial@example.com" }, orderDetails: {}, transport: { ...context.transport, volumes: null, grossWeight: null } }, products);
+  const bytes = await renderQuotePdf(full, { logo: null, photos: new Map() });
+  assert.equal((await PDFDocument.load(bytes)).getPageCount(), 1);
+  const text = pdfText(bytes);
+  assert.match(text, /Favorecido: LUDUS EQUIPAMENTOS PARA MUSCULAÇÃO LTDA/);
+  assert.match(text, /R\$ 20\.000,00/);
+  assert.doesNotMatch(text, /a definir|a cadastrar|a informar|não se aplica|endereço do cadastro/);
+  assert.equal(pdfImages(bytes), 1);
+  for (const piece of pdfPieces(bytes)) assert.ok(piece.y >= 40 && piece.y <= 802, `${piece.text} fora da margem`);
 });
 
 test("normalização remove número repetido, preserva complementos e números legítimos e usa município oficial", () => {

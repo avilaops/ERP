@@ -1,8 +1,17 @@
 import type { Queryable } from "@/lib/db/pool";
-import { checkedProposalDetails, ProposalSettingsError } from "@/lib/quote/settings";
+import { checkedProposalDetails, closingProposalProblems, ProposalSettingsError } from "@/lib/quote/settings";
 import type { ProposalDetails, ProposalField } from "@/lib/quote/settings";
 
 export type StoredProposalDetails = { details: ProposalDetails; revision: string };
+
+/** Read terms and both revisions in one snapshot for the closing's conditional write. */
+export async function loadClosingProposal(orderId: number, conn: Queryable): Promise<{ missing: string[]; orderRevision: string; companyRevision: string }> {
+  const { rows } = await conn.query(`SELECT c.proposal_details || o.proposal_details AS details,
+      o.proposal_details_revision::text AS order_revision, c.proposal_details_revision::text AS company_revision
+    FROM orders o CROSS JOIN company_settings c WHERE o.id = $1`, [orderId]);
+  if (!rows[0]) throw new ProposalSettingsError("Cadastro não encontrado. Recarregue a tela.");
+  return { missing: closingProposalProblems(rows[0].details as ProposalDetails), orderRevision: String(rows[0].order_revision), companyRevision: String(rows[0].company_revision) };
+}
 export async function loadProposalDetails(conn: Queryable, orderId?: number): Promise<StoredProposalDetails> {
   const { rows } = await conn.query(orderId === undefined
     ? "SELECT proposal_details, proposal_details_revision::text AS revision FROM company_settings"

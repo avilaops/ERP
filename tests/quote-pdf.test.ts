@@ -103,7 +103,7 @@ test("2 itens: PDF de uma página A4 com o que o cliente lê", async () => {
   assert.doesNotMatch(text, /custo|lucro|comiss|DIFAL|faixa/i);
 });
 
-test("sem cliente e sem desconto: 'Cliente: a informar', sem a coluna nem a linha do desconto", async () => {
+test("sem cliente e sem desconto: campos ausentes não aparecem no PDF", async () => {
   const bytes = await renderQuotePdf(
     {
       ...DOCUMENT,
@@ -118,7 +118,7 @@ test("sem cliente e sem desconto: 'Cliente: a informar', sem a coluna nem a linh
     NOTHING,
   );
   const text = pdfText(bytes);
-  assert.ok(text.includes("Cliente: a informar"));
+  assert.ok(!text.includes("Cliente: a informar"));
   assert.doesNotMatch(text, /desconto|Entrega:|Prazo de fabricação|Observações/i);
 });
 

@@ -221,8 +221,8 @@ export async function renderQuotePdf(document: QuoteDocument, { logo, photos }: 
         ],
         MARGIN + half,
       )
-    : block("Cliente", ["Cliente: a informar"], MARGIN + half);
-  y = Math.min(afterSeller, afterCustomer) - 10;
+    : y;
+  y = Math.min(afterSeller, afterCustomer) - 6;
 
   // Items: photo, what the equipment is, and the values.
   const numeric = numericColumns(document, fonts);
@@ -296,10 +296,20 @@ export async function renderQuotePdf(document: QuoteDocument, { logo, photos }: 
     rule(y);
   }
 
+  // Short delivery details use the space alongside the totals, without shrinking text.
+  const deliverySection = document.sections?.find((section) => section.title === "Entrega e transporte");
+  const sideWidth = CONTENT_WIDTH - 250;
+  const sideLines = [document.production ? `Prazo de fabricação: ${document.production}` : null, ...(deliverySection?.lines ?? [])]
+    .filter((line): line is string => Boolean(line))
+    .flatMap((line) => wrap(clean(line), fonts.regular, 9, sideWidth));
+  const sideHeight = 30 + sideLines.length * 12;
+  const compactDelivery = Boolean(deliverySection) && sideLines.length > 0 && sideHeight <= 114;
+
   // Totals, kept together.
   const totalsHeight = 16 + document.totals.reduce((total, row) => total + (row.strong ? 24 : 14), 0);
-  if (y - totalsHeight < bodyBottom) newPage();
+  if (y - Math.max(totalsHeight, compactDelivery ? sideHeight + 12 : 0) < bodyBottom) newPage();
   y -= 12;
+  const summaryTop = y;
   write(`${document.units} un.`, MARGIN, y - 9, { color: MUTED });
   const labelX = right - 230;
   for (const row of document.totals) {
@@ -315,12 +325,18 @@ export async function renderQuotePdf(document: QuoteDocument, { logo, photos }: 
       y -= 14;
     }
   }
-  y -= 16;
+  if (compactDelivery) {
+    const top = y;
+    y = summaryTop - 14;
+    for (const line of sideLines) { write(line, MARGIN, y - 9); y -= 12; }
+    y = Math.min(top, y);
+  }
+  y -= 10;
 
   // Delivery, production time and notes, when there are any.
   const conditions: [string, string | null][] = [
     ["Entrega", document.delivery],
-    ["Prazo de fabricação", document.production],
+    ["Prazo de fabricação", compactDelivery ? null : document.production],
     ["Observações", document.notes],
   ];
   for (const [label, value] of conditions) {
@@ -330,7 +346,25 @@ export async function renderQuotePdf(document: QuoteDocument, { logo, photos }: 
   }
 
   // The payment as agreed, in a box of its own.
-  if (document.payment.length > 0) {
+  const paymentLines = document.payment.flatMap((line) => wrap(clean(line), fonts.regular, 9, CONTENT_WIDTH - (document.pix ? 156 : 20)));
+  const beneficiaryLines = document.pix ? [`Favorecido: ${document.pix.name}`, `Chave: ${document.pix.key}`, `Valor em aberto: ${document.pix.amount}`] : [];
+  const beneficiaryHeight = beneficiaryLines.flatMap((line) => wrap(clean(line), fonts.regular, 9, CONTENT_WIDTH - 156)).length * 12;
+  const combinedHeight = Math.max(140, 32 + paymentLines.length * 12 + beneficiaryHeight);
+  const combinedPix = document.pix && document.payment.length > 0 && combinedHeight <= 220 ? document.pix : null;
+  if (combinedPix) {
+    if (y - combinedHeight - 16 < bodyBottom) newPage();
+    y -= 8;
+    page.drawRectangle({ x: MARGIN, y: y - combinedHeight, width: CONTENT_WIDTH, height: combinedHeight, color: SHADE });
+    write("CONDIÇÕES DE PAGAMENTO", MARGIN + 10, y - 14, { size: 8, bold: true, color: MUTED });
+    paymentLines.forEach((line, index) => write(line, MARGIN + 10, y - 29 - index * 12));
+    const qr = await pdf.embedPng(await QRCode.toBuffer(combinedPix.code, { errorCorrectionLevel: "M", margin: 4, width: 400 }));
+    page.drawImage(qr, { x: right - 129, y: y - 132, width: 112, height: 112 });
+    write("PIX DA ENTRADA", right - 129, y - 14, { size: 8, bold: true });
+    const top = y;
+    y -= 32 + paymentLines.length * 12;
+    for (const line of beneficiaryLines) paragraph(line, { x: MARGIN + 10, width: CONTENT_WIDTH - 156 });
+    y = Math.min(y, top - combinedHeight) - 8;
+  } else if (document.payment.length > 0) {
     const lines = document.payment.flatMap((line) => wrap(clean(line), fonts.regular, 9, CONTENT_WIDTH - 20));
     let offset = 0;
     while (offset < lines.length) {
@@ -346,19 +380,21 @@ export async function renderQuotePdf(document: QuoteDocument, { logo, photos }: 
     }
   }
 
-  if (document.pix) {
-    if (y - 154 < bodyBottom) newPage();
+  if (document.pix && !combinedPix) {
+    const text = ["PIX DA ENTRADA", `Valor em aberto: ${document.pix.amount}`, `Favorecido: ${document.pix.name}`, `Chave: ${document.pix.key}`, "Confira o favorecido no aplicativo do seu banco."];
+    const height = Math.max(126, text.flatMap((line) => wrap(clean(line), fonts.regular, 9, CONTENT_WIDTH - 138)).length * 12);
+    if (y - height - 22 < bodyBottom) newPage();
     y -= 10;
     const qr = await pdf.embedPng(await QRCode.toBuffer(document.pix.code, { errorCorrectionLevel: "M", margin: 4, width: 400 }));
     page.drawImage(qr, { x: MARGIN, y: y - 126, width: 126, height: 126 });
     const top = y;
     const x = MARGIN + 138;
-    paragraph("PIX DA ENTRADA", { x, width: CONTENT_WIDTH - 138, bold: true });
-    for (const line of [`Valor em aberto: ${document.pix.amount}`, `Favorecido: ${document.pix.name}`, `Chave: ${document.pix.key}`, "Confira o favorecido no aplicativo do seu banco."]) paragraph(line, { x, width: CONTENT_WIDTH - 138 });
+    for (const [index, line] of text.entries()) paragraph(line, { x, width: CONTENT_WIDTH - 138, bold: index === 0 });
     y = Math.min(y, top - 126) - 12;
   }
 
   for (const section of document.sections ?? []) {
+    if (section.lines.length === 0 || (compactDelivery && section === deliverySection)) continue;
     if (y - 45 < bodyBottom) newPage();
     y -= 10;
     paragraph(section.title.toUpperCase(), { bold: true });
@@ -373,11 +409,11 @@ export async function renderQuotePdf(document: QuoteDocument, { logo, photos }: 
       ["Vendedor", [seller.name]],
       ...(document.manager ? ([["Gerente comercial", [document.manager]]] as [string, string[]][]) : []),
     ];
-    const signaturesHeight = 96;
+    const signaturesHeight = 94;
     if (y - signaturesHeight < bodyBottom) newPage();
     y -= 18;
     write(document.signedAt, MARGIN, y - 9);
-    y -= 52;
+    y -= 32;
     const slot = CONTENT_WIDTH / signers.length;
     signers.forEach(([title, details], index) => {
       const left = MARGIN + index * slot + 8;
