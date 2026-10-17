@@ -1,4 +1,5 @@
 import { INPUT } from "@/components/ui";
+import { FormSteps } from "@/components/FormSteps";
 import { BANK_FIELDS, SUPPLIER_KIND_LABELS, SUPPLIER_KINDS } from "@/lib/db/suppliers";
 import type { Supplier } from "@/lib/db/suppliers";
 
@@ -19,8 +20,15 @@ export function SupplierFields({ saved }: { saved: Supplier | null }) {
     ["phone", "Telefone", saved?.phone],
     ["email", "E-mail", saved?.email],
   ] as const;
+  const fields = (rows: readonly (typeof plain[number])[]) => rows.map(([key, label, value]) => (
+    <div key={key}>
+      <label htmlFor={key} className={LABEL}>{label}</label>
+      <input id={key} name={key} type={key === "email" ? "email" : "text"} defaultValue={value ?? ""} autoComplete="off" className={INPUT} />
+    </div>
+  ));
   return (
-    <>
+    <FormSteps label="Etapa do fornecedor" steps={[
+      { title: "Identificação", content: <div key="identificacao" className="grid gap-3 sm:grid-cols-2">
       <div>
         <label htmlFor="kind" className={LABEL}>
           Tipo
@@ -33,18 +41,11 @@ export function SupplierFields({ saved }: { saved: Supplier | null }) {
           ))}
         </select>
       </div>
-      {plain.map(([key, label, value]) => (
-        <div key={key}>
-          <label htmlFor={key} className={LABEL}>
-            {label}
-          </label>
-          <input id={key} name={key} type="text" defaultValue={value ?? ""} autoComplete="off" className={INPUT} />
-        </div>
-      ))}
-      <fieldset className="rounded border border-slate-200 p-4 sm:col-span-2">
-        <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Dados para pagamento</legend>
-        <div className="grid gap-4 sm:grid-cols-2">
-          {BANK_FIELDS.map(([key, label]) => (
+      {fields(plain.filter(([key]) => ["name", "document"].includes(key)))}</div> },
+      { title: "Empresa", content: <div key="empresa" className="grid gap-3 sm:grid-cols-2">{fields(plain.filter(([key]) => ["tradeName", "country"].includes(key)))}</div> },
+      { title: "Contato", content: <div key="contato" className="grid gap-3 sm:grid-cols-2">{fields(plain.filter(([key]) => ["contactName", "phone", "email"].includes(key)))}</div> },
+      ...Array.from({ length: Math.ceil(BANK_FIELDS.length / 3) }, (_, index) => ({ title: `Dados para pagamento ${index + 1}`, content: <div key={`banco-${index}`} className="grid gap-3 sm:grid-cols-2">
+          {BANK_FIELDS.slice(index * 3, index * 3 + 3).map(([key, label]) => (
             <div key={key}>
               <label htmlFor={key} className={LABEL}>
                 {label}
@@ -52,14 +53,13 @@ export function SupplierFields({ saved }: { saved: Supplier | null }) {
               <input id={key} name={key} type="text" defaultValue={saved?.bank[key] ?? ""} autoComplete="off" className={INPUT} />
             </div>
           ))}
-        </div>
-      </fieldset>
-      <div className="sm:col-span-2">
+        </div> })),
+      { title: "Observações", content: <div key="observacoes">
         <label htmlFor="notes" className={LABEL}>
           Observações
         </label>
         <input id="notes" name="notes" type="text" defaultValue={saved?.notes ?? ""} className={INPUT} />
-      </div>
-    </>
+      </div> },
+    ]} />
   );
 }

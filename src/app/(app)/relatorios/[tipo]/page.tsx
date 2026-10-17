@@ -1,14 +1,15 @@
 import { cookies } from "next/headers";
 import Link from "next/link";
+import { FitRows } from "@/components/FitRows";
 import { notFound, redirect } from "next/navigation";
-import { CARD, INPUT, LABEL, Pager, pageOf, PageHeader, QUIET_LINK, SECONDARY } from "@/components/ui";
+import { CARD, INPUT, LABEL, Pager, pageOf, PageHeader, QUIET_LINK, SECONDARY, MetricSummary, ViewTabs } from "@/components/ui";
 import { NO_ACCESS_PATH, requirePermission } from "@/lib/auth";
 import { allows, menuItem } from "@/lib/auth/permissions";
 import { tenantDb } from "@/lib/db/pool";
 import { reportOf, runReport } from "@/lib/db/reports";
 import { isoDate } from "@/lib/format";
 import { brDate, parsePeriod, PERIODS, personOf, showCell, showFigure } from "@/lib/reports-view";
-import { ROWS_COOKIE, rowsPerPage } from "@/lib/rows";
+import { rowsPerPage } from "@/lib/rows";
 
 export const metadata = { title: `${menuItem("relatorios").label} · ERP` };
 export const dynamic = "force-dynamic";
@@ -30,8 +31,10 @@ export default async function RelatorioPage({ params, searchParams }: { params: 
 
   const here = `${HOME}/${report.key}`;
   const chosen = period.key === "datas" ? `de=${period.from}&ate=${period.to}` : `periodo=${period.key}`;
-  const slice = pageOf(data.rows, first(query.pagina), rowsPerPage((await cookies()).get(ROWS_COOKIE)?.value));
+  const size = rowsPerPage((await cookies()).get("erp_linhas_relatorio")?.value, 1);
+  const slice = pageOf(data.rows, first(query.pagina), size);
   const numeric = (index: number) => data.columns[index].kind === "money" || data.columns[index].kind === "count";
+  const moneyColumn = data.columns.findIndex((column) => column.kind === "money");
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -58,18 +61,7 @@ export default async function RelatorioPage({ params, searchParams }: { params: 
 
       {report.period && (
         <>
-          <nav aria-label="Período" className="mt-3 flex flex-wrap gap-2">
-            {PERIODS.map((item) => (
-              <Link
-                key={item.key}
-                href={`${here}?periodo=${item.key}`}
-                aria-current={period.key === item.key ? "page" : undefined}
-                className={`inline-flex min-h-[var(--control)] items-center rounded-full border px-3 text-sm font-medium ${period.key === item.key ? "border-brand bg-brand text-white" : "border-slate-300 bg-white hover:bg-slate-50"}`}
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
+          <ViewTabs label="Período" items={PERIODS.map((item) => ({ href: `${here}?periodo=${item.key}`, label: item.label, current: period.key === item.key }))} />
           <details className={`${CARD} mt-2`} open={period.key === "datas"}>
             <summary className="cursor-pointer px-3 py-2 text-sm font-medium">Outro período</summary>
             <form method="get" action={here} className="flex flex-wrap items-end gap-2 border-t border-slate-200 p-3">
@@ -93,21 +85,30 @@ export default async function RelatorioPage({ params, searchParams }: { params: 
         </>
       )}
 
-      <dl className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-        {data.summary.map((figure) => (
-          <div key={figure.label} className={`${CARD} px-3 py-2`}>
-            <dt className="text-xs text-slate-600">{figure.label}</dt>
-            <dd className="text-lg font-semibold">{showFigure(figure)}</dd>
-          </div>
-        ))}
-      </dl>
+      <MetricSummary items={data.summary.map((figure) => ({ label: figure.label, value: showFigure(figure) }))} />
 
       <section className={`${CARD} mt-3`} aria-label="Lista">
         {data.rows.length === 0 ? (
           <p className="p-4 text-sm text-slate-600">Nada neste período.</p>
         ) : (
           <>
-            <div className="overflow-x-auto">
+            <div id="report-rows">
+            <ul className="md:hidden">
+              {slice.rows.map((row, rowIndex) => (
+                <li key={slice.from + rowIndex} data-row className="border-t border-slate-200 first:border-t-0">
+                  <details>
+                    <summary className="disclosure-heading items-start">
+                      <span className="min-w-0 break-words">{showCell(row[0], data.columns[0].kind)}{moneyColumn > 0 && <span className="mt-1 block font-semibold">{showCell(row[moneyColumn], "money")}</span>}</span>
+                      <span aria-hidden="true" className="disclosure-marker">+</span>
+                    </summary>
+                    <dl className="grid gap-3 border-t border-slate-200 p-4 text-sm">
+                      {row.map((value, index) => <div key={data.columns[index].label}><dt className="text-slate-600">{data.columns[index].label}</dt><dd className="break-words font-medium">{showCell(value, data.columns[index].kind)}</dd></div>)}
+                    </dl>
+                  </details>
+                </li>
+              ))}
+            </ul>
+            <div className="hidden overflow-x-auto md:block">
               <table className="stack-sm w-full text-sm">
                 <thead>
                   <tr className="text-left text-xs text-slate-600">
@@ -120,7 +121,7 @@ export default async function RelatorioPage({ params, searchParams }: { params: 
                 </thead>
                 <tbody>
                   {slice.rows.map((row, rowIndex) => (
-                    <tr key={slice.from + rowIndex} className="border-t border-slate-200">
+                    <tr data-row key={slice.from + rowIndex} className="border-t border-slate-200">
                       {row.map((value, index) => (
                         <td key={data.columns[index].label} data-label={data.columns[index].label} className={`px-3 py-2 ${numeric(index) ? "text-right tabular-nums" : ""}`}>
                           {showCell(value, data.columns[index].kind)}
@@ -131,10 +132,12 @@ export default async function RelatorioPage({ params, searchParams }: { params: 
                 </tbody>
               </table>
             </div>
+            </div>
             <Pager {...slice} noun={["linha", "linhas"]} hrefFor={(page) => `${here}?${chosen}&pagina=${page}`} />
           </>
         )}
       </section>
+      <FitRows listId="report-rows" shown={size} minimum={1} cookieName="erp_linhas_relatorio" />
     </div>
   );
 }

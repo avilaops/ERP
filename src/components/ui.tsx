@@ -9,7 +9,7 @@ export { pageOf } from "@/lib/rows";
  * system looks and behaves as one. Colours are the names of the light palette;
  * the dark theme and the brand of each company follow by themselves.
  */
-export const CARD = "rounded-lg border border-slate-200 bg-white";
+export const CARD = "rounded-xl border border-slate-200 bg-white";
 /** A group of things under one small title, without a box of its own. */
 export const SECTION_TITLE = "text-xs font-semibold uppercase tracking-wide text-slate-600";
 export const LABEL = "block text-sm font-medium text-slate-700";
@@ -24,6 +24,53 @@ export const DANGER = "inline-flex min-h-[var(--control)] items-center justify-c
 export const DANGER_OUTLINE = "inline-flex min-h-[var(--control)] items-center justify-center rounded-lg border border-red-300 bg-white px-4 text-sm font-medium text-red-700 hover:bg-red-50";
 export const QUIET_LINK = "font-medium text-brand underline";
 
+/** Page views are navigation; their selected state is distinct from a primary action. */
+export function ViewTabs({ label, items }: { label: string; items: { href: string; label: string; current: boolean }[] }) {
+  return (
+    <nav aria-label={label} className="view-tabs">
+      {items.map((item) => (
+        <Link key={item.href} href={item.href} aria-current={item.current ? "page" : undefined}>
+          {item.label}
+        </Link>
+      ))}
+    </nav>
+  );
+}
+
+/** Secondary context is available without taking the first fold away from the task. */
+export function SectionDisclosure({ title, children, className = "" }: { title: string; children: ReactNode; className?: string }) {
+  return (
+    <details className={`${CARD} ${className}`}>
+      <summary className="disclosure-heading">{title}<span aria-hidden="true" className="disclosure-marker">+</span></summary>
+      <div className="border-t border-slate-200 p-4">{children}</div>
+    </details>
+  );
+}
+
+export type SummaryMetric = { label: string; value: string; note?: string; attention?: boolean };
+
+/** The decision metrics stay in the summary; counts and secondary metrics open on request. */
+export function MetricSummary({ items }: { items: SummaryMetric[] }) {
+  const metrics = (rows: SummaryMetric[]) => rows.map(({ label, value, note, attention }) => (
+    <div key={label} className="min-w-0">
+      <dt className="text-sm text-slate-600">{label}</dt>
+      <dd className={`mt-1 break-words text-lg font-semibold tabular-nums ${attention ? "text-red-700" : ""}`}>{value}</dd>
+      {note && <dd className="text-xs text-slate-600">{note}</dd>}
+    </div>
+  ));
+  return (
+    <details aria-label="Resumo financeiro" className={`${CARD} mt-3`}>
+      <summary className="disclosure-heading">
+        <span className="grid min-w-0 flex-1 grid-cols-2 gap-3">
+          {items.slice(0, 2).map((item) => <span key={item.label} className="min-w-0"><span className="block font-normal text-slate-600">{item.label}</span><span className={`block break-words font-semibold ${item.attention ? "text-red-700" : ""}`}>{item.value}</span></span>)}
+        </span>
+        <span className="sr-only">Ver todos os indicadores</span><span className="disclosure-marker" aria-hidden="true">+</span>
+      </summary>
+      <dl className="grid grid-cols-2 gap-3 border-t border-slate-200 p-3">{metrics(items)}</dl>
+    </details>
+  );
+}
+
 /**
  * The top of a screen: where the person is, in one line, with at most one
  * short sentence under it and the actions of the screen on the right. A long
@@ -31,10 +78,15 @@ export const QUIET_LINK = "font-medium text-brand underline";
  */
 export function PageHeader({ title, hint, actions }: { title: string; hint?: ReactNode; actions?: ReactNode }) {
   return (
-    <header className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+    <header className="page-header flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
       <div className="min-w-0">
         <h1>{title}</h1>
-        {hint && <p className="mt-0.5 text-sm text-slate-600">{hint}</p>}
+        {typeof hint === "string" && hint.length > 130 ? (
+          <details className="mt-1 max-w-prose text-sm text-slate-600">
+            <summary className="inline-flex min-h-[var(--control)] cursor-pointer items-center text-brand">Como funciona</summary>
+            <p className="pb-2">{hint}</p>
+          </details>
+        ) : hint ? <p className="mt-1 max-w-prose text-sm text-slate-600">{hint}</p> : null}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </header>

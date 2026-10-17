@@ -1933,7 +1933,7 @@ test("contrato com selo e segundo código: o assinado sai selado com o certifica
   assert.equal((await listOrderContracts(closed.id, db.pool))[0].status, "enviado");
 
   // Com o certificado da empresa guardado, o contrato assinado sai selado.
-  await saveCertificate(testPfx({ name: "EMPRESA DE TESTE LTDA:11222333000181", bits: 2048, until: new Date("2027-06-01T00:00:00Z") }), "senha-de-teste", vault, DIRECTOR, now, db.pool);
+  await saveCertificate(testPfx({ name: "EMPRESA DE TESTE LTDA:11222333000181", bits: 2048, until: new Date(now.getTime() + 365 * 86_400_000) }), "senha-de-teste", vault, DIRECTOR, now, db.pool);
   assert.equal(await sealStanding(db.pool, now), null);
   await signOrderContract(opened, token, mailCode, { ...signing, phoneCode }, db.pool);
   const [signed] = await listOrderContracts(closed.id, db.pool);
@@ -1954,7 +1954,7 @@ test("contrato com selo e segundo código: o assinado sai selado com o certifica
   assert.equal(sealOf(await contractFile(signed, { company: "Acme", orderNumber: number, now, vault: () => vault }, db.pool)), null);
   // Certificado vencido não sela.
   await saveContractSettings({ ...(await loadContractSettings(db.pool)), seal: true }, DIRECTOR, db.pool);
-  assert.equal(await sealStanding(db.pool, new Date("2027-07-01T00:00:00Z")), "vencido");
+  assert.equal(await sealStanding(db.pool, new Date(now.getTime() + 366 * 86_400_000)), "vencido");
   await saveContractSettings({ ...(await loadContractSettings(db.pool)), seal: false }, DIRECTOR, db.pool);
   await db.pool.query("DELETE FROM fiscal_certificates");
 });

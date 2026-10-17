@@ -1,5 +1,6 @@
+import { FormSteps } from "@/components/FormSteps";
 import Link from "next/link";
-import { CARD, INPUT, PRIMARY, SECONDARY } from "@/components/ui";
+import { CARD, INPUT, PRIMARY, SECONDARY, SectionDisclosure, PageHeader } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { menuItem } from "@/lib/auth/permissions";
 import { CONTRACT_WORDS, DEFAULT_CONTRACT_BODY, DEFAULT_CONTRACT_TITLE } from "@/lib/contract/text";
@@ -31,28 +32,16 @@ export default async function ContractSettingsPage() {
 
   return (
     <>
-      <p className="text-sm">
-        <Link href={menuItem("parametros").href} className="text-brand underline">
-          ← {menuItem("parametros").label}
-        </Link>
-      </p>
-      <h1 className="mt-2 text-2xl font-semibold">Contrato</h1>
-      <p className="mt-1 max-w-3xl text-slate-600">
+      <PageHeader title="Contrato" actions={<Link href={menuItem("parametros").href} className={SECONDARY}>← Configurações</Link>} />
+      <SectionDisclosure title="Ajuda e importação" className="mt-2">
+      <details className="mt-1 max-w-3xl text-sm text-slate-600"><summary className="inline-flex min-h-[var(--control)] cursor-pointer items-center text-brand">Como funciona</summary><p className="pb-3">
         Depois que o pedido é fechado, o contrato sai deste modelo, preenchido com os dados do pedido, e vai para o cliente assinar por um link no e-mail. O
         cliente confirma com nome, CPF e um código enviado ao e-mail dele; o sistema guarda data, hora e endereço de rede de cada passo e junta esse
         registro ao PDF assinado.
-      </p>
-      {!hasMailbox && (
-        <p className="mt-3 max-w-3xl rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          Ainda não há caixa de saída de e-mail: sem ela o contrato não é enviado. Veja{" "}
-          <Link href="/parametros/email" className="underline">
-            E-mail das notas
-          </Link>
-          .
-        </p>
-      )}
+      </p></details>
 
-      <section className={`${CARD} mt-6 p-5`} aria-labelledby="arquivo">
+
+      <SectionDisclosure title="Importar um modelo de contrato" className="mt-3">
         <h2 id="arquivo" className="text-sm font-semibold uppercase tracking-wide">
           Já tem o contrato em Word?
         </h2>
@@ -75,34 +64,39 @@ export default async function ContractSettingsPage() {
             </button>
           )}
         </ActionForm>
-      </section>
+      </SectionDisclosure>
+      </SectionDisclosure>
 
-      <ActionForm action={saveContractSettingsAction} className="mt-6 flex flex-col gap-6">
-        <section className={`${CARD} p-5`} aria-labelledby="modelo">
-          <h2 id="modelo" className="text-sm font-semibold uppercase tracking-wide">
+      <ActionForm action={saveContractSettingsAction} className="mt-3 flex flex-col gap-2">
+        <FormSteps steps={[{ title: "Título do modelo", content: (<section key="modelo" className={`${CARD} p-5`} aria-labelledby="modelo">
+          <h2 id="modelo" className="sr-only">
             Modelo do contrato
           </h2>
-          <p className="mt-1 max-w-3xl text-sm text-slate-600">
-            Em branco, vale o texto padrão que aparece em cinza: ele só identifica as partes, o que é vendido, o valor e o prazo, e traz a cláusula em que as
-            partes aceitam a assinatura eletrônica. As cláusulas da sua empresa (garantia, multa, foro, entrega) entram aqui, com o texto do seu advogado. Mantenha
-            a cláusula da assinatura eletrônica.
-          </p>
-          <div className="mt-4 grid gap-4">
+
+          <div className="grid gap-3">
             <div>
               <label htmlFor="title" className={LABEL}>
                 Título
               </label>
               <input key={settings.title ?? ""} id="title" name="title" type="text" defaultValue={settings.title ?? ""} placeholder={DEFAULT_CONTRACT_TITLE} autoComplete="off" className={INPUT} />
             </div>
+          </div>
+        </section>) },
+{ title: "Texto do contrato", content: (<section key="texto" className={`${CARD} p-5`} aria-label="Texto do contrato">
             <div>
               <label htmlFor="body" className={LABEL}>
-                Texto (linha começada por “# ” vira título de seção; por “- ”, item de lista)
+                Texto do contrato
               </label>
-              <textarea key={settings.body ?? ""} id="body" name="body" rows={22} defaultValue={settings.body ?? ""} placeholder={DEFAULT_CONTRACT_BODY} className={`${INPUT} py-2 font-mono text-sm`} />
+              <textarea key={settings.body ?? ""} id="body" name="body" rows={3} defaultValue={settings.body ?? ""} placeholder={DEFAULT_CONTRACT_BODY} className={`${INPUT} py-2 font-mono text-sm`} />
             </div>
-          </div>
-          <details className="mt-4 text-sm">
+          <details className="mt-2 text-sm">
             <summary className="cursor-pointer font-medium text-brand">Campos que o sistema preenche ({CONTRACT_WORDS.length})</summary>
+            <p className="mt-2">Comece uma linha por “# ” para título de seção ou por “- ” para item de lista.</p>
+<p className="mt-1 max-w-3xl text-sm text-slate-600">
+            Em branco, vale o texto padrão que aparece em cinza: ele só identifica as partes, o que é vendido, o valor e o prazo, e traz a cláusula em que as
+            partes aceitam a assinatura eletrônica. As cláusulas da sua empresa (garantia, multa, foro, entrega) entram aqui, com o texto do seu advogado. Mantenha
+            a cláusula da assinatura eletrônica.
+          </p>
             <p className="mt-2 text-slate-600">Escreva o campo entre chaves no texto. O que o pedido não tiver fica em branco, e a tela do pedido avisa antes de enviar.</p>
             <dl className="mt-2 grid gap-x-6 gap-y-1 sm:grid-cols-2">
               {CONTRACT_WORDS.map(([word, meaning]) => (
@@ -113,13 +107,21 @@ export default async function ContractSettingsPage() {
               ))}
             </dl>
           </details>
-        </section>
-
-        <section className={`${CARD} p-5`} aria-labelledby="envio">
-          <h2 id="envio" className="text-sm font-semibold uppercase tracking-wide">
+        </section>) },
+{ title: "Envio ao cliente", content: (<section key="envio" className={`${CARD} p-4`} aria-labelledby="envio">
+{!hasMailbox && (
+        <p className="mt-3 max-w-3xl rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          Ainda não há caixa de saída de e-mail: sem ela o contrato não é enviado. Veja{" "}
+          <Link href="/parametros/email" className="underline">
+            E-mail das notas
+          </Link>
+          .
+        </p>
+      )}
+          <h2 id="envio" className="sr-only">
             Envio ao cliente
           </h2>
-          <div className="mt-4 grid gap-4 sm:grid-cols-4">
+          <div className="mt-3 grid gap-3 sm:grid-cols-4">
             <div>
               <label htmlFor="linkDays" className={LABEL}>
                 Validade do link (dias)
@@ -132,20 +134,21 @@ export default async function ContractSettingsPage() {
               </label>
               <input key={settings.mailSubject ?? ""} id="mailSubject" name="mailSubject" type="text" defaultValue={settings.mailSubject ?? ""} placeholder={DEFAULT_CONTRACT_MAIL_SUBJECT} autoComplete="off" className={INPUT} />
             </div>
-            <div className="sm:col-span-4">
+          </div>
+        </section>) },
+{ title: "Mensagem do e-mail", content: (<section key="mensagem" className={`${CARD} p-5`} aria-label="Mensagem do e-mail">
+            <div>
               <label htmlFor="mailBody" className={LABEL}>
                 Texto do e-mail: {"{empresa}"}, {"{cliente}"}, {"{pedido}"}, {"{validade}"} e {"{link}"} (obrigatório) são trocados pelos dados do contrato
               </label>
-              <textarea key={settings.mailBody ?? ""} id="mailBody" name="mailBody" rows={9} defaultValue={settings.mailBody ?? ""} placeholder={DEFAULT_CONTRACT_MAIL_BODY} className={`${INPUT} py-2`} />
+              <textarea key={settings.mailBody ?? ""} id="mailBody" name="mailBody" rows={4} defaultValue={settings.mailBody ?? ""} placeholder={DEFAULT_CONTRACT_MAIL_BODY} className={`${INPUT} py-2`} />
             </div>
-          </div>
-        </section>
-
-        <section className={`${CARD} p-5`} aria-labelledby="seguranca">
-          <h2 id="seguranca" className="text-sm font-semibold uppercase tracking-wide">
+        </section>) },
+{ title: "Segurança", content: (<section key="seguranca" className={`${CARD} p-5`} aria-labelledby="seguranca">
+          <h2 id="seguranca" className="sr-only">
             Segurança
           </h2>
-          <div className="mt-4 flex flex-col gap-4">
+          <div className="flex flex-col gap-3">
             <div className="sm:max-w-xs">
               <label htmlFor="downloadDays" className={LABEL}>
                 Depois de assinado, o link do cliente entrega o PDF por (dias)
@@ -153,6 +156,9 @@ export default async function ContractSettingsPage() {
               <input key={settings.downloadDays} id="downloadDays" name="downloadDays" type="text" inputMode="numeric" defaultValue={settings.downloadDays} autoComplete="off" className={INPUT} />
               <p className="mt-1 text-xs text-slate-600">Passado o prazo, ou se o link venceu sem assinatura, o endereço não entrega mais nada. A empresa continua baixando pelo pedido.</p>
             </div>
+          </div>
+        </section>) },
+{ title: "Selo digital", content: (<section key="selo" className={`${CARD} p-4`} aria-label="Selo digital">
             <label className="flex items-start gap-3">
               <input key={String(settings.seal)} type="checkbox" name="seal" value="sim" defaultChecked={settings.seal} className="mt-1 h-5 w-5" />
               <span className="text-sm">
@@ -170,6 +176,8 @@ export default async function ContractSettingsPage() {
                 </span>
               </span>
             </label>
+        </section>) },
+{ title: "Código por SMS", content: (<section key="sms" className={`${CARD} p-5`} aria-label="Código por SMS">
             <label className="flex items-start gap-3">
               <input key={String(settings.secondFactor)} type="checkbox" name="secondFactor" value="sim" defaultChecked={settings.secondFactor} className="mt-1 h-5 w-5" />
               <span className="text-sm">
@@ -183,8 +191,7 @@ export default async function ContractSettingsPage() {
                 </span>
               </span>
             </label>
-          </div>
-        </section>
+        </section>) }]} />
 
         <div>
           <button type="submit" className={PRIMARY}>

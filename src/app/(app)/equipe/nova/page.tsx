@@ -18,7 +18,7 @@ export default async function NovaPessoaPage() {
         <Link href={menuItem("equipe").href} aria-label="Voltar para Equipe e acessos" className="inline-flex min-h-[var(--control)] shrink-0 items-center rounded-lg bg-brand-soft px-3 text-xl text-brand">
           ←
         </Link>
-        <h1 className="min-w-0 truncate text-2xl font-semibold">Convidar pessoa</h1>
+        <h1 className="min-w-0 break-words text-2xl font-semibold">Convidar pessoa</h1>
       </div>
       <p className="mt-1 text-sm text-slate-600">A pessoa recebe um e-mail com o endereço do sistema. Quem ainda não tem conta recebe junto o endereço para criar a senha.</p>
       <ActionForm action={inviteUserAction} className="mt-3 flex flex-col gap-3">

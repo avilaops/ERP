@@ -3,6 +3,7 @@ import { FitRows } from "@/components/FitRows";
 import { cookies } from "next/headers";
 import { rowsPerPage } from "@/lib/rows";
 import { PasswordField } from "@/components/PasswordField";
+import { FormSteps } from "@/components/FormSteps";
 import { loadFiscalRules, listPaymentCodes, missingFiscalRules, PAYMENT_CODES } from "@/lib/db/fiscal-rules";
 import { listNumberVoids } from "@/lib/db/invoices";
 import { listLines } from "@/lib/db/product-lines";
@@ -63,7 +64,16 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
     ["ibsCityRate", "Alíquota do IBS municipal (%)", formatPercent(rules.ibsCityRate), "0 em 2026", ""],
     ["cbsRate", "Alíquota da CBS (%)", formatPercent(rules.cbsRate), "0,9 em 2026", ""],
   ] as const;
-  // One part at a time: the certificate, who issues, the rules of the invoice of each line and its numbering.
+  const ruleGroups: [string, (typeof ruleFields)[number][]][] = [
+    ["Natureza da operação", ruleFields.slice(0, 1)],
+    ["CFOP", ruleFields.slice(1, 4)],
+    ["ICMS e IPI", ruleFields.slice(4, 7)],
+    ["PIS", ruleFields.slice(7, 9)],
+    ["COFINS", ruleFields.slice(9, 11)],
+    ["Classificação IBS/CBS", ruleFields.slice(11, 13)],
+    ["Alíquotas IBS/CBS", ruleFields.slice(13)],
+  ];
+  // One part at a time, preserving the fields and their existing server validation.
   const TABS = [
     ["consulta", "Consultar CNPJ"],
     ["certificado", certificate ? "Certificado" : "Certificado · falta"],
@@ -267,12 +277,11 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
             <h2 id="regras" className="text-sm font-semibold uppercase tracking-wide">
               Regras fiscais da nota{lines.length > 1 ? ` · linha ${line.name}` : ""}
             </h2>
-            <p className="mt-1 max-w-3xl text-sm text-slate-600">
-              O que o contador define para a venda desta linha. Os exemplos são só o formato: nenhum código vem preenchido pelo sistema. As
-              alíquotas de ICMS e o IPI vêm dos Parâmetros da linha.
-            </p>
+            <p className="mt-1 text-sm text-slate-600">Definições da contabilidade para esta linha.</p>
             <LineTabs lines={lines} current={line.id} path={HERE} others={{ ver: "regras" }} />
-            <ActionForm action={prepareSaleOperationAction} className="mt-3 flex flex-wrap items-end gap-3">
+            <details className="mt-3 rounded-lg border border-slate-200">
+            <summary className="disclosure-heading">Completar CFOPs por operação<span className="disclosure-marker" aria-hidden="true">+</span></summary>
+            <ActionForm action={prepareSaleOperationAction} className="flex flex-wrap items-end gap-3 border-t border-slate-200 p-3">
               <input type="hidden" name="lineId" value={line.id} />
               <div className="min-w-0 flex-1">
                 <label htmlFor="operation" className={LABEL}>Operação comum desta linha</label>
@@ -284,21 +293,23 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
               </div>
               <button type="submit" className={SECONDARY}>Completar CFOPs vazios</button>
             </ActionForm>
+            </details>
             {missingRules.length > 0 && (
-              <p className="mt-3 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-                Para emitir nota desta linha, faltam: {missingRules.join(", ")}.
-              </p>
+              <details className="mt-3 rounded-lg border border-amber-300 bg-amber-50 text-sm text-amber-900">
+                <summary className="disclosure-heading">Pendências para emissão ({missingRules.length})<span className="disclosure-marker" aria-hidden="true">+</span></summary>
+                <p className="px-4 pb-3">Para emitir nota desta linha, faltam: {missingRules.join(", ")}.</p>
+              </details>
             )}
             <ActionForm key={line.id} action={saveFiscalRulesAction} className="mt-4 grid gap-4 sm:grid-cols-2">
               <input type="hidden" name="lineId" value={line.id} />
-              {ruleFields.map(([key, label, value, placeholder, span]) => (
+              <FormSteps steps={[...ruleGroups.map(([title, fields]) => ({ title, content: <div key={title} className="grid gap-3 sm:grid-cols-2">{fields.map(([key, label, value, placeholder, span]) => (
                 <div key={key} className={span}>
                   <label htmlFor={key} className={LABEL}>
                     {label}
                   </label>
                   <input id={key} name={key} type="text" defaultValue={value ?? ""} placeholder={placeholder} autoComplete="off" className={INPUT} />
                 </div>
-              ))}
+              ))}</div> })), { title: "Condições da venda", content: <div key="condicoes" className="grid gap-3">
               <label className="flex min-h-[var(--control)] items-start gap-2 py-2.5 text-sm sm:col-span-2">
                 <input type="checkbox" name="finalConsumer" value="sim" defaultChecked={rules.finalConsumer} className="mt-1" />
                 <span>
@@ -320,6 +331,7 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
                 </label>
                 <textarea id="additionalInfo" name="additionalInfo" rows={3} defaultValue={rules.additionalInfo ?? ""} className={`${INPUT} py-2`} />
               </div>
+              </div> }]} />
               <div className="sm:col-span-2">
                 <button type="submit" className={PRIMARY}>
                   Salvar regras fiscais
@@ -330,7 +342,6 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
 
         </>
       )}
-
       {tab === "pagamentos" && (
           <section className={`${CARD} mt-4`} aria-labelledby="pagamento-na-nota">
             <h2 id="pagamento-na-nota" className="border-b border-slate-200 px-5 py-2 text-sm font-semibold uppercase tracking-wide">

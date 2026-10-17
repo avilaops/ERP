@@ -38,7 +38,7 @@ export default async function IntegracoesPage({ searchParams }: { searchParams: 
         </Link>
       </p>
       <PageHeader title="Integrações" hint="Outros sistemas da empresa (n8n, site, CRM) leem e gravam no ERP por chave, e são avisados quando algo acontece." />
-      <nav aria-label="Partes das integrações" className="mt-2 flex flex-wrap gap-x-1 border-b border-slate-200">
+      <nav aria-label="Partes das integrações" className="view-tabs">
         {TABS.map(([key, label]) => (
           <Link
             key={key}

@@ -31,7 +31,7 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
   const size = rowsPerPage((await cookies()).get(ROWS_COOKIE)?.value);
 
   const nav = (
-    <nav aria-label="Partes do estoque" className="mt-3 flex flex-wrap gap-2">
+    <nav aria-label="Partes do estoque" className="view-tabs">
       {TABS.map(([key, label]) => (
         <Link key={key} href={`${HERE}?ver=${key}`} aria-current={tab === key ? "page" : undefined} className={`${TAB} ${tab === key ? ON : OFF}`}>
           {label}

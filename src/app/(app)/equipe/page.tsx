@@ -67,13 +67,13 @@ export default async function EquipePage() {
               <li key={user.id} className="border-t border-slate-200 first:border-t-0">
                 <Link href={`${menuItem("equipe").href}/${user.id}`} className="flex items-center justify-between gap-3 px-5 py-3 active:bg-slate-50">
                   <span className="min-w-0">
-                    <span className="block truncate font-medium">
+                    <span className="block break-words font-medium">
                       {user.name}
                       {user.email === session.email ? " (você)" : ""}
                     </span>
-                    <span className="block truncate text-xs text-slate-500">{user.email}</span>
+                    <span className="block break-words text-xs text-slate-500">{user.email}</span>
                     {user.active && user.invite && user.email !== session.email && (
-                      <span className={`block truncate text-xs ${user.invite.status === "enviado" ? "text-emerald-800" : "text-amber-900"}`}>
+                      <span className={`block break-words text-xs ${user.invite.status === "enviado" ? "text-emerald-800" : "text-amber-900"}`}>
                         {user.invite.status === "enviado" ? "Convite enviado por e-mail" : user.invite.status === "falhou" ? "O convite por e-mail não saiu" : "Convite por e-mail não enviado"}
                       </span>
                     )}

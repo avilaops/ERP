@@ -54,7 +54,7 @@ export default async function CompraPage({ params, searchParams }: { params: Pro
           </div>
         ))}
       </dl>
-      <nav aria-label="Partes da compra" className="mt-3 flex flex-wrap gap-2">
+      <nav aria-label="Partes da compra" className="view-tabs">
         {TABS.map(([key, label]) => (
           <Link key={key} href={`${HERE}/${purchase.id}?ver=${key}`} aria-current={tab === key ? "page" : undefined} className={`${TAB} ${tab === key ? "border-brand bg-brand text-white" : "border-slate-300 bg-white hover:bg-slate-50"}`}>
             {label}

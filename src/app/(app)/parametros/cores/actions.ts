@@ -29,7 +29,7 @@ export async function createColorAction(_previous: ActionState, formData: FormDa
     return { error: problem(error) };
   }
   revalidatePath(HERE);
-  return { error: null };
+  return { error: null, notice: "Cor adicionada." };
 }
 
 export async function updateColorAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
@@ -43,7 +43,7 @@ export async function updateColorAction(_previous: ActionState, formData: FormDa
     return { error: problem(error) };
   }
   revalidatePath(HERE);
-  return { error: null };
+  return { error: null, notice: "Cor salva." };
 }
 
 /** "Remover": the orders that chose the colour keep it; only the list changes. */
@@ -56,5 +56,5 @@ export async function deleteColorAction(_previous: ActionState, formData: FormDa
     return { error: problem(error) };
   }
   revalidatePath(HERE);
-  return { error: null };
+  return { error: null, notice: "Cor removida da lista. Os pedidos anteriores mantêm a escolha." };
 }

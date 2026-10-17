@@ -27,10 +27,10 @@ export default async function LinhasPage() {
         </Link>
       </p>
       <h1 className="mt-2 text-2xl font-semibold">Linhas de produto</h1>
-      <p className="mt-1 max-w-3xl text-slate-600">
+      <details className="mt-1 max-w-3xl text-sm text-slate-600"><summary className="inline-flex min-h-[var(--control)] cursor-pointer items-center text-brand">Como funciona</summary><p className="pb-3">
         Cada linha (importada, nacional…) tem os seus parâmetros, as suas alíquotas por estado, os seus equipamentos e a sua tabela de
         preços. Um pedido é de uma linha só. A linha nova nasce com uma cópia dos parâmetros de outra: depois é só mudar o que difere.
-      </p>
+      </p></details>
 
       <section className={`${CARD} mt-6 p-5`} aria-labelledby="nova">
         <h2 id="nova" className="text-sm font-semibold uppercase tracking-wide">

@@ -72,7 +72,8 @@ export default async function OportunidadePage({ params, searchParams }: { param
       />
       {item.stageKind === "perdida" && item.lostReason && <p className="mt-1 text-sm text-slate-600">Motivo da perda: {item.lostReason}</p>}
 
-      {/* Where the sale stands is the decision of this screen: one tap moves it. */}
+      <details className={`${CARD} mt-3`}>
+      <summary className="disclosure-heading">Alterar etapa da oportunidade<span className="disclosure-marker" aria-hidden="true">+</span></summary>
       <ActionForm action={moveOpportunityAction} className="mt-3 flex flex-wrap items-end gap-2">
         {hidden}
         <div className="min-w-40 flex-1">
@@ -97,8 +98,9 @@ export default async function OportunidadePage({ params, searchParams }: { param
           Mover
         </button>
       </ActionForm>
+      </details>
 
-      <nav aria-label="Partes da oportunidade" className="mt-4 flex flex-wrap gap-x-1 border-b border-slate-200">
+      <nav aria-label="Partes da oportunidade" className="view-tabs">
         {TABS.map(([key, label]) => (
           <Link
             key={key}

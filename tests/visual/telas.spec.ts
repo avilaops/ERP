@@ -114,7 +114,7 @@ test("telas: cabem na largura, controles com 44 px e nenhum erro, nos cinco tama
       report.push({ path, size: `${width}×${height}`, ...result });
       expect.soft(result.overflowX, `${current}: rolagem lateral`).toBeLessThanOrEqual(0);
       expect.soft(result.small, `${current}: controles abaixo de 44 px`).toEqual([]);
-      if (width === 390 || width === 1440) {
+      {
         await page.screenshot({ path: testInfo.outputPath(`${path.slice(1).replace(/[/?=&]/g, "_") || "inicio"}.${width}.png`), fullPage: true });
       }
     }

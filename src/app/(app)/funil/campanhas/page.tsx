@@ -52,7 +52,7 @@ export default async function CampanhasPage({ searchParams }: { searchParams: Pr
           </>
         }
       />
-      <nav aria-label="Partes das campanhas" className="mt-2 flex flex-wrap gap-x-1 border-b border-slate-200">
+      <nav aria-label="Partes das campanhas" className="view-tabs">
         {TABS.map(([key, label]) => (
           <Link
             key={key}
@@ -90,8 +90,8 @@ export default async function CampanhasPage({ searchParams }: { searchParams: Pr
             <li key={campaign.id}>
               <Link href={`${HERE}/${campaign.id}`} className="flex min-h-[var(--control)] items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 hover:border-brand">
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate font-semibold leading-snug">{campaign.name}</span>
-                  <span className="block truncate text-sm text-slate-600">
+                  <span className="block break-words font-semibold leading-snug">{campaign.name}</span>
+                  <span className="block break-words text-sm text-slate-600">
                     {CAMPAIGN_AUDIENCES[campaign.audience]}
                     {campaign.uf ? ` · ${campaign.uf}` : ""}
                     {campaign.status === "rascunho" ? ` · criada em ${showDate(campaign.createdAt)}` : ` · ${campaign.sent} de ${campaign.sent + campaign.queued + campaign.failed + campaign.skipped} enviados`}
@@ -127,7 +127,7 @@ export default async function CampanhasPage({ searchParams }: { searchParams: Pr
           {slice.rows.map((optout) => (
             <li key={optout.email} className={`${CARD} flex items-center gap-2 px-3 py-2`}>
               <span className="min-w-0 flex-1">
-                <span className="block truncate font-medium">{optout.email}</span>
+                <span className="block break-words font-medium">{optout.email}</span>
                 <span className="block text-sm text-slate-600">
                   {optout.origin === "descadastro" ? "Saiu pelo link do e-mail" : `Incluído por ${optout.createdBy}`} · {showDate(optout.createdAt)}
                 </span>

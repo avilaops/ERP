@@ -46,8 +46,8 @@ export default async function HistoricoDoClientePage({ params, searchParams }: {
               const body = (
                 <>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate font-medium leading-snug">{entry.title}</span>
-                    <span className="block truncate text-sm text-slate-600">
+                    <span className="block break-words font-medium leading-snug">{entry.title}</span>
+                    <span className="block break-words text-sm text-slate-600">
                       {showDateTime(entry.at)}
                       {entry.amount !== null ? ` · ${showMoney(entry.amount)}` : ""}
                       {entry.detail ? ` · ${entry.detail}` : ""}

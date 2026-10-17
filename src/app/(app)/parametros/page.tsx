@@ -112,7 +112,7 @@ export default async function ParametrosPage({ searchParams }: { searchParams: P
     <>
       <h1 className="text-2xl font-semibold">{menuItem("parametros").label}</h1>
       <p className="mt-1 text-slate-600">Impostos, canal e política. Tudo que muda aqui recalcula a tabela inteira.</p>
-      <nav aria-label="Partes dos parâmetros" className="mt-2 flex flex-wrap gap-x-1 border-b border-slate-200">
+      <nav aria-label="Partes dos parâmetros" className="view-tabs">
         {TABS.map(([key, label]) => (
           <Link
             key={key}

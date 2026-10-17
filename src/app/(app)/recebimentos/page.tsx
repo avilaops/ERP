@@ -1,9 +1,10 @@
 import { monthLabel } from "@/lib/commissions-view";
 import { cookies } from "next/headers";
 import Link from "next/link";
+import { FitRows } from "@/components/FitRows";
+import { CARD, DANGER_OUTLINE, pageOf, Pager, PRIMARY, SECONDARY, PageHeader, MetricSummary, ViewTabs } from "@/components/ui";
+import { rowsPerPage } from "@/lib/rows";
 import { OrderReference } from "@/components/OrderReference";
-import { CARD, DANGER_OUTLINE, pageOf, Pager, PRIMARY, SECONDARY } from "@/components/ui";
-import { ROWS_COOKIE, rowsPerPage } from "@/lib/rows";
 import { requirePermission } from "@/lib/auth";
 import { confirmsRefunds, menuItem } from "@/lib/auth/permissions";
 import { listPaymentMethods } from "@/lib/db/orders";
@@ -42,7 +43,12 @@ export default async function RecebimentosPage({ searchParams }: { searchParams:
   const tab = TABS.find(([key]) => key === (Array.isArray(asked) ? asked[0] : asked))?.[0] ?? "aberto";
   // Each open amount is a form of its own: a few at a time, the ones due first.
   const askedPage = (await searchParams).pagina;
-  const slice = pageOf(open, Array.isArray(askedPage) ? askedPage[0] : askedPage, Math.min(5, rowsPerPage((await cookies()).get(ROWS_COOKIE)?.value)));
+  const pageNumber = Array.isArray(askedPage) ? askedPage[0] : askedPage;
+  const size = rowsPerPage((await cookies()).get("erp_linhas_receber")?.value, 1);
+  const slice = pageOf(open, pageNumber, size);
+  const receiptSlice = pageOf(receipts, pageNumber, size);
+  const refundSlice = pageOf(refunds, pageNumber, size);
+  const activeSlice = tab === "recebidos" ? receiptSlice : tab === "estornos" ? refundSlice : slice;
 
   const cards = [
     ["A receber", showMoney(summary.open.total), count(summary.open.count), ""],
@@ -53,32 +59,12 @@ export default async function RecebimentosPage({ searchParams }: { searchParams:
 
   return (
     <>
-      <h1 className="text-2xl font-semibold">{menuItem("recebimentos").label}</h1>
-      <p className="mt-1 text-slate-600">Entradas e parcelas dos pedidos fechados. A baixa gera a comissão do vendedor.</p>
+      <PageHeader title={menuItem("recebimentos").label} hint="Entradas e parcelas dos pedidos fechados." />
 
-      <nav aria-label="Partes dos recebimentos" className="mt-3 flex flex-wrap gap-x-1 border-b border-slate-200">
-        {TABS.map(([key, label]) => (
-          <Link
-            key={key}
-            href={key === "aberto" ? HERE : `${HERE}?ver=${key}`}
-            aria-current={key === tab ? "page" : undefined}
-            className={`inline-flex min-h-[var(--control)] items-center border-b-2 px-3 text-sm font-medium ${key === tab ? "border-brand text-brand" : "border-transparent text-slate-600 hover:text-slate-900"}`}
-          >
-            {label}
-          </Link>
-        ))}
-      </nav>
+      <ViewTabs label="Partes dos recebimentos" items={TABS.map(([key, label]) => ({ href: `${HERE}?ver=${key}`, label, current: key === tab }))} />
       {tab === "aberto" && (
         <>
-      <dl className="mt-4 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-        {cards.map(([label, value, note, color]) => (
-          <div key={label} className={`${CARD} p-4`}>
-            <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</dt>
-            <dd className={`mt-1 text-2xl font-bold ${color}`}>{value}</dd>
-            <dd className="text-xs text-slate-600">{note}</dd>
-          </div>
-        ))}
-      </dl>
+      <MetricSummary items={cards.map(([label, value, note, color]) => ({ label, value, note, attention: Boolean(color) }))} />
 
       <section className={`${CARD} mt-6`} aria-labelledby="abertos">
         <h2 id="abertos" className="border-b border-slate-200 px-5 py-3 text-sm font-semibold uppercase tracking-wide">
@@ -88,11 +74,11 @@ export default async function RecebimentosPage({ searchParams }: { searchParams:
           <p className="p-5 text-sm text-slate-600">Nada a receber. Os valores aparecem aqui quando um pedido é fechado.</p>
         ) : (
           <>
-          <ul>
+          <ul id="parcelas">
             {slice.rows.map((item) => {
               const late = isOverdue(item, today);
               return (
-                <li key={item.id} className="border-t border-slate-200 px-5 py-4 first:border-t-0">
+                <li data-row key={item.id} className="border-t border-slate-200 px-4 py-3 first:border-t-0">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <OrderReference access={session} number={item.orderNumber} customer={item.customerName} />
@@ -111,7 +97,7 @@ export default async function RecebimentosPage({ searchParams }: { searchParams:
                       </p>
                     </div>
                   </div>
-                  <ReceiptForm key={`${item.id}:${item.open}`} id={item.id} openAmount={item.open} today={today} initialMethod={item.method} methods={methods} initiallyOpen={slice.rows.length === 1} />
+                  <ReceiptForm key={`${item.id}:${item.open}`} id={item.id} openAmount={item.open} today={today} initialMethod={item.method} methods={methods} initiallyOpen={false} />
                 </li>
               );
             })}
@@ -132,8 +118,8 @@ export default async function RecebimentosPage({ searchParams }: { searchParams:
             Estornos aguardando a diretoria ({refunds.length})
           </h2>
           <ul>
-            {refunds.map((refund) => (
-              <li key={refund.id} className="border-t border-slate-200 px-5 py-4 first:border-t-0">
+            {refundSlice.rows.map((refund) => (
+              <li data-row key={refund.id} className="border-t border-slate-200 px-4 py-3 first:border-t-0">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <OrderReference access={session} number={refund.orderNumber} customer={refund.customerName} />
@@ -197,8 +183,8 @@ export default async function RecebimentosPage({ searchParams }: { searchParams:
                 </tr>
               </thead>
               <tbody>
-                {receipts.map((receipt) => (
-                  <tr key={receipt.id} className="border-t border-slate-200 align-top">
+                {receiptSlice.rows.map((receipt) => (
+                  <tr data-row key={receipt.id} className="border-t border-slate-200 align-top">
                     <td className="px-4 py-3">
                       <OrderReference access={session} number={receipt.orderNumber} customer={receipt.customerName} />
                       <span className="block text-xs text-slate-500">
@@ -216,6 +202,7 @@ export default async function RecebimentosPage({ searchParams }: { searchParams:
                       ) : receipt.state === "estorno-pedido" ? (
                         <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-900">Aguardando a diretoria</span>
                       ) : (
+                        <details><summary className="disclosure-heading !px-0 text-red-700">Pedir estorno<span className="disclosure-marker" aria-hidden="true">+</span></summary>
                         <ActionForm action={requestRefundAction} className="flex flex-wrap items-center gap-2">
                           <input type="hidden" name="id" value={receipt.id} />
                           <input
@@ -229,6 +216,7 @@ export default async function RecebimentosPage({ searchParams }: { searchParams:
                             Pedir estorno
                           </button>
                         </ActionForm>
+                        </details>
                       )}
                     </td>
                   </tr>
@@ -240,6 +228,8 @@ export default async function RecebimentosPage({ searchParams }: { searchParams:
       )}
         </>
       )}
+      {tab !== "aberto" && <Pager {...activeSlice} noun={tab === "estornos" ? ["estorno", "estornos"] : ["recebimento", "recebimentos"]} hrefFor={(page) => `${HERE}?ver=${tab}&pagina=${page}`} />}
+      {tab === "aberto" && <FitRows listId="parcelas" shown={size} minimum={1} cookieName="erp_linhas_receber" />}
     </>
   );
 }

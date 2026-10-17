@@ -39,9 +39,9 @@ export default async function ConversasPage({ searchParams }: { searchParams: Pr
               const body = (
                 <>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate font-semibold leading-snug">{conversation.opportunityTitle ?? conversation.name ?? `+${conversation.contact}`}</span>
-                    <span className="block truncate text-sm text-slate-600">{conversation.last}</span>
-                    <span className="block truncate text-xs text-slate-500">
+                    <span className="block break-words font-semibold leading-snug">{conversation.opportunityTitle ?? conversation.name ?? `+${conversation.contact}`}</span>
+                    <span className="block break-words text-sm text-slate-600">{conversation.last}</span>
+                    <span className="block break-words text-xs text-slate-500">
                       {showDateTime(conversation.lastAt)} · {conversation.name ?? `+${conversation.contact}`}
                       {everyone && conversation.ownerName ? ` · de ${conversation.ownerName}` : ""}
                     </span>

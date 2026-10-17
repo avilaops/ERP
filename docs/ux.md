@@ -85,7 +85,9 @@ Diretoria, percorre todas as telas que o menu alcança (uma de cada tipo) e mede
 cinco tamanhos. Falha quando a tela rola para o lado, quando algo que se toca tem menos de 44 px
 ou quando a página dá erro. Quantas telas de altura cada página ocupa vai para `telas.json`, sem
 falhar: meta de 1,0 em todos, e o que passar disso entra na lista de pendências abaixo, com o
-motivo. Os prints de cada tela em 390 e 1440 ficam em `test-results/telas/`.
+motivo. Os prints de cada tela nos cinco tamanhos ficam em `test-results/telas/`.
+
+A harmonização usa a especificação e os critérios de [harmonizacao-ui.md](harmonizacao-ui.md).
 
 Para rodar na própria máquina, num banco com nome terminado em `_demo` e com `ERP_LOCAL_LOGIN=1`:
 
