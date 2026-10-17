@@ -104,8 +104,13 @@ export async function listFiscalOverview(scope: FiscalOverviewScope, conn: Query
             WHERE order_id = o.id AND environment = $2 ORDER BY id DESC LIMIT 1
          ) i ON true
          LEFT JOIN LATERAL (
-           SELECT id, kind, status, attempts, last_error, run_after FROM fiscal_jobs
-            WHERE order_id = o.id ORDER BY id DESC LIMIT 1
+           SELECT fj.id, fj.kind, fj.status, fj.attempts, fj.last_error, fj.run_after FROM fiscal_jobs fj
+            WHERE fj.order_id = o.id
+              AND (fj.invoice_id IS NULL OR EXISTS (
+                SELECT 1 FROM fiscal_invoices job_invoice
+                 WHERE job_invoice.id = fj.invoice_id AND job_invoice.environment = $2
+              ))
+            ORDER BY fj.id DESC LIMIT 1
          ) j ON true
         WHERE o.status = 'fechado' AND ($1::text IS NULL OR o.seller_email = $1)
         ORDER BY o.closed_at DESC, o.id DESC`,

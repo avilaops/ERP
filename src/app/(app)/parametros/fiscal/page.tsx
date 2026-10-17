@@ -11,7 +11,7 @@ import { listLines } from "@/lib/db/product-lines";
 import { LINE_PARAM, pickLine } from "@/lib/lines-view";
 import Link from "next/link";
 import { CARD, DANGER, DANGER_OUTLINE, INPUT, LABEL, PRIMARY, SECONDARY, PageHeader, Pager, pageOf } from "@/components/ui";
-import { requirePermission } from "@/lib/auth";
+import { allows, requirePermission } from "@/lib/auth";
 import { menuItem } from "@/lib/auth/permissions";
 import { formatDocument } from "@/lib/customer";
 import { loadCertificateInfo, loadDanfeReformDate, loadFiscalSettings, missingFiscalData, TAX_REGIMES } from "@/lib/db/fiscal";
@@ -106,7 +106,7 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
   return (
     <>
       <PageHeader title="Fiscal" hint="Preparação da nota." actions={<>
-        <Link href="/fiscal" className={SECONDARY}>← Operação fiscal</Link>
+        {allows(session, "fiscal") && <Link href="/fiscal" className={SECONDARY}>← Operação fiscal</Link>}
         <Link href={menuItem("parametros").href} className={SECONDARY}>{menuItem("parametros").label}</Link>
       </>} />
 

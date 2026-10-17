@@ -27,6 +27,8 @@ test("painel fiscal mapeia pedidos, notas e inutilizações sem buscar conteúdo
   assert.equal(statements.length, 4);
   assert.match(statements[0], /o\.seller_email = \$1/);
   assert.match(statements[0], /environment = \$2/);
+  assert.match(statements[0], /invoice_id IS NULL OR EXISTS/);
+  assert.match(statements[0], /job_invoice\.environment = \$2/);
   assert.match(statements[1], /o\.seller_email = \$1/);
   for (const sql of statements) assert.doesNotMatch(sql, /signed_xml|authorized_xml|certificate|passphrase/i);
 });
