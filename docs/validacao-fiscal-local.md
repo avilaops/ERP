@@ -90,6 +90,24 @@ Transportes dos testes são substitutos controlados, sem emissão externa.
 Em 17/10/2026, a suíte geral passou com 751 testes, zero falhas ou pulos; lint,
 tipos e `npm ci --dry-run --ignore-scripts` passaram no servidor de build.
 
+Build aprovado e standalone de 3.309 entradas conferido sem rede e sem `tests/`:
+NF-e, cancelamento, CC-e e inutilização fictícios passaram, e XML com NCM inválido
+foi recusado. Os 13 hashes e o motor 5.3.0 também foram conferidos no container
+de produção, executando apenas validação local de documentos inválidos.
+
+Publicado em `40a7b70`, em 17/10/2026 às 10:13:41 UTC. Health público confirmou a
+revisão e o container ficou `healthy`; nenhuma migração pendente. Delta SHA-256
+`8ed81f79e21bcd3281a1f205cc41d6657282707f68f71dbb845caae29e7d8019`.
+Artefato e imagem anteriores conservados. [PR21](https://github.com/avilaops/ERP/pull/21)
+tem base na PR20; nenhuma PR anterior foi mesclada.
+
+Antes/depois: uma conexão ativa, três clientes, sete pedidos, um recebimento,
+zero contas a pagar, 13 atividades e nenhuma nota, evento ou envio fiscal. MCP sem
+token continua 401. Certificado válido, ambiente em homologação e SMTP próprio
+com envio automático preservados. Continuam vazios no HXKP os códigos de ICMS,
+IPI, PIS, COFINS e CST/classificação IBS/CBS. A aba real permanece no login; não
+houve autenticação alternativa, emissão, assinatura ou entrega real de e-mail.
+
 O fluxo real segue na AVL-21/AVL-77. Configuração tributária aprovada pelo contador
 (AVL-12), assinatura do cliente, homologação externa e entrega de e-mail exigem
 suas próprias evidências. Teste local não comprova essas etapas.

@@ -95,3 +95,13 @@ A aba real abriu no login e aguarda autenticação do usuário para conferir o H
 pela UI. Emissão e eventos externos, assinatura do cliente e entrega de e-mail
 continuam sem evidência desta retomada. Não inferir tributação pelo CNPJ nem usar
 a simulação como prova de autorização. Verificações finais de lint/tipos aprovadas.
+
+## Continuação: validação local obrigatória
+
+Em 17/10/2026, publicada a AVL-73 em `40a7b70`: NF-e, cancelamento, CC-e e
+inutilização passam por XSD local antes de transmitir. Falha do motor também
+bloqueia. Prévia assinada é conferida antes da numeração; recuperação consulta a
+SEFAZ antes de decidir pelo reenvio. 751 testes, lint, tipos, build e standalone
+isolado aprovados; health público e execução do motor no container confirmados.
+Dados reais e configuração preservados, sem emissão externa ou entrega de e-mail.
+Detalhes e limites em [Conferência local do XML fiscal](validacao-fiscal-local.md).

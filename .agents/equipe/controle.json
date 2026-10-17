@@ -7,10 +7,10 @@
       "id": "T-20261017-validacao-fiscal-local",
       "title": "Conferir XML fiscal localmente antes da transmissao",
       "owner": null,
-      "status": "em-andamento",
+      "status": "em-revisao",
       "acceptance": ["Schemas locais com versao, origem e hash", "Falha de XML ou motor bloqueia emissao e eventos", "Previa antes da numeracao e XML final antes da transmissao", "Banco isolado e standalone conferidos; resultado externo separado"],
-      "evidence": ["https://linear.app/avilaops/issue/AVL-73", "https://linear.app/avilaops/issue/AVL-69", "docs/validacao-fiscal-local.md", "751 testes aprovados sem falhas ou pulos; lint, tipos e npm ci dry-run aprovados; teste integrado confirma recusa antes de numerar ou chamar o transporte"],
-      "next": "Concluir suite geral, lint, tipos, build e teste do artefato; publicar com reversao e atualizar Linear. Matriz completa e jobs persistentes continuam nas AVL-69/AVL-75."
+      "evidence": ["https://linear.app/avilaops/issue/AVL-73", "https://linear.app/avilaops/issue/AVL-69", "https://github.com/avilaops/ERP/pull/21", "docs/validacao-fiscal-local.md", "751 testes aprovados sem falhas ou pulos; lint, tipos e npm ci dry-run aprovados; teste integrado confirma recusa antes de numerar ou chamar o transporte", "Build e standalone sem rede/tests: quatro XMLs ficticios validos e um invalido recusado; 13 hashes e worker/WASM conferidos", "Publicado em 40a7b70, health publico confirmado e container healthy; motor executado no container sem transmitir; conexao e contagens reais preservadas"],
+      "next": "PR21 em revisao; homologacao externa e entrega real ainda pendentes. UI HXKP aguarda login, regras tributarias dependem do contador na AVL-12. Matriz completa e jobs persistentes continuam nas AVL-69/AVL-75."
     },
     {
       "id": "T-20261017-fluxo-fiscal-eventos",
