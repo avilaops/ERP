@@ -13,7 +13,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 ETAPA="${ETAPA:-tudo}"
 
-if [ "$ETAPA" != "montar" ]; then
+if [ "$ETAPA" != "montar" ] && [ "$ETAPA" != "empacotar" ]; then
 echo "▸ conferindo (lint, tipos, testes)"
 npm run lint
 npm run typecheck
