@@ -57,6 +57,7 @@ test("migração: uma numeração só pode ter uma reserva ativa", () => {
   assert.match(migration, /SET environment = NULL, series = NULL, invoice_number = NULL/);
   assert.match(migration, /CREATE UNIQUE INDEX fiscal_jobs_unique_reserved_number_idx/);
   assert.match(migration, /status IN \('pendente', 'processando', 'revisao_manual'\)/);
+  assert.match(migration, /WITH duplicated[\s\S]*invoice_number IS NOT NULL/);
 });
 
 test("migração: aplica em ordem, registra e rodar de novo não muda nada", { skip }, async () => {

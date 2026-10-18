@@ -1452,6 +1452,17 @@ test("fila fiscal: clique repetido compartilha a emissão; perda de resposta ret
     ),
     (error: unknown) => typeof error === "object" && error !== null && "code" in error && error.code === "23505",
   );
+  const collisionNumber = await createOrder({ seller: SELLER, version: 1, productId: ID["LD-B001"], quantity: 2 }, numbers("261018-COL1"), db.pool);
+  await linkOrderCustomer(collisionNumber, customerSp, SELLER.email, MINE, db.pool);
+  await saveOrderTerms(collisionNumber, { ...TERMS, deliveryUf: "SP" }, SELLER.email, MINE, db.pool);
+  await savePayment(collisionNumber, { ...PAYMENT, downPayment: 30000 }, SELLER.email, MINE, db.pool);
+  await closeOrder(collisionNumber, SELLER.email, MINE, db.pool);
+  const ownedNumber = await db.pool.query("SELECT number FROM fiscal_invoices WHERE environment = 'homologacao' AND series = 1 AND status = 'autorizada' ORDER BY id LIMIT 1");
+  assert.ok(ownedNumber.rows[0]);
+  await db.pool.query("UPDATE company_settings SET nfe_next_number = $1", [ownedNumber.rows[0].number]);
+  await assert.rejects(() => enqueueNfeIssue(collisionNumber, who, ALL, db.pool), /já pertence a uma nota/i);
+  assert.equal(Number((await db.pool.query("SELECT nfe_next_number FROM company_settings")).rows[0].nfe_next_number), Number(ownedNumber.rows[0].number));
+  await db.pool.query("UPDATE company_settings SET nfe_next_number = 44");
   assert.equal(Number((await db.pool.query("SELECT nfe_next_number FROM company_settings")).rows[0].nfe_next_number), 44);
   await db.pool.query("UPDATE customers SET street_number = '2' WHERE id = $1", [customerSp]);
   await db.pool.query("UPDATE fiscal_jobs SET run_after = $2 WHERE id = $1", [first.id, now]);

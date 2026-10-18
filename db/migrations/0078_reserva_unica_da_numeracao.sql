@@ -9,6 +9,7 @@ WITH duplicated AS (
       FROM fiscal_jobs
      WHERE kind = 'emitir_nfe'
        AND invoice_id IS NULL
+       AND invoice_number IS NOT NULL
        AND status IN ('pendente', 'processando', 'revisao_manual')
 )
 UPDATE fiscal_jobs j
