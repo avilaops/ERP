@@ -1445,6 +1445,12 @@ test("fila fiscal: clique repetido compartilha a emissão; perda de resposta ret
   const target = await db.pool.query("SELECT environment, series, invoice_number FROM fiscal_jobs WHERE id = $1", [first.id]);
   assert.deepEqual([target.rows[0].environment, Number(target.rows[0].series), Number(target.rows[0].invoice_number)], ["homologacao", 1, 43]);
   assert.equal(Number((await db.pool.query("SELECT nfe_next_number FROM company_settings")).rows[0].nfe_next_number), 44);
+  await db.pool.query("UPDATE fiscal_jobs SET status = 'revisao_manual' WHERE id = $1", [first.id]);
+  const resumed = await enqueueNfeIssue(number, who, ALL, db.pool);
+  const resumedTarget = await db.pool.query("SELECT invoice_number FROM fiscal_jobs WHERE id = $1", [resumed.id]);
+  assert.equal(resumed.id, first.id);
+  assert.equal(Number(resumedTarget.rows[0].invoice_number), 43);
+  assert.equal(Number((await db.pool.query("SELECT nfe_next_number FROM company_settings")).rows[0].nfe_next_number), 44);
   // enqueueNfeIssue usa o relógio do banco. Prenda a disponibilidade ao relógio
   // fictício deste teste para ele não depender da hora em que o CI começou.
   await db.pool.query("UPDATE fiscal_jobs SET run_after = $2 WHERE id = $1", [first.id, now]);
@@ -1777,7 +1783,7 @@ test("fila de inutilização: persiste o XML assinado antes da SEFAZ e não dupl
   const unrelated = await takeNextNumber(db.pool);
   const unrelatedJob = await enqueueNumberVoid({ series: 1, first: unrelated, last: unrelated, reason: "Numeração reservada para testar emissão sem sobreposição." }, who, now, vault, db.pool);
   const order = await db.pool.query("SELECT id FROM orders WHERE status = 'fechado' LIMIT 1");
-  const unrelatedIssue = await db.pool.query("INSERT INTO fiscal_jobs (kind, order_id, requested_by, run_after) VALUES ('emitir_nfe', $1, $2, $3) RETURNING id", [order.rows[0].id, who, now]);
+  const unrelatedIssue = await db.pool.query("INSERT INTO fiscal_jobs (kind, order_id, requested_by, run_after, environment, series, invoice_number) VALUES ('emitir_nfe', $1, $2, $3, 'homologacao', 1, $4) RETURNING id", [order.rows[0].id, who, now, unrelated + 100]);
   const accepted = async () => {
     retransmissions += 1;
     return `<retInutNFe versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe"><infInut><cStat>102</cStat><xMotivo>Inutilização de número homologado</xMotivo><nProt>135260000000011</nProt></infInut></retInutNFe>`;
@@ -1789,20 +1795,15 @@ test("fila de inutilização: persiste o XML assinado antes da SEFAZ e não dupl
 
   const guarded = await takeNextNumber(db.pool);
   const guardedJob = await enqueueNumberVoid({ series: 1, first: guarded, last: guarded, reason: "Numeração reservada para testar concorrência de emissão." }, who, now, vault, db.pool);
-  await db.pool.query(
-    `INSERT INTO fiscal_invoices (order_id, environment, series, number, access_key, status, signed_xml, status_code, status_reason, issued_at, created_by)
-     VALUES ($1, 'homologacao', 1, $2, $3, 'rejeitada', '<NFe>rejeitada</NFe>', '999', 'Rejeição de teste', $4, $5)`,
-    [order.rows[0].id, guarded, "8".repeat(44), now, who],
-  );
-  const active = await db.pool.query("INSERT INTO fiscal_jobs (kind, order_id, requested_by, run_after) VALUES ('emitir_nfe', $1, $2, $3) RETURNING id", [order.rows[0].id, who, now]);
+  const active = await db.pool.query("INSERT INTO fiscal_jobs (kind, order_id, requested_by, run_after, environment, series, invoice_number) VALUES ('emitir_nfe', $1, $2, $3, 'homologacao', 1, $4) RETURNING id", [order.rows[0].id, who, now, guarded]);
   assert.equal(await runOneNumberVoidJob(now, vault, async () => { retransmissions += 1; return ""; }, db.pool), "retry");
   assert.equal(retransmissions, 1);
   assert.deepEqual((await db.pool.query("SELECT status, attempts, last_error FROM fiscal_void_jobs WHERE id = $1", [guardedJob.id])).rows.map((row) => [row.status, Number(row.attempts), /aguardando a emissão fiscal ativa/i.test(row.last_error)]), [["pendente", 0, true]]);
   await db.pool.query("UPDATE fiscal_jobs SET status = 'revisao_manual' WHERE id = $1", [active.rows[0].id]);
   await db.pool.query(
-    `UPDATE fiscal_invoices SET status = 'assinada', signed_xml = '<NFe>aguardando resposta</NFe>', status_code = NULL, status_reason = NULL
-      WHERE environment = 'homologacao' AND series = 1 AND number = $1`,
-    [guarded],
+    `INSERT INTO fiscal_invoices (order_id, environment, series, number, access_key, status, signed_xml, issued_at, created_by)
+     VALUES ($1, 'homologacao', 1, $2, $3, 'assinada', '<NFe>aguardando resposta</NFe>', $4, $5)`,
+    [order.rows[0].id, guarded, "8".repeat(44), now, who],
   );
   assert.equal(await runOneNumberVoidJob(new Date(now.getTime() + 60_000), vault, async () => { retransmissions += 1; return ""; }, db.pool), "manual_review");
   assert.equal(retransmissions, 1);

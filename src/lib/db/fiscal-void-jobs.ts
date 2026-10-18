@@ -101,10 +101,13 @@ export async function runOneNumberVoidJob(now: Date, vault: Buffer, send: Send, 
     const activeIssue = await conn.query(
       `SELECT 1 FROM fiscal_jobs j
        WHERE j.kind = 'emitir_nfe' AND j.status IN ('pendente', 'processando')
-         AND EXISTS (
-           SELECT 1 FROM fiscal_invoices i
-            WHERE i.order_id = j.order_id AND i.status IN ('assinada', 'rejeitada')
-              AND i.environment = $1 AND i.series = $2 AND i.number BETWEEN $3 AND $4
+         AND (
+           (j.environment = $1 AND j.series = $2 AND j.invoice_number BETWEEN $3 AND $4)
+           OR EXISTS (
+             SELECT 1 FROM fiscal_invoices i
+              WHERE i.order_id = j.order_id AND i.status IN ('assinada', 'rejeitada')
+                AND i.environment = $1 AND i.series = $2 AND i.number BETWEEN $3 AND $4
+           )
          )
        LIMIT 1`,
       [job.environment, job.range.series, job.range.first, job.range.last],

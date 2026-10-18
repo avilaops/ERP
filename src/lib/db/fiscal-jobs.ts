@@ -101,6 +101,39 @@ export async function enqueueNfeIssue(orderNumber: string, who: string, scope: O
       const rejected = previous.find((invoice) => invoice.status === "rejeitada" && invoice.series === preview.input.series);
       const reusable = rejected && !NUMBER_TAKEN.has(rejected.statusCode ?? "")
         && !(await isNumberVoided(preview.input.environment, preview.input.series, rejected.number, held)) ? rejected.number : null;
+      const reservation = await held.query(
+        `SELECT j.id, j.invoice_number
+           FROM fiscal_jobs j
+          WHERE j.order_id = $1 AND j.kind = 'emitir_nfe' AND j.status = 'revisao_manual'
+            AND j.environment = $2 AND j.series = $3 AND j.invoice_number IS NOT NULL
+            AND j.invoice_id IS NULL
+            AND NOT EXISTS (SELECT 1 FROM fiscal_invoices i WHERE i.fiscal_job_id = j.id)
+            AND NOT EXISTS (
+              SELECT 1 FROM fiscal_invoices i
+               WHERE i.environment = j.environment AND i.series = j.series AND i.number = j.invoice_number
+            )
+            AND NOT EXISTS (
+              SELECT 1 FROM fiscal_number_voids v
+               WHERE v.environment = j.environment AND v.series = j.series
+                 AND j.invoice_number BETWEEN v.first_number AND v.last_number
+            )
+          ORDER BY j.id DESC
+          LIMIT 1
+          FOR UPDATE OF j`,
+        [order.id, preview.input.environment, preview.input.series],
+      );
+      if (!waiting && reusable === null && reservation.rows[0]) {
+        const id = Number(reservation.rows[0].id);
+        await held.query(
+          `UPDATE fiscal_jobs
+              SET status = 'pendente', requested_by = $2, attempts = 0, run_after = now(),
+                  lease_until = NULL, completed_at = NULL, last_error = NULL, updated_at = now()
+            WHERE id = $1`,
+          [id, who],
+        );
+        await held.query("COMMIT");
+        return { id, joined: false };
+      }
       const invoiceNumber = waiting?.number ?? reusable ?? await takeNextNumber(held);
       const { rows } = await held.query(
         `INSERT INTO fiscal_jobs (kind, order_id, requested_by, environment, series, invoice_number)
@@ -219,7 +252,10 @@ async function retryFiscalJob(job: FiscalJob, message: string, now: Date, conn: 
 }
 
 async function failFiscalJob(job: FiscalJob, error: unknown, now: Date, conn: Queryable): Promise<boolean> {
-  const message = error instanceof Error ? error.message.slice(0, 2000) : "Falha inesperada ao processar a nota.";
+  const detail = error instanceof Error ? error.message : "Falha inesperada ao processar a nota.";
+  const message = (job.kind === "emitir_nfe" && job.invoiceNumber !== null
+    ? `Número ${job.invoiceNumber} reservado para esta emissão. ${detail}`
+    : detail).slice(0, 2000);
   const retry = job.attempts < MAX_ATTEMPTS && (job.kind === "emitir_nfe" ? await awaitingAnswer(job.orderId, conn) : isTransientEventError(error));
   if (!retry) {
     await conn.query(
