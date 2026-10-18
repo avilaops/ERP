@@ -32,9 +32,11 @@ test("só src/lib/db fala com o PostgreSQL", () => {
 
 test("consultas usam parâmetros ($1), nunca valor colado no texto", () => {
   for (const file of files("src/lib/db", /\.ts$/)) {
-    // Interpolating a value would need a ${…} that is not one of the fixed column lists.
+    // Interpolating a value would need a ${…} that is not one of the fixed SQL
+    // fragments. `restriction` is assembled only from fixed predicates here;
+    // every searched or filtered value remains a PostgreSQL parameter.
     for (const [, expression] of read(file).matchAll(/query\(\s*`[^`]*?\$\{([^}]+)\}/g)) {
-      assert.match(expression, /^(ACCESS|COLUMNS|COLUMN_LIST|placeholders|updates|COLUMNS\.length \+ 1)$/, `${file}: \${${expression}}`);
+      assert.match(expression, /^(ACCESS|COLUMNS|COLUMN_LIST|QUALIFIED_COLUMNS|CUSTOMER_FROM|placeholders|updates|restriction|COLUMNS\.length \+ 1)$/, `${file}: \${${expression}}`);
     }
   }
 });

@@ -1,249 +1,89 @@
-import { LineTabs } from "@/components/LineTabs";
-import { lineWords } from "@/lib/line-words";
-import { listLines } from "@/lib/db/product-lines";
-import { LINE_PARAM, pickLine } from "@/lib/lines-view";
-import { cookies } from "next/headers";
 import Link from "next/link";
-import { pageOf, Pager, SECONDARY } from "@/components/ui";
-import { ROWS_COOKIE, rowsPerPage } from "@/lib/rows";
+import { LineTabs } from "@/components/LineTabs";
+import { ListPager, ListQuery } from "@/components/ListQuery";
+import { CARD, SECONDARY } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
-import { tenantDb } from "@/lib/db/pool";
 import { menuItem } from "@/lib/auth/permissions";
 import { loadParams } from "@/lib/db/params";
-import { latestVersion, loadPublishedSnapshot, nextVersionNumber } from "@/lib/db/price-table";
-import { listProducts } from "@/lib/db/products";
+import { latestVersion, loadPublishedParams, nextVersionNumber } from "@/lib/db/price-table";
+import { loadProductPublicationSummary, loadProductTabCounts, queryProducts } from "@/lib/db/products";
 import type { Product } from "@/lib/db/products";
+import { listLines } from "@/lib/db/product-lines";
+import { tenantDb } from "@/lib/db/pool";
 import { showMoney, showPercent } from "@/lib/format";
+import { LINE_PARAM, pickLine } from "@/lib/lines-view";
+import { listHref, parseListQuery } from "@/lib/list-query";
+import { lineWords } from "@/lib/line-words";
+import { publishNoticeFromCount, samePricingParams } from "@/lib/price-table";
+import { productToRow } from "@/lib/product-form";
 import { roundCents } from "@/lib/pricing/money";
 import type { PricingParams } from "@/lib/pricing/params";
 import { productPrices } from "@/lib/pricing/table";
-import { draftPriceTable, pendingChanges, publishNotice } from "@/lib/price-table";
-import { productToRow } from "@/lib/product-form";
-import { counterText, hasCost, listHref, parseTab, PRODUCT_TABS, supplierLine, viewProducts } from "@/lib/products-view";
+import { counterText, hasCost, PRODUCT_TABS, supplierLine } from "@/lib/products-view";
 import { ActionForm } from "../pedidos/ActionForm";
 import { ConfirmButton } from "../pedidos/ConfirmButton";
-import {
-  createProductAction,
-  deleteProductAction,
-  deleteProductsWithoutCodeAction,
-  pasteAdvisoryCostsAction,
-  publishPriceTableAction,
-  setProductActiveAction,
-  updateProductAction,
-} from "./actions";
+import { createProductAction, deleteProductAction, deleteProductsWithoutCodeAction, pasteAdvisoryCostsAction, setProductActiveAction, updateProductAction } from "./actions";
 import { ProductRow } from "./ProductRow";
 import type { ProductRowData } from "./ProductRow";
 import { ProductTools } from "./ProductTools";
 import { PublishBanner } from "./PublishBanner";
 
 const ITEM = menuItem("produtos");
+const NONE = "—";
 
 export const metadata = { title: `${ITEM.label} · ERP` };
 export const dynamic = "force-dynamic";
 
-const NONE = "—";
-/** The typed columns keep room for `11.571,09` and for the credit in full precision; their titles may wrap. */
-const COLUMNS = (cost: string): [string, string][] => [
-  [cost, "min-w-24"],
-  ["Crédito imp. %", "min-w-24"],
-  ["Embalagem R$", "min-w-20"],
-  ["Custo real · Tabela s/IPI", "min-w-28"],
-  // One column for the two limits, one under the other: the table fits a laptop without scrolling sideways.
-  ["Desc. máx. na meta", "min-w-24"],
-];
-
-/** `95069100` as the invoice and the tax table print it: `9506.91.00`. */
 const formatNcm = (ncm: string) => (/^\d{8}$/.test(ncm) ? `${ncm.slice(0, 4)}.${ncm.slice(4, 6)}.${ncm.slice(6)}` : ncm);
-
-/** Every figure of the row is calculated here, on the server, by the engine. */
 function toRow(product: Product, params: PricingParams): ProductRowData {
-  const prices = hasCost(product)
-    ? productPrices(
-        { advisoryCost: product.advisoryCost ?? 0, taxCredit: product.taxCredit, packaging: product.packaging },
-        params,
-      )
-    : null;
+  const prices = hasCost(product) ? productPrices({ advisoryCost: product.advisoryCost ?? 0, taxCredit: product.taxCredit, packaging: product.packaging }, params) : null;
   const money = (value: number) => showMoney(roundCents(value));
-
-  return {
-    id: product.id,
-    active: product.active,
-    values: productToRow(product),
-    hasPhoto: product.hasPhoto,
-    supplier: supplierLine(product),
-    ncm: product.ncm ? `NCM ${formatNcm(product.ncm)}` : "sem NCM",
-    realCost: prices ? money(prices.realCost) : NONE,
-    table: prices ? money(prices.table) : NONE,
-    tableWithIpi: prices ? money(prices.tableWithIpi) : null,
-    maxSp: prices ? showPercent(prices.maxSp) : NONE,
-    maxTaxpayer: prices ? showPercent(prices.maxTaxpayer) : NONE,
-  };
+  return { id: product.id, active: product.active, values: productToRow(product), hasPhoto: product.hasPhoto, supplier: supplierLine(product), ncm: product.ncm ? `NCM ${formatNcm(product.ncm)}` : "sem NCM", realCost: prices ? money(prices.realCost) : NONE, table: prices ? money(prices.table) : NONE, tableWithIpi: prices ? money(prices.tableWithIpi) : null, maxSp: prices ? showPercent(prices.maxSp, 2) : NONE, maxTaxpayer: prices ? showPercent(prices.maxTaxpayer, 2) : NONE, taxCreditDisplay: showPercent(product.taxCredit, 2) };
 }
 
-const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
-
-export default async function ProdutosPage({
-  searchParams,
-}: {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
+export default async function ProdutosPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const session = await requirePermission("produtos");
   const conn = tenantDb(session.tenant.slug);
-
-  const query = await searchParams;
-  const tab = parseTab(first(query.aba));
-  const search = (first(query.q) ?? "").trim();
-
-  // One product line at a time: its equipments, its parameters and its published table.
+  const raw = await searchParams;
   const lines = await listLines(conn);
-  const line = pickLine(lines, query[LINE_PARAM]);
-  const several = lines.length > 1;
-  const [params, products, latest, nextNumber] = await Promise.all([
-    loadParams(conn, line.id),
-    listProducts({ lineId: line.id }, conn),
-    latestVersion(conn, line.id),
-    nextVersionNumber(conn),
-  ]);
-  // What the team sees against what would be published now.
-  const published = latest ? await loadPublishedSnapshot(latest.version, conn) : null;
-  const draft = draftPriceTable(params, products);
-  const notice = publishNotice(draft, latest, pendingChanges(draft, published), nextNumber);
-  const rows = viewProducts(products, { tab, search }).map((product) => toRow(product, params));
-  // A long catalogue is never drawn whole: one slice at a time, with the way to the next.
-  const slice = pageOf(rows, first(query.pagina), rowsPerPage((await cookies()).get(ROWS_COOKIE)?.value));
-  const pageHref = (page: number) => {
-    const base = listHref(ITEM.href, tab, search, several ? line.id : null);
-    return page > 1 ? `${base}${base.includes("?") ? "&" : "?"}pagina=${page}` : base;
-  };
-
+  const line = pickLine(lines, raw[LINE_PARAM]);
+  const lineValues = lines.map((item) => String(item.id));
+  const options = { sorts: ["codigo", "nome"] as const, defaultSort: "codigo" as const, filters: { aba: PRODUCT_TABS.map((tab) => tab.key), linha: lineValues } };
+  const query = parseListQuery({ ...raw, linha: String(line.id) }, options);
+  const tab = (query.filters.aba?.[0] ?? "ativos") as (typeof PRODUCT_TABS)[number]["key"];
+  const [params, latest, nextNumber, result, tabCounts] = await Promise.all([loadParams(conn, line.id), latestVersion(conn, line.id), nextVersionNumber(conn), queryProducts(query, line.id, conn), loadProductTabCounts(line.id, conn)]);
+  const publishedParams = latest ? await loadPublishedParams(latest.version, conn) : null;
+  const publication = await loadProductPublicationSummary(line.id, latest?.version ?? null, publishedParams ? !samePricingParams(params, publishedParams) : false, params.safetyMargin, conn);
+  const notice = publishNoticeFromCount(publication.itemCount, latest, publication.pending, nextNumber);
+  const rows = result.items.map((product) => toRow(product, params));
+  const page = result;
   const words = lineWords(line.imported);
+
   return (
     <>
-      <ProductTools
-        create={createProductAction}
-        paste={pasteAdvisoryCostsAction}
-        lineId={line.id}
-        imported={line.imported}
-        heading={
-          <>
-            <h1 className="text-2xl font-semibold">{ITEM.label}</h1>
-            <p className="mt-1 max-w-2xl text-sm text-slate-600">Custos e preços dos equipamentos. Alterações chegam à equipe após publicar.</p>
-          </>
-        }
-      />
-
+      <ProductTools create={createProductAction} paste={pasteAdvisoryCostsAction} lineId={line.id} imported={line.imported} heading={<><h1 className="text-2xl font-semibold">{ITEM.label}</h1><p className="mt-1 hidden max-w-2xl text-sm text-slate-600 sm:block">Custos e preços dos equipamentos. Alterações chegam à equipe após publicar.</p></>} />
       <LineTabs lines={lines} current={line.id} path={ITEM.href} />
+      <PublishBanner key={line.id} notice={notice} lineId={line.id} />
 
-      <PublishBanner key={line.id} notice={notice} action={publishPriceTableAction} lineId={line.id} />
+      <nav aria-label="Situação dos equipamentos" className="view-tabs mt-4 flex-nowrap overflow-x-auto">
+        {PRODUCT_TABS.map(({ key, label }) => {
+          const filters: Record<string, string[]> = { linha: [String(line.id)], ...(key === "ativos" ? {} : { aba: [key] }) };
+          return <Link key={key} href={listHref(ITEM.href, query, { filters, page: 1 }, options)} aria-current={key === tab ? "page" : undefined}>{label} ({tabCounts[key]})</Link>;
+        })}
+      </nav>
 
-      <section className="mt-6 rounded-lg border border-slate-200 bg-white" aria-label="Equipamentos">
-        <div className="flex flex-wrap items-end justify-between gap-4 p-4">
-          <div className="flex flex-col gap-3">
-            <nav aria-label="Abas" className="view-tabs">
-              {PRODUCT_TABS.map(({ key, label }) => (
-                <Link
-                  key={key}
-                  href={listHref(ITEM.href, key, search, several ? line.id : null)}
-                  aria-current={key === tab ? "page" : undefined}
-                  className={`inline-flex min-h-[var(--control)] items-center rounded-md px-3 font-medium ${
-                    key === tab ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100"
-                  }`}
-                >
-                  {label}
-                </Link>
-              ))}
-            </nav>
-            <form method="get" action={ITEM.href} role="search" className="flex w-full gap-2 sm:w-auto">
-              {tab !== "ativos" && <input type="hidden" name="aba" value={tab} />}
-              {several && <input type="hidden" name={LINE_PARAM} value={line.id} />}
-              <input
-                type="search"
-                name="q"
-                defaultValue={search}
-                placeholder="Buscar nome, código ou fornecedor"
-                aria-label="Buscar nome, código ou fornecedor"
-                className="min-h-[var(--control)] min-w-0 flex-1 rounded border border-slate-300 px-3 text-sm sm:w-72 sm:flex-none outline-none focus:ring-2 focus:ring-brand"
-              />
-              <button type="submit" className={SECONDARY}>
-                Buscar
-              </button>
-            </form>
-          </div>
-          <p className="text-xs text-slate-600">{counterText(rows.length, params.safetyMargin)}</p>
-        </div>
-        {tab === "sem-codigo" && search === "" && rows.length > 0 && (
-          <ActionForm action={deleteProductsWithoutCodeAction} className="border-t border-slate-200 px-4 py-3">
-            <input type="hidden" name="lineId" value={line.id} />
-            <ConfirmButton
-              label={`Excluir os ${rows.length} sem código`}
-              confirmLabel={`Confirmar: excluir os ${rows.length}`}
-              className="rounded border border-red-300 bg-white px-3 py-2 text-sm font-medium text-red-700"
-            />
-            <p className="mt-1 text-xs text-slate-600">Saem do cadastro e da tabela publicada. O que já estiver em pedido, compra ou estoque fica.</p>
-          </ActionForm>
-        )}
+      <section className={`${CARD} mt-3 list-screen`} aria-label="Equipamentos">
+        <ListQuery path={ITEM.href} query={query} options={options} searchLabel="Buscar produto por nome, código ou fornecedor" searchPlaceholder="Nome, código ou fornecedor" sorts={[{ value: "codigo", label: "Código" }, { value: "nome", label: "Nome" }]} />
+        <p className="px-4 pb-3 text-xs text-slate-600">{counterText(result.total, params.safetyMargin)}</p>
+        {tab === "sem-codigo" && query.search === "" && result.total > 0 && <ActionForm action={deleteProductsWithoutCodeAction} className="border-t border-slate-200 px-4 py-3"><input type="hidden" name="lineId" value={line.id} /><ConfirmButton label={`Excluir os ${result.total} sem código`} confirmLabel={`Confirmar: excluir os ${result.total}`} className={`${SECONDARY} text-red-700`} /><p className="mt-1 text-xs text-slate-600">Saem do cadastro e da tabela publicada. Itens com histórico permanecem.</p></ActionForm>}
 
-        {rows.length === 0 ? (
-          <p className="border-t border-slate-200 p-6 text-slate-600">
-            {search === "" ? "Nenhum equipamento nesta aba." : `Nenhum equipamento encontrado para "${search}".`}
-          </p>
-        ) : (
-          <>
-            {/* On a phone each equipment is a card that opens its own screen; the table is for wider screens. */}
-            <ul className="border-t border-slate-200 md:hidden">
-              {slice.rows.map((row) => (
-                <li key={row.id} className="border-t border-slate-200 first:border-t-0">
-                  <Link href={`${ITEM.href}/${row.id}`} className="flex items-center justify-between gap-3 px-4 py-3 active:bg-slate-50">
-                    <span className="min-w-0">
-                      <span className="block break-words font-medium">{row.values.name}</span>
-                      <span className="block break-words text-xs text-slate-500">{[row.values.code || "sem código", row.supplier].filter(Boolean).join(" · ")}</span>
-                      <span className="block break-words text-xs text-slate-500">{row.ncm}</span>
-                    </span>
-                    <span className="shrink-0 text-right">
-                      <span className="block font-semibold">{row.tableWithIpi ?? "sem custo"}</span>
-                      <span className="block text-xs text-slate-500">{row.tableWithIpi ? (row.tableWithIpi === row.table ? "preço de tabela" : "tabela c/ IPI") : "toque para informar"}</span>
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          <div className="relative hidden overflow-x-auto md:block">
-            <table className="w-full text-sm">
-              <thead className="border-t border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                <tr>
-                  <th scope="col" className="min-w-40 px-2 py-2 pl-4 text-left align-bottom font-semibold">
-                    Equipamento
-                  </th>
-                  {COLUMNS(words.cost).map(([column, width]) => (
-                    <th key={column} scope="col" className={`${width || "whitespace-nowrap"} px-2 py-2 text-right align-bottom font-semibold`}>
-                      {column}
-                    </th>
-                  ))}
-                  {/* Stays in sight when a narrow screen makes the table scroll sideways. */}
-                  <th scope="col" className="sticky right-0 bg-slate-50 px-2 py-2 pr-4">
-                    <span className="sr-only">Ações</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {slice.rows.map((row) => (
-                  <ProductRow
-                    key={row.id}
-                    row={row}
-                    imported={line.imported}
-                    save={updateProductAction}
-                    setActive={setProductActiveAction}
-                    remove={deleteProductAction}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="border-t border-slate-200 px-4 pb-3">
-            <Pager {...slice} noun={["equipamento", "equipamentos"]} hrefFor={pageHref} />
-          </div>
-          </>
-        )}
+        {rows.length === 0 ? <p className="border-t border-slate-200 p-6 text-slate-600">Nenhum equipamento corresponde à aba, busca e filtros aplicados.</p> : <div className="list-results">
+          <ul className="2xl:hidden">
+            {rows.map((row) => <li key={row.id} className="border-t border-slate-200 px-4 py-3 first:border-t-0"><div className="flex items-start justify-between gap-4"><div className="min-w-0"><Link href={`${ITEM.href}/${row.id}`} className="break-words font-medium text-brand underline">{row.values.name}</Link><p className="mt-1 break-words text-xs text-slate-500">{[row.values.code || "sem código", row.supplier, row.ncm].filter(Boolean).join(" · ")}</p></div><div className="shrink-0 text-right"><strong className="block">{row.tableWithIpi ?? "Sem custo"}</strong><span className="block text-xs text-slate-500">{row.tableWithIpi ? "Preço com IPI" : "Preço indisponível"}</span></div></div><dl className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4"><div><dt className="text-slate-500">{words.cost}</dt><dd>{row.values.advisoryCost || NONE}</dd></div><div><dt className="text-slate-500">Crédito tributário</dt><dd>{row.taxCreditDisplay}</dd></div><div><dt className="text-slate-500">Embalagem</dt><dd>{row.values.packaging || "0,00"}</dd></div><div><dt className="text-slate-500">Desconto máximo</dt><dd>SP {row.maxSp} · contribuinte {row.maxTaxpayer}</dd></div></dl><Link href={`${ITEM.href}/${row.id}`} className={`${SECONDARY} mt-3 w-full sm:w-auto`}>Editar custos e cadastro</Link></li>)}
+          </ul>
+          <div className="hidden 2xl:block"><table className="w-full table-fixed text-sm"><thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="w-1/4 px-3 py-2 text-left">Equipamento</th><th className="px-3 py-2 text-right">{words.cost}</th><th className="px-3 py-2 text-right">Crédito tributário</th><th className="px-3 py-2 text-right">Embalagem</th><th className="px-3 py-2 text-right">Custo real e preços</th><th className="px-3 py-2 text-right">Descontos máximos</th><th className="px-3 py-2"><span className="sr-only">Ações</span></th></tr></thead><tbody>{rows.map((row) => <ProductRow key={row.id} row={row} imported={line.imported} save={updateProductAction} setActive={setProductActiveAction} remove={deleteProductAction} />)}</tbody></table></div>
+        </div>}
+        <ListPager path={ITEM.href} query={query} options={options} result={page} noun={["equipamento", "equipamentos"]} />
       </section>
     </>
   );

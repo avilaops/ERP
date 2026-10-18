@@ -4,6 +4,9 @@ import type { Queryable } from "@/lib/db/pool";
 import type { AdvisoryCostRow } from "@/lib/advisory-paste";
 import { assertAmount, assertRate } from "@/lib/pricing/money";
 import type { ProductCost } from "@/lib/pricing/product";
+import { listResult } from "@/lib/list-query";
+import type { ListQuery, ListResult } from "@/lib/list-query";
+import type { PendingChanges } from "@/lib/price-table";
 
 export type Product = {
   id: number;
@@ -28,6 +31,7 @@ export type Product = {
   /** Plate-loaded: an order asks, for this equipment, whether the pegs are Olympic or standard. */
   plateLoaded: boolean;
 };
+export type ProductListSort = "codigo" | "nome";
 
 export type ProductInput = {
   name: string;
@@ -334,6 +338,124 @@ export async function listProducts({ active, lineId }: { active?: boolean; lineI
     [active ?? null, lineId ?? null],
   );
   return rows.map(toProduct);
+}
+
+const SEARCH_FROM = "áàâãäéèêëíìîïóòôõöúùûüç";
+const SEARCH_TO = "aaaaaeeeeiiiiooooouuuuc";
+const normalizedSearch = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR");
+
+/** The visible product slice. The complete cost projection is loaded separately only for publication calculations. */
+export async function queryProducts(query: ListQuery<ProductListSort>, lineId: number, conn: Queryable): Promise<ListResult<Product>> {
+  const tab = query.filters.aba?.[0] ?? "ativos";
+  const values: unknown[] = [lineId, normalizedSearch(query.search)];
+  const where = [`line_id = $1`, `($2 = '' OR
+    translate(lower(name), '${SEARCH_FROM}', '${SEARCH_TO}') LIKE '%' || $2 || '%'
+    OR translate(lower(COALESCE(code, '')), '${SEARCH_FROM}', '${SEARCH_TO}') LIKE '%' || $2 || '%'
+    OR translate(lower(COALESCE(supplier_name, '')), '${SEARCH_FROM}', '${SEARCH_TO}') LIKE '%' || $2 || '%'
+    OR translate(lower(COALESCE(supplier_model, '')), '${SEARCH_FROM}', '${SEARCH_TO}') LIKE '%' || $2 || '%')`];
+  if (tab === "ativos") where.push("active");
+  else if (tab === "sem-custo") where.push("active AND (advisory_cost IS NULL OR advisory_cost <= 0)");
+  else if (tab === "sem-codigo") where.push("active AND code IS NULL");
+  else if (tab === "inativos") where.push("NOT active");
+  const restriction = `WHERE ${where.join(" AND ")}`;
+  const counted = await conn.query(`SELECT count(*) AS total FROM products ${restriction}`, values);
+  const total = Number(counted.rows[0]?.total ?? 0);
+  const pages = Math.max(1, Math.ceil(total / query.pageSize));
+  const page = Math.min(pages, query.page);
+  const dataValues = [...values, query.pageSize, (page - 1) * query.pageSize];
+  const order = query.sort === "nome" ? "lower(name)" : "code ASC NULLS LAST, lower(name)";
+  const direction = query.direction.toUpperCase();
+  const orderSql = query.sort === "codigo" ? (query.direction === "asc" ? order : "code DESC NULLS LAST, lower(name) DESC") : `${order} ${direction}`;
+  const { rows } = await conn.query(
+    `SELECT ${COLUMNS} FROM products ${restriction} ORDER BY ${orderSql}, id ${direction}
+      LIMIT $${dataValues.length - 1} OFFSET $${dataValues.length}`,
+    dataValues,
+  );
+  return listResult(rows.map(toProduct), total, page, query.pageSize);
+}
+
+export type ProductTabCounts = { ativos: number; "sem-custo": number; "sem-codigo": number; inativos: number };
+
+/** Counts every product tab without loading product records. */
+export async function loadProductTabCounts(lineId: number, conn: Queryable): Promise<ProductTabCounts> {
+  const { rows } = await conn.query(
+    `SELECT count(*) FILTER (WHERE active)::int AS active,
+            count(*) FILTER (WHERE active AND (advisory_cost IS NULL OR advisory_cost <= 0))::int AS without_cost,
+            count(*) FILTER (WHERE active AND code IS NULL)::int AS without_code,
+            count(*) FILTER (WHERE NOT active)::int AS inactive
+       FROM products WHERE line_id = $1`,
+    [lineId],
+  );
+  const row = rows[0];
+  return { ativos: Number(row.active), "sem-custo": Number(row.without_cost), "sem-codigo": Number(row.without_code), inativos: Number(row.inactive) };
+}
+
+export type ProductPublicationSummary = { itemCount: number; pending: PendingChanges | null };
+
+/** Stable database token for every value that can change the next published table. */
+export async function loadPriceTableDraftRevision(lineId: number, conn: Queryable): Promise<string> {
+  const { rows } = await conn.query(
+    `SELECT md5(
+       COALESCE((SELECT jsonb_agg(jsonb_build_array(id, name, code, advisory_cost, tax_credit, packaging, active, line_id) ORDER BY id)::text
+                   FROM products WHERE line_id = $1), '[]') || '|' ||
+       COALESCE((SELECT to_jsonb(p)::text FROM pricing_params p WHERE line_id = $1), '{}') || '|' ||
+       COALESCE((SELECT jsonb_agg(to_jsonb(r) ORDER BY uf)::text FROM state_tax_rates r WHERE line_id = $1), '[]')
+     ) AS revision`,
+    [lineId],
+  );
+  return String(rows[0].revision);
+}
+
+/** Publication banner totals are calculated in PostgreSQL; no product row is sent to the list page. */
+export async function loadProductPublicationSummary(
+  lineId: number,
+  publishedVersion: number | null,
+  rulesChanged: boolean,
+  safetyMargin: number,
+  conn: Queryable,
+): Promise<ProductPublicationSummary> {
+  const { rows } = await conn.query(
+    `WITH current_items AS (
+       SELECT id AS product_id, code, name, advisory_cost, tax_credit, packaging
+         FROM products
+        WHERE line_id = $1 AND active AND advisory_cost > 0
+          AND advisory_cost * (1 - tax_credit) * (1 + $3::numeric) + packaging > 0
+     ), old_items AS (
+       SELECT * FROM price_table_items WHERE version = $2
+     ), compared AS (
+       SELECT c.product_id AS current_id, old.product_id AS old_id,
+              CASE
+                WHEN old.product_id IS NULL THEN 'added'
+                WHEN c.product_id IS NULL THEN 'removed'
+                WHEN c.advisory_cost IS DISTINCT FROM old.advisory_cost
+                  OR c.tax_credit IS DISTINCT FROM old.tax_credit
+                  OR c.packaging IS DISTINCT FROM old.packaging THEN 'costs'
+                WHEN c.name IS DISTINCT FROM old.name OR c.code IS DISTINCT FROM old.code THEN 'renamed'
+                ELSE 'same'
+              END AS category
+         FROM current_items c
+         FULL JOIN old_items old ON old.product_id = c.product_id
+     ) SELECT
+       (SELECT count(*)::int FROM current_items) AS item_count,
+       count(*) FILTER (WHERE category = 'costs')::int AS costs,
+       count(*) FILTER (WHERE category = 'added')::int AS added,
+       count(*) FILTER (WHERE category = 'removed')::int AS removed,
+       count(*) FILTER (WHERE category = 'renamed')::int AS renamed
+     FROM compared`,
+    [lineId, publishedVersion ?? 0, safetyMargin],
+  );
+  const row = rows[0];
+  const pending: PendingChanges = {
+    rules: rulesChanged,
+    costs: Number(row.costs),
+    added: Number(row.added),
+    removed: Number(row.removed),
+    renamed: Number(row.renamed),
+  };
+  return {
+    itemCount: Number(row.item_count),
+    pending: pending.rules || pending.costs + pending.added + pending.removed + pending.renamed > 0 ? pending : null,
+  };
 }
 
 /** What the engine needs from the active products of a line that already have a cost. */

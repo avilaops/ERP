@@ -41,11 +41,11 @@ test("moldura: o que gruda numa borda respeita as barras do celular", () => {
   assert.match(css, /--tabbar: calc\(3\.5rem \+ env\(safe-area-inset-bottom\)\);/);
   // Dentro das páginas, nada gruda no topo ou no pé da tela sem contar com as barras.
   for (const file of pages()) assert.doesNotMatch(read(APP + file), /sticky (top|bottom)-0\b/, file);
-  assert.ok(read(`${APP}layout.tsx`).includes("pb-[calc(var(--tabbar)+1rem)]"));
+  assert.ok(read(`${APP}layout.tsx`).includes("pb-[calc(var(--tabbar)+2rem)]"));
   // No celular: até quatro destinos e "Mais"; no computador o menu tem a altura da janela e rolagem própria.
   const frame = read("src/components/MobileMenu.tsx");
   assert.ok(frame.includes('aria-label="Atalhos"') && frame.includes('{open ? "Fechar" : "Mais"}'));
-  assert.ok(frame.includes("md:sticky md:top-0 md:h-dvh"));
+  assert.ok(frame.includes("lg:sticky lg:top-0 lg:h-dvh"));
   assert.ok(read("src/components/Sidebar.tsx").includes(".slice(0, 4)"));
 });
 

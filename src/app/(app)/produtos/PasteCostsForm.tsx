@@ -104,7 +104,7 @@ export function PasteCostsForm({ action, onClose, imported }: { action: PasteAct
                       <th scope="col" className="px-3 py-2 text-left font-semibold">
                         Equipamento
                       </th>
-                      {[words.cost, "Crédito imp.", "Embalagem R$"].map((column) => (
+                      {[words.cost, "Crédito tributário", "Embalagem R$"].map((column) => (
                         <th key={column} scope="col" className="px-3 py-2 text-right font-semibold">
                           {column}
                         </th>

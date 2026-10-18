@@ -140,6 +140,9 @@ jobs:
 
       - run: npm run test:telas -- telas.spec.ts --output=test-results/varredura
 
+      - name: Consultas em escala nos seis tamanhos
+        run: npm run test:telas -- consultas-em-escala.spec.ts --output=test-results/consultas-em-escala
+
       # Os prints de cada tela e a altura de cada uma (telas.json), para conferir sem rodar nada.
       - uses: actions/upload-artifact@v4
         if: always()

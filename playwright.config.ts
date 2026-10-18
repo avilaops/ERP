@@ -1,5 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
+const visualDatabaseUrl = process.env.ERP_TEST_DATABASE_URL?.trim();
+
 /**
  * The screens test (`npm run test:telas`): opens the system with the local
  * sign-in, walks every screen reachable from the menu and measures each one in
@@ -16,6 +18,7 @@ export default defineConfig({
     ...devices["Desktop Chrome"],
     locale: "pt-BR",
     navigationTimeout: 30_000,
+    actionTimeout: 10_000,
     launchOptions: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE } : undefined,
   },
   webServer: {
@@ -23,5 +26,11 @@ export default defineConfig({
     url: "http://127.0.0.1:3020/dev/login",
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,
+    env: {
+      ...process.env,
+      ERP_LOCAL_LOGIN: "1",
+      ERP_TENANTS: process.env.ERP_TENANTS ?? "ludus:Ludus Equipamentos",
+      ...(visualDatabaseUrl ? { DATABASE_URL: visualDatabaseUrl } : {}),
+    },
   },
 });

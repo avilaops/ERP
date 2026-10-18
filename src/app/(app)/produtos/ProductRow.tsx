@@ -23,6 +23,8 @@ export type ProductRowData = {
   tableWithIpi: string | null;
   maxSp: string;
   maxTaxpayer: string;
+  /** Reading format; the editable value above keeps database precision. */
+  taxCreditDisplay: string;
 };
 
 type RowAction = (state: RowState, formData: FormData) => Promise<RowState>;
@@ -107,7 +109,7 @@ export function ProductRow({
               <div className="mt-1.5 flex items-center gap-2">
                 {field("code", "max-w-28 shrink-0")}
                 <a href={`/produtos/${row.id}`} className="whitespace-nowrap text-xs font-medium text-brand underline">
-                  abrir
+                  Abrir cadastro
                 </a>
               </div>
               {row.supplier && <span className="mt-1 block break-words text-xs text-slate-500">{row.supplier}</span>}
@@ -119,16 +121,17 @@ export function ProductRow({
         <td className="px-2 py-3">{field("taxCredit", "text-right", "decimal")}</td>
         <td className="px-2 py-3">{field("packaging", "text-right", "decimal")}</td>
         <td className="whitespace-nowrap px-2 py-3 text-right">
-          <span className="block text-xs text-slate-500">custo real {row.realCost}</span>
+          <span className="block text-xs text-slate-500">Custo real {row.realCost}</span>
+          <span className="block text-xs text-slate-500">Preço sem IPI</span>
           <span className="font-semibold">{row.table}</span>
-          {row.tableWithIpi && row.tableWithIpi !== row.table && <span className="block text-xs text-slate-500">c/IPI {row.tableWithIpi}</span>}
+          {row.tableWithIpi && row.tableWithIpi !== row.table && <span className="block text-xs text-slate-500">Preço com IPI {row.tableWithIpi}</span>}
         </td>
         <td className="whitespace-nowrap px-2 py-3 text-right text-xs">
           <span className="block">
-            <span className="text-slate-500">SP</span> <span className="text-sm">{row.maxSp}</span>
+            <span className="text-slate-500">Venda em SP</span> <span className="text-sm">{row.maxSp}</span>
           </span>
           <span className="block">
-            <span className="text-slate-500">c/IE</span> <span className="text-sm">{row.maxTaxpayer}</span>
+            <span className="text-slate-500">Contribuinte ICMS</span> <span className="text-sm">{row.maxTaxpayer}</span>
           </span>
         </td>
         <td className="sticky right-0 whitespace-nowrap bg-white px-2 py-3 pr-3 text-right">
@@ -144,7 +147,9 @@ export function ProductRow({
             {pending ? "Salvando…" : "Salvar"}
           </button>
           {/* The keys matter: without them React would turn the pressed "Excluir" into "Confirmar" in place, and the same click would submit the deletion. */}
-          <div className="mt-1 text-sm">
+          <details className="mt-1 text-sm">
+            <summary className="inline-flex min-h-[var(--control)] cursor-pointer list-none items-center rounded-lg px-2 hover:bg-slate-100">Mais ações</summary>
+            <div className="rounded-lg border border-slate-200 p-1">
             {confirming ? (
               <>
                 <span className="block">Excluir de vez?</span>
@@ -173,7 +178,8 @@ export function ProductRow({
                 </button>
               </>
             )}
-          </div>
+            </div>
+          </details>
         </td>
       </tr>
       {state.status === "error" && (

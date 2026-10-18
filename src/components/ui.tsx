@@ -62,9 +62,9 @@ export function MetricSummary({ items }: { items: SummaryMetric[] }) {
     <details aria-label="Resumo financeiro" className={`${CARD} mt-3`}>
       <summary className="disclosure-heading">
         <span className="grid min-w-0 flex-1 grid-cols-2 gap-3">
-          {items.slice(0, 2).map((item) => <span key={item.label} className="min-w-0"><span className="block font-normal text-slate-600">{item.label}</span><span className={`block break-words font-semibold ${item.attention ? "text-red-700" : ""}`}>{item.value}</span></span>)}
+          {items.slice(0, 2).map((item) => <span key={item.label} className="min-w-0"><span className="block font-normal text-slate-600">{item.label}</span><span className={`block whitespace-nowrap text-xs font-semibold tabular-nums sm:text-base ${item.attention ? "text-red-700" : ""}`}>{item.value}</span></span>)}
         </span>
-        <span className="sr-only">Ver todos os indicadores</span><span className="disclosure-marker" aria-hidden="true">+</span>
+        <span className="ml-2 shrink-0 text-sm font-medium text-brand"><span className="hidden sm:inline">Ver indicadores</span><span className="sm:hidden">Ver</span></span><span className="disclosure-marker" aria-hidden="true">+</span>
       </summary>
       <dl className="grid grid-cols-2 gap-3 border-t border-slate-200 p-3">{metrics(items)}</dl>
     </details>

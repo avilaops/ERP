@@ -1,6 +1,8 @@
 import { isValidCnpj, isValidCpf, normalizeDocument } from "@/lib/customer";
 import { pgErrorCode } from "@/lib/db/pool";
 import type { Queryable } from "@/lib/db/pool";
+import { listResult } from "@/lib/list-query";
+import type { ListQuery, ListResult } from "@/lib/list-query";
 
 /** A refusal the user can act on. The message goes to the screen as it is. */
 export class SupplierError extends Error {}
@@ -36,6 +38,7 @@ export type SupplierInput = {
 };
 
 export type Supplier = SupplierInput & { id: number; updatedAt: Date };
+export type SupplierListSort = "nome" | "cadastro";
 
 const UNIQUE_VIOLATION = "23505";
 const COLUMNS = "id, kind, document, name, trade_name, contact_name, phone, email, country, bank_details, notes, active, updated_at";
@@ -96,6 +99,51 @@ const DUPLICATE = "Já existe fornecedor com este documento. Altere o que está 
 export async function listSuppliers(conn: Queryable): Promise<Supplier[]> {
   const { rows } = await conn.query(`SELECT ${COLUMNS} FROM suppliers ORDER BY active DESC, lower(COALESCE(trade_name, name)), id`);
   return rows.map(supplier);
+}
+
+export async function listSupplierCountries(conn: Queryable): Promise<string[]> {
+  const { rows } = await conn.query("SELECT DISTINCT country FROM suppliers WHERE country IS NOT NULL ORDER BY country");
+  return rows.map((row) => String(row.country));
+}
+
+const SEARCH_FROM = "áàâãäéèêëíìîïóòôõöúùûüç";
+const SEARCH_TO = "aaaaaeeeeiiiiooooouuuuc";
+const normalizedSearch = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR");
+const searchable = (column: string) => `translate(lower(COALESCE(${column}, '')), '${SEARCH_FROM}', '${SEARCH_TO}')`;
+
+/** A supplier page, searched and cut by PostgreSQL. */
+export async function querySuppliers(query: ListQuery<SupplierListSort>, conn: Queryable): Promise<ListResult<Supplier>> {
+  const values: unknown[] = [normalizedSearch(query.search)];
+  const where = [
+    `($1 = '' OR ${searchable("name")} LIKE '%' || $1 || '%' OR ${searchable("trade_name")} LIKE '%' || $1 || '%'
+      OR ${searchable("contact_name")} LIKE '%' || $1 || '%' OR ${searchable("country")} LIKE '%' || $1 || '%'
+      OR regexp_replace(COALESCE(document, ''), '[^0-9A-Z]', '', 'g') LIKE '%' || upper(regexp_replace($1, '[^0-9A-Z]', '', 'g')) || '%')`,
+  ];
+  const addArray = (column: string, selected: string[] | undefined) => {
+    if (!selected?.length) return;
+    values.push(selected);
+    where.push(`${column} = ANY($${values.length}::text[])`);
+  };
+  addArray("kind", query.filters.tipo);
+  addArray("country", query.filters.pais);
+  const status = query.filters.situacao?.[0];
+  if (status === "ativo") where.push("active");
+  if (status === "inativo") where.push("NOT active");
+  const restriction = `WHERE ${where.join(" AND ")}`;
+  const counted = await conn.query(`SELECT count(*) AS total FROM suppliers ${restriction}`, values);
+  const total = Number(counted.rows[0]?.total ?? 0);
+  const pages = Math.max(1, Math.ceil(total / query.pageSize));
+  const page = Math.min(pages, query.page);
+  const dataValues = [...values, query.pageSize, (page - 1) * query.pageSize];
+  const order = query.sort === "cadastro" ? "created_at" : "lower(COALESCE(trade_name, name))";
+  const direction = query.direction.toUpperCase();
+  const { rows } = await conn.query(
+    `SELECT ${COLUMNS} FROM suppliers ${restriction}
+      ORDER BY ${order} ${direction}, id ${direction}
+      LIMIT $${dataValues.length - 1} OFFSET $${dataValues.length}`,
+    dataValues,
+  );
+  return listResult(rows.map(supplier), total, page, query.pageSize);
 }
 
 export async function getSupplier(id: number, conn: Queryable): Promise<Supplier | null> {

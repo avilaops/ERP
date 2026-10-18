@@ -27,10 +27,135 @@
   --action-ink: #ffffff;
   --field-border: #7a8798;
 }
-@media (min-width: 48rem) {
+@media (min-width: 64rem) {
   :root {
     --topbar: 0px;
     --tabbar: 0px;
+  }
+}
+
+/* Large operational lists keep their controls and pager reachable; only the records move. */
+main:has(> .list-screen) {
+  box-sizing: border-box;
+  display: flex;
+  height: calc(100dvh - var(--topbar));
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  padding-bottom: var(--tabbar);
+}
+.list-screen {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+}
+.list-results {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+[data-list-pager] {
+  flex: 0 0 auto;
+}
+@media (min-width: 48rem) {
+  [data-list-pager] {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    border-top: 1px solid var(--color-slate-200);
+  }
+  [data-list-pager] > :is(div, nav) {
+    border-top: 0;
+  }
+}
+@media (max-width: 63.999rem) and (max-height: 37.5rem) {
+  .page-header > div > p {
+    display: none;
+  }
+  .product-tools p,
+  .publish-banner strong {
+    display: none;
+  }
+  .publish-banner {
+    margin-top: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+  .publish-banner > div {
+    flex-wrap: nowrap;
+  }
+  details[aria-label="Resumo financeiro"] {
+    margin-top: 0.25rem;
+  }
+  details[aria-label="Resumo financeiro"] .disclosure-heading {
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+  }
+  .list-query {
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+  }
+  .view-tabs {
+    margin-top: 0;
+  }
+  main > .view-tabs + .list-screen {
+    margin-top: 0;
+  }
+  .list-screen[aria-label="Equipamentos"] > .list-query + p {
+    padding-bottom: 0;
+    line-height: 1rem;
+  }
+  .list-query > form {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+    gap: 0.25rem;
+  }
+  .list-query details.group {
+    position: relative;
+  }
+  .list-query details.group > div {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    z-index: 40;
+    width: min(42rem, calc(100vw - 2rem));
+    max-height: calc(100dvh - var(--topbar) - var(--tabbar) - 4rem);
+    overflow: auto;
+    border: 1px solid var(--color-slate-200);
+    border-radius: var(--radius-surface);
+    background: var(--color-white);
+    padding: 0.75rem;
+    box-shadow: 0 0.75rem 2rem rgb(15 23 42 / 0.2);
+  }
+  .list-results > ul {
+    display: block !important;
+  }
+  .list-results > table {
+    display: none !important;
+  }
+  [data-list-pager] {
+    border-top: 0;
+  }
+  main > section[aria-label="Resumo da publicação"] {
+    margin-top: 0.25rem;
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+  }
+  .publication-action {
+    margin-top: 0.25rem;
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+  }
+  [data-after-rows] {
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+  [data-list-pager] > div > div {
+    padding-top: 0;
+    padding-bottom: 0;
   }
 }
 
@@ -208,13 +333,16 @@ main .border-slate-300:has(> input) {
 }
 .view-tabs {
   display: flex;
-  flex-wrap: wrap;
+  flex-shrink: 0;
+  flex-wrap: nowrap;
   gap: 0.25rem;
   margin-top: 0.75rem;
   border-bottom: 1px solid var(--color-slate-200);
+  overflow-x: auto;
 }
 .view-tabs > a {
   display: inline-flex;
+  flex: 0 0 auto;
   min-height: var(--control);
   min-width: var(--control);
   align-items: center;
@@ -226,7 +354,7 @@ main .border-slate-300:has(> input) {
   color: var(--color-slate-600);
   font-size: 0.875rem;
   font-weight: 500;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
 }
 .view-tabs > a[aria-current="page"] {
   border-bottom-color: var(--color-brand);

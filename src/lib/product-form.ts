@@ -11,7 +11,7 @@ const FIELDS = {
   supplierModel: { label: "Modelo do fornecedor", kind: "text" },
   supplierPriceUsd: { label: "Preço do fornecedor US$", kind: "usd" },
   advisoryCost: { label: "Custo assessoria R$", kind: "cost" },
-  taxCredit: { label: "Crédito imp. %", kind: "rate" },
+  taxCredit: { label: "Crédito tributário %", kind: "rate" },
   packaging: { label: "Embalagem R$", kind: "money" },
 } as const satisfies Record<string, { label: string; kind: FieldKind }>;
 

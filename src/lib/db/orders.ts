@@ -19,6 +19,9 @@ import type { ApprovalReason, DiscountBand, PolicyCheck } from "@/lib/pricing/or
 import { parseDate } from "@/lib/pricing/payment";
 import { UFS } from "@/lib/pricing/states";
 import type { Uf } from "@/lib/pricing/states";
+import { listResult } from "@/lib/list-query";
+import type { ListQuery, ListResult } from "@/lib/list-query";
+import type { OrderIndicators } from "@/lib/pricing/indicators";
 
 export type OrderStatus = "em_negociacao" | "aguardando_aprovacao" | "fechado" | "perdido" | "cancelado";
 
@@ -880,6 +883,26 @@ export type OrderSummary = {
   items: { quantity: number; tableUnitPrice: number }[];
 };
 
+export type OrderListSort = "atualizacao" | "numero" | "cliente" | "vendedor";
+export type OrderListTab = "abertos" | "aprovacao" | "fechados" | "perdidos" | "todos";
+export type OrderOverview = { counts: Record<OrderListTab, number>; indicators: OrderIndicators };
+
+const summary = (row: Record<string, unknown>): OrderSummary => ({
+  number: String(row.number),
+  status: row.status as OrderStatus,
+  sellerEmail: String(row.seller_email),
+  sellerName: String(row.seller_name),
+  customerName: textOrNull(row.trade_name ?? row.customer_name),
+  customerDocument: textOrNull(row.customer_document),
+  deliveryUf: row.delivery_uf as Uf | null,
+  taxpayer: row.taxpayer === true,
+  discount: Number(row.discount),
+  ipi: Number(row.ipi),
+  updatedAt: row.updated_at as Date,
+  closedAt: row.closed_at as Date | null,
+  items: ((row.items as { quantity: number; price: number }[] | null) ?? []).map((item) => ({ quantity: Number(item.quantity), tableUnitPrice: Number(item.price) })),
+});
+
 /** Every order the scope reaches, newest change first, each with the table price of its own version. */
 export async function listOrders(scope: OrderScope, conn: Queryable, pagination?: { limit: number; offset: number }): Promise<OrderSummary[]> {
   const { rows } = await conn.query(
@@ -896,24 +919,91 @@ export async function listOrders(scope: OrderScope, conn: Queryable, pagination?
       ORDER BY o.updated_at DESC, o.id DESC LIMIT $2::integer OFFSET $3::integer`,
     [scope.sellerEmail, pagination ? Math.max(1, Math.min(100, Math.trunc(pagination.limit))) : null, pagination ? Math.max(0, Math.trunc(pagination.offset)) : 0],
   );
-  return rows.map((row) => ({
-    number: String(row.number),
-    status: row.status as OrderStatus,
-    sellerEmail: String(row.seller_email),
-    sellerName: String(row.seller_name),
-    customerName: textOrNull(row.trade_name ?? row.customer_name),
-    customerDocument: textOrNull(row.customer_document),
-    deliveryUf: row.delivery_uf as Uf | null,
-    taxpayer: row.taxpayer === true,
-    discount: Number(row.discount),
-    ipi: Number(row.ipi),
-    updatedAt: row.updated_at as Date,
-    closedAt: row.closed_at as Date | null,
-    items: ((row.items as { quantity: number; price: number }[] | null) ?? []).map((item) => ({
-      quantity: Number(item.quantity),
-      tableUnitPrice: Number(item.price),
-    })),
-  }));
+  return rows.map(summary);
+}
+
+const ORDER_TAB_STATUSES: Record<OrderListTab, readonly OrderStatus[] | null> = {
+  abertos: ["em_negociacao"], aprovacao: ["aguardando_aprovacao"], fechados: ["fechado"], perdidos: ["perdido"], todos: null,
+};
+const SEARCH_FROM = "áàâãäéèêëíìîïóòôõöúùûüç";
+const SEARCH_TO = "aaaaaeeeeiiiiooooouuuuc";
+const normalizedSearch = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR");
+
+/** One filtered order page. Price items are loaded only for the visible orders. */
+export async function queryOrders(query: ListQuery<OrderListSort>, scope: OrderScope, conn: Queryable): Promise<ListResult<OrderSummary>> {
+  const tab = (query.filters.aba?.[0] ?? "abertos") as OrderListTab;
+  const statuses = ORDER_TAB_STATUSES[tab] ?? ORDER_TAB_STATUSES.abertos;
+  const values: unknown[] = [scope.sellerEmail, normalizedSearch(query.search)];
+  const where = ["($1::text IS NULL OR o.seller_email = $1)", `($2 = '' OR
+    translate(lower(COALESCE(c.trade_name, c.name, '')), '${SEARCH_FROM}', '${SEARCH_TO}') LIKE '%' || $2 || '%'
+    OR lower(o.number) LIKE '%' || lower(regexp_replace($2, '^#', '')) || '%'
+    OR COALESCE(c.document, '') LIKE '%' || regexp_replace($2, '[^0-9A-Z]', '', 'g') || '%')`];
+  if (statuses) {
+    values.push(statuses);
+    where.push(`o.status = ANY($${values.length}::text[])`);
+  }
+  const restriction = `WHERE ${where.join(" AND ")}`;
+  const counted = await conn.query(`SELECT count(*) AS total FROM orders o LEFT JOIN customers c ON c.id = o.customer_id ${restriction}`, values);
+  const total = Number(counted.rows[0]?.total ?? 0);
+  const pages = Math.max(1, Math.ceil(total / query.pageSize));
+  const page = Math.min(pages, query.page);
+  const order = query.sort === "numero" ? "o.number" : query.sort === "cliente" ? "lower(COALESCE(c.trade_name, c.name, ''))" : query.sort === "vendedor" ? "lower(o.seller_name)" : "o.updated_at";
+  const direction = query.direction.toUpperCase();
+  const dataValues = [...values, query.pageSize, (page - 1) * query.pageSize];
+  const { rows } = await conn.query(
+    `SELECT o.number, o.status, o.seller_email, o.seller_name, c.name AS customer_name, c.trade_name,
+            c.document AS customer_document, o.delivery_uf, o.taxpayer, o.discount, v.ipi, o.updated_at, o.closed_at,
+            (SELECT json_agg(json_build_object('quantity', i.quantity, 'price', p.table_price) ORDER BY i.product_id)
+               FROM order_items i JOIN price_table_items p ON p.version = i.price_table_version AND p.product_id = i.product_id
+              WHERE i.order_id = o.id) AS items
+       FROM orders o JOIN price_table_versions v ON v.version = o.price_table_version LEFT JOIN customers c ON c.id = o.customer_id
+       ${restriction} ORDER BY ${order} ${direction}, o.id ${direction}
+       LIMIT $${dataValues.length - 1} OFFSET $${dataValues.length}`,
+    dataValues,
+  );
+  return listResult(rows.map(summary), total, page, query.pageSize);
+}
+
+/** Counts and cards for every order in scope, without returning those orders to Next.js. */
+export async function loadOrderOverview(scope: OrderScope, month: string, conn: Queryable): Promise<OrderOverview> {
+  if (!/^\d{4}-\d{2}$/.test(month)) throw new Error(`Mês inválido: "${month}". Use AAAA-MM.`);
+  const { rows } = await conn.query(
+    `WITH scoped AS (
+       SELECT o.id, o.status, o.discount, o.closed_at,
+              COALESCE(k.invoice_total,
+                round(COALESCE(sum(i.quantity * p.table_price), 0) * (1 - o.discount) * (1 + v.ipi), 2)) AS invoice_total
+         FROM orders o
+         JOIN price_table_versions v ON v.version = o.price_table_version
+         LEFT JOIN order_items i ON i.order_id = o.id
+         LEFT JOIN price_table_items p ON p.version = i.price_table_version AND p.product_id = i.product_id
+         LEFT JOIN LATERAL (SELECT invoice_total FROM order_closings WHERE order_id = o.id AND reopened_at IS NULL ORDER BY closed_at DESC LIMIT 1) k ON true
+        WHERE ($1::text IS NULL OR o.seller_email = $1)
+        GROUP BY o.id, o.status, o.discount, o.closed_at, v.ipi, k.invoice_total
+     ) SELECT
+       count(*) FILTER (WHERE status = 'em_negociacao')::int AS open_count,
+       count(*) FILTER (WHERE status = 'aguardando_aprovacao')::int AS approval_count,
+       count(*) FILTER (WHERE status = 'fechado')::int AS closed_count,
+       count(*) FILTER (WHERE status = 'perdido')::int AS lost_count,
+       count(*)::int AS all_count,
+       COALESCE(sum(invoice_total) FILTER (WHERE status = 'em_negociacao'), 0) AS open_total,
+       count(*) FILTER (WHERE status = 'fechado' AND to_char(closed_at AT TIME ZONE 'America/Sao_Paulo', 'YYYY-MM') = $2)::int AS month_count,
+       COALESCE(sum(invoice_total) FILTER (WHERE status = 'fechado' AND to_char(closed_at AT TIME ZONE 'America/Sao_Paulo', 'YYYY-MM') = $2), 0) AS month_total,
+       avg(discount) FILTER (WHERE status = 'fechado') AS average_discount
+     FROM scoped`,
+    [scope.sellerEmail, month],
+  );
+  const row = rows[0];
+  const closed = Number(row.closed_count);
+  const lost = Number(row.lost_count);
+  return {
+    counts: { abertos: Number(row.open_count), aprovacao: Number(row.approval_count), fechados: closed, perdidos: lost, todos: Number(row.all_count) },
+    indicators: {
+      open: { count: Number(row.open_count), total: Number(row.open_total) },
+      closedInMonth: { count: Number(row.month_count), total: Number(row.month_total) },
+      closeRate: closed + lost === 0 ? null : closed / (closed + lost),
+      averageClosedDiscount: row.average_discount === null ? null : Number(row.average_discount),
+    },
+  };
 }
 
 /** The payment methods the company offers, in the order of the lists. */
