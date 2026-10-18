@@ -17,108 +17,204 @@
       "title": "Concluir o módulo Fiscal operacional",
       "owner": null,
       "status": "concluida",
-      "acceptance": ["Menu Fiscal visível para a Diretoria", "Pedidos fechados, fila, revisões, notas, e-mails e inutilizações consultáveis por empresa", "Resumo do pedido indica contrato, emissão e envio ao contato", "Lint, tipos, testes, build e telas nos cinco tamanhos aprovados no GitHub Actions"],
-      "evidence": ["docs/superpowers/plans/2026-10-17-modulo-fiscal-operacional.md", "https://github.com/avilaops/ERP/pull/21", "https://github.com/avilaops/ERP/pull/22", "https://github.com/avilaops/ERP/actions/runs/39142367764", "Auditoria final: escopo por vendedor e ambiente, concorrência de reabertura, quinta tentativa, relógio do lote, transição segura de jobs antigos, permissões dependentes e inutilização concorrente cobertos", "Produção publicada em 2956e64; health público confirmado, backup validado e migrações 0072–0078 aplicadas"],
-      "next": "Concluído em produção em 18/10/2026. A primeira emissão e o primeiro e-mail reais permanecem como ação operacional de pessoa autorizada; nenhum documento fiscal real foi transmitido nos testes."
+      "acceptance": "Menu Fiscal visível para a Diretoria\nPedidos fechados, fila, revisões, notas, e-mails e inutilizações consultáveis por empresa\nResumo do pedido indica contrato, emissão e envio ao contato\nLint, tipos, testes, build e telas nos cinco tamanhos aprovados no GitHub Actions",
+      "evidence": "docs/superpowers/plans/2026-10-17-modulo-fiscal-operacional.md\nhttps://github.com/avilaops/ERP/pull/21\nhttps://github.com/avilaops/ERP/pull/22\nhttps://github.com/avilaops/ERP/actions/runs/39142367764\nAuditoria final: escopo por vendedor e ambiente, concorrência de reabertura, quinta tentativa, relógio do lote, transição segura de jobs antigos, permissões dependentes e inutilização concorrente cobertos\nProdução publicada em 2956e64; health público confirmado, backup validado e migrações 0072–0078 aplicadas",
+      "next": "Concluído em produção em 18/10/2026. A primeira emissão e o primeiro e-mail reais permanecem como ação operacional de pessoa autorizada; nenhum documento fiscal real foi transmitido nos testes.",
+      "blocker": "",
+      "history": [
+        {
+          "at": "2026-10-18",
+          "status": "concluida",
+          "note": "Registro legado normalizado para o contrato central."
+        }
+      ]
     },
     {
       "id": "T-20261017-validacao-fiscal-local",
       "title": "Conferir XML fiscal localmente antes da transmissao",
       "owner": null,
       "status": "em-revisao",
-      "acceptance": ["Schemas locais com versao, origem e hash", "Falha de XML ou motor bloqueia emissao e eventos", "Previa antes da numeracao e XML final antes da transmissao", "Banco isolado e standalone conferidos; resultado externo separado"],
-      "evidence": ["https://linear.app/avilaops/issue/AVL-73", "https://linear.app/avilaops/issue/AVL-69", "https://github.com/avilaops/ERP/pull/21", "docs/validacao-fiscal-local.md", "751 testes aprovados sem falhas ou pulos; lint, tipos e npm ci dry-run aprovados; teste integrado confirma recusa antes de numerar ou chamar o transporte", "Build e standalone sem rede/tests: quatro XMLs ficticios validos e um invalido recusado; 13 hashes e worker/WASM conferidos", "Publicado em 40a7b70, health publico confirmado e container healthy; motor executado no container sem transmitir; conexao e contagens reais preservadas"],
-      "next": "PR21 em revisao; homologacao externa e entrega real ainda pendentes. UI HXKP aguarda login, regras tributarias dependem do contador na AVL-12. Matriz completa e jobs persistentes continuam nas AVL-69/AVL-75."
+      "acceptance": "Schemas locais com versao, origem e hash\nFalha de XML ou motor bloqueia emissao e eventos\nPrevia antes da numeracao e XML final antes da transmissao\nBanco isolado e standalone conferidos; resultado externo separado",
+      "evidence": "https://linear.app/avilaops/issue/AVL-73\nhttps://linear.app/avilaops/issue/AVL-69\nhttps://github.com/avilaops/ERP/pull/21\ndocs/validacao-fiscal-local.md\n751 testes aprovados sem falhas ou pulos; lint, tipos e npm ci dry-run aprovados; teste integrado confirma recusa antes de numerar ou chamar o transporte\nBuild e standalone sem rede/tests: quatro XMLs ficticios validos e um invalido recusado; 13 hashes e worker/WASM conferidos\nPublicado em 40a7b70, health publico confirmado e container healthy; motor executado no container sem transmitir; conexao e contagens reais preservadas",
+      "next": "PR21 em revisao; homologacao externa e entrega real ainda pendentes. UI HXKP aguarda login, regras tributarias dependem do contador na AVL-12. Matriz completa e jobs persistentes continuam nas AVL-69/AVL-75.",
+      "blocker": "",
+      "history": [
+        {
+          "at": "2026-10-18",
+          "status": "em-revisao",
+          "note": "Registro legado normalizado para o contrato central."
+        }
+      ]
     },
     {
       "id": "T-20261017-fila-fiscal-persistente",
       "title": "Processar emissão fiscal persistente e recuperar transmissão",
       "owner": null,
       "status": "concluida",
-      "acceptance": ["Fila isolada por empresa com lease e idempotência por pedido", "Falha após transmissão consulta antes de reenviar o XML original", "Retentativas limitadas não repetem rejeição definitiva", "Worker, testes e publicação registrados separadamente"],
-      "evidence": ["https://linear.app/avilaops/issue/AVL-75", "https://github.com/avilaops/ERP/pull/21", "https://github.com/avilaops/ERP/pull/22", "Commit c351a3f: migration 0072, fila por tenant e worker no background", "Commit 55bae30: migration 0073 inclui CC-e e cancelamento na fila; texto validado antes da gravação e e-mail automático preservado", "Commit 18e97a0: migration 0074 persiste inutilização com XML assinado antes do worker; resposta incerta exige revisão manual", "GitHub Actions 39142367764: PostgreSQL, 774 testes, lint, tipos, build, pacote e telas nos cinco tamanhos aprovados", "Produção publicada em 2956e64; backup anterior validado, migrações 0072–0078 aplicadas e container saudável", "A posse da inutilização é confirmada antes da chamada externa; UF de recuperação vem da chave assinada; revisão substituída não oculta o trabalho atual"],
-      "next": "Concluído em produção. A emissão fiscal real e o envio real de e-mail não foram usados como teste e dependem de operação autorizada."
+      "acceptance": "Fila isolada por empresa com lease e idempotência por pedido\nFalha após transmissão consulta antes de reenviar o XML original\nRetentativas limitadas não repetem rejeição definitiva\nWorker, testes e publicação registrados separadamente",
+      "evidence": "https://linear.app/avilaops/issue/AVL-75\nhttps://github.com/avilaops/ERP/pull/21\nhttps://github.com/avilaops/ERP/pull/22\nCommit c351a3f: migration 0072, fila por tenant e worker no background\nCommit 55bae30: migration 0073 inclui CC-e e cancelamento na fila; texto validado antes da gravação e e-mail automático preservado\nCommit 18e97a0: migration 0074 persiste inutilização com XML assinado antes do worker; resposta incerta exige revisão manual\nGitHub Actions 39142367764: PostgreSQL, 774 testes, lint, tipos, build, pacote e telas nos cinco tamanhos aprovados\nProdução publicada em 2956e64; backup anterior validado, migrações 0072–0078 aplicadas e container saudável\nA posse da inutilização é confirmada antes da chamada externa; UF de recuperação vem da chave assinada; revisão substituída não oculta o trabalho atual",
+      "next": "Concluído em produção. A emissão fiscal real e o envio real de e-mail não foram usados como teste e dependem de operação autorizada.",
+      "blocker": "",
+      "history": [
+        {
+          "at": "2026-10-18",
+          "status": "concluida",
+          "note": "Registro legado normalizado para o contrato central."
+        }
+      ]
     },
     {
       "id": "T-20261017-fluxo-fiscal-eventos",
       "title": "Retomar fluxo completo e distribuir CC-e com protocolo do evento",
       "owner": null,
       "status": "em-revisao",
-      "acceptance": ["Evento novo conserva XML assinado e recibo real coerentes", "CC-e integra envio fiscal existente e registra ID efetivo; evento 136 nao cancela nota", "Testes isolados, UI nos cinco tamanhos e build verificados", "Homologacao externa e envio real distinguidos de simulacao"],
-      "evidence": ["https://linear.app/avilaops/issue/AVL-154", "https://linear.app/avilaops/issue/AVL-77", "docs/fluxo-completo-fiscal.md", "744 testes aprovados sem falhas ou pulos; lint e tipos aprovados antes dos ajustes visuais finais", "UI isolada RRS7, nota 9001 serie 909 explicitamente simulada, sem transmissao ou entrega de e-mail", "Cinco medidas da selecao inicial em uma tela e cinco do detalhe sem excesso lateral ou controles abaixo de 44 px; teclado, rascunho e ampliacao conferidos"],
-      "next": "Publicado em 37a1f70: health publico e container healthy; migracao 0070 aplicada; build, lint/tipos e 41 testes finais aprovados. Conexao ativa e contagens reais preservadas. PR20 em revisao. UI real HXKP aguarda login; faltam CSTs ICMS/IPI/PIS/COFINS e CST/classificacao IBS/CBS. Regime informado, certificado valido, SMTP ludus@ludusequipamentos.com e automatico ligado. Homologacao externa e entrega real ainda nao executadas."
+      "acceptance": "Evento novo conserva XML assinado e recibo real coerentes\nCC-e integra envio fiscal existente e registra ID efetivo; evento 136 nao cancela nota\nTestes isolados, UI nos cinco tamanhos e build verificados\nHomologacao externa e envio real distinguidos de simulacao",
+      "evidence": "https://linear.app/avilaops/issue/AVL-154\nhttps://linear.app/avilaops/issue/AVL-77\ndocs/fluxo-completo-fiscal.md\n744 testes aprovados sem falhas ou pulos; lint e tipos aprovados antes dos ajustes visuais finais\nUI isolada RRS7, nota 9001 serie 909 explicitamente simulada, sem transmissao ou entrega de e-mail\nCinco medidas da selecao inicial em uma tela e cinco do detalhe sem excesso lateral ou controles abaixo de 44 px; teclado, rascunho e ampliacao conferidos",
+      "next": "Publicado em 37a1f70: health publico e container healthy; migracao 0070 aplicada; build, lint/tipos e 41 testes finais aprovados. Conexao ativa e contagens reais preservadas. PR20 em revisao. UI real HXKP aguarda login; faltam CSTs ICMS/IPI/PIS/COFINS e CST/classificacao IBS/CBS. Regime informado, certificado valido, SMTP ludus@ludusequipamentos.com e automatico ligado. Homologacao externa e entrega real ainda nao executadas.",
+      "blocker": "",
+      "history": [
+        {
+          "at": "2026-10-18",
+          "status": "em-revisao",
+          "note": "Registro legado normalizado para o contrato central."
+        }
+      ]
     },
     {
       "id": "T-20261017-mcp-comercial",
       "title": "Concluir cadastros, orcamento, funil e decisoes confirmadas no MCP",
       "owner": null,
       "status": "em-revisao",
-      "acceptance": ["Dez acoes comerciais com previa, confirmacao, revisao e autoria", "Solicitar aprovacao nao fecha venda automaticamente", "Cancelamento sem baixa ou efeitos vinculados; concorrencia com baixa, contrato e producao protegida", "Consolidar duplicadas sem apagar historico; escopo de equipe e alçada preservados", "Testes isolados, HTTP, UI, build e publicacao verificados"],
-      "evidence": ["https://linear.app/avilaops/issue/AVL-149", "147 testes afetados e suite final de 743 testes aprovados, sem falhas ou pulos; lint, tipos e build aprovados", "HTTP demo 1.3.0: dez acoes comerciais e fluxo de cliente a recebimento parcial; cancelamento com baixa recusado, tarefa duplicada consolidada com motivo", "25 medicoes finais de UI nos cinco tamanhos sem excesso lateral ou controles menores que 44 px; teclado, rascunho e ampliacao conferidos", "Publicado em 703d7ac; health publico confirmou commit e container healthy, migracao 0069 aplicada, conexao e contagens reais preservadas", "https://github.com/avilaops/ERP/pull/19", "docs/mcp-operacoes.md"],
-      "next": "Publicado com AVL-148 em 703d7ac: health publico e container healthy; migracao 0069 aplicada. 743 testes, lint, tipos e build aprovados; conexao ativa e contagens reais preservadas. PR19 em revisao; varredura geral de telas do CI em execucao. Conferir descoberta no Claude do usuario e aceite operacional fiscal, sem mutacoes reais de teste."
+      "acceptance": "Dez acoes comerciais com previa, confirmacao, revisao e autoria\nSolicitar aprovacao nao fecha venda automaticamente\nCancelamento sem baixa ou efeitos vinculados; concorrencia com baixa, contrato e producao protegida\nConsolidar duplicadas sem apagar historico; escopo de equipe e alçada preservados\nTestes isolados, HTTP, UI, build e publicacao verificados",
+      "evidence": "https://linear.app/avilaops/issue/AVL-149\n147 testes afetados e suite final de 743 testes aprovados, sem falhas ou pulos; lint, tipos e build aprovados\nHTTP demo 1.3.0: dez acoes comerciais e fluxo de cliente a recebimento parcial; cancelamento com baixa recusado, tarefa duplicada consolidada com motivo\n25 medicoes finais de UI nos cinco tamanhos sem excesso lateral ou controles menores que 44 px; teclado, rascunho e ampliacao conferidos\nPublicado em 703d7ac; health publico confirmou commit e container healthy, migracao 0069 aplicada, conexao e contagens reais preservadas\nhttps://github.com/avilaops/ERP/pull/19\ndocs/mcp-operacoes.md",
+      "next": "Publicado com AVL-148 em 703d7ac: health publico e container healthy; migracao 0069 aplicada. 743 testes, lint, tipos e build aprovados; conexao ativa e contagens reais preservadas. PR19 em revisao; varredura geral de telas do CI em execucao. Conferir descoberta no Claude do usuario e aceite operacional fiscal, sem mutacoes reais de teste.",
+      "blocker": "",
+      "history": [
+        {
+          "at": "2026-10-18",
+          "status": "em-revisao",
+          "note": "Registro legado normalizado para o contrato central."
+        }
+      ]
     },
     {
       "id": "T-20261017-mcp-financeiro-consultas",
       "title": "Completar financeiro e consultas comerciais e operacionais no MCP",
       "owner": null,
       "status": "em-revisao",
-      "acceptance": ["Quinze ferramentas respeitam perfil, tela, poder e empresa", "Contas a pagar exigem previa, confirmacao, revisao e repeticao idempotente", "Relatorios usam dados registrados e explicitam limites sem presumir agenda, custo ou envio", "Banco isolado, HTTP e UI conferidos antes da publicacao"],
-      "evidence": ["https://linear.app/avilaops/issue/AVL-148", "docs/mcp-operacoes.md", "733 testes aprovados; 14 testes MCP repetidos apos ajustes finais; lint e tipos aprovados", "HTTP demo 1.2.0: 15 novas ferramentas, 12 consultas, cobranca rascunho, conta e baixa com confirmacao sem duplicacao", "Conta ficticia de R$ 123,45 conferida como paga na UI; 15 medicoes de uma tela nos cinco tamanhos, controles >=44 px; teclado e texto/zoom 200% conferidos"],
-      "next": "Publicado com as dez mutacoes comerciais em 703d7ac. As 29 funcoes da AVL-145 estao implementadas e publicadas. Conexao ativa (1), clientes (3), pedidos (7), recebimentos (1), contas a pagar (0), atividades (13) e notas (0) iguais antes/depois. PR18/PR19 abertas; descoberta no assistente externo ainda sem comprovacao."
+      "acceptance": "Quinze ferramentas respeitam perfil, tela, poder e empresa\nContas a pagar exigem previa, confirmacao, revisao e repeticao idempotente\nRelatorios usam dados registrados e explicitam limites sem presumir agenda, custo ou envio\nBanco isolado, HTTP e UI conferidos antes da publicacao",
+      "evidence": "https://linear.app/avilaops/issue/AVL-148\ndocs/mcp-operacoes.md\n733 testes aprovados; 14 testes MCP repetidos apos ajustes finais; lint e tipos aprovados\nHTTP demo 1.2.0: 15 novas ferramentas, 12 consultas, cobranca rascunho, conta e baixa com confirmacao sem duplicacao\nConta ficticia de R$ 123,45 conferida como paga na UI; 15 medicoes de uma tela nos cinco tamanhos, controles >=44 px; teclado e texto/zoom 200% conferidos",
+      "next": "Publicado com as dez mutacoes comerciais em 703d7ac. As 29 funcoes da AVL-145 estao implementadas e publicadas. Conexao ativa (1), clientes (3), pedidos (7), recebimentos (1), contas a pagar (0), atividades (13) e notas (0) iguais antes/depois. PR18/PR19 abertas; descoberta no assistente externo ainda sem comprovacao.",
+      "blocker": "",
+      "history": [
+        {
+          "at": "2026-10-18",
+          "status": "em-revisao",
+          "note": "Registro legado normalizado para o contrato central."
+        }
+      ]
     },
     {
       "id": "T-20261017-mcp-prioridades",
       "title": "Ampliar MCP com baixa, margem, caixa e tarefa em pedido",
       "owner": null,
       "status": "em-revisao",
-      "acceptance": ["Quatro ferramentas com permissoes por tela, poder e escopo", "Previa, confirmacao e protecao contra repeticao das escritas", "Testes de banco, tipos, lint e publicacao verificada sem mutacoes reais de teste"],
-      "evidence": ["https://linear.app/avilaops/issue/AVL-145", "https://linear.app/avilaops/issue/AVL-146", "https://github.com/avilaops/ERP/pull/17", "docs/mcp-operacoes.md", "117 testes afetados aprovados sem falhas ou pulos; lint, tipos e build aprovados", "HTTP em demo: handshake, lista por perfil, margem, caixa e tarefa com confirmacao idempotente; 15 medicoes de UI nos cinco tamanhos", "Publicado em bc9374f; health confirmou commit e container healthy. Migracao 0068 aplicada. Conexao ativa preservada (1); recebimentos (1) e tarefas reais (13) iguais antes/depois"],
-      "next": "Primeira entrega preservada na publicacao 703d7ac, que completa as 29 funcoes da AVL-145. PR17 permanece aberta, dependente da PR16; PR18/PR19 tambem em revisao. Conferir descoberta das ferramentas no assistente do usuario."
+      "acceptance": "Quatro ferramentas com permissoes por tela, poder e escopo\nPrevia, confirmacao e protecao contra repeticao das escritas\nTestes de banco, tipos, lint e publicacao verificada sem mutacoes reais de teste",
+      "evidence": "https://linear.app/avilaops/issue/AVL-145\nhttps://linear.app/avilaops/issue/AVL-146\nhttps://github.com/avilaops/ERP/pull/17\ndocs/mcp-operacoes.md\n117 testes afetados aprovados sem falhas ou pulos; lint, tipos e build aprovados\nHTTP em demo: handshake, lista por perfil, margem, caixa e tarefa com confirmacao idempotente; 15 medicoes de UI nos cinco tamanhos\nPublicado em bc9374f; health confirmou commit e container healthy. Migracao 0068 aplicada. Conexao ativa preservada (1); recebimentos (1) e tarefas reais (13) iguais antes/depois",
+      "next": "Primeira entrega preservada na publicacao 703d7ac, que completa as 29 funcoes da AVL-145. PR17 permanece aberta, dependente da PR16; PR18/PR19 tambem em revisao. Conferir descoberta das ferramentas no assistente do usuario.",
+      "blocker": "",
+      "history": [
+        {
+          "at": "2026-10-18",
+          "status": "em-revisao",
+          "note": "Registro legado normalizado para o contrato central."
+        }
+      ]
     },
     {
       "id": "T-20261017-refinar-proposta",
       "title": "Ocultar campos vazios e exigir condicoes comerciais antes de fechar",
       "owner": null,
       "status": "em-revisao",
-      "acceptance": ["PDF sem placeholders ou informacoes internas, favorecido legal e valores com centavos", "Garantia, frete e montagem exigidos no fechamento e na aprovacao", "HXKP legivel em uma pagina, QR valido e publicacao conferida pela UI"],
-      "evidence": ["PDF real HXKP em uma pagina, inspecionado visualmente; QR decodificado com entrada de R$ 20.000,00 e chave CNPJ", "Validacao no servidor e na UI, incluindo revisoes concorrentes; sem condicoes reais inventadas", "76 testes das areas afetadas e 37 de rotas, tema e UX aprovados; lint, tipos e build aprovados", "Etapa Fechar em dois estados nos cinco tamanhos: 10 medicoes de uma tela, sem rolagem lateral e controles >=44 px", "Publicado em 58c97aa; health confirmou o commit e container healthy. PDF regenerado com snapshot somente leitura dos dados atuais, sem alterar termos, dinheiro ou emitir documentos"],
-      "next": "Conferencia final concluida apos reconexao: PDF de producao baixado pela UI, uma pagina e QR validos. DM10 fechou por Enter e voltou ao Resumo; Tab alcancou a acao com texto/zoom 200%, restaurados depois. Garantia, montagem e frete reais ainda precisam ser definidos pela empresa. PR16 permanece aberta para revisao."
+      "acceptance": "PDF sem placeholders ou informacoes internas, favorecido legal e valores com centavos\nGarantia, frete e montagem exigidos no fechamento e na aprovacao\nHXKP legivel em uma pagina, QR valido e publicacao conferida pela UI",
+      "evidence": "PDF real HXKP em uma pagina, inspecionado visualmente; QR decodificado com entrada de R$ 20.000,00 e chave CNPJ\nValidacao no servidor e na UI, incluindo revisoes concorrentes; sem condicoes reais inventadas\n76 testes das areas afetadas e 37 de rotas, tema e UX aprovados; lint, tipos e build aprovados\nEtapa Fechar em dois estados nos cinco tamanhos: 10 medicoes de uma tela, sem rolagem lateral e controles >=44 px\nPublicado em 58c97aa; health confirmou o commit e container healthy. PDF regenerado com snapshot somente leitura dos dados atuais, sem alterar termos, dinheiro ou emitir documentos",
+      "next": "Conferencia final concluida apos reconexao: PDF de producao baixado pela UI, uma pagina e QR validos. DM10 fechou por Enter e voltou ao Resumo; Tab alcancou a acao com texto/zoom 200%, restaurados depois. Garantia, montagem e frete reais ainda precisam ser definidos pela empresa. PR16 permanece aberta para revisao.",
+      "blocker": "",
+      "history": [
+        {
+          "at": "2026-10-18",
+          "status": "em-revisao",
+          "note": "Registro legado normalizado para o contrato central."
+        }
+      ]
     },
     {
       "id": "T-20261017-proposta-completa",
       "title": "Completar informacoes comerciais e fiscais do PDF com configuracao pela UI",
       "owner": null,
       "status": "em-revisao",
-      "acceptance": ["Identificacao fiscal e contato da vendedora, PIX configurado, entrega e transporte no PDF", "Garantia e condicoes comerciais configuraveis sem termos presumidos", "NCM, peso, status, desconto e parcelas coerentes; PDF legivel e UI nos cinco tamanhos"],
-      "evidence": ["docs/dados-da-proposta.md", "715 testes aprovados, sem falhas ou pulos; lint e tipos aprovados", "15 etapas nos cinco tamanhos: 75 amostras de uma tela, sem rolagem lateral e controles >=44 px; teclado, zoom e texto 200% conferidos", "Demo DM11: validacao preserva campos, voltar salva, garantia especifica e demais termos herdados refletidos no PDF; frete FOB separado", "Previa real HXKP em duas paginas conferida; QR lido com chave CNPJ e valor de R$ 20.000; condicoes nao definidas ficam explicitas"],
-      "next": "Publicado em fa1f709; health e container saudaveis. Contato da ficha e chave PIX do contrato cadastrados pela UI. PDF real HXKP baixado pela tela, duas paginas e QR de R$ 20.000 decodificado; sem dados ficticios. Garantia, montagem, site, frete e prazo de transporte reais ainda dependem de definicao/cadastro. PR16 em revisao."
+      "acceptance": "Identificacao fiscal e contato da vendedora, PIX configurado, entrega e transporte no PDF\nGarantia e condicoes comerciais configuraveis sem termos presumidos\nNCM, peso, status, desconto e parcelas coerentes; PDF legivel e UI nos cinco tamanhos",
+      "evidence": "docs/dados-da-proposta.md\n715 testes aprovados, sem falhas ou pulos; lint e tipos aprovados\n15 etapas nos cinco tamanhos: 75 amostras de uma tela, sem rolagem lateral e controles >=44 px; teclado, zoom e texto 200% conferidos\nDemo DM11: validacao preserva campos, voltar salva, garantia especifica e demais termos herdados refletidos no PDF; frete FOB separado\nPrevia real HXKP em duas paginas conferida; QR lido com chave CNPJ e valor de R$ 20.000; condicoes nao definidas ficam explicitas",
+      "next": "Publicado em fa1f709; health e container saudaveis. Contato da ficha e chave PIX do contrato cadastrados pela UI. PDF real HXKP baixado pela tela, duas paginas e QR de R$ 20.000 decodificado; sem dados ficticios. Garantia, montagem, site, frete e prazo de transporte reais ainda dependem de definicao/cadastro. PR16 em revisao.",
+      "blocker": "",
+      "history": [
+        {
+          "at": "2026-10-18",
+          "status": "em-revisao",
+          "note": "Registro legado normalizado para o contrato central."
+        }
+      ]
     },
     {
       "id": "T-20261016-empresa-no-orcamento",
       "title": "Identificar a empresa vendedora no cabecalho do PDF",
       "owner": null,
       "status": "em-revisao",
-      "acceptance": ["Cabecalho do orcamento identifica Ludus Equipamentos como empresa vendedora", "Nome vem da empresa da sessao; vendedor individual permanece somente na assinatura"],
-      "evidence": ["24 testes de documento/PDF aprovados, sem falhas ou pulos; lint e build aprovados", "Teste com logo e duas empresas verifica cabecalho e assinatura separadamente", "Publicado em bfd789a, health saudavel; PDF do pedido 261016-HXKP aberto e baixado pela UI: EMPRESA VENDEDORA / Ludus Equipamentos, vendedor individual somente na assinatura"],
-      "next": "PR16 aguarda revisao; correcao publicada e conferida no PDF de producao."
+      "acceptance": "Cabecalho do orcamento identifica Ludus Equipamentos como empresa vendedora\nNome vem da empresa da sessao; vendedor individual permanece somente na assinatura",
+      "evidence": "24 testes de documento/PDF aprovados, sem falhas ou pulos; lint e build aprovados\nTeste com logo e duas empresas verifica cabecalho e assinatura separadamente\nPublicado em bfd789a, health saudavel; PDF do pedido 261016-HXKP aberto e baixado pela UI: EMPRESA VENDEDORA / Ludus Equipamentos, vendedor individual somente na assinatura",
+      "next": "PR16 aguarda revisao; correcao publicada e conferida no PDF de producao.",
+      "blocker": "",
+      "history": [
+        {
+          "at": "2026-10-18",
+          "status": "em-revisao",
+          "note": "Registro legado normalizado para o contrato central."
+        }
+      ]
     },
     {
       "id": "T-20261016-meios-pagamento",
       "title": "Separar vencimento e meio efetivo de pagamento no pedido",
       "owner": null,
       "status": "em-revisao",
-      "acceptance": ["Vendedor escolhe entrada, prazo e meio do saldo independentemente", "PIX, transferência, dinheiro, cartão presencial e link disponíveis; boleto desativado na Ludus", "Pedido de exemplo com entrada PIX e saldo parcelado; NF-e usa os meios efetivos"],
-      "evidence": ["docs/pagamento-do-pedido.md", "705 testes aprovados, sem falhas ou pulos; 33 testes de rotas/UX após reorganização", "Três etapas nos cinco tamanhos: 15 amostras de uma tela, sem rolagem lateral e controles >=44 px", "Demo DM11: entrada PIX e saldo PIX em três parcelas; erro preserva campos; voltar salva; prazo separado do meio"],
-      "next": "Publicado em 77df694, health saudável. HXKP ajustado, aprovado e fechado pela UI: entrada PIX de R$ 20.000 e saldo PIX de 3 x R$ 7.608,16 a cada 30 dias; títulos conferidos em Recebimentos. Cartão presencial e links cartão/PIX cadastrados com códigos conferidos; boleto desligado. PR16 aguarda revisão. AVL-12 e AVL-21 atualizadas; restam as definições tributárias e etapas externas do fluxo fiscal."
+      "acceptance": "Vendedor escolhe entrada, prazo e meio do saldo independentemente\nPIX, transferência, dinheiro, cartão presencial e link disponíveis; boleto desativado na Ludus\nPedido de exemplo com entrada PIX e saldo parcelado; NF-e usa os meios efetivos",
+      "evidence": "docs/pagamento-do-pedido.md\n705 testes aprovados, sem falhas ou pulos; 33 testes de rotas/UX após reorganização\nTrês etapas nos cinco tamanhos: 15 amostras de uma tela, sem rolagem lateral e controles >=44 px\nDemo DM11: entrada PIX e saldo PIX em três parcelas; erro preserva campos; voltar salva; prazo separado do meio",
+      "next": "Publicado em 77df694, health saudável. HXKP ajustado, aprovado e fechado pela UI: entrada PIX de R$ 20.000 e saldo PIX de 3 x R$ 7.608,16 a cada 30 dias; títulos conferidos em Recebimentos. Cartão presencial e links cartão/PIX cadastrados com códigos conferidos; boleto desligado. PR16 aguarda revisão. AVL-12 e AVL-21 atualizadas; restam as definições tributárias e etapas externas do fluxo fiscal.",
+      "blocker": "",
+      "history": [
+        {
+          "at": "2026-10-18",
+          "status": "em-revisao",
+          "note": "Registro legado normalizado para o contrato central."
+        }
+      ]
     },
     {
       "id": "T-20261016-nfe-por-nota",
       "title": "Personalizar regras fiscais na preparação de cada nota",
       "owner": null,
       "status": "em-revisao",
-      "acceptance": ["Preparar regras por pedido sem alterar o padrão da empresa", "Preservar validação fiscal, XML assinado e edições concorrentes", "Conferir UI, persistência e cinco tamanhos"],
-      "evidence": ["https://linear.app/avilaops/issue/AVL-28", "704 testes sem falhas ou pulos; lint e tipos aprovados", "Demo isolado erp_note_rules_demo, pedido 261017-DM07: regras preenchidas pela UI e refletidas na pré-validação", "12 etapas e cinco tamanhos: 60 amostras com uma tela, sem rolagem lateral e áreas de toque >=44 px", "docs/nfe-por-nota.md"],
-      "next": "Acompanhar publicação e aceite na AVL-28. Regras reais devem ser escolhidas pela pessoa autorizada; nenhum código real foi presumido ou emitido."
+      "acceptance": "Preparar regras por pedido sem alterar o padrão da empresa\nPreservar validação fiscal, XML assinado e edições concorrentes\nConferir UI, persistência e cinco tamanhos",
+      "evidence": "https://linear.app/avilaops/issue/AVL-28\n704 testes sem falhas ou pulos; lint e tipos aprovados\nDemo isolado erp_note_rules_demo, pedido 261017-DM07: regras preenchidas pela UI e refletidas na pré-validação\n12 etapas e cinco tamanhos: 60 amostras com uma tela, sem rolagem lateral e áreas de toque >=44 px\ndocs/nfe-por-nota.md",
+      "next": "Acompanhar publicação e aceite na AVL-28. Regras reais devem ser escolhidas pela pessoa autorizada; nenhum código real foi presumido ou emitido.",
+      "blocker": "",
+      "history": [
+        {
+          "at": "2026-10-18",
+          "status": "em-revisao",
+          "note": "Registro legado normalizado para o contrato central."
+        }
+      ]
     }
   ],
   "decisions": [],
