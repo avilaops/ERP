@@ -90,15 +90,22 @@ async function claimNumberVoidJob(now: Date, conn: Queryable): Promise<FiscalVoi
 
 /** A missing answer is manual review: without a reliable consultation endpoint, automatic retransmission could duplicate a tax request. */
 export async function runOneNumberVoidJob(now: Date, vault: Buffer, send: Send, conn: Queryable): Promise<"none" | "completed" | "retry" | "manual_review"> {
+  const job = await withQueryableConnection(conn, async (held) => {
+    await held.query("BEGIN");
+    try {
+      const claimed = await claimNumberVoidJob(now, held);
+      await held.query("COMMIT");
+      return claimed;
+    } catch (error) {
+      await held.query("ROLLBACK");
+      throw error;
+    }
+  });
+  if (!job) return "none";
+
   return withQueryableConnection(conn, async (held) => {
     await held.query("BEGIN");
-    let job: FiscalVoidJob | null = null;
     try {
-      job = await claimNumberVoidJob(now, held);
-      if (!job) {
-        await held.query("COMMIT");
-        return "none";
-      }
       await held.query("SAVEPOINT fiscal_void_processing");
       await lockFiscalNumbering(job.environment, job.range.series, held);
       const used = await usedNumbersIn(job.environment, job.range.series, job.range.first, job.range.last, held);
@@ -144,10 +151,6 @@ export async function runOneNumberVoidJob(now: Date, vault: Buffer, send: Send, 
       await held.query("COMMIT");
       return "completed";
     } catch (error) {
-      if (!job) {
-        await held.query("ROLLBACK");
-        throw error;
-      }
       await held.query("ROLLBACK TO SAVEPOINT fiscal_void_processing");
       const message = error instanceof Error ? error.message.slice(0, 2000) : "Falha inesperada ao inutilizar a numeração.";
       await held.query("UPDATE fiscal_void_jobs SET status = 'revisao_manual', lease_until = NULL, last_error = $2, updated_at = $3 WHERE id = $1 AND status = 'processando'", [job.id, message, now]);

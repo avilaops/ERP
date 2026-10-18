@@ -1808,6 +1808,11 @@ test("fila de inutilização: persiste o XML assinado antes da SEFAZ e não dupl
 
   const send = async (_url: string, _action: string, envelope: string) => {
     assert.match(envelope, /<xServ>INUTILIZAR<\/xServ>/);
+    const durableClaim = await db.pool.query("SELECT status, attempts, lease_until FROM fiscal_void_jobs WHERE id = $1", [first.id]);
+    assert.deepEqual(
+      durableClaim.rows.map((row) => [row.status, Number(row.attempts), row.lease_until instanceof Date]),
+      [["processando", 1, true]],
+    );
     return `<retInutNFe versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe"><infInut><cStat>102</cStat><xMotivo>Inutilização de número homologado</xMotivo><nProt>135260000000010</nProt></infInut></retInutNFe>`;
   };
   assert.equal(await runOneNumberVoidJob(now, vault, send, db.pool), "completed");
