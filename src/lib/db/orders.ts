@@ -933,11 +933,12 @@ const normalizedSearch = (value: string) => value.normalize("NFD").replace(/[\u0
 export async function queryOrders(query: ListQuery<OrderListSort>, scope: OrderScope, conn: Queryable): Promise<ListResult<OrderSummary>> {
   const tab = (query.filters.aba?.[0] ?? "abertos") as OrderListTab;
   const statuses = ORDER_TAB_STATUSES[tab] ?? ORDER_TAB_STATUSES.abertos;
-  const values: unknown[] = [scope.sellerEmail, normalizedSearch(query.search)];
+  const documentSearch = query.search.replace(/[^0-9A-Z]/gi, "").toUpperCase();
+  const values: unknown[] = [scope.sellerEmail, normalizedSearch(query.search), documentSearch];
   const where = ["($1::text IS NULL OR o.seller_email = $1)", `($2 = '' OR
     translate(lower(COALESCE(c.trade_name, c.name, '')), '${SEARCH_FROM}', '${SEARCH_TO}') LIKE '%' || $2 || '%'
     OR lower(o.number) LIKE '%' || lower(regexp_replace($2, '^#', '')) || '%'
-    OR COALESCE(c.document, '') LIKE '%' || regexp_replace($2, '[^0-9A-Z]', '', 'g') || '%')`];
+    OR (length($3) >= 8 AND upper(COALESCE(c.document, '')) LIKE '%' || $3 || '%'))`];
   if (statuses) {
     values.push(statuses);
     where.push(`o.status = ANY($${values.length}::text[])`);

@@ -74,7 +74,7 @@ test("pedidos: lista paginada e indicadores usam consultas agregadas, sem carreg
     return { rows: [{ number: "261018-TEST", status: "em_negociacao", seller_email: "vendas@teste.local", seller_name: "Vendedor", customer_name: "Academia", trade_name: null, customer_document: "48240052000161", delivery_uf: "SP", taxpayer: true, discount: 0.08, ipi: 0.13, updated_at: new Date("2026-10-18T12:00:00Z"), closed_at: null, items: [{ quantity: 2, price: 1000 }] }] };
   } } as unknown as Queryable;
   const options = { sorts: ["atualizacao", "numero", "cliente", "vendedor"] as const, defaultSort: "atualizacao" as const, defaultDirection: "desc" as const, filters: { aba: ["abertos", "aprovacao", "fechados", "perdidos", "todos"] } };
-  const query = parseListQuery({ pagina: "527", porPagina: "10", aba: "abertos" }, options);
+  const query = parseListQuery({ q: "DM09", pagina: "527", porPagina: "10", aba: "abertos" }, options);
 
   const [result, overview] = await Promise.all([
     queryOrders(query, { sellerEmail: null }, conn),
@@ -86,6 +86,8 @@ test("pedidos: lista paginada e indicadores usam consultas agregadas, sem carreg
   assert.deepEqual(overview.indicators.closedInMonth, { count: 3, total: 97812.61 });
   const pageCall = calls.find((call) => call.text.includes("json_agg"));
   assert.ok(pageCall);
+  assert.deepEqual(pageCall.values?.slice(0, 3), [null, "dm09", "DM09"]);
+  assert.match(pageCall.text, /length\(\$3\) >= 8/);
   assert.deepEqual(pageCall.values?.slice(-2), [10, 2100]);
   assert.ok(calls.some((call) => call.text.includes("count(*) FILTER")));
   await assert.rejects(() => loadOrderOverview({ sellerEmail: null }, "18/10/2026", conn), /Mês inválido/);
