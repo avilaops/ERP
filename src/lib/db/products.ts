@@ -361,10 +361,15 @@ export async function queryProducts(query: ListQuery<ProductListSort>, lineId: n
   const page = Math.min(pages, query.page);
   const dataValues = [...values, query.pageSize, (page - 1) * query.pageSize];
   const direction = query.direction.toUpperCase();
-  const codePrefix = "lower(regexp_replace(code, '[0-9]+$', ''))";
-  const codeNumber = "COALESCE(NULLIF(substring(code FROM '([0-9]+)$'), '')::numeric, -1)";
+  const codeNaturalKey = `(SELECT string_agg(
+      CASE WHEN (piece)[1] ~ '^[0-9]+$'
+        THEN 'N' || lpad(length(COALESCE(NULLIF(ltrim((piece)[1], '0'), ''), '0'))::text, 3, '0')
+             || COALESCE(NULLIF(ltrim((piece)[1], '0'), ''), '0')
+        ELSE 'T' || lower((piece)[1]) END,
+      '|' ORDER BY ordinal)
+    FROM regexp_matches(COALESCE(code, ''), '([0-9]+|[^0-9]+)', 'g') WITH ORDINALITY AS pieces(piece, ordinal))`;
   const orderSql = query.sort === "codigo"
-    ? `(code IS NULL) ASC, ${codePrefix} ${direction}, ${codeNumber} ${direction}, lower(code) ${direction}, lower(name) ${direction}`
+    ? `(code IS NULL) ASC, ${codeNaturalKey} ${direction}, lower(code) ${direction}, lower(name) ${direction}`
     : `lower(name) ${direction}`;
   const { rows } = await conn.query(
     `SELECT ${COLUMNS} FROM products ${restriction} ORDER BY ${orderSql}, id ${direction}
