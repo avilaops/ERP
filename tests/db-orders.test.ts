@@ -1417,7 +1417,7 @@ test("emissão: guarda a nota assinada antes de enviar; rejeitada reemite com o 
 });
 
 test("fila fiscal: clique repetido compartilha a emissão; perda de resposta retenta o mesmo XML e envia o e-mail automático", { skip }, async () => {
-  const { enqueueNfeIssue, runOneFiscalJob } = await import("@/lib/db/fiscal-jobs");
+  const { enqueueNfeIssue, listOrderFiscalJobs, runOneFiscalJob } = await import("@/lib/db/fiscal-jobs");
   const { listOrderInvoices } = await import("@/lib/db/invoices");
   const { saveCertificate } = await import("@/lib/db/fiscal");
   const { SefazError } = await import("@/lib/fiscal/sefaz");
@@ -1484,6 +1484,8 @@ test("fila fiscal: clique repetido compartilha a emissão; perda de resposta ret
   await db.pool.query("UPDATE fiscal_jobs SET invoice_id = NULL WHERE id = $1", [first.id]);
   assert.equal(await runOneFiscalJob(delayedAgain.rows[0].run_after as Date, { ...dependencies, send: authorize }, db.pool), "completed");
   assert.deepEqual((await listOrderInvoices(orderId, db.pool)).map((invoice) => [invoice.status, invoice.number, invoice.protocol]), [["autorizada", 43, "135260000000071"]]);
+  assert.deepEqual((await listOrderFiscalJobs(orderId, "homologacao", db.pool)).map((job) => job.id), [first.id]);
+  assert.deepEqual(await listOrderFiscalJobs(orderId, "producao", db.pool), []);
   assert.deepEqual(mail, ["fila@cliente.test"]);
   const done = await db.pool.query("SELECT status, attempts, lease_until, completed_at FROM fiscal_jobs WHERE id = $1", [first.id]);
   assert.equal(done.rows[0].status, "concluido");

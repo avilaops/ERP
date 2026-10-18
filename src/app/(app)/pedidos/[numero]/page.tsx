@@ -231,7 +231,7 @@ export default async function PedidoPage({
   const invoices = invoice ? await listOrderInvoices(order.id, conn) : [];
   const events = invoice ? await listOrderInvoiceEvents(order.id, conn) : [];
   const mails = invoice ? await listOrderInvoiceMails(order.id, conn) : [];
-  const fiscalJobs = invoice ? await listOrderFiscalJobs(order.id, conn) : [];
+  const fiscalJobs = invoice ? await listOrderFiscalJobs(order.id, invoice.input.environment, conn) : [];
   const currentFiscalJob = fiscalJobs[0] ?? null;
   const currentInvoice = invoice ? (invoices.find((item) => item.environment === invoice.input.environment) ?? null) : null;
   const carriers = invoice ? await listCarriers(conn) : [];

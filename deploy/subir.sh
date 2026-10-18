@@ -82,21 +82,35 @@ echo "▸ imagem, migração e subida"
 ssh "$SERVIDOR" "bash -s" <<REMOTO
 set -euo pipefail
 cd $PASTA
+ANTERIOR=\$(docker inspect --format '{{.Image}}' erp 2>/dev/null || true)
 GIT_SHA=$COMMIT BUILT_AT=$AGORA docker compose build -q
 # O worker antigo para antes da migração. Assim ele não pode capturar um job
 # legado no intervalo entre o backfill e a troca do container. Se a migração
-# falhar, o trap religa exatamente o container antigo.
+# ou a nova versão falhar, o trap recoloca a imagem anterior.
 docker compose stop erp
-MIGROU=0
-trap 'if [ "\$MIGROU" -eq 0 ]; then docker compose start erp; fi' EXIT
+restaurar_anterior() {
+  echo '! publicação falhou; restaurando a imagem anterior'
+  if [ -n "\$ANTERIOR" ]; then
+    docker tag "\$ANTERIOR" erp:latest
+    docker compose up -d --force-recreate
+  else
+    docker compose start erp
+  fi
+}
+trap restaurar_anterior EXIT
 # Cria o esquema de cada empresa de ERP_TENANTS e aplica o que falta.
 # </dev/null: sem isso o "compose run" lê a entrada padrão e engole o resto deste
 # roteiro, e o "compose up" logo abaixo nunca roda. (Sem crases aqui: este trecho
 # é interpretado pelo shell local antes de ir para o servidor.)
 docker compose run --rm --no-deps -T erp \
   node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/db-migrate.ts </dev/null
-MIGROU=1
 GIT_SHA=$COMMIT BUILT_AT=$AGORA docker compose up -d --force-recreate
+for i in \$(seq 1 25); do
+  SAUDE=\$(curl -sf -m 5 http://127.0.0.1:$PORTA/api/health 2>/dev/null || true)
+  if echo "\$SAUDE" | grep -q '"commit":"$COMMIT"'; then break; fi
+  [ "\$i" -lt 25 ] || { docker compose logs --tail 40; exit 1; }
+  sleep 3
+done
 trap - EXIT
 docker image prune -f >/dev/null
 REMOTO

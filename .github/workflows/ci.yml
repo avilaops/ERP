@@ -52,6 +52,9 @@ jobs:
 
       - run: npm run typecheck
 
+      - name: Conferir scripts de publicação
+        run: bash -n deploy/*.sh
+
       # Falha se algum teste for pulado: sem banco, os testes de banco não provam nada.
       - name: Testes
         shell: bash

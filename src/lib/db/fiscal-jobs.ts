@@ -38,10 +38,19 @@ export type FiscalJobSummary = {
 };
 
 /** The order page only needs the work still relevant to the person, never XML or certificate data. */
-export async function listOrderFiscalJobs(orderId: number, conn: Queryable): Promise<FiscalJobSummary[]> {
+export async function listOrderFiscalJobs(orderId: number, environment: "homologacao" | "producao", conn: Queryable): Promise<FiscalJobSummary[]> {
   const { rows } = await conn.query(
-    "SELECT id, kind, status, attempts, last_error, run_after FROM fiscal_jobs WHERE order_id = $1 ORDER BY id DESC LIMIT 5",
-    [orderId],
+    `SELECT j.id, j.kind, j.status, j.attempts, j.last_error, j.run_after
+       FROM fiscal_jobs j
+      WHERE j.order_id = $1
+        AND (
+          EXISTS (SELECT 1 FROM fiscal_invoices i WHERE i.id = j.invoice_id AND i.environment = $2)
+          OR EXISTS (SELECT 1 FROM fiscal_invoices i WHERE i.fiscal_job_id = j.id AND i.environment = $2)
+          OR (j.kind = 'emitir_nfe' AND j.invoice_id IS NULL
+              AND NOT EXISTS (SELECT 1 FROM fiscal_invoices i WHERE i.fiscal_job_id = j.id))
+        )
+      ORDER BY j.id DESC LIMIT 5`,
+    [orderId, environment],
   );
   return rows.map((row) => ({ id: Number(row.id), kind: row.kind as FiscalJobSummary["kind"], status: row.status as FiscalJobSummary["status"], attempts: Number(row.attempts), lastError: row.last_error === null ? null : String(row.last_error), runAfter: row.run_after as Date }));
 }
