@@ -1691,6 +1691,32 @@ test("nota autorizada: carta de correção numera 1, 2…; cancelamento grava o 
   assert.match(outbox[0].message, /filename="CCe-2-NFe\d{44}\.xml"/);
   assert.ok(!outbox[0].message.includes("segredo-padrao"));
 
+  // O reenvio manual respeita a escolha de anexos e pode incluir o contrato assinado.
+  await assert.rejects(() => sendInvoiceMail({ ...request, documents: [] }, db.pool), /Escolha pelo menos um documento/);
+  const selectedMessages: string[] = [];
+  await sendInvoiceMail({ ...request, documents: ["danfe"], send: async (_config, _envelope, message) => void selectedMessages.push(message) }, db.pool);
+  assert.match(selectedMessages[0], /filename="DANFE-42\.pdf"/);
+  assert.doesNotMatch(selectedMessages[0], /filename="NFe\d{44}\.xml"|filename="CCe-/);
+
+  const { createContract } = await import("@/lib/db/contracts");
+  const { PDFDocument } = await import("pdf-lib");
+  const contractPdf = await PDFDocument.create();
+  contractPdf.addPage([300, 400]).drawText("Contrato assinado para o envio da nota");
+  const contractBytes = await contractPdf.save();
+  const contract = await createContract({
+    orderId, sequence: 1, title: "Contrato fiscal", body: "Contrato assinado para acompanhar a nota fiscal.", pdf: contractBytes,
+    sha256: "c".repeat(64), tokenHash: "d".repeat(64), expiresAt: new Date("2026-11-17T12:00:00Z"), recipientName: "Cliente Teste",
+    recipientEmail: "compras@cliente.test", createdBy: who,
+  }, db.pool);
+  await db.pool.query(
+    "UPDATE order_contracts SET status='assinado', signed_at=$2, signer_name='Cliente Teste', signer_document='12345678909', signer_ip='127.0.0.1' WHERE id=$1",
+    [contract.id, now],
+  );
+  await sendInvoiceMail({ ...request, documents: ["xml", "contrato"], send: async (_config, _envelope, message) => void selectedMessages.push(message) }, db.pool);
+  assert.match(selectedMessages[1], /filename="NFe\d{44}\.xml"/);
+  assert.match(selectedMessages[1], new RegExp(`filename="contrato-${number}-1-assinado\\.pdf"`));
+  assert.doesNotMatch(selectedMessages[1], /filename="DANFE-|filename="CCe-/);
+
   // Texto e resposta da empresa; e a caixa própria passa a ser a de saída, com a senha cifrada no banco.
   await assert.rejects(() => saveMailTexts({ subject: "x", body: "curto", replyTo: "errado", autoSend: true }, who, db.pool), (error: unknown) => error instanceof MailSettingsError && /Assunto/.test(error.message) && /Texto/.test(error.message) && /Responder para/.test(error.message));
   await saveMailTexts({ subject: "NF {numero} da {empresa}", body: "Segue a nota {numero}, chave {chave}.", replyTo: "Fiscal@Empresa.test", autoSend: false }, who, db.pool);
@@ -1709,6 +1735,7 @@ test("nota autorizada: carta de correção numera 1, 2…; cancelamento grava o 
   assert.match(outbox[1].message, /^From: "Empresa de Teste Ltda" <fiscal@empresa\.test>\r\nTo: compras@cliente\.test\r\nReply-To: fiscal@empresa\.test\r\nSubject: NF 42 da Empresa de Teste Ltda\r\n/);
   assert.deepEqual((await listOrderInvoiceMails(orderId, db.pool)).map((mail) => [mail.kind, mail.recipient, mail.channel, mail.status]), [
     ["nota", "compras@cliente.test", "empresa", "enviado"], ["nota", "outro@cliente.test", "empresa", "falhou"], ["nota", "compras@cliente.test", "avilaops", "enviado"],
+    ["nota", "compras@cliente.test", "avilaops", "enviado"], ["nota", "compras@cliente.test", "avilaops", "enviado"],
   ]);
   assert.equal((await listOrderInvoices(orderId, db.pool))[0].status, "autorizada");
   await removeOwnMailbox(who, db.pool);

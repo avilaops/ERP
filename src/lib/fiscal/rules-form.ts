@@ -19,6 +19,18 @@ export const NOTE_RULE_STEPS: { title: string; fields: RuleField[] }[] = [
   { title: "Informações complementares", fields: [{ key: "additionalInfo", label: "Texto para esta nota", kind: "textarea" }] },
 ];
 
+/** Opens the wizard at the first rule named by a validation message. */
+export function firstProblemStep(problems: readonly string[]): number {
+  const problem = problems[0]?.toLocaleLowerCase("pt-BR") ?? "";
+  if (problem.includes("ibs/cbs") || problem.includes("cclasstrib")) return 7;
+  if (problem.includes("cofins")) return 6;
+  if (problem.includes("pis")) return 5;
+  if (problem.includes("ipi")) return 4;
+  if (problem.includes("icms") || problem.includes("csosn")) return 3;
+  if (problem.includes("cfop")) return problem.includes("outro estado") || problem.includes("interestadual") ? 2 : 1;
+  return 0;
+}
+
 /** Only the displayed step is accepted; missing fields cannot erase another step. */
 export function noteRulePatch(step: number, read: (key: string) => string): Partial<FiscalRules> {
   const group = NOTE_RULE_STEPS[step];
