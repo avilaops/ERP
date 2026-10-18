@@ -110,7 +110,18 @@ export async function listFiscalOverview(scope: FiscalOverviewScope, conn: Query
                 SELECT 1 FROM fiscal_invoices job_invoice
                  WHERE job_invoice.id = fj.invoice_id AND job_invoice.environment = $2
               ))
-            ORDER BY CASE fj.status WHEN 'revisao_manual' THEN 0 WHEN 'processando' THEN 1 WHEN 'pendente' THEN 2 ELSE 3 END,
+            ORDER BY CASE
+                       WHEN fj.status = 'revisao_manual' AND NOT EXISTS (
+                         SELECT 1 FROM fiscal_jobs replacement
+                          WHERE replacement.order_id = fj.order_id
+                            AND replacement.kind = fj.kind
+                            AND replacement.id > fj.id
+                            AND (fj.kind = 'emitir_nfe' OR replacement.invoice_id IS NOT DISTINCT FROM fj.invoice_id)
+                       ) THEN 0
+                       WHEN fj.status = 'processando' THEN 1
+                       WHEN fj.status = 'pendente' THEN 2
+                       ELSE 3
+                     END,
                      fj.id DESC
             LIMIT 1
          ) j ON true

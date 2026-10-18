@@ -29,7 +29,10 @@ test("painel fiscal mapeia pedidos, notas e inutilizações sem buscar conteúdo
   assert.match(statements[0], /environment = \$2/);
   assert.match(statements[0], /invoice_id IS NULL OR EXISTS/);
   assert.match(statements[0], /job_invoice\.environment = \$2/);
-  assert.match(statements[0], /ORDER BY CASE fj\.status WHEN 'revisao_manual' THEN 0/);
+  assert.match(statements[0], /fj\.status = 'revisao_manual' AND NOT EXISTS/);
+  assert.match(statements[0], /replacement\.kind = fj\.kind/);
+  assert.match(statements[0], /replacement\.id > fj\.id/);
+  assert.match(statements[0], /replacement\.invoice_id IS NOT DISTINCT FROM fj\.invoice_id/);
   assert.match(statements[1], /o\.seller_email = \$1/);
   for (const sql of statements) assert.doesNotMatch(sql, /signed_xml|authorized_xml|certificate|passphrase/i);
 });
