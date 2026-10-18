@@ -9,7 +9,7 @@ import { receiveMail } from "@/lib/db/inbox";
 import { deliverPending } from "@/lib/db/integrations";
 import { tenantDb } from "@/lib/db/pool";
 import { runProspectLoad } from "@/lib/db/prospect-load";
-import { fiscalJobDependencies, runOneFiscalJob } from "@/lib/db/fiscal-jobs";
+import { fiscalJobDependencies, runFiscalJobBatch } from "@/lib/db/fiscal-jobs";
 import { runOneNumberVoidJob } from "@/lib/db/fiscal-void-jobs";
 import { vaultKey } from "@/lib/fiscal/certificate";
 import { sendToSefaz } from "@/lib/fiscal/channel";
@@ -66,8 +66,8 @@ export async function runBackground(env: Record<string, string | undefined>, now
       ["cadências", () => runCadences(tenant, now, { env, key, send: sendMail }, conn)],
       ["campanhas", () => runCampaigns(tenant, now, { env, key, send: sendMail }, conn)],
       ["avisos", () => deliverPending(key, now, conn)],
-      ["fila fiscal", () => runOneFiscalJob(now, fiscalJobDependencies(env, sendToSefaz, layoutCheck({ ERP_FISCAL_URL: env.ERP_FISCAL_URL, ERP_FISCAL_TOKEN: env.ERP_FISCAL_TOKEN })), conn)],
-      ["fila de inutilização", () => runOneNumberVoidJob(now, vaultKey(env.ERP_CERT_KEY), sendToSefaz, conn)],
+      ["fila fiscal", () => runFiscalJobBatch(fiscalJobDependencies(env, sendToSefaz, layoutCheck({ ERP_FISCAL_URL: env.ERP_FISCAL_URL, ERP_FISCAL_TOKEN: env.ERP_FISCAL_TOKEN })), conn)],
+      ["fila de inutilização", () => runOneNumberVoidJob(new Date(), vaultKey(env.ERP_CERT_KEY), sendToSefaz, conn)],
     ] as const) {
       try {
         await job();

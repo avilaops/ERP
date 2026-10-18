@@ -4,13 +4,16 @@
 # imagem de runtime → migração de cada empresa → docker compose up → conferência.
 # Só sai 0 se /api/health responder com a revisão enviada.
 #
-# Uso: bash deploy/subir.sh            (BUILD_HOST=local faz o build nesta máquina)
+# Uso: bash deploy/subir.sh
+#      PACOTE_PRONTO=/caminho/standalone.tgz bash deploy/subir.sh
+# O segundo modo publica o artefato produzido pelo GitHub e não executa build.
 # Pré-requisitos (uma vez, ver docs/operacao.md): acesso por SSH ao servidor,
 # /opt/erp/.env preenchido, banco e bloco do Caddy criados.
 set -euo pipefail
 SERVIDOR="${SERVIDOR:-applications}"
 # Onde o `next build` roda. Pedido do Nicolas (2026-10-08): no apps-noclient, não no creators.
 BUILD_HOST="${BUILD_HOST:-apps-noclient}"
+PACOTE_PRONTO="${PACOTE_PRONTO:-}"
 BUILD_DIR="/opt/build/erp"
 PASTA="/opt/erp"
 PORTA=3140
@@ -19,17 +22,24 @@ cd "$(dirname "$0")/.."
 if [ -n "$(git status --porcelain)" ]; then
   echo "! Há alteração não commitada. Commite antes de subir:"; git status --short; exit 1
 fi
+COMMIT_COMPLETO="$(git rev-parse HEAD)"
 COMMIT="$(git rev-parse --short HEAD)"
 AGORA="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 echo "=== ERP → $SERVIDOR ($COMMIT) ==="
 
 ssh "$SERVIDOR" "mkdir -p $PASTA && [ -f $PASTA/.env ] || { echo '! falta $PASTA/.env (copie .env.example e preencha)'; exit 1; }"
-if [ "$BUILD_HOST" = "local" ]; then
+if [ -n "$PACOTE_PRONTO" ]; then
+  [ -f "$PACOTE_PRONTO" ] || { echo "! pacote do GitHub não encontrado: $PACOTE_PRONTO"; exit 1; }
+  bash deploy/conferir-identidade-pacote.sh "$PACOTE_PRONTO" "$COMMIT_COMPLETO"
+  echo "▸ enviando pacote aprovado pelo GitHub"
+  ssh "$SERVIDOR" "cat > $PASTA/standalone.tgz" < "$PACOTE_PRONTO"
+elif [ "$BUILD_HOST" = "local" ]; then
   # A pasta temporária sai no fim, com sucesso ou não: cada publicação deixava 14 MB em /tmp.
   TEMPORARIA="$(mktemp -d)"
   trap 'rm -rf "$TEMPORARIA"' EXIT
   PACOTE="$TEMPORARIA/standalone.tgz"
-  bash deploy/empacotar.sh "$PACOTE"
+  SOURCE_SHA="$COMMIT_COMPLETO" bash deploy/empacotar.sh "$PACOTE"
+  bash deploy/conferir-identidade-pacote.sh "$PACOTE" "$COMMIT_COMPLETO"
   echo "▸ enviando"
   ssh "$SERVIDOR" "cat > $PASTA/standalone.tgz" < "$PACOTE"
 else
@@ -46,7 +56,8 @@ if ! sha256sum -c ../lock.sha256 >/dev/null 2>&1 || [ ! -d node_modules ]; then
   npm ci --no-audit --no-fund >/dev/null
   sha256sum package-lock.json > ../lock.sha256
 fi
-ETAPA=montar bash deploy/empacotar.sh $BUILD_DIR/standalone.tgz
+SOURCE_SHA=$COMMIT_COMPLETO ETAPA=montar bash deploy/empacotar.sh $BUILD_DIR/standalone.tgz
+bash deploy/conferir-identidade-pacote.sh $BUILD_DIR/standalone.tgz $COMMIT_COMPLETO
 REMOTO
   echo "▸ enviando"
   ssh "$BUILD_HOST" "cat $BUILD_DIR/standalone.tgz" | ssh "$SERVIDOR" "cat > $PASTA/standalone.tgz"
@@ -54,19 +65,54 @@ fi
 scp -q Dockerfile "$SERVIDOR:$PASTA/Dockerfile"
 scp -q deploy/docker-compose.yml "$SERVIDOR:$PASTA/docker-compose.yml"
 
+echo "▸ backup anterior às migrações"
+BACKUP="/opt/backups/erp-antes-deploy-$COMMIT-$(date -u +%Y%m%dT%H%M%SZ).dump"
+ssh "$SERVIDOR" "bash -s" <<REMOTO
+set -euo pipefail
+PARCIAL="$BACKUP.parcial"
+rm -f "\$PARCIAL"
+sudo -u postgres pg_dump -Fc -f "\$PARCIAL" erp
+test -s "\$PARCIAL"
+sudo -u postgres pg_restore -l "\$PARCIAL" >/dev/null
+mv "\$PARCIAL" "$BACKUP"
+chmod 640 "$BACKUP"
+echo "· $BACKUP"
+REMOTO
+
 echo "▸ imagem, migração e subida"
 ssh "$SERVIDOR" "bash -s" <<REMOTO
 set -euo pipefail
 cd $PASTA
+ANTERIOR=\$(docker inspect --format '{{.Image}}' erp 2>/dev/null || true)
 GIT_SHA=$COMMIT BUILT_AT=$AGORA docker compose build -q
-# Migração antes de trocar o container: cria o esquema de cada empresa de
-# ERP_TENANTS e aplica o que falta. Falha aqui aborta o deploy com a versão antiga no ar.
+# O worker antigo para antes da migração. Assim ele não pode capturar um job
+# legado no intervalo entre o backfill e a troca do container. Se a migração
+# ou a nova versão falhar, o trap recoloca a imagem anterior.
+docker compose stop erp
+restaurar_anterior() {
+  echo '! publicação falhou; restaurando a imagem anterior'
+  if [ -n "\$ANTERIOR" ]; then
+    docker tag "\$ANTERIOR" erp:latest
+    docker compose up -d --force-recreate
+  else
+    docker compose start erp
+  fi
+}
+trap restaurar_anterior EXIT
+# Cria o esquema de cada empresa de ERP_TENANTS e aplica o que falta.
 # </dev/null: sem isso o "compose run" lê a entrada padrão e engole o resto deste
 # roteiro, e o "compose up" logo abaixo nunca roda. (Sem crases aqui: este trecho
 # é interpretado pelo shell local antes de ir para o servidor.)
 docker compose run --rm --no-deps -T erp \
   node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/db-migrate.ts </dev/null
 GIT_SHA=$COMMIT BUILT_AT=$AGORA docker compose up -d --force-recreate
+for i in \$(seq 1 25); do
+  SAUDE=\$(curl -sf -m 5 http://127.0.0.1:$PORTA/api/health 2>/dev/null || true)
+  if echo "\$SAUDE" | grep -q '"commit":"$COMMIT"'; then break; fi
+  [ "\$i" -lt 25 ] || { docker compose logs --tail 40; exit 1; }
+  sleep 3
+done
+trap - EXIT
 docker image prune -f >/dev/null
 REMOTO
 

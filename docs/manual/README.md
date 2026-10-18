@@ -28,6 +28,10 @@ Passo a passo de cada funcionalidade do sistema da Ludus Equipamentos. Versão n
 - [Contas a pagar](paginas/13-contas-pagar.md) *(em validação)*
 - [Comissões](paginas/14-comissoes.md)
 
+## Fiscal
+
+- [Operação fiscal](paginas/24-fiscal.md)
+
 ## Gerencial
 
 - [Dashboard](paginas/15-dashboard.md)

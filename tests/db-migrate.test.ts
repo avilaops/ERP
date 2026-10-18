@@ -29,6 +29,37 @@ async function withClient<T>(fn: (client: pg.PoolClient) => Promise<T>): Promise
   }
 }
 
+test("migração: jobs de evento antigos só recebem uma nota inequívoca", () => {
+  const migration = readFileSync(join(MIGRATIONS_DIR, "0075_identidade_da_fila_fiscal.sql"), "utf8");
+  assert.match(migration, /kind = 'emitir_nfe'[\s\S]*status = 'processando'[\s\S]*status = 'pendente' AND attempts > 0/);
+  assert.match(migration, /Emissão criada antes da identificação da nota; confira a nota e a SEFAZ/);
+  assert.match(migration, /Evento legado interrompido durante o processamento; confira a nota e a SEFAZ/);
+  assert.match(migration, /kind IN \('correcao_nfe', 'cancelamento_nfe'\)[\s\S]*status = 'processando'[\s\S]*invoice_id IS NULL/);
+  assert.match(migration, /count\(\*\)::integer AS matches/);
+  assert.match(migration, /j\.status = 'pendente'/);
+  assert.match(migration, /candidates\.matches = 1/);
+  assert.doesNotMatch(migration, /JOIN company_settings[\s\S]*nfe_environment = i\.environment/);
+  assert.match(migration, /status = 'revisao_manual'/);
+  assert.match(migration, /Evento criado antes da identificação da nota/);
+});
+
+test("migração: emissão sem XML antigo exige nova confirmação da preparação", () => {
+  const migration = readFileSync(join(MIGRATIONS_DIR, "0077_preparacao_confirmada_da_emissao.sql"), "utf8");
+  assert.match(migration, /ADD COLUMN preparation_hash text/);
+  assert.match(migration, /status IN \('pendente', 'processando'\)/);
+  assert.match(migration, /invoice_id IS NULL/);
+  assert.match(migration, /preparação fiscal ser preservada/);
+});
+
+test("migração: uma numeração só pode ter uma reserva ativa", () => {
+  const migration = readFileSync(join(MIGRATIONS_DIR, "0078_reserva_unica_da_numeracao.sql"), "utf8");
+  assert.match(migration, /row_number\(\) OVER/);
+  assert.match(migration, /SET environment = NULL, series = NULL, invoice_number = NULL/);
+  assert.match(migration, /CREATE UNIQUE INDEX fiscal_jobs_unique_reserved_number_idx/);
+  assert.match(migration, /status IN \('pendente', 'processando', 'revisao_manual'\)/);
+  assert.match(migration, /WITH duplicated[\s\S]*invoice_number IS NOT NULL/);
+});
+
 test("migração: aplica em ordem, registra e rodar de novo não muda nada", { skip }, async () => {
   const first = await withClient((client) => migrate(client, MIGRATIONS_DIR));
   assert.deepEqual(first, [
@@ -96,8 +127,11 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "0062_cobranca_por_pix.sql",
     "0063_anilheiro_olimpico_ou_standard.sql",
     "0064_cores_do_equipamento_no_pedido.sql",
+    "0065_boletos_do_pedido.sql",
+    "0066_documentos.sql",
     "0066_regras_fiscais_por_pedido.sql",
     "0067_dados_comerciais_da_proposta.sql",
+    "0067_documentos_namespace.sql",
     "0068_confirmacoes_mcp.sql",
     "0069_cancelamento_de_rascunhos.sql",
     "0070_email_da_carta_de_correcao.sql",
@@ -105,6 +139,10 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "0072_fila_fiscal.sql",
     "0073_fila_de_eventos_fiscais.sql",
     "0074_fila_inutilizacao_fiscal.sql",
+    "0075_identidade_da_fila_fiscal.sql",
+    "0076_alvo_da_emissao_fiscal.sql",
+    "0077_preparacao_confirmada_da_emissao.sql",
+    "0078_reserva_unica_da_numeracao.sql",
   ]);
 
   const second = await withClient((client) => migrate(client, MIGRATIONS_DIR));
@@ -134,6 +172,14 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "company_settings",
     "contract_settings",
     "customers",
+    "document_attempts",
+    "document_chunks",
+    "document_collections",
+    "document_jobs",
+    "document_links",
+    "document_schema_elements",
+    "document_sources",
+    "document_versions",
     "equipment_colors",
     "fiscal_certificates",
     "fiscal_invoice_events",
@@ -145,6 +191,7 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "fiscal_void_jobs",
     "fixed_expenses",
     "idempotency_keys",
+    "library_documents",
     "lost_reasons",
     "machines",
     "mail_optouts",
@@ -197,6 +244,7 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "purchase_items",
     "purchases",
     "receipts",
+    "receivable_bills",
     "receivables",
     "refund_requests",
     "refunds",

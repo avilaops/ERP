@@ -1417,58 +1417,172 @@ test("emissão: guarda a nota assinada antes de enviar; rejeitada reemite com o 
 });
 
 test("fila fiscal: clique repetido compartilha a emissão; perda de resposta retenta o mesmo XML e envia o e-mail automático", { skip }, async () => {
-  const { enqueueNfeIssue, runOneFiscalJob } = await import("@/lib/db/fiscal-jobs");
+  const { enqueueNfeIssue, listOrderFiscalJobs, runOneFiscalJob } = await import("@/lib/db/fiscal-jobs");
   const { listOrderInvoices } = await import("@/lib/db/invoices");
   const { saveCertificate } = await import("@/lib/db/fiscal");
   const { SefazError } = await import("@/lib/fiscal/sefaz");
   const { testPfx } = await import("./fiscal-helpers.ts");
   const { randomBytes } = await import("node:crypto");
 
-  const number = await createOrder({ seller: SELLER, version: 1, productId: ID["LD-B001"], quantity: 1 }, numbers("261018-JOB1"), db.pool);
+  const number = await createOrder({ seller: SELLER, version: 1, productId: ID["LD-B001"], quantity: 2 }, numbers("261018-JOB1"), db.pool);
   await linkOrderCustomer(number, customerSp, SELLER.email, MINE, db.pool);
   await saveOrderTerms(number, { ...TERMS, deliveryUf: "SP" }, SELLER.email, MINE, db.pool);
-  await savePayment(number, { ...PAYMENT, downPayment: 1_000 }, SELLER.email, MINE, db.pool);
+  await savePayment(number, { ...PAYMENT, downPayment: 30000 }, SELLER.email, MINE, db.pool);
   await closeOrder(number, SELLER.email, MINE, db.pool);
   const orderId = Number((await db.pool.query("SELECT id FROM orders WHERE number = $1", [number])).rows[0].id);
-  await db.pool.query("UPDATE customers SET email = 'fila@cliente.test' WHERE id = $1", [customerSp]);
+  await db.pool.query(
+    "UPDATE customers SET email = 'fila@cliente.test', city = 'São José do Rio Preto', cep = '15035000', street = 'Rua A', street_number = '1', district = 'Centro' WHERE id = $1",
+    [customerSp],
+  );
 
   const now = new Date("2026-10-18T12:00:00Z");
   const who = "diretoria@teste.local";
   const vault = randomBytes(32);
   await saveCertificate(testPfx({ name: "EMPRESA DE TESTE LTDA:11222333000181" }), "senha-de-teste", vault, who, now, db.pool);
-  const first = await enqueueNfeIssue(number, who, db.pool);
-  const repeated = await enqueueNfeIssue(number, who, db.pool);
+  const first = await enqueueNfeIssue(number, who, ALL, db.pool);
+  const repeated = await enqueueNfeIssue(number, who, ALL, db.pool);
   assert.deepEqual([repeated.id, repeated.joined], [first.id, true]);
+  const target = await db.pool.query("SELECT environment, series, invoice_number FROM fiscal_jobs WHERE id = $1", [first.id]);
+  assert.deepEqual([target.rows[0].environment, Number(target.rows[0].series), Number(target.rows[0].invoice_number)], ["homologacao", 1, 43]);
+  const otherOrder = await db.pool.query("SELECT id FROM orders WHERE id <> $1 ORDER BY id LIMIT 1", [orderId]);
+  await assert.rejects(
+    () => db.pool.query(
+      "INSERT INTO fiscal_jobs (kind, order_id, requested_by, environment, series, invoice_number, preparation_hash) VALUES ('emitir_nfe', $1, $2, 'homologacao', 1, 43, $3)",
+      [otherOrder.rows[0].id, who, "a".repeat(64)],
+    ),
+    (error: unknown) => typeof error === "object" && error !== null && "code" in error && error.code === "23505",
+  );
+  const collisionNumber = await createOrder({ seller: SELLER, version: 1, productId: ID["LD-B001"], quantity: 2 }, numbers("261018-COL1"), db.pool);
+  await linkOrderCustomer(collisionNumber, customerSp, SELLER.email, MINE, db.pool);
+  await saveOrderTerms(collisionNumber, { ...TERMS, deliveryUf: "SP" }, SELLER.email, MINE, db.pool);
+  await savePayment(collisionNumber, { ...PAYMENT, downPayment: 30000 }, SELLER.email, MINE, db.pool);
+  await closeOrder(collisionNumber, SELLER.email, MINE, db.pool);
+  const ownedNumber = await db.pool.query("SELECT number FROM fiscal_invoices WHERE environment = 'homologacao' AND series = 1 AND status = 'autorizada' ORDER BY id LIMIT 1");
+  assert.ok(ownedNumber.rows[0]);
+  await db.pool.query("UPDATE company_settings SET nfe_next_number = $1", [ownedNumber.rows[0].number]);
+  await assert.rejects(() => enqueueNfeIssue(collisionNumber, who, ALL, db.pool), /já pertence a uma nota/i);
+  assert.equal(Number((await db.pool.query("SELECT nfe_next_number FROM company_settings")).rows[0].nfe_next_number), Number(ownedNumber.rows[0].number));
+  await db.pool.query("UPDATE company_settings SET nfe_next_number = 44");
+  assert.equal(Number((await db.pool.query("SELECT nfe_next_number FROM company_settings")).rows[0].nfe_next_number), 44);
+  await db.pool.query("UPDATE customers SET street_number = '2' WHERE id = $1", [customerSp]);
+  await db.pool.query("UPDATE fiscal_jobs SET run_after = $2 WHERE id = $1", [first.id, now]);
+  let changedPreparationCalls = 0;
+  assert.equal(await runOneFiscalJob(now, { vault, check: null, env: {}, send: async () => { changedPreparationCalls += 1; return ""; } }, db.pool), "manual_review");
+  assert.equal(changedPreparationCalls, 0);
+  assert.match(String((await db.pool.query("SELECT last_error FROM fiscal_jobs WHERE id = $1", [first.id])).rows[0].last_error), /preparação fiscal mudou/i);
+  await db.pool.query("UPDATE customers SET street_number = '1' WHERE id = $1", [customerSp]);
+  const reservationLock = await db.pool.connect();
+  await reservationLock.query("BEGIN");
+  await reservationLock.query("SELECT pg_advisory_xact_lock(hashtext('erp-fiscal-numbering'), hashtext(current_schema() || ':' || $1 || ':' || $2::text))", ["homologacao", 1]);
+  let resumedSettled = false;
+  const resumedPromise = enqueueNfeIssue(number, who, ALL, db.pool).finally(() => { resumedSettled = true; });
+  try {
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    assert.equal(resumedSettled, false);
+  } finally {
+    await reservationLock.query("ROLLBACK");
+    reservationLock.release();
+  }
+  const resumed = await resumedPromise;
+  const resumedTarget = await db.pool.query("SELECT invoice_number FROM fiscal_jobs WHERE id = $1", [resumed.id]);
+  assert.equal(resumed.id, first.id);
+  assert.equal(Number(resumedTarget.rows[0].invoice_number), 43);
+  assert.equal(Number((await db.pool.query("SELECT nfe_next_number FROM company_settings")).rows[0].nfe_next_number), 44);
+  // enqueueNfeIssue usa o relógio do banco. Prenda a disponibilidade ao relógio
+  // fictício deste teste para ele não depender da hora em que o CI começou.
+  await db.pool.query("UPDATE fiscal_jobs SET run_after = $2 WHERE id = $1", [first.id, now]);
 
-  const timeout = async () => { throw new SefazError("A SEFAZ não respondeu a tempo."); };
+  // O ambiente confirmado no clique pertence ao job. Alterar a configuração
+  // antes de o worker acordar não pode transformar homologação em produção.
+  await db.pool.query("UPDATE company_settings SET nfe_environment = 'producao', nfe_series = 9, nfe_next_number = 1");
+  await assert.rejects(() => enqueueNfeIssue(number, who, ALL, db.pool), /outra preparação fiscal/i);
+  const timeout = async (url: string, _action: string, envelope: string) => {
+    assert.match(url, /homologacao/);
+    assert.match(envelope, /<tpAmb>2<\/tpAmb>/);
+    assert.match(envelope, /<serie>1<\/serie>/);
+    assert.match(envelope, /<nNF>43<\/nNF>/);
+    throw new SefazError("A SEFAZ não respondeu a tempo.");
+  };
   const mail: string[] = [];
   const dependencies = { vault, send: timeout, check: null, env: { ERP_SMTP_HOST: "mail.teste", ERP_SMTP_USER: "fiscal@teste.local", ERP_SMTP_PASSWORD: "segredo", ERP_MAIL_FROM: "fiscal@teste.local" }, mailSend: async (_config: unknown, envelope: { to: string }) => void mail.push(envelope.to) };
-  assert.equal(await runOneFiscalJob(now, dependencies, db.pool), "retry");
-  assert.deepEqual((await listOrderInvoices(orderId, db.pool)).map((invoice) => [invoice.status, invoice.number]), [["assinada", 43]]);
+  try {
+    assert.equal(await runOneFiscalJob(now, dependencies, db.pool), "retry");
+    assert.equal(Number((await db.pool.query("SELECT nfe_next_number FROM company_settings")).rows[0].nfe_next_number), 1);
+  } finally {
+    await db.pool.query("UPDATE company_settings SET nfe_environment = 'homologacao', nfe_series = 1, nfe_next_number = 44");
+  }
+  assert.deepEqual((await listOrderInvoices(orderId, db.pool)).map((invoice) => [invoice.status, invoice.number, invoice.environment, invoice.series]), [["assinada", 43, "homologacao", 1]]);
   const delayed = await db.pool.query("SELECT status, attempts, run_after FROM fiscal_jobs WHERE id = $1", [first.id]);
   assert.deepEqual([delayed.rows[0].status, Number(delayed.rows[0].attempts)], ["pendente", 1]);
 
-  const authorize = async (url: string, _action: string, envelope: string) => {
+  const stillProcessing = async (url: string, _action: string, envelope: string) => {
     if (/nfeconsultaprotocolo4/.test(url)) {
       const key = /<chNFe>(\d{44})<\/chNFe>/.exec(envelope)![1];
       return `<retConsSitNFe versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe"><cStat>217</cStat><xMotivo>NF-e não consta</xMotivo><chNFe>${key}</chNFe></retConsSitNFe>`;
     }
-    const key = /Id="NFe(\d{44})"/.exec(envelope)![1];
-    return `<retEnviNFe versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe"><cStat>104</cStat><xMotivo>Lote processado</xMotivo><protNFe versao="4.00"><infProt><chNFe>${key}</chNFe><nProt>135260000000071</nProt><cStat>100</cStat><xMotivo>Autorizado o uso da NF-e</xMotivo></infProt></protNFe></retEnviNFe>`;
+    return `<retEnviNFe versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe"><cStat>105</cStat><xMotivo>Lote em processamento</xMotivo></retEnviNFe>`;
   };
-  assert.equal(await runOneFiscalJob(delayed.rows[0].run_after as Date, { ...dependencies, send: authorize }, db.pool), "completed");
+  assert.equal(await runOneFiscalJob(delayed.rows[0].run_after as Date, { ...dependencies, send: stillProcessing }, db.pool), "retry");
+  const delayedAgain = await db.pool.query("SELECT status, attempts, run_after FROM fiscal_jobs WHERE id = $1", [first.id]);
+  assert.deepEqual([delayedAgain.rows[0].status, Number(delayedAgain.rows[0].attempts)], ["pendente", 2]);
+
+  // Uma quinta resposta ainda não final não pode ficar pendente e impossível de reclamar.
+  await db.pool.query("UPDATE fiscal_jobs SET attempts = 4 WHERE id = $1", [first.id]);
+  assert.equal(await runOneFiscalJob(delayedAgain.rows[0].run_after as Date, { ...dependencies, send: stillProcessing }, db.pool), "manual_review");
+  const finalAnswerMissing = await db.pool.query("SELECT status, attempts, last_error FROM fiscal_jobs WHERE id = $1", [first.id]);
+  assert.deepEqual([finalAnswerMissing.rows[0].status, Number(finalAnswerMissing.rows[0].attempts)], ["revisao_manual", 5]);
+  assert.match(String(finalAnswerMissing.rows[0].last_error), /ainda não deu o veredito/i);
+  await db.pool.query("UPDATE fiscal_jobs SET status = 'pendente', attempts = 2, run_after = $2, last_error = NULL WHERE id = $1", [first.id, delayedAgain.rows[0].run_after]);
+
+  const authorize = async (url: string, _action: string, envelope: string) => {
+    if (/nfeconsultaprotocolo4/.test(url)) {
+      const key = /<chNFe>(\d{44})<\/chNFe>/.exec(envelope)![1];
+      return `<retConsSitNFe versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe"><cStat>100</cStat><xMotivo>Autorizado o uso da NF-e</xMotivo><chNFe>${key}</chNFe><protNFe versao="4.00"><infProt><chNFe>${key}</chNFe><nProt>135260000000071</nProt><cStat>100</cStat><xMotivo>Autorizado o uso da NF-e</xMotivo></infProt></protNFe></retConsSitNFe>`;
+    }
+    throw new Error("a nota recuperada por consulta não deve ser retransmitida");
+  };
+  await db.pool.query("UPDATE fiscal_invoices SET fiscal_job_id = NULL WHERE order_id = $1", [orderId]);
+  await db.pool.query("UPDATE fiscal_jobs SET invoice_id = NULL WHERE id = $1", [first.id]);
+  assert.equal(await runOneFiscalJob(delayedAgain.rows[0].run_after as Date, { ...dependencies, send: authorize }, db.pool), "completed");
   assert.deepEqual((await listOrderInvoices(orderId, db.pool)).map((invoice) => [invoice.status, invoice.number, invoice.protocol]), [["autorizada", 43, "135260000000071"]]);
+  assert.deepEqual((await listOrderFiscalJobs(orderId, "homologacao", db.pool)).map((job) => job.id), [first.id]);
+  assert.deepEqual(await listOrderFiscalJobs(orderId, "producao", db.pool), []);
+  const legacyEvent = await db.pool.query(
+    `INSERT INTO fiscal_jobs (kind, order_id, requested_by, status, event_text, last_error)
+     VALUES ('correcao_nfe', $1, $2, 'revisao_manual', 'Evento legado sem nota identificada.', 'Confira a nota e a SEFAZ.')
+     RETURNING id`,
+    [orderId, who],
+  );
+  const legacyEventId = Number(legacyEvent.rows[0].id);
+  assert.deepEqual((await listOrderFiscalJobs(orderId, "homologacao", db.pool)).map((job) => job.id), [legacyEventId, first.id]);
+  assert.deepEqual((await listOrderFiscalJobs(orderId, "producao", db.pool)).map((job) => job.id), [legacyEventId]);
+  await db.pool.query("DELETE FROM fiscal_jobs WHERE id = $1", [legacyEventId]);
   assert.deepEqual(mail, ["fila@cliente.test"]);
   const done = await db.pool.query("SELECT status, attempts, lease_until, completed_at FROM fiscal_jobs WHERE id = $1", [first.id]);
   assert.equal(done.rows[0].status, "concluido");
-  assert.equal(Number(done.rows[0].attempts), 2);
+  assert.equal(Number(done.rows[0].attempts), 3);
   assert.equal(done.rows[0].lease_until, null);
   assert.ok(done.rows[0].completed_at);
+
+  // Se o processo cair depois do veredito, a retomada reconhece a nota ligada ao job e não transmite outra vez.
+  const linked = await db.pool.query("SELECT i.id, i.fiscal_job_id, j.invoice_id FROM fiscal_invoices i JOIN fiscal_jobs j ON j.id = $2 WHERE i.order_id = $1", [orderId, first.id]);
+  assert.deepEqual([Number(linked.rows[0].fiscal_job_id), Number(linked.rows[0].invoice_id)], [first.id, Number(linked.rows[0].id)]);
+  await db.pool.query("UPDATE fiscal_jobs SET status = 'processando', lease_until = $2, completed_at = NULL WHERE id = $1", [first.id, new Date(now.getTime() - 1)]);
+  let recoveredCalls = 0;
+  assert.equal(await runOneFiscalJob(now, { ...dependencies, send: async () => { recoveredCalls += 1; throw new Error("não deve transmitir"); } }, db.pool), "completed");
+  assert.equal(recoveredCalls, 0);
+
+  // Uma quinta tentativa interrompida não estoura o CHECK nem fica presa para sempre.
+  await db.pool.query("UPDATE fiscal_jobs SET status = 'processando', attempts = 5, lease_until = $2, completed_at = NULL WHERE id = $1", [first.id, new Date(now.getTime() - 1)]);
+  assert.equal(await runOneFiscalJob(now, dependencies, db.pool), "none");
+  const exhausted = await db.pool.query("SELECT status, attempts, last_error FROM fiscal_jobs WHERE id = $1", [first.id]);
+  assert.deepEqual([exhausted.rows[0].status, Number(exhausted.rows[0].attempts)], ["revisao_manual", 5]);
+  assert.match(String(exhausted.rows[0].last_error), /cinco tentativas/i);
 });
 
 test("nota autorizada: carta de correção numera 1, 2…; cancelamento grava o evento e a nota vira cancelada; recusa da SEFAZ não grava nada", { skip }, async () => {
   const { registerOrderNfeEvent, issueOrderNfe, IssueError } = await import("@/lib/db/issue-nfe");
-  const { listOrderInvoiceEvents, listOrderInvoices } = await import("@/lib/db/invoices");
+  const { listOrderInvoiceEvents, listOrderInvoices, loadAuthorizedXml } = await import("@/lib/db/invoices");
   const { saveCertificate } = await import("@/lib/db/fiscal");
   const { testPfx } = await import("./fiscal-helpers.ts");
   const { randomBytes } = await import("node:crypto");
@@ -1477,15 +1591,49 @@ test("nota autorizada: carta de correção numera 1, 2…; cancelamento grava o 
   const { id: orderId, number } = closed.rows[0];
   const now = new Date("2026-10-08T15:00:00Z");
   const who = "diretoria@teste.local";
+  const { enqueueNfeEvent } = await import("@/lib/db/fiscal-jobs");
   // O cofre do teste anterior ficou com ele: o certificado é enviado de novo, com uma chave nova.
   const vault = randomBytes(32);
   await saveCertificate(testPfx({ name: "EMPRESA DE TESTE LTDA:11222333000181" }), "senha-de-teste", vault, who, now, db.pool);
+
+  const beforeReopening = await db.pool.query("SELECT closed_at FROM orders WHERE number = $1", [number]);
+  await db.pool.query("UPDATE orders SET status = 'em_negociacao', closed_at = NULL WHERE number = $1", [number]);
+  try {
+    await assert.rejects(
+      () => enqueueNfeEvent(number, "correcao", "Corrigir o peso bruto informado no transporte.", who, ALL, db.pool),
+      /pedido não está fechado/i,
+    );
+  } finally {
+    await db.pool.query("DELETE FROM fiscal_jobs WHERE order_id = (SELECT id FROM orders WHERE number = $1) AND status IN ('pendente', 'processando')", [number]);
+    await db.pool.query("UPDATE orders SET status = 'fechado', closed_at = $2 WHERE number = $1", [number, beforeReopening.rows[0].closed_at]);
+  }
 
   const answer = (envelope: string, code: string, reason: string) => {
     const key = /<chNFe>(\d{44})<\/chNFe>/.exec(envelope)![1];
     const field = (name: string) => new RegExp(`<${name}>([^<]+)</${name}>`).exec(envelope)![1];
     return `<soap:Envelope xmlns:soap="x"><soap:Body><retEnvEvento versao="1.00" xmlns="http://www.portalfiscal.inf.br/nfe"><cStat>128</cStat><xMotivo>Lote processado</xMotivo><retEvento versao="1.00"><infEvento><tpAmb>${field("tpAmb")}</tpAmb><cStat>${code}</cStat><xMotivo>${reason}</xMotivo><chNFe>${key}</chNFe><tpEvento>${field("tpEvento")}</tpEvento><nSeqEvento>${field("nSeqEvento")}</nSeqEvento>${["135", "136"].includes(code) ? "<nProt>135260000077777</nProt>" : ""}</infEvento></retEvento></retEnvEvento></soap:Body></soap:Envelope>`;
   };
+
+  const queuedCorrection = await enqueueNfeEvent(number, "correcao", "Corrigir o peso bruto informado no transporte.", who, ALL, db.pool);
+  const sameCorrection = await enqueueNfeEvent(number, "correcao", "  Corrigir   o peso bruto informado no transporte. ", who, ALL, db.pool);
+  assert.deepEqual([sameCorrection.id, sameCorrection.joined], [queuedCorrection.id, true]);
+  await assert.rejects(
+    () => enqueueNfeEvent(number, "correcao", "Corrigir o peso líquido informado no transporte.", who, ALL, db.pool),
+    /outra justificativa|outro texto/i,
+  );
+  const intendedInvoice = Number((await db.pool.query("SELECT invoice_id FROM fiscal_jobs WHERE id = $1", [queuedCorrection.id])).rows[0].invoice_id);
+  await db.pool.query("UPDATE fiscal_jobs SET run_after = $2 WHERE id = $1", [queuedCorrection.id, now]);
+  await db.pool.query("UPDATE company_settings SET nfe_environment = 'producao'");
+  const { runOneFiscalJob } = await import("@/lib/db/fiscal-jobs");
+  try {
+    assert.equal(await runOneFiscalJob(now, { vault, check: null, env: {}, send: async (_url, _action, envelope) => answer(envelope, "135", "Evento registrado e vinculado a NF-e") }, db.pool), "completed");
+  } finally {
+    await db.pool.query("UPDATE company_settings SET nfe_environment = 'homologacao'");
+  }
+  const queuedEvent = await db.pool.query("SELECT id, invoice_id FROM fiscal_invoice_events WHERE fiscal_job_id = $1", [queuedCorrection.id]);
+  assert.deepEqual([Number(queuedEvent.rows[0].invoice_id), intendedInvoice], [intendedInvoice, intendedInvoice]);
+  await db.pool.query("DELETE FROM fiscal_invoice_events WHERE id = $1", [queuedEvent.rows[0].id]);
+  await db.pool.query("DELETE FROM fiscal_jobs WHERE id = $1", [queuedCorrection.id]);
   const sent: string[] = [];
   const accept = async (url: string, _action: string, envelope: string) => {
     sent.push(envelope);
@@ -1574,12 +1722,21 @@ test("nota autorizada: carta de correção numera 1, 2…; cancelamento grava o 
   assert.equal((await listOrderInvoiceMails(orderId,db.pool))[0].eventId,firstEvent.id);
   await assert.rejects(()=>sendInvoiceMail({...request,kind:"correcao",eventId:999999},db.pool),/evento fiscal ainda não está registrado/);
 
-  assert.match((await registerOrderNfeEvent(number, "cancelamento", "Cliente desistiu da compra antes da saída.", who, now, vault, accept, db.pool)).message, /cancelada/);
-  // Cancelada: o e-mail leva o XML da nota e o do cancelamento, sem DANFE.
-  await sendInvoiceMail(request, db.pool);
+  await db.pool.query("UPDATE mail_settings SET auto_send = true");
+  const cancellationJob = await enqueueNfeEvent(number, "cancelamento", "Cliente desistiu da compra antes da saída.", who, ALL, db.pool);
+  await db.pool.query("UPDATE fiscal_jobs SET run_after = $2 WHERE id = $1", [cancellationJob.id, now]);
+  assert.equal(await runOneFiscalJob(now, { vault, check: null, env, send: accept, mailSend: deliver }, db.pool), "completed");
+  // O automático reutiliza o último destinatário da nota e leva o XML da nota e do cancelamento, sem DANFE.
+  assert.equal(outbox[3].to, "compras@cliente.test");
   assert.match(outbox[3].message, /Subject: =\?UTF-8\?B\?Q2FuY2VsYW1lbnRv/);
   assert.match(outbox[3].message, /filename="Cancelamento-NFe\d{44}\.xml"/);
   assert.doesNotMatch(outbox[3].message, /DANFE-42\.pdf|CCe-2-NFe/);
+  // Se o processo cair depois do evento e do e-mail, a retomada não repete nenhum dos dois.
+  await db.pool.query("UPDATE fiscal_jobs SET status = 'processando', lease_until = $2, completed_at = NULL WHERE id = $1", [cancellationJob.id, new Date(now.getTime() - 1)]);
+  let recoveredEventCalls = 0;
+  const mailsBeforeRecovery = outbox.length;
+  assert.equal(await runOneFiscalJob(now, { vault, check: null, env, send: async () => { recoveredEventCalls += 1; return ""; }, mailSend: deliver }, db.pool), "completed");
+  assert.deepEqual([recoveredEventCalls, outbox.length], [0, mailsBeforeRecovery]);
   await assert.rejects(() => sendInvoiceMail({ ...request, kind: "correcao" }, db.pool), /nota está cancelada/);
   assert.equal((await listOrderInvoiceMails(orderId, db.pool))[0].kind, "cancelamento");
   const rejectedInvoice = await db.pool.query("SELECT id FROM fiscal_invoices WHERE status NOT IN ('autorizada', 'cancelada') LIMIT 1");
@@ -1587,15 +1744,17 @@ test("nota autorizada: carta de correção numera 1, 2…; cancelamento grava o 
 
   assert.ok(sent.at(-1)!.includes("<tpEvento>110111</tpEvento>") && sent.at(-1)!.includes("<nProt>135260000000001</nProt>"));
   assert.equal((await listOrderInvoices(orderId, db.pool))[0].status, "cancelada");
+  assert.equal((await loadAuthorizedXml(orderId, db.pool))?.accessKey.length, 44, "o XML autorizado continua disponível depois do cancelamento");
   assert.deepEqual((await listOrderInvoiceEvents(orderId, db.pool)).map((event) => [event.kind, event.sequence]), [["correcao", 1], ["correcao", 2], ["cancelamento", 1]]);
 
   // Cancelada, não aceita mais evento; e o pedido pode ter uma nota nova, com o número seguinte.
   await assert.rejects(() => registerOrderNfeEvent(number, "correcao", "Mais uma correção depois de cancelada.", who, now, vault, accept, db.pool), /não tem nota autorizada/);
+  const nextBeforeAgain = Number((await db.pool.query("SELECT nfe_next_number FROM company_settings")).rows[0].nfe_next_number);
   const again = await issueOrderNfe(number, who, now, vault, async (_u, _a, envelope) => {
     const key = /Id="NFe(\d{44})"/.exec(envelope)![1];
     return `<retEnviNFe versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe"><cStat>104</cStat><xMotivo>ok</xMotivo><protNFe versao="4.00"><infProt><chNFe>${key}</chNFe><nProt>135260000000002</nProt><cStat>100</cStat><xMotivo>Autorizado</xMotivo></infProt></protNFe></retEnviNFe>`;
   }, db.pool);
-  assert.deepEqual([again.invoice.number, again.invoice.status], [43, "autorizada"]);
+  assert.deepEqual([again.invoice.number, again.invoice.status], [nextBeforeAgain, "autorizada"]);
 
   // Nota enviada sem resposta que a SEFAZ, consultada, diz ter autorizado: grava o protocolo e NÃO reenvia.
   const { voidInvoiceNumbers } = await import("@/lib/db/issue-nfe");
@@ -1609,7 +1768,7 @@ test("nota autorizada: carta de correção numera 1, 2…; cancelamento grava o 
     const key = /<chNFe>(\d{44})/.exec(envelope)![1];
     return `<retConsSitNFe versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe"><cStat>100</cStat><xMotivo>Autorizado o uso da NF-e</xMotivo><chNFe>${key}</chNFe><protNFe versao="4.00"><infProt><chNFe>${key}</chNFe><nProt>135260000000003</nProt><cStat>100</cStat><xMotivo>Autorizado o uso da NF-e</xMotivo></infProt></protNFe></retConsSitNFe>`;
   }, db.pool);
-  assert.deepEqual([found.invoice.number, found.invoice.status, found.invoice.protocol], [44, "autorizada", "135260000000003"]);
+  assert.deepEqual([found.invoice.number, found.invoice.status, found.invoice.protocol], [nextBeforeAgain + 1, "autorizada", "135260000000003"]);
   assert.equal(calls.length, 1);
   assert.match(calls[0], /nfeconsultaprotocolo4/);
   assert.match(found.message, /já estava autorizada/);
@@ -1619,11 +1778,12 @@ test("nota autorizada: carta de correção numera 1, 2…; cancelamento grava o 
     assert.ok(envelope.includes("<xServ>INUTILIZAR</xServ>") && envelope.includes("<Signature "));
     return `<retInutNFe versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe"><infInut><cStat>102</cStat><xMotivo>Inutilização de número homologado</xMotivo><nProt>135260000000009</nProt></infInut></retInutNFe>`;
   };
-  await assert.rejects(() => voidInvoiceNumbers({ series: 1, first: 42, last: 44, reason: "Numeração pulada por falha de sistema." }, who, now, vault, voided, db.pool), /veredito da SEFAZ nesta faixa \(número 42, 43, 44\)/);
-  await assert.rejects(() => voidInvoiceNumbers({ series: 1, first: 45, last: 45, reason: "Numeração pulada por falha de sistema." }, who, now, vault, voided, db.pool), /o próximo da empresa é o 45/);
-  assert.equal(await takeNextNumber(db.pool), 45);
-  assert.match((await voidInvoiceNumbers({ series: 1, first: 45, last: 45, reason: "Numeração pulada por falha de sistema." }, who, now, vault, voided, db.pool)).message, /45 a 45 inutilizada/);
-  assert.deepEqual((await listNumberVoids(db.pool)).map((item) => [item.first, item.last, item.protocol]), [[45, 45, "135260000000009"]]);
+  await assert.rejects(() => voidInvoiceNumbers({ series: 1, first: 42, last: nextBeforeAgain + 1, reason: "Numeração pulada por falha de sistema." }, who, now, vault, voided, db.pool), /veredito da SEFAZ nesta faixa/);
+  const available = nextBeforeAgain + 2;
+  await assert.rejects(() => voidInvoiceNumbers({ series: 1, first: available, last: available, reason: "Numeração pulada por falha de sistema." }, who, now, vault, voided, db.pool), new RegExp(`o próximo da empresa é o ${available}`));
+  assert.equal(await takeNextNumber(db.pool), available);
+  assert.match((await voidInvoiceNumbers({ series: 1, first: available, last: available, reason: "Numeração pulada por falha de sistema." }, who, now, vault, voided, db.pool)).message, new RegExp(`${available} a ${available} inutilizada`));
+  assert.deepEqual((await listNumberVoids(db.pool)).map((item) => [item.first, item.last, item.protocol]), [[available, available, "135260000000009"]]);
 });
 
 test("fila de inutilização: persiste o XML assinado antes da SEFAZ e não duplica clique repetido", { skip }, async () => {
@@ -1637,8 +1797,8 @@ test("fila de inutilização: persiste o XML assinado antes da SEFAZ e não dupl
   const who = "diretoria@teste.local";
   const vault = randomBytes(32);
   await saveCertificate(testPfx({ name: "EMPRESA DE TESTE LTDA:11222333000181" }), "senha-de-teste", vault, who, now, db.pool);
-  assert.equal(await takeNextNumber(db.pool), 46);
-  const range = { series: 1, first: 46, last: 46, reason: "Numeração reservada e não utilizada no teste." };
+  const available = await takeNextNumber(db.pool);
+  const range = { series: 1, first: available, last: available, reason: "Numeração reservada e não utilizada no teste." };
   const first = await enqueueNumberVoid(range, who, now, vault, db.pool);
   const repeated = await enqueueNumberVoid(range, who, now, vault, db.pool);
   assert.deepEqual([repeated.id, repeated.joined], [first.id, true]);
@@ -1648,11 +1808,70 @@ test("fila de inutilização: persiste o XML assinado antes da SEFAZ e não dupl
 
   const send = async (_url: string, _action: string, envelope: string) => {
     assert.match(envelope, /<xServ>INUTILIZAR<\/xServ>/);
+    const durableClaim = await db.pool.query("SELECT status, attempts, lease_until FROM fiscal_void_jobs WHERE id = $1", [first.id]);
+    assert.deepEqual(
+      durableClaim.rows.map((row) => [row.status, Number(row.attempts), row.lease_until instanceof Date]),
+      [["processando", 1, true]],
+    );
     return `<retInutNFe versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe"><infInut><cStat>102</cStat><xMotivo>Inutilização de número homologado</xMotivo><nProt>135260000000010</nProt></infInut></retInutNFe>`;
   };
   assert.equal(await runOneNumberVoidJob(now, vault, send, db.pool), "completed");
   assert.deepEqual((await listNumberVoidJobs(db.pool)).slice(0, 1).map((job) => [job.status, job.attempts]), [["concluido", 1]]);
-  assert.deepEqual((await listNumberVoids(db.pool)).slice(0, 1).map((item) => [item.first, item.last, item.protocol]), [[46, 46, "135260000000010"]]);
+  assert.deepEqual((await listNumberVoids(db.pool)).slice(0, 1).map((item) => [item.first, item.last, item.protocol]), [[available, available, "135260000000010"]]);
+
+  const abandoned = await takeNextNumber(db.pool);
+  const abandonedRange = { series: 1, first: abandoned, last: abandoned, reason: "Numeração reservada para testar recuperação interrompida." };
+  const abandonedJob = await enqueueNumberVoid(abandonedRange, who, now, vault, db.pool);
+  await assert.rejects(
+    () => enqueueNumberVoid({ ...abandonedRange, reason: "Outra justificativa válida para a mesma faixa reservada." }, who, now, vault, db.pool),
+    /outra justificativa/i,
+  );
+  await db.pool.query("UPDATE fiscal_void_jobs SET status = 'processando', attempts = 1, lease_until = $2 WHERE id = $1", [abandonedJob.id, new Date(now.getTime() - 1)]);
+  let retransmissions = 0;
+  assert.equal(await runOneNumberVoidJob(now, vault, async () => { retransmissions += 1; return ""; }, db.pool), "none");
+  assert.equal(retransmissions, 0);
+  assert.deepEqual((await db.pool.query("SELECT status, last_error FROM fiscal_void_jobs WHERE id = $1", [abandonedJob.id])).rows.map((row) => [row.status, /confira a SEFAZ/i.test(row.last_error)]), [["revisao_manual", true]]);
+
+  const unrelated = await takeNextNumber(db.pool);
+  const unrelatedJob = await enqueueNumberVoid({ series: 1, first: unrelated, last: unrelated, reason: "Numeração reservada para testar emissão sem sobreposição." }, who, now, vault, db.pool);
+  const order = await db.pool.query("SELECT id FROM orders WHERE status = 'fechado' LIMIT 1");
+  const unrelatedIssue = await db.pool.query("INSERT INTO fiscal_jobs (kind, order_id, requested_by, run_after, environment, series, invoice_number) VALUES ('emitir_nfe', $1, $2, $3, 'homologacao', 1, $4) RETURNING id", [order.rows[0].id, who, now, unrelated + 100]);
+  const accepted = async () => {
+    retransmissions += 1;
+    return `<retInutNFe versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe"><infInut><cStat>102</cStat><xMotivo>Inutilização de número homologado</xMotivo><nProt>135260000000011</nProt></infInut></retInutNFe>`;
+  };
+  const voidLock = await db.pool.connect();
+  await voidLock.query("BEGIN");
+  await voidLock.query("SELECT pg_advisory_xact_lock(hashtext('erp-fiscal-numbering'), hashtext(current_schema() || ':' || $1 || ':' || $2::text))", ["homologacao", 1]);
+  let voidSettled = false;
+  const voidPromise = runOneNumberVoidJob(now, vault, accepted, db.pool).finally(() => { voidSettled = true; });
+  try {
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    assert.equal(voidSettled, false);
+  } finally {
+    await voidLock.query("ROLLBACK");
+    voidLock.release();
+  }
+  assert.equal(await voidPromise, "completed");
+  assert.equal(retransmissions, 1);
+  assert.deepEqual((await listNumberVoidJobs(db.pool)).filter((job) => job.id === unrelatedJob.id).map((job) => job.status), ["concluido"]);
+  await db.pool.query("UPDATE fiscal_jobs SET status = 'concluido', completed_at = $2 WHERE id = $1", [unrelatedIssue.rows[0].id, now]);
+
+  const guarded = await takeNextNumber(db.pool);
+  const guardedJob = await enqueueNumberVoid({ series: 1, first: guarded, last: guarded, reason: "Numeração reservada para testar concorrência de emissão." }, who, now, vault, db.pool);
+  const active = await db.pool.query("INSERT INTO fiscal_jobs (kind, order_id, requested_by, run_after, environment, series, invoice_number) VALUES ('emitir_nfe', $1, $2, $3, 'homologacao', 1, $4) RETURNING id", [order.rows[0].id, who, now, guarded]);
+  assert.equal(await runOneNumberVoidJob(now, vault, async () => { retransmissions += 1; return ""; }, db.pool), "retry");
+  assert.equal(retransmissions, 1);
+  assert.deepEqual((await db.pool.query("SELECT status, attempts, last_error FROM fiscal_void_jobs WHERE id = $1", [guardedJob.id])).rows.map((row) => [row.status, Number(row.attempts), /aguardando a emissão fiscal ativa/i.test(row.last_error)]), [["pendente", 0, true]]);
+  await db.pool.query("UPDATE fiscal_jobs SET status = 'revisao_manual' WHERE id = $1", [active.rows[0].id]);
+  await db.pool.query(
+    `INSERT INTO fiscal_invoices (order_id, environment, series, number, access_key, status, signed_xml, issued_at, created_by)
+     VALUES ($1, 'homologacao', 1, $2, $3, 'assinada', '<NFe>aguardando resposta</NFe>', $4, $5)`,
+    [order.rows[0].id, guarded, "8".repeat(44), now, who],
+  );
+  assert.equal(await runOneNumberVoidJob(new Date(now.getTime() + 60_000), vault, async () => { retransmissions += 1; return ""; }, db.pool), "manual_review");
+  assert.equal(retransmissions, 1);
+  assert.deepEqual((await db.pool.query("SELECT status, last_error FROM fiscal_void_jobs WHERE id = $1", [guardedJob.id])).rows.map((row) => [row.status, /nota assinada .* sem veredito/i.test(row.last_error)]), [["revisao_manual", true]]);
 });
 
 test("resposta perdida: evento duplicado (573) vem da consulta; número que já é de outra nota na SEFAZ (539) não é reaproveitado; duplicidade (204) traz o protocolo ou espera", { skip }, async () => {
@@ -1664,7 +1883,18 @@ test("resposta perdida: evento duplicado (573) vem da consulta; número que já 
   const { testPfx } = await import("./fiscal-helpers.ts");
   const { randomBytes } = await import("node:crypto");
 
-  const closed = await db.pool.query("SELECT o.id, o.number, i.id AS invoice_id, i.number AS invoice_number, i.access_key FROM orders o JOIN fiscal_invoices i ON i.order_id = o.id WHERE i.status = 'autorizada' LIMIT 1");
+  const closed = await db.pool.query(
+    `SELECT o.id, o.number, i.id AS invoice_id, i.number AS invoice_number, i.access_key
+       FROM orders o
+       JOIN fiscal_invoices i ON i.order_id = o.id
+      WHERE i.status = 'autorizada'
+        AND NOT EXISTS (
+          SELECT 1 FROM fiscal_invoices pending
+           WHERE pending.order_id = o.id AND pending.status = 'assinada'
+        )
+      ORDER BY i.id DESC
+      LIMIT 1`,
+  );
   const { id: orderId, number, invoice_id: invoiceId, invoice_number: invoiceNumber, access_key: key } = closed.rows[0];
   const now = new Date("2026-10-08T16:00:00Z");
   const who = "diretoria@teste.local";
@@ -1809,17 +2039,27 @@ test("excluir pedido com histórico: só a diretoria, e só enquanto nada chegou
   assert.equal((await closeOrder(number, SELLER.email, MINE, db.pool)).status, "fechado");
   const { rows } = await db.pool.query("SELECT id FROM orders WHERE number = $1", [number]);
   const id = Number(rows[0].id);
+  const queued = await db.pool.query("INSERT INTO fiscal_jobs (kind, order_id, requested_by) VALUES ('emitir_nfe', $1, $2) RETURNING id", [id, DIRECTOR]);
   // Fechado não se exclui; reaberto, tem histórico: o vendedor não exclui, a diretoria sim.
   await assert.rejects(() => deleteOrder(number, ALL, db.pool, { withHistory: true }), /fora de negociação/);
+  await db.pool.query("UPDATE fiscal_jobs SET status = 'processando', attempts = 1, lease_until = now() + interval '2 minutes' WHERE id = $1", [queued.rows[0].id]);
+  await assert.rejects(() => reopenOrder(number, DIRECTOR, ALL, db.pool), /operação fiscal em processamento/);
+  assert.equal((await getOrder(number, ALL, db.pool))?.status, "fechado");
+  await db.pool.query("UPDATE fiscal_jobs SET status = 'pendente', attempts = 0, lease_until = NULL WHERE id = $1", [queued.rows[0].id]);
   await reopenOrder(number, DIRECTOR, ALL, db.pool);
-  await assert.rejects(() => deleteOrder(number, MINE, db.pool), /só a diretoria pode excluí-lo/);
+  const abandoned = await db.pool.query("SELECT status, last_error FROM fiscal_jobs WHERE id = $1", [queued.rows[0].id]);
+  assert.equal(abandoned.rows[0].status, "revisao_manual");
+  assert.match(String(abandoned.rows[0].last_error), /pedido reaberto/i);
+  await assert.rejects(() => deleteOrder(number, MINE, db.pool), /nota fiscal/);
   // Com recebimento baixado, nem a diretoria: o dinheiro entrou.
   const expected = await db.pool.query("SELECT id FROM receivables WHERE order_id = $1 ORDER BY number LIMIT 1", [id]);
   await db.pool.query("INSERT INTO receipts (receivable_id, amount, amount_without_ipi, received_at, method, recorded_by) VALUES ($1, 100, 88.5, now(), 'PIX', 'x')", [expected.rows[0].id]);
   await assert.rejects(() => deleteOrder(number, ALL, db.pool, { withHistory: true }), /tem recebimento, conta, nota fiscal ou contrato assinado/);
   await db.pool.query("DELETE FROM receipts WHERE receivable_id = $1", [expected.rows[0].id]);
+  await assert.rejects(() => deleteOrder(number, ALL, db.pool, { withHistory: true }), /nota fiscal/);
+  await db.pool.query("DELETE FROM fiscal_jobs WHERE id = $1", [queued.rows[0].id]);
   assert.deepEqual(await deleteOrder(number, ALL, db.pool, { withHistory: true }), { sellerEmail: SELLER.email });
-  for (const tableName of ["orders", "order_items", "order_closings", "order_approvals", "receivables"]) {
+  for (const tableName of ["orders", "order_items", "order_closings", "order_approvals", "receivables", "fiscal_jobs"]) {
     const column = tableName === "orders" ? "id" : "order_id";
     assert.equal(Number((await db.pool.query(`SELECT count(*) FROM ${tableName} WHERE ${column} = $1`, [id])).rows[0].count), 0, tableName);
   }

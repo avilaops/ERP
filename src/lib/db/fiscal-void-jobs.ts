@@ -1,6 +1,9 @@
 import { IssueError, prepareNumberVoid, sendPreparedNumberVoid } from "@/lib/db/issue-nfe";
 import type { NumberVoidRange } from "@/lib/db/issue-nfe";
 import type { Queryable } from "@/lib/db/pool";
+import { usedNumbersIn } from "@/lib/db/invoices";
+import { lockFiscalNumbering } from "@/lib/db/fiscal-number-lock";
+import { withQueryableConnection } from "@/lib/db/pool";
 import type { Send } from "@/lib/fiscal/channel";
 
 const LEASE_MS = 2 * 60_000;
@@ -31,13 +34,14 @@ export type FiscalVoidJobSummary = {
 export async function enqueueNumberVoid(range: NumberVoidRange, who: string, now: Date, vault: Buffer, conn: Queryable): Promise<{ id: number; joined: boolean }> {
   const prepared = await prepareNumberVoid(range, now, vault, conn);
   const { rows } = await conn.query(
-    `INSERT INTO fiscal_void_jobs (environment, issuer_uf, series, first_number, last_number, reason, signed_xml, requested_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    `INSERT INTO fiscal_void_jobs (environment, issuer_uf, series, first_number, last_number, reason, signed_xml, requested_by, run_after)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
      ON CONFLICT (environment, series, first_number, last_number) WHERE status IN ('pendente', 'processando')
      DO UPDATE SET updated_at = now()
-     RETURNING id, (xmax <> 0) AS joined`,
-    [prepared.environment, prepared.issuerUf, prepared.series, prepared.first, prepared.last, prepared.reason, prepared.signedXml, who],
+     RETURNING id, reason, (xmax <> 0) AS joined`,
+    [prepared.environment, prepared.issuerUf, prepared.series, prepared.first, prepared.last, prepared.reason, prepared.signedXml, who, now],
   );
+  if (String(rows[0].reason) !== prepared.reason) throw new IssueError("Já há uma inutilização pendente para esta faixa com outra justificativa. Aguarde a conclusão ou revise a pendência antes de confirmar novamente.");
   return { id: Number(rows[0].id), joined: rows[0].joined === true };
 }
 
@@ -52,11 +56,17 @@ export async function listNumberVoidJobs(conn: Queryable): Promise<FiscalVoidJob
 }
 
 async function claimNumberVoidJob(now: Date, conn: Queryable): Promise<FiscalVoidJob | null> {
+  await conn.query(
+    `UPDATE fiscal_void_jobs
+        SET status = 'revisao_manual', lease_until = NULL,
+            last_error = COALESCE(last_error, 'Processamento interrompido após o envio; confira a SEFAZ antes de qualquer retransmissão.'), updated_at = $1
+      WHERE status = 'processando' AND lease_until <= $1`,
+    [now],
+  );
   const { rows } = await conn.query(
     `WITH candidate AS (
        SELECT id FROM fiscal_void_jobs
-        WHERE (status = 'pendente' AND run_after <= $1)
-           OR (status = 'processando' AND lease_until <= $1)
+        WHERE status = 'pendente' AND run_after <= $1
         ORDER BY run_after, id
         LIMIT 1
         FOR UPDATE SKIP LOCKED
@@ -79,18 +89,75 @@ async function claimNumberVoidJob(now: Date, conn: Queryable): Promise<FiscalVoi
 }
 
 /** A missing answer is manual review: without a reliable consultation endpoint, automatic retransmission could duplicate a tax request. */
-export async function runOneNumberVoidJob(now: Date, vault: Buffer, send: Send, conn: Queryable): Promise<"none" | "completed" | "manual_review"> {
-  const job = await claimNumberVoidJob(now, conn);
+export async function runOneNumberVoidJob(now: Date, vault: Buffer, send: Send, conn: Queryable): Promise<"none" | "completed" | "retry" | "manual_review"> {
+  const job = await withQueryableConnection(conn, async (held) => {
+    await held.query("BEGIN");
+    try {
+      const claimed = await claimNumberVoidJob(now, held);
+      await held.query("COMMIT");
+      return claimed;
+    } catch (error) {
+      await held.query("ROLLBACK");
+      throw error;
+    }
+  });
   if (!job) return "none";
-  try {
-    await sendPreparedNumberVoid({ ...job.range, environment: job.environment, issuerUf: job.issuerUf, signedXml: job.signedXml }, job.requestedBy, now, vault, send, conn);
-    await conn.query("UPDATE fiscal_void_jobs SET status = 'concluido', completed_at = $2, lease_until = NULL, last_error = NULL, updated_at = $2 WHERE id = $1 AND status = 'processando'", [job.id, now]);
-    return "completed";
-  } catch (error) {
-    const message = error instanceof Error ? error.message.slice(0, 2000) : "Falha inesperada ao inutilizar a numeração.";
-    await conn.query("UPDATE fiscal_void_jobs SET status = 'revisao_manual', lease_until = NULL, last_error = $2, updated_at = $3 WHERE id = $1 AND status = 'processando'", [job.id, message, now]);
-    return "manual_review";
-  }
+
+  return withQueryableConnection(conn, async (held) => {
+    await held.query("BEGIN");
+    try {
+      await held.query("SAVEPOINT fiscal_void_processing");
+      await lockFiscalNumbering(job.environment, job.range.series, held);
+      const used = await usedNumbersIn(job.environment, job.range.series, job.range.first, job.range.last, held);
+      const unresolvedIssue = await held.query(
+        `SELECT number FROM fiscal_invoices
+         WHERE status = 'assinada' AND environment = $1 AND series = $2 AND number BETWEEN $3 AND $4
+         LIMIT 1`,
+        [job.environment, job.range.series, job.range.first, job.range.last],
+      );
+      const activeIssue = await held.query(
+        `SELECT 1 FROM fiscal_jobs j
+         WHERE j.kind = 'emitir_nfe' AND j.status IN ('pendente', 'processando')
+           AND (
+             (j.environment = $1 AND j.series = $2 AND j.invoice_number BETWEEN $3 AND $4)
+             OR EXISTS (
+               SELECT 1 FROM fiscal_invoices i
+                WHERE i.order_id = j.order_id AND i.status IN ('assinada', 'rejeitada')
+                  AND i.environment = $1 AND i.series = $2 AND i.number BETWEEN $3 AND $4
+             )
+           )
+         LIMIT 1`,
+        [job.environment, job.range.series, job.range.first, job.range.last],
+      );
+      if (used.length > 0) {
+        throw new IssueError(`A faixa passou a conter nota com veredito da SEFAZ (número ${used.join(", ")}); confira-a manualmente.`);
+      }
+      if (unresolvedIssue.rows[0]) {
+        throw new IssueError(`A faixa contém a nota assinada ${Number(unresolvedIssue.rows[0].number)} ainda sem veredito; confira a situação na SEFAZ antes de inutilizar.`);
+      }
+      if (activeIssue.rows[0]) {
+        await held.query(
+          `UPDATE fiscal_void_jobs
+              SET status = 'pendente', attempts = GREATEST(attempts - 1, 0), run_after = $2,
+                  lease_until = NULL, last_error = 'Aguardando a emissão fiscal ativa terminar antes de conferir a faixa.', updated_at = $1
+            WHERE id = $3 AND status = 'processando'`,
+          [now, new Date(now.getTime() + 60_000), job.id],
+        );
+        await held.query("COMMIT");
+        return "retry";
+      }
+      await sendPreparedNumberVoid({ ...job.range, environment: job.environment, issuerUf: job.issuerUf, signedXml: job.signedXml }, job.requestedBy, now, vault, send, held);
+      await held.query("UPDATE fiscal_void_jobs SET status = 'concluido', completed_at = $2, lease_until = NULL, last_error = NULL, updated_at = $2 WHERE id = $1 AND status = 'processando'", [job.id, now]);
+      await held.query("COMMIT");
+      return "completed";
+    } catch (error) {
+      await held.query("ROLLBACK TO SAVEPOINT fiscal_void_processing");
+      const message = error instanceof Error ? error.message.slice(0, 2000) : "Falha inesperada ao inutilizar a numeração.";
+      await held.query("UPDATE fiscal_void_jobs SET status = 'revisao_manual', lease_until = NULL, last_error = $2, updated_at = $3 WHERE id = $1 AND status = 'processando'", [job.id, message, now]);
+      await held.query("COMMIT");
+      return "manual_review";
+    }
+  });
 }
 
 /** Retains the public domain error type for action callers. */

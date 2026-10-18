@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { EMPTY_FISCAL_RULES } from "@/lib/db/fiscal-rules";
 import type { FiscalRules } from "@/lib/db/fiscal-rules";
+import { nfePreparationFingerprint } from "@/lib/db/order-nfe";
 import { buildNfeXml } from "@/lib/fiscal/nfe";
 import { orderNfe } from "@/lib/fiscal/order-nfe";
 import type { OrderNfeSource } from "@/lib/fiscal/order-nfe";
@@ -41,6 +42,13 @@ const SOURCE: OrderNfeSource = {
   issuedAt: "2026-10-08T10:00:00-03:00",
   software: "ERP Avila Ops",
 };
+
+test("confirmação fiscal: horário e código aleatório pertencem ao worker; os dados tributários não", () => {
+  const input = orderNfe(SOURCE).input;
+  const confirmed = nfePreparationFingerprint(input);
+  assert.equal(nfePreparationFingerprint({ ...input, issuedAt: "2026-10-09T11:00:00-03:00", randomCode: "91827364" }), confirmed);
+  assert.notEqual(nfePreparationFingerprint({ ...input, recipient: { ...input.recipient, street: "Rua alterada" } }), confirmed);
+});
 
 test("pedido fechado vira nota: preço com o desconto do pedido, ICMS de saída do destino, DIFAL, código do município pelo nome", () => {
   const { input, problems, totals } = orderNfe(SOURCE);

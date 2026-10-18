@@ -10,7 +10,7 @@ import type { Order } from "@/lib/db/orders";
 import type { Queryable } from "@/lib/db/pool";
 import { loadPublishedSnapshot, loadPublishedTable } from "@/lib/db/price-table";
 import { isAcceptableRandomCode } from "@/lib/fiscal/nfe";
-import type { FreightMode } from "@/lib/fiscal/nfe";
+import type { FreightMode, NfeInput } from "@/lib/fiscal/nfe";
 import { orderNfe } from "@/lib/fiscal/order-nfe";
 import { APP_NAME } from "@/lib/app-identity";
 import { isoDate } from "@/lib/format";
@@ -20,6 +20,11 @@ import { paymentOf, saleOf } from "@/lib/order-quote";
 export function issueInstant(now: Date): string {
   const local = new Date(now.getTime() - 3 * 3_600_000).toISOString().slice(0, 19);
   return `${local}-03:00`;
+}
+
+/** Identifies every confirmed fiscal input except the emission instant, which belongs to the worker. */
+export function nfePreparationFingerprint(input: NfeInput): string {
+  return createHash("sha256").update(JSON.stringify({ ...input, randomCode: "", issuedAt: "" })).digest("hex");
 }
 
 /**
@@ -39,14 +44,24 @@ function previewCode(orderNumber: string, invoiceNumber: number): string {
  * consuming it and signs nothing. `null` when the order does not exist or is
  * not closed.
  */
-export async function previewOrderNfe(orderNumber: string, now: Date, conn: Queryable, issue?: { number: number; randomCode: string }) {
+export async function previewOrderNfe(orderNumber: string, now: Date, conn: Queryable, issue?: {
+  number?: number;
+  randomCode?: string;
+  environment?: "homologacao" | "producao";
+  series?: number;
+}) {
   const order: Order | null = await getOrder(orderNumber, { sellerEmail: null }, conn);
   if (!order || order.status !== "fechado" || order.items.length === 0) return null;
   const table = await loadPublishedTable(order.priceTableVersion, conn);
   const snapshot = await loadPublishedSnapshot(order.priceTableVersion, conn);
   if (!table || !snapshot) return null;
 
-  const settings = await loadFiscalSettings(conn);
+  const currentSettings = await loadFiscalSettings(conn);
+  const settings = {
+    ...currentSettings,
+    environment: issue?.environment ?? currentSettings.environment,
+    series: issue?.series ?? currentSettings.series,
+  };
   const { rules, revision: rulesRevision } = await loadOrderFiscalRules(order.id, table.lineId, conn);
   const fiscal = new Map<number, ProductFiscal>();
   for (const item of order.items) {
@@ -58,6 +73,7 @@ export async function previewOrderNfe(orderNumber: string, now: Date, conn: Quer
   const codes = new Map((await listPaymentCodes(conn)).map((method) => [method.label, method.code]));
 
   const freight = await conn.query("SELECT nfe_freight_mode FROM orders WHERE id = $1", [order.id]);
+  const number = issue?.number ?? settings.nextNumber;
   const built = orderNfe({
     freightMode: (freight.rows[0]?.nfe_freight_mode ?? null) as FreightMode | null,
     transport: await loadOrderTransport(order.id, conn),
@@ -70,8 +86,8 @@ export async function previewOrderNfe(orderNumber: string, now: Date, conn: Quer
     params: snapshot.params,
     receipts: plan.receipts,
     paymentCodes: codes,
-    number: issue?.number ?? settings.nextNumber,
-    randomCode: issue?.randomCode ?? previewCode(order.number, issue?.number ?? settings.nextNumber),
+    number,
+    randomCode: issue?.randomCode ?? previewCode(order.number, number),
     issuedAt: issueInstant(now),
     software: APP_NAME.normalize("NFD").replace(/[^\x20-\x7e]/g, "").replace(/\s+/g, " ").trim(),
   });
