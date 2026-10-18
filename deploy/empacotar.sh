@@ -12,6 +12,11 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 ETAPA="${ETAPA:-tudo}"
+SOURCE_SHA="${SOURCE_SHA:-${GITHUB_SHA:-}}"
+if [ -z "$SOURCE_SHA" ]; then
+  SOURCE_SHA="$(git rev-parse HEAD)"
+fi
+[[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "! SOURCE_SHA inválido"; exit 1; }
 
 if [ "$ETAPA" != "montar" ] && [ "$ETAPA" != "empacotar" ]; then
 echo "▸ conferindo (lint, tipos, testes)"
@@ -42,6 +47,7 @@ cp src/lib/auth/tenants.ts "$RAIZ/src/lib/auth/"
 cp src/lib/db/config.ts src/lib/db/migrate.ts src/lib/db/control-schema.ts "$RAIZ/src/lib/db/"
 rm -rf "$RAIZ/db/migrations" && cp -r db/migrations "$RAIZ/db/"
 rm -rf "$RAIZ/db/control" && cp -r db/control "$RAIZ/db/"
+printf '%s\n' "$SOURCE_SHA" > "$RAIZ/.erp-source-sha"
 
 # O validador precisa funcionar no standalone, sem depender da árvore de testes.
 node <<'NODE'
@@ -72,6 +78,7 @@ echo "▸ conferindo o pacote"
 LISTA="$(tar -tzf "$SAIDA")"
 conta() { printf '%s\n' "$LISTA" | grep -cE "$1" || true; }
 [ "$(conta '^\./server\.js$')" = "1" ] || { echo "! sem server.js no pacote"; exit 1; }
+[ "$(conta '^\./\.erp-source-sha$')" = "1" ] || { echo "! sem identidade do commit no pacote"; exit 1; }
 [ "$(conta '^\./(\.env|\.git/)')" = "0" ] || { echo "! segredo dentro do pacote"; exit 1; }
 [ "$(conta '\.css$')" != "0" ] || { echo "! sem CSS no pacote"; exit 1; }
 [ "$(conta '^\./db/migrations/[0-9]{4}_.*\.sql$')" != "0" ] || { echo "! sem migrações no pacote"; exit 1; }

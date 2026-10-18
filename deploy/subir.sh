@@ -22,6 +22,7 @@ cd "$(dirname "$0")/.."
 if [ -n "$(git status --porcelain)" ]; then
   echo "! Há alteração não commitada. Commite antes de subir:"; git status --short; exit 1
 fi
+COMMIT_COMPLETO="$(git rev-parse HEAD)"
 COMMIT="$(git rev-parse --short HEAD)"
 AGORA="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 echo "=== ERP → $SERVIDOR ($COMMIT) ==="
@@ -29,9 +30,7 @@ echo "=== ERP → $SERVIDOR ($COMMIT) ==="
 ssh "$SERVIDOR" "mkdir -p $PASTA && [ -f $PASTA/.env ] || { echo '! falta $PASTA/.env (copie .env.example e preencha)'; exit 1; }"
 if [ -n "$PACOTE_PRONTO" ]; then
   [ -f "$PACOTE_PRONTO" ] || { echo "! pacote do GitHub não encontrado: $PACOTE_PRONTO"; exit 1; }
-  gzip -t "$PACOTE_PRONTO"
-  [ "$(tar -tzf "$PACOTE_PRONTO" | grep -cxF './server.js' || true)" = "1" ] \
-    || { echo "! pacote do GitHub sem server.js"; exit 1; }
+  bash deploy/conferir-identidade-pacote.sh "$PACOTE_PRONTO" "$COMMIT_COMPLETO"
   echo "▸ enviando pacote aprovado pelo GitHub"
   ssh "$SERVIDOR" "cat > $PASTA/standalone.tgz" < "$PACOTE_PRONTO"
 elif [ "$BUILD_HOST" = "local" ]; then
@@ -39,7 +38,8 @@ elif [ "$BUILD_HOST" = "local" ]; then
   TEMPORARIA="$(mktemp -d)"
   trap 'rm -rf "$TEMPORARIA"' EXIT
   PACOTE="$TEMPORARIA/standalone.tgz"
-  bash deploy/empacotar.sh "$PACOTE"
+  SOURCE_SHA="$COMMIT_COMPLETO" bash deploy/empacotar.sh "$PACOTE"
+  bash deploy/conferir-identidade-pacote.sh "$PACOTE" "$COMMIT_COMPLETO"
   echo "▸ enviando"
   ssh "$SERVIDOR" "cat > $PASTA/standalone.tgz" < "$PACOTE"
 else
@@ -56,7 +56,8 @@ if ! sha256sum -c ../lock.sha256 >/dev/null 2>&1 || [ ! -d node_modules ]; then
   npm ci --no-audit --no-fund >/dev/null
   sha256sum package-lock.json > ../lock.sha256
 fi
-ETAPA=montar bash deploy/empacotar.sh $BUILD_DIR/standalone.tgz
+SOURCE_SHA=$COMMIT_COMPLETO ETAPA=montar bash deploy/empacotar.sh $BUILD_DIR/standalone.tgz
+bash deploy/conferir-identidade-pacote.sh $BUILD_DIR/standalone.tgz $COMMIT_COMPLETO
 REMOTO
   echo "▸ enviando"
   ssh "$BUILD_HOST" "cat $BUILD_DIR/standalone.tgz" | ssh "$SERVIDOR" "cat > $PASTA/standalone.tgz"

@@ -161,6 +161,9 @@ backup original está em `/opt/backups/backup-todos-bancos.sh.bak-20261006-antes
 bash deploy/publicar-do-github.sh
 ```
 
+O pacote contém o SHA completo do código que o produziu. A publicação recusa o
+artefato se essa identidade não for exatamente o `HEAD` local selecionado.
+
 O script exige `main` limpa e idêntica a `origin/main`, localiza o CI verde daquele SHA e baixa o
 pacote produzido no GitHub. Antes das migrações, grava e valida um dump novo do banco `erp` em
 `/opt/backups`. Depois envia o pacote, monta apenas a imagem de runtime no servidor, **aplica as
