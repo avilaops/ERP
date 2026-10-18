@@ -7,7 +7,7 @@
       "id": "T-20261017-modulo-fiscal-operacional",
       "title": "Concluir o módulo Fiscal operacional",
       "owner": null,
-      "status": "concluido",
+      "status": "concluida",
       "acceptance": ["Menu Fiscal visível para a Diretoria", "Pedidos fechados, fila, revisões, notas, e-mails e inutilizações consultáveis por empresa", "Resumo do pedido indica contrato, emissão e envio ao contato", "Lint, tipos, testes, build e telas nos cinco tamanhos aprovados no GitHub Actions"],
       "evidence": ["docs/superpowers/plans/2026-10-17-modulo-fiscal-operacional.md", "https://github.com/avilaops/ERP/pull/21", "https://github.com/avilaops/ERP/pull/22", "https://github.com/avilaops/ERP/actions/runs/39142367764", "Auditoria final: escopo por vendedor e ambiente, concorrência de reabertura, quinta tentativa, relógio do lote, transição segura de jobs antigos, permissões dependentes e inutilização concorrente cobertos", "Produção publicada em 2956e64; health público confirmado, backup validado e migrações 0072–0078 aplicadas"],
       "next": "Concluído em produção em 18/10/2026. A primeira emissão e o primeiro e-mail reais permanecem como ação operacional de pessoa autorizada; nenhum documento fiscal real foi transmitido nos testes."
@@ -25,7 +25,7 @@
       "id": "T-20261017-fila-fiscal-persistente",
       "title": "Processar emissão fiscal persistente e recuperar transmissão",
       "owner": null,
-      "status": "concluido",
+      "status": "concluida",
       "acceptance": ["Fila isolada por empresa com lease e idempotência por pedido", "Falha após transmissão consulta antes de reenviar o XML original", "Retentativas limitadas não repetem rejeição definitiva", "Worker, testes e publicação registrados separadamente"],
       "evidence": ["https://linear.app/avilaops/issue/AVL-75", "https://github.com/avilaops/ERP/pull/21", "https://github.com/avilaops/ERP/pull/22", "Commit c351a3f: migration 0072, fila por tenant e worker no background", "Commit 55bae30: migration 0073 inclui CC-e e cancelamento na fila; texto validado antes da gravação e e-mail automático preservado", "Commit 18e97a0: migration 0074 persiste inutilização com XML assinado antes do worker; resposta incerta exige revisão manual", "GitHub Actions 39142367764: PostgreSQL, 774 testes, lint, tipos, build, pacote e telas nos cinco tamanhos aprovados", "Produção publicada em 2956e64; backup anterior validado, migrações 0072–0078 aplicadas e container saudável", "A posse da inutilização é confirmada antes da chamada externa; UF de recuperação vem da chave assinada; revisão substituída não oculta o trabalho atual"],
       "next": "Concluído em produção. A emissão fiscal real e o envio real de e-mail não foram usados como teste e dependem de operação autorizada."
