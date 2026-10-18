@@ -62,7 +62,9 @@ test("caixa: senha selada só abre com a chave certa; caixa padrão só existe c
   assert.equal(openSecret(sealed, key), "s3nha da caixa");
   assert.ok(!sealed.ciphertext.toString("utf8").includes("s3nha"));
   assert.throws(() => openSecret(sealed, randomBytes(32)), /chave do cofre/);
-  assert.throws(() => openSecret({ ...sealed, ciphertext: Buffer.from(sealed.ciphertext).fill(1, 0, 1) }, key), /chave do cofre/);
+  const altered = Buffer.from(sealed.ciphertext);
+  altered[0] ^= 0xff;
+  assert.throws(() => openSecret({ ...sealed, ciphertext: altered }, key), /chave do cofre/);
 
   const env = { ERP_SMTP_HOST: "mail.avilaops.com", ERP_SMTP_USER: "notas@avilaops.com", ERP_SMTP_PASSWORD: "x", ERP_MAIL_FROM: "Notas@AvilaOps.com" };
   assert.deepEqual(defaultMailbox(env), { channel: "avilaops", smtp: { host: "mail.avilaops.com", port: 465, username: "notas@avilaops.com", password: "x" }, from: "notas@avilaops.com" });

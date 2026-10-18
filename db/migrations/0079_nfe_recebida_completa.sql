@@ -39,7 +39,7 @@ CREATE INDEX fiscal_received_nfes_issued_idx ON fiscal_received_nfes (issued_at 
 CREATE INDEX fiscal_received_nfes_issuer_idx ON fiscal_received_nfes (issuer_document);
 
 CREATE TABLE fiscal_received_nfe_items (
-    nfe_id             bigint NOT NULL REFERENCES fiscal_received_nfes (id) ON DELETE RESTRICT,
+    nfe_id             bigint NOT NULL REFERENCES fiscal_received_nfes (id),
     line_number        integer NOT NULL CHECK (line_number > 0),
     supplier_code      text,
     ean                text,

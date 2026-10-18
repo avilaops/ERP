@@ -31,7 +31,7 @@ CREATE INDEX fiscal_distributed_pending_idx ON fiscal_distributed_documents (nsu
 -- O clique apenas enfileira. O worker assina e transmite; resultado incerto vai para revisão.
 CREATE TABLE fiscal_recipient_manifestations (
     id             bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    nfe_id         bigint NOT NULL REFERENCES fiscal_received_nfes (id) ON DELETE RESTRICT,
+    nfe_id         bigint NOT NULL REFERENCES fiscal_received_nfes (id),
     kind           text NOT NULL CHECK (kind IN ('ciencia', 'confirmacao', 'desconhecimento', 'nao_realizada')),
     reason         text,
     status         text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'registered', 'manual_review')),
