@@ -507,7 +507,7 @@ test("o banco prende o pedido à versão e não deixa apagar o que ele usa", { s
 
   // Fora de negociação precisa de cliente, UF e prazo; e fechado precisa da data.
   const fresh = (await db.pool.query("SELECT id FROM orders WHERE number = '260930-536F'")).rows[0].id;
-  await assert.rejects(() => db.pool.query("UPDATE orders SET status = 'aguardando_aprovacao' WHERE id = $1", [fresh]), /check/i);
+  await assert.rejects(() => db.pool.query("UPDATE orders SET status = 'aguardando_aprovacao' WHERE id = $1", [fresh]), /orders_commercial_data/i);
   await assert.rejects(() => db.pool.query("UPDATE orders SET status = 'fechado' WHERE id = $1", [id]), /check/i);
   await assert.rejects(() => db.pool.query("UPDATE orders SET closed_at = now() WHERE id = $1", [id]), /check/i);
   await assert.rejects(() => db.pool.query("UPDATE orders SET status = 'arquivado' WHERE id = $1", [id]), /check/i);
