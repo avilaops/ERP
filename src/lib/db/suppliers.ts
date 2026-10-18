@@ -2,6 +2,7 @@ import { isValidCnpj, isValidCpf, normalizeDocument } from "@/lib/customer";
 import { pgErrorCode } from "@/lib/db/pool";
 import type { Queryable } from "@/lib/db/pool";
 import { listResult } from "@/lib/list-query";
+import { compactDocumentSearch } from "@/lib/list-query";
 import type { ListQuery, ListResult } from "@/lib/list-query";
 
 /** A refusal the user can act on. The message goes to the screen as it is. */
@@ -113,11 +114,11 @@ const searchable = (column: string) => `translate(lower(COALESCE(${column}, ''))
 
 /** A supplier page, searched and cut by PostgreSQL. */
 export async function querySuppliers(query: ListQuery<SupplierListSort>, conn: Queryable): Promise<ListResult<Supplier>> {
-  const values: unknown[] = [normalizedSearch(query.search)];
+  const values: unknown[] = [normalizedSearch(query.search), compactDocumentSearch(query.search)];
   const where = [
-    `($1 = '' OR ${searchable("name")} LIKE '%' || $1 || '%' OR ${searchable("trade_name")} LIKE '%' || $1 || '%'
-      OR ${searchable("contact_name")} LIKE '%' || $1 || '%' OR ${searchable("country")} LIKE '%' || $1 || '%'
-      OR regexp_replace(COALESCE(document, ''), '[^0-9A-Z]', '', 'g') LIKE '%' || upper(regexp_replace($1, '[^0-9A-Z]', '', 'g')) || '%')`,
+    `($1 = '' OR strpos(${searchable("name")}, $1) > 0 OR strpos(${searchable("trade_name")}, $1) > 0
+      OR strpos(${searchable("contact_name")}, $1) > 0 OR strpos(${searchable("country")}, $1) > 0
+      OR ($2 <> '' AND strpos(regexp_replace(upper(COALESCE(document, '')), '[^0-9A-Z]', '', 'g'), $2) > 0))`,
   ];
   const addArray = (column: string, selected: string[] | undefined) => {
     if (!selected?.length) return;

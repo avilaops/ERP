@@ -349,10 +349,10 @@ export async function queryProducts(query: ListQuery<ProductListSort>, lineId: n
   const tab = query.filters.aba?.[0] ?? "ativos";
   const values: unknown[] = [lineId, normalizedSearch(query.search)];
   const where = [`line_id = $1`, `($2 = '' OR
-    translate(lower(name), '${SEARCH_FROM}', '${SEARCH_TO}') LIKE '%' || $2 || '%'
-    OR translate(lower(COALESCE(code, '')), '${SEARCH_FROM}', '${SEARCH_TO}') LIKE '%' || $2 || '%'
-    OR translate(lower(COALESCE(supplier_name, '')), '${SEARCH_FROM}', '${SEARCH_TO}') LIKE '%' || $2 || '%'
-    OR translate(lower(COALESCE(supplier_model, '')), '${SEARCH_FROM}', '${SEARCH_TO}') LIKE '%' || $2 || '%')`];
+    strpos(translate(lower(name), '${SEARCH_FROM}', '${SEARCH_TO}'), $2) > 0
+    OR strpos(translate(lower(COALESCE(code, '')), '${SEARCH_FROM}', '${SEARCH_TO}'), $2) > 0
+    OR strpos(translate(lower(COALESCE(supplier_name, '')), '${SEARCH_FROM}', '${SEARCH_TO}'), $2) > 0
+    OR strpos(translate(lower(COALESCE(supplier_model, '')), '${SEARCH_FROM}', '${SEARCH_TO}'), $2) > 0)`];
   if (tab === "ativos") where.push("active");
   else if (tab === "sem-custo") where.push("active AND (advisory_cost IS NULL OR advisory_cost <= 0)");
   else if (tab === "sem-codigo") where.push("active AND code IS NULL");
@@ -363,9 +363,12 @@ export async function queryProducts(query: ListQuery<ProductListSort>, lineId: n
   const pages = Math.max(1, Math.ceil(total / query.pageSize));
   const page = Math.min(pages, query.page);
   const dataValues = [...values, query.pageSize, (page - 1) * query.pageSize];
-  const order = query.sort === "nome" ? "lower(name)" : "code ASC NULLS LAST, lower(name)";
   const direction = query.direction.toUpperCase();
-  const orderSql = query.sort === "codigo" ? (query.direction === "asc" ? order : "code DESC NULLS LAST, lower(name) DESC") : `${order} ${direction}`;
+  const codePrefix = "lower(regexp_replace(code, '[0-9]+$', ''))";
+  const codeNumber = "COALESCE(NULLIF(substring(code FROM '([0-9]+)$'), '')::numeric, -1)";
+  const orderSql = query.sort === "codigo"
+    ? `(code IS NULL) ASC, ${codePrefix} ${direction}, ${codeNumber} ${direction}, lower(code) ${direction}, lower(name) ${direction}`
+    : `lower(name) ${direction}`;
   const { rows } = await conn.query(
     `SELECT ${COLUMNS} FROM products ${restriction} ORDER BY ${orderSql}, id ${direction}
       LIMIT $${dataValues.length - 1} OFFSET $${dataValues.length}`,

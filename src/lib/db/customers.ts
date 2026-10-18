@@ -5,6 +5,7 @@ import type { Queryable } from "@/lib/db/pool";
 import type { Uf } from "@/lib/pricing/states";
 import { normalizedAddress } from "@/lib/address";
 import { listResult } from "@/lib/list-query";
+import { compactDocumentSearch } from "@/lib/list-query";
 import type { ListQuery, ListResult } from "@/lib/list-query";
 
 export type { CustomerInput } from "@/lib/customer";
@@ -165,10 +166,10 @@ const searchText = (value: string) => value.normalize("NFD").replace(/[\u0300-\u
 
 /** A customer page. Filters and count are applied in PostgreSQL before any row reaches Next.js. */
 export async function queryCustomers(query: ListQuery<CustomerListSort>, conn: Queryable): Promise<ListResult<CustomerListItem>> {
-  const values: unknown[] = [searchText(query.search)];
+  const values: unknown[] = [searchText(query.search), compactDocumentSearch(query.search)];
   const where = [
-    `($1 = '' OR ${searchable("c.name")} LIKE '%' || $1 || '%' OR ${searchable("c.trade_name")} LIKE '%' || $1 || '%'
-      OR regexp_replace(c.document, '[^0-9A-Z]', '', 'g') LIKE '%' || upper(regexp_replace($1, '[^0-9A-Z]', '', 'g')) || '%')`,
+    `($1 = '' OR strpos(${searchable("c.name")}, $1) > 0 OR strpos(${searchable("c.trade_name")}, $1) > 0
+      OR ($2 <> '' AND strpos(regexp_replace(upper(COALESCE(c.document, '')), '[^0-9A-Z]', '', 'g'), $2) > 0))`,
   ];
   const addArray = (column: string, selected: string[] | undefined) => {
     if (!selected?.length) return;

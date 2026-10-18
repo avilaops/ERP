@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { listHref, parseListQuery } from "@/lib/list-query";
+import { compactDocumentSearch, listHref, orderDocumentSearch, parseListQuery } from "@/lib/list-query";
 
 const OPTIONS = {
   sorts: ["nome", "cadastro"] as const,
@@ -77,4 +77,11 @@ test("endereço de lista: preserva critérios, reseta página quando a consulta 
   );
   assert.equal(listHref("/clientes", parseListQuery({}, OPTIONS), {}, OPTIONS), "/clientes");
   assert.equal(listHref("/clientes", query, { search: "", filters: {}, pageSize: 25, sort: "nome", direction: "asc" }, OPTIONS), "/clientes");
+});
+
+test("documentos: preserva letras do CNPJ e não confunde código curto de pedido", () => {
+  assert.equal(compactDocumentSearch("12.ABC.345/0001-90"), "12ABC345000190");
+  assert.equal(orderDocumentSearch("1234"), "1234");
+  assert.equal(orderDocumentSearch("12.ABC.345/0001-90"), "12ABC345000190");
+  assert.equal(orderDocumentSearch("DM09"), "");
 });

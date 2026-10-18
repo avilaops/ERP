@@ -246,6 +246,7 @@ export async function publishPriceTableAction(_previous: PublishState, formData:
     console.info(`[produtos] tabela v${result.version} publicada: ${result.count} equipamento(s), por ${session.email}`);
 
     revalidatePath(menuItem("produtos").href);
+    revalidatePath("/produtos/publicacao");
     revalidatePath(menuItem("tabela-precos").href);
     return { status: "published", message: result.message };
   } catch (error) {

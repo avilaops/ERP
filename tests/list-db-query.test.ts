@@ -86,8 +86,8 @@ test("pedidos: lista paginada e indicadores usam consultas agregadas, sem carreg
   assert.deepEqual(overview.indicators.closedInMonth, { count: 3, total: 97812.61 });
   const pageCall = calls.find((call) => call.text.includes("json_agg"));
   assert.ok(pageCall);
-  assert.deepEqual(pageCall.values?.slice(0, 3), [null, "dm09", "DM09"]);
-  assert.match(pageCall.text, /length\(\$3\) >= 8/);
+  assert.deepEqual(pageCall.values?.slice(0, 3), [null, "dm09", ""]);
+  assert.match(pageCall.text, /\$3 <> ''/);
   assert.deepEqual(pageCall.values?.slice(-2), [10, 2100]);
   assert.ok(calls.some((call) => call.text.includes("count(*) FILTER")));
   await assert.rejects(() => loadOrderOverview({ sellerEmail: null }, "18/10/2026", conn), /Mês inválido/);

@@ -23,6 +23,14 @@ const activeCount = <Sort extends string>(query: Query<Sort>, options: ListQuery
 /** The same search/filter/sort grammar for every large operational list. */
 export function ListQuery<Sort extends string>({ path, query, options, searchLabel, searchPlaceholder, sorts, filters = [] }: Props<Sort>) {
   const visible = new Set(filters.map((filter) => filter.key));
+  const hiddenFilters = Object.fromEntries(Object.entries(query.filters).filter(([key]) => !visible.has(key)));
+  const clearHref = listHref(path, query, {
+    search: "",
+    pageSize: 25,
+    sort: options.defaultSort,
+    direction: options.defaultDirection ?? "asc",
+    filters: hiddenFilters,
+  }, options);
   const count = activeCount(query, options, visible);
   const activeFilters = filters.flatMap((filter) => (query.filters[filter.key] ?? []).map((value) => ({
     key: filter.key,
@@ -39,7 +47,7 @@ export function ListQuery<Sort extends string>({ path, query, options, searchLab
             <input type="search" name="q" defaultValue={query.search} placeholder={searchPlaceholder} aria-label={searchLabel} className={INPUT} />
           </label>
           <button type="submit" className={SECONDARY}>Buscar</button>
-          {(query.search !== "" || count > 0) && <Link href={path} className={SECONDARY}>Limpar</Link>}
+          {(query.search !== "" || count > 0) && <Link href={clearHref} className={SECONDARY}>Limpar</Link>}
         </div>
 
         <details className="group" open={count > 0}>

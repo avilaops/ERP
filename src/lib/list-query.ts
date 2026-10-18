@@ -34,6 +34,15 @@ export type ListQueryChanges<Sort extends string> = Partial<Omit<ListQuery<Sort>
   filters?: Record<string, string[]>;
 };
 
+/** Keeps letters introduced by the alphanumeric CNPJ format while removing punctuation. */
+export const compactDocumentSearch = (value: string): string => value.toUpperCase().replace(/[^0-9A-Z]/g, "");
+
+/** Avoids reading short order codes such as DM09 as document fragments. */
+export const orderDocumentSearch = (value: string): string => {
+  const compact = compactDocumentSearch(value);
+  return /^[\d\s./-]+$/.test(value.trim()) || compact.length >= 8 ? compact : "";
+};
+
 const first = (value: QueryValue): string | undefined => (Array.isArray(value) ? value[0] : value);
 const all = (value: QueryValue): string[] => (Array.isArray(value) ? value : value === undefined ? [] : [value]);
 

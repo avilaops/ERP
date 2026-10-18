@@ -20,6 +20,7 @@ import { parseDate } from "@/lib/pricing/payment";
 import { UFS } from "@/lib/pricing/states";
 import type { Uf } from "@/lib/pricing/states";
 import { listResult } from "@/lib/list-query";
+import { orderDocumentSearch } from "@/lib/list-query";
 import type { ListQuery, ListResult } from "@/lib/list-query";
 import type { OrderIndicators } from "@/lib/pricing/indicators";
 
@@ -933,12 +934,12 @@ const normalizedSearch = (value: string) => value.normalize("NFD").replace(/[\u0
 export async function queryOrders(query: ListQuery<OrderListSort>, scope: OrderScope, conn: Queryable): Promise<ListResult<OrderSummary>> {
   const tab = (query.filters.aba?.[0] ?? "abertos") as OrderListTab;
   const statuses = ORDER_TAB_STATUSES[tab] ?? ORDER_TAB_STATUSES.abertos;
-  const documentSearch = query.search.replace(/[^0-9A-Z]/gi, "").toUpperCase();
+  const documentSearch = orderDocumentSearch(query.search);
   const values: unknown[] = [scope.sellerEmail, normalizedSearch(query.search), documentSearch];
   const where = ["($1::text IS NULL OR o.seller_email = $1)", `($2 = '' OR
-    translate(lower(COALESCE(c.trade_name, c.name, '')), '${SEARCH_FROM}', '${SEARCH_TO}') LIKE '%' || $2 || '%'
-    OR lower(o.number) LIKE '%' || lower(regexp_replace($2, '^#', '')) || '%'
-    OR (length($3) >= 8 AND upper(COALESCE(c.document, '')) LIKE '%' || $3 || '%'))`];
+    strpos(translate(lower(COALESCE(c.trade_name, c.name, '')), '${SEARCH_FROM}', '${SEARCH_TO}'), $2) > 0
+    OR strpos(lower(o.number), lower(regexp_replace($2, '^#', ''))) > 0
+    OR ($3 <> '' AND strpos(regexp_replace(upper(COALESCE(c.document, '')), '[^0-9A-Z]', '', 'g'), $3) > 0))`];
   if (statuses) {
     values.push(statuses);
     where.push(`o.status = ANY($${values.length}::text[])`);

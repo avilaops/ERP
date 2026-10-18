@@ -35,8 +35,8 @@ const REVIEW_CTE = `WITH current_items AS (
     ), filtered AS (
       SELECT * FROM compared
        WHERE category IS NOT NULL
-         AND ($5 = '' OR translate(lower(COALESCE(current_name, old_name, '')), 'áàâãäéèêëíìîïóòôõöúùûüç', 'aaaaaeeeeiiiiooooouuuuc') LIKE '%' || $5 || '%'
-           OR translate(lower(COALESCE(current_code, old_code, '')), 'áàâãäéèêëíìîïóòôõöúùûüç', 'aaaaaeeeeiiiiooooouuuuc') LIKE '%' || $5 || '%')
+         AND ($5 = '' OR strpos(translate(lower(COALESCE(current_name, old_name, '')), 'áàâãäéèêëíìîïóòôõöúùûüç', 'aaaaaeeeeiiiiooooouuuuc'), $5) > 0
+           OR strpos(translate(lower(COALESCE(current_code, old_code, '')), 'áàâãäéèêëíìîïóòôõöúùûüç', 'aaaaaeeeeiiiiooooouuuuc'), $5) > 0)
          AND ($6::text IS NULL OR category = $6)
     )`;
 const REVIEW_COUNT_SQL = `${REVIEW_CTE} SELECT count(*) AS total FROM filtered`;
