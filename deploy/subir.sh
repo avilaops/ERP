@@ -71,7 +71,9 @@ ssh "$SERVIDOR" "bash -s" <<REMOTO
 set -euo pipefail
 PARCIAL="$BACKUP.parcial"
 rm -f "\$PARCIAL"
-sudo -u postgres pg_dump -Fc -f "\$PARCIAL" erp
+# A raiz abre o arquivo no diretório de backups; o pg_dump continua executando
+# como postgres e escreve somente no descritor já aberto.
+sudo -u postgres pg_dump -Fc erp > "\$PARCIAL"
 test -s "\$PARCIAL"
 sudo -u postgres pg_restore -l "\$PARCIAL" >/dev/null
 mv "\$PARCIAL" "$BACKUP"
