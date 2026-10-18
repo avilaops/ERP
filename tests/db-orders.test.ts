@@ -1769,7 +1769,18 @@ test("resposta perdida: evento duplicado (573) vem da consulta; número que já 
   const { testPfx } = await import("./fiscal-helpers.ts");
   const { randomBytes } = await import("node:crypto");
 
-  const closed = await db.pool.query("SELECT o.id, o.number, i.id AS invoice_id, i.number AS invoice_number, i.access_key FROM orders o JOIN fiscal_invoices i ON i.order_id = o.id WHERE i.status = 'autorizada' LIMIT 1");
+  const closed = await db.pool.query(
+    `SELECT o.id, o.number, i.id AS invoice_id, i.number AS invoice_number, i.access_key
+       FROM orders o
+       JOIN fiscal_invoices i ON i.order_id = o.id
+      WHERE i.status = 'autorizada'
+        AND NOT EXISTS (
+          SELECT 1 FROM fiscal_invoices pending
+           WHERE pending.order_id = o.id AND pending.status = 'assinada'
+        )
+      ORDER BY i.id DESC
+      LIMIT 1`,
+  );
   const { id: orderId, number, invoice_id: invoiceId, invoice_number: invoiceNumber, access_key: key } = closed.rows[0];
   const now = new Date("2026-10-08T16:00:00Z");
   const who = "diretoria@teste.local";
