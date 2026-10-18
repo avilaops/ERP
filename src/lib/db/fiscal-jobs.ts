@@ -154,6 +154,16 @@ export async function enqueueNfeIssue(orderNumber: string, who: string, scope: O
         return { id, joined: false };
       }
       const invoiceNumber = waiting?.number ?? reusable ?? await takeNextNumber(held);
+      const conflictingReservation = await held.query(
+        `SELECT id FROM fiscal_jobs
+          WHERE kind = 'emitir_nfe' AND environment = $1 AND series = $2 AND invoice_number = $3
+            AND invoice_id IS NULL AND status IN ('pendente', 'processando', 'revisao_manual')
+          LIMIT 1`,
+        [preview.input.environment, preview.input.series, invoiceNumber],
+      );
+      if (conflictingReservation.rows[0]) {
+        throw new IssueError(`O número ${invoiceNumber} da série ${preview.input.series} já está reservado por outra emissão. Ajuste o próximo número fiscal após conferir a SEFAZ.`);
+      }
       const confirmed = await previewOrderNfe(orderNumber, new Date(), held, { environment: preview.input.environment, series: preview.input.series, number: invoiceNumber });
       if (!confirmed || confirmed.problems.length > 0) throw new IssueError("A preparação fiscal mudou. Confira os dados antes de emitir.");
       const { rows } = await held.query(

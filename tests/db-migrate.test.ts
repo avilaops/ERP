@@ -51,6 +51,14 @@ test("migração: emissão sem XML antigo exige nova confirmação da preparaç�
   assert.match(migration, /preparação fiscal ser preservada/);
 });
 
+test("migração: uma numeração só pode ter uma reserva ativa", () => {
+  const migration = readFileSync(join(MIGRATIONS_DIR, "0078_reserva_unica_da_numeracao.sql"), "utf8");
+  assert.match(migration, /row_number\(\) OVER/);
+  assert.match(migration, /SET environment = NULL, series = NULL, invoice_number = NULL/);
+  assert.match(migration, /CREATE UNIQUE INDEX fiscal_jobs_unique_reserved_number_idx/);
+  assert.match(migration, /status IN \('pendente', 'processando', 'revisao_manual'\)/);
+});
+
 test("migração: aplica em ordem, registra e rodar de novo não muda nada", { skip }, async () => {
   const first = await withClient((client) => migrate(client, MIGRATIONS_DIR));
   assert.deepEqual(first, [
@@ -133,6 +141,7 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "0075_identidade_da_fila_fiscal.sql",
     "0076_alvo_da_emissao_fiscal.sql",
     "0077_preparacao_confirmada_da_emissao.sql",
+    "0078_reserva_unica_da_numeracao.sql",
   ]);
 
   const second = await withClient((client) => migrate(client, MIGRATIONS_DIR));

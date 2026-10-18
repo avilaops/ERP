@@ -1444,6 +1444,14 @@ test("fila fiscal: clique repetido compartilha a emissão; perda de resposta ret
   assert.deepEqual([repeated.id, repeated.joined], [first.id, true]);
   const target = await db.pool.query("SELECT environment, series, invoice_number FROM fiscal_jobs WHERE id = $1", [first.id]);
   assert.deepEqual([target.rows[0].environment, Number(target.rows[0].series), Number(target.rows[0].invoice_number)], ["homologacao", 1, 43]);
+  const otherOrder = await db.pool.query("SELECT id FROM orders WHERE id <> $1 ORDER BY id LIMIT 1", [orderId]);
+  await assert.rejects(
+    () => db.pool.query(
+      "INSERT INTO fiscal_jobs (kind, order_id, requested_by, environment, series, invoice_number, preparation_hash) VALUES ('emitir_nfe', $1, $2, 'homologacao', 1, 43, $3)",
+      [otherOrder.rows[0].id, who, "a".repeat(64)],
+    ),
+    (error: unknown) => typeof error === "object" && error !== null && "code" in error && error.code === "23505",
+  );
   assert.equal(Number((await db.pool.query("SELECT nfe_next_number FROM company_settings")).rows[0].nfe_next_number), 44);
   await db.pool.query("UPDATE customers SET street_number = '2' WHERE id = $1", [customerSp]);
   await db.pool.query("UPDATE fiscal_jobs SET run_after = $2 WHERE id = $1", [first.id, now]);
