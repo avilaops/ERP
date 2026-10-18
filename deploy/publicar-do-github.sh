@@ -10,6 +10,7 @@ BRANCH="$(git branch --show-current)"
 
 [ "$BRANCH" = "main" ] || { echo "! a publicação exige o branch main"; exit 1; }
 [ -z "$(git status --porcelain)" ] || { echo "! há alterações locais; não vou publicar outra árvore"; git status --short; exit 1; }
+git fetch --quiet origin main
 [ "$(git rev-parse origin/main)" = "$HEAD" ] || { echo "! main local não corresponde a origin/main"; exit 1; }
 
 RUN_ID="$(gh run list --repo "$REPO" --workflow CI --branch main --commit "$HEAD" --event push --limit 5 \

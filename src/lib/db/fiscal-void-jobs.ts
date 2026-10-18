@@ -100,9 +100,12 @@ export async function runOneNumberVoidJob(now: Date, vault: Buffer, send: Send, 
     );
     const activeIssue = await conn.query(
       `SELECT 1 FROM fiscal_jobs j
-        LEFT JOIN fiscal_invoices i ON i.fiscal_job_id = j.id
        WHERE j.kind = 'emitir_nfe' AND j.status IN ('pendente', 'processando')
-         AND (i.id IS NULL OR (i.environment = $1 AND i.series = $2 AND i.number BETWEEN $3 AND $4))
+         AND EXISTS (
+           SELECT 1 FROM fiscal_invoices i
+            WHERE i.order_id = j.order_id AND i.status IN ('assinada', 'rejeitada')
+              AND i.environment = $1 AND i.series = $2 AND i.number BETWEEN $3 AND $4
+         )
        LIMIT 1`,
       [job.environment, job.range.series, job.range.first, job.range.last],
     );

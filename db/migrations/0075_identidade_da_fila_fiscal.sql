@@ -33,13 +33,13 @@ UPDATE fiscal_jobs
    AND invoice_id IS NULL;
 
 -- Jobs pendentes criados pela versão anterior não guardavam a nota escolhida.
--- Só vinculamos quando há exatamente uma nota autorizada no ambiente atual;
--- qualquer ambiguidade para antes de uma operação fiscal irreversível.
+-- Só vinculamos quando o pedido tem exatamente uma nota autorizada em todos os
+-- ambientes. A configuração pode ter mudado depois do clique; usar o ambiente
+-- atual nessa decisão poderia corrigir ou cancelar a nota errada.
 WITH candidates AS (
     SELECT j.id AS job_id, min(i.id) AS invoice_id, count(*)::integer AS matches
       FROM fiscal_jobs j
       JOIN fiscal_invoices i ON i.order_id = j.order_id AND i.status = 'autorizada'
-      JOIN company_settings s ON s.nfe_environment = i.environment
      WHERE j.kind IN ('correcao_nfe', 'cancelamento_nfe')
        AND j.status = 'pendente'
        AND j.invoice_id IS NULL

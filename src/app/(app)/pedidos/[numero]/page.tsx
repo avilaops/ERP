@@ -625,10 +625,9 @@ export default async function PedidoPage({
             </div>
             <div className="sm:col-span-2">
               <label htmlFor="carrierId" className="block text-xs font-medium text-slate-600">
-                Transportadora (opcional) ·{" "}
-                <Link href="/parametros/transportadoras" className={SECONDARY}>
+                Transportadora (opcional){allows(session, "parametros") && <>{" · "}<Link href="/parametros/transportadoras" className={SECONDARY}>
                   cadastrar
-                </Link>
+                </Link></>}
               </label>
               <select key={transport.carrier?.id ?? ""} id="carrierId" name="carrierId" defaultValue={transport.carrier?.id ?? ""} className={`${INPUT} mt-1 w-full`}>
                 <option value="">— sem transportadora na nota —</option>

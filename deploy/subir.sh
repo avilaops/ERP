@@ -83,14 +83,21 @@ ssh "$SERVIDOR" "bash -s" <<REMOTO
 set -euo pipefail
 cd $PASTA
 GIT_SHA=$COMMIT BUILT_AT=$AGORA docker compose build -q
-# Migração antes de trocar o container: cria o esquema de cada empresa de
-# ERP_TENANTS e aplica o que falta. Falha aqui aborta o deploy com a versão antiga no ar.
+# O worker antigo para antes da migração. Assim ele não pode capturar um job
+# legado no intervalo entre o backfill e a troca do container. Se a migração
+# falhar, o trap religa exatamente o container antigo.
+docker compose stop erp
+MIGROU=0
+trap 'if [ "\$MIGROU" -eq 0 ]; then docker compose start erp; fi' EXIT
+# Cria o esquema de cada empresa de ERP_TENANTS e aplica o que falta.
 # </dev/null: sem isso o "compose run" lê a entrada padrão e engole o resto deste
 # roteiro, e o "compose up" logo abaixo nunca roda. (Sem crases aqui: este trecho
 # é interpretado pelo shell local antes de ir para o servidor.)
 docker compose run --rm --no-deps -T erp \
   node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/db-migrate.ts </dev/null
+MIGROU=1
 GIT_SHA=$COMMIT BUILT_AT=$AGORA docker compose up -d --force-recreate
+trap - EXIT
 docker image prune -f >/dev/null
 REMOTO
 

@@ -38,6 +38,7 @@ test("migração: jobs de evento antigos só recebem uma nota inequívoca", () =
   assert.match(migration, /count\(\*\)::integer AS matches/);
   assert.match(migration, /j\.status = 'pendente'/);
   assert.match(migration, /candidates\.matches = 1/);
+  assert.doesNotMatch(migration, /JOIN company_settings[\s\S]*nfe_environment = i\.environment/);
   assert.match(migration, /status = 'revisao_manual'/);
   assert.match(migration, /Evento criado antes da identificação da nota/);
 });

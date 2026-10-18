@@ -1742,21 +1742,38 @@ test("fila de inutilização: persiste o XML assinado antes da SEFAZ e não dupl
   assert.equal(retransmissions, 0);
   assert.deepEqual((await db.pool.query("SELECT status, last_error FROM fiscal_void_jobs WHERE id = $1", [abandonedJob.id])).rows.map((row) => [row.status, /confira a SEFAZ/i.test(row.last_error)]), [["revisao_manual", true]]);
 
+  const unrelated = await takeNextNumber(db.pool);
+  const unrelatedJob = await enqueueNumberVoid({ series: 1, first: unrelated, last: unrelated, reason: "Numeração reservada para testar emissão sem sobreposição." }, who, now, vault, db.pool);
+  const order = await db.pool.query("SELECT id FROM orders WHERE status = 'fechado' LIMIT 1");
+  const unrelatedIssue = await db.pool.query("INSERT INTO fiscal_jobs (kind, order_id, requested_by, run_after) VALUES ('emitir_nfe', $1, $2, $3) RETURNING id", [order.rows[0].id, who, now]);
+  const accepted = async () => {
+    retransmissions += 1;
+    return `<retInutNFe versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe"><infInut><cStat>102</cStat><xMotivo>Inutilização de número homologado</xMotivo><nProt>135260000000011</nProt></infInut></retInutNFe>`;
+  };
+  assert.equal(await runOneNumberVoidJob(now, vault, accepted, db.pool), "completed");
+  assert.equal(retransmissions, 1);
+  assert.deepEqual((await listNumberVoidJobs(db.pool)).filter((job) => job.id === unrelatedJob.id).map((job) => job.status), ["concluido"]);
+  await db.pool.query("UPDATE fiscal_jobs SET status = 'concluido', completed_at = $2 WHERE id = $1", [unrelatedIssue.rows[0].id, now]);
+
   const guarded = await takeNextNumber(db.pool);
   const guardedJob = await enqueueNumberVoid({ series: 1, first: guarded, last: guarded, reason: "Numeração reservada para testar concorrência de emissão." }, who, now, vault, db.pool);
-  const order = await db.pool.query("SELECT id FROM orders WHERE status = 'fechado' LIMIT 1");
+  await db.pool.query(
+    `INSERT INTO fiscal_invoices (order_id, environment, series, number, access_key, status, signed_xml, status_code, status_reason, issued_at, created_by)
+     VALUES ($1, 'homologacao', 1, $2, $3, 'rejeitada', '<NFe>rejeitada</NFe>', '999', 'Rejeição de teste', $4, $5)`,
+    [order.rows[0].id, guarded, "8".repeat(44), now, who],
+  );
   const active = await db.pool.query("INSERT INTO fiscal_jobs (kind, order_id, requested_by, run_after) VALUES ('emitir_nfe', $1, $2, $3) RETURNING id", [order.rows[0].id, who, now]);
   assert.equal(await runOneNumberVoidJob(now, vault, async () => { retransmissions += 1; return ""; }, db.pool), "retry");
-  assert.equal(retransmissions, 0);
+  assert.equal(retransmissions, 1);
   assert.deepEqual((await db.pool.query("SELECT status, attempts, last_error FROM fiscal_void_jobs WHERE id = $1", [guardedJob.id])).rows.map((row) => [row.status, Number(row.attempts), /aguardando a emissão fiscal ativa/i.test(row.last_error)]), [["pendente", 0, true]]);
   await db.pool.query("UPDATE fiscal_jobs SET status = 'revisao_manual' WHERE id = $1", [active.rows[0].id]);
   await db.pool.query(
-    `INSERT INTO fiscal_invoices (order_id, environment, series, number, access_key, status, signed_xml, issued_at, created_by)
-     VALUES ($1, 'homologacao', 1, $2, $3, 'assinada', '<NFe>aguardando resposta</NFe>', $4, $5)`,
-    [order.rows[0].id, guarded, "9".repeat(44), now, who],
+    `UPDATE fiscal_invoices SET status = 'assinada', signed_xml = '<NFe>aguardando resposta</NFe>', status_code = NULL, status_reason = NULL
+      WHERE environment = 'homologacao' AND series = 1 AND number = $1`,
+    [guarded],
   );
   assert.equal(await runOneNumberVoidJob(new Date(now.getTime() + 60_000), vault, async () => { retransmissions += 1; return ""; }, db.pool), "manual_review");
-  assert.equal(retransmissions, 0);
+  assert.equal(retransmissions, 1);
   assert.deepEqual((await db.pool.query("SELECT status, last_error FROM fiscal_void_jobs WHERE id = $1", [guardedJob.id])).rows.map((row) => [row.status, /nota assinada .* sem veredito/i.test(row.last_error)]), [["revisao_manual", true]]);
 });
 
