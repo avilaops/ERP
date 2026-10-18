@@ -1446,7 +1446,19 @@ test("fila fiscal: clique repetido compartilha a emissão; perda de resposta ret
   assert.deepEqual([target.rows[0].environment, Number(target.rows[0].series), Number(target.rows[0].invoice_number)], ["homologacao", 1, 43]);
   assert.equal(Number((await db.pool.query("SELECT nfe_next_number FROM company_settings")).rows[0].nfe_next_number), 44);
   await db.pool.query("UPDATE fiscal_jobs SET status = 'revisao_manual' WHERE id = $1", [first.id]);
-  const resumed = await enqueueNfeIssue(number, who, ALL, db.pool);
+  const reservationLock = await db.pool.connect();
+  await reservationLock.query("BEGIN");
+  await reservationLock.query("SELECT pg_advisory_xact_lock(hashtext('erp-fiscal-numbering'), hashtext(current_schema() || ':' || $1 || ':' || $2::text))", ["homologacao", 1]);
+  let resumedSettled = false;
+  const resumedPromise = enqueueNfeIssue(number, who, ALL, db.pool).finally(() => { resumedSettled = true; });
+  try {
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    assert.equal(resumedSettled, false);
+  } finally {
+    await reservationLock.query("ROLLBACK");
+    reservationLock.release();
+  }
+  const resumed = await resumedPromise;
   const resumedTarget = await db.pool.query("SELECT invoice_number FROM fiscal_jobs WHERE id = $1", [resumed.id]);
   assert.equal(resumed.id, first.id);
   assert.equal(Number(resumedTarget.rows[0].invoice_number), 43);
@@ -1788,7 +1800,19 @@ test("fila de inutilização: persiste o XML assinado antes da SEFAZ e não dupl
     retransmissions += 1;
     return `<retInutNFe versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe"><infInut><cStat>102</cStat><xMotivo>Inutilização de número homologado</xMotivo><nProt>135260000000011</nProt></infInut></retInutNFe>`;
   };
-  assert.equal(await runOneNumberVoidJob(now, vault, accepted, db.pool), "completed");
+  const voidLock = await db.pool.connect();
+  await voidLock.query("BEGIN");
+  await voidLock.query("SELECT pg_advisory_xact_lock(hashtext('erp-fiscal-numbering'), hashtext(current_schema() || ':' || $1 || ':' || $2::text))", ["homologacao", 1]);
+  let voidSettled = false;
+  const voidPromise = runOneNumberVoidJob(now, vault, accepted, db.pool).finally(() => { voidSettled = true; });
+  try {
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    assert.equal(voidSettled, false);
+  } finally {
+    await voidLock.query("ROLLBACK");
+    voidLock.release();
+  }
+  assert.equal(await voidPromise, "completed");
   assert.equal(retransmissions, 1);
   assert.deepEqual((await listNumberVoidJobs(db.pool)).filter((job) => job.id === unrelatedJob.id).map((job) => job.status), ["concluido"]);
   await db.pool.query("UPDATE fiscal_jobs SET status = 'concluido', completed_at = $2 WHERE id = $1", [unrelatedIssue.rows[0].id, now]);
@@ -1986,12 +2010,14 @@ test("excluir pedido com histórico: só a diretoria, e só enquanto nada chegou
   const abandoned = await db.pool.query("SELECT status, last_error FROM fiscal_jobs WHERE id = $1", [queued.rows[0].id]);
   assert.equal(abandoned.rows[0].status, "revisao_manual");
   assert.match(String(abandoned.rows[0].last_error), /pedido reaberto/i);
-  await assert.rejects(() => deleteOrder(number, MINE, db.pool), /só a diretoria pode excluí-lo/);
+  await assert.rejects(() => deleteOrder(number, MINE, db.pool), /nota fiscal/);
   // Com recebimento baixado, nem a diretoria: o dinheiro entrou.
   const expected = await db.pool.query("SELECT id FROM receivables WHERE order_id = $1 ORDER BY number LIMIT 1", [id]);
   await db.pool.query("INSERT INTO receipts (receivable_id, amount, amount_without_ipi, received_at, method, recorded_by) VALUES ($1, 100, 88.5, now(), 'PIX', 'x')", [expected.rows[0].id]);
   await assert.rejects(() => deleteOrder(number, ALL, db.pool, { withHistory: true }), /tem recebimento, conta, nota fiscal ou contrato assinado/);
   await db.pool.query("DELETE FROM receipts WHERE receivable_id = $1", [expected.rows[0].id]);
+  await assert.rejects(() => deleteOrder(number, ALL, db.pool, { withHistory: true }), /nota fiscal/);
+  await db.pool.query("DELETE FROM fiscal_jobs WHERE id = $1", [queued.rows[0].id]);
   assert.deepEqual(await deleteOrder(number, ALL, db.pool, { withHistory: true }), { sellerEmail: SELLER.email });
   for (const tableName of ["orders", "order_items", "order_closings", "order_approvals", "receivables", "fiscal_jobs"]) {
     const column = tableName === "orders" ? "id" : "order_id";

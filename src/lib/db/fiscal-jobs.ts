@@ -1,6 +1,7 @@
 import { IssueError, issueOrderNfe, registerOrderNfeEvent } from "@/lib/db/issue-nfe";
 import { loadMailInfo } from "@/lib/db/mail";
 import { loadFiscalSettings } from "@/lib/db/fiscal";
+import { lockFiscalNumbering } from "@/lib/db/fiscal-number-lock";
 import { isNumberVoided, listOrderInvoices, takeNextNumber } from "@/lib/db/invoices";
 import { previewOrderNfe } from "@/lib/db/order-nfe";
 import { getOrder } from "@/lib/db/orders";
@@ -78,6 +79,7 @@ export async function enqueueNfeIssue(orderNumber: string, who: string, scope: O
       const preview = await previewOrderNfe(orderNumber, new Date(), held);
       if (!preview) throw new IssueError("Pedido não encontrado ou ainda não fechado: só pedido fechado tem nota.");
       if (preview.problems.length > 0) throw new IssueError(`A nota ainda não pode ser emitida. Falta: ${preview.problems.join(" ")}`);
+      await lockFiscalNumbering(preview.input.environment, preview.input.series, held);
 
       const active = await held.query(
         "SELECT id, kind, environment, series FROM fiscal_jobs WHERE order_id = $1 AND status IN ('pendente', 'processando') FOR UPDATE",
