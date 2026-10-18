@@ -82,8 +82,8 @@ test("toda ação de servidor confere a permissão antes de qualquer outra coisa
 test("a página lê o banco só depois de conferir a permissão", () => {
   const reads: [string, string, string[]][] = [
     ["/parametros", "parametros", ["loadParams(", "listProductCosts("]],
-    ["/produtos", "produtos", ["loadParams(", "listProducts(", "latestVersion(", "loadPublishedSnapshot("]],
-    ["/clientes", "clientes", ["listCustomers("]],
+    ["/produtos", "produtos", ["loadParams(", "queryProducts(", "loadProductTabCounts(", "latestVersion(", "loadProductPublicationSummary("]],
+    ["/clientes", "clientes", ["queryCustomers("]],
     ["/clientes/[id]", "clientes", ["getCustomer("]],
     ["/pedidos/novo", "pedidos", ["latestVersion(", "loadPublishedTable("]],
     ["/tabela-precos", "tabela-precos", ["latestVersion(", "loadPublishedTable(", "loadPublishedSnapshot("]],
@@ -168,7 +168,8 @@ test("Pedido: custo só é lido para quem pode ver, e nada dele vai para compone
   const list = source("/pedidos");
   assert.doesNotMatch(list, /loadPublishedSnapshot|loadOrderStanding|seesCosts|directorOf|DirectorBoard/);
   assert.ok(list.includes("seesAllOrders(session)"));
-  assert.ok(list.includes("listOrders({ sellerEmail: everyone ? null : session.email }, conn)"));
+  assert.ok(list.includes("queryOrders(query, scope, conn)"));
+  assert.ok(list.includes("loadOrderOverview(scope, month, conn)"));
 });
 
 test("multi-empresa: toda leitura e gravação usa o banco da empresa da sessão", () => {
@@ -346,7 +347,8 @@ test("não existe página no grupo protegido sem requirePermission", () => {
   // and the list of prospects; and the switch of the calls by the system;
   // and, of production, the materials, what will run short, the list of materials of one equipment and the hours.
   // and the preparation of the fiscal rules of one order's invoice.
-  assert.equal(all.length, MENU_ITEMS.length + 63);
+  // Product publishing has its own review screen before the irreversible action.
+  assert.equal(all.length, MENU_ITEMS.length + 64);
   for (const route of all) {
     assert.match(source(route), /await requirePermission\(/, route);
   }

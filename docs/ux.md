@@ -56,6 +56,7 @@ teclado aberto a tela pode rolar: o que não pode é um campo ou uma ação fica
 | `DANGER`, `DANGER_OUTLINE` | Remover, desfazer, cancelar: texto vermelho; com borda quando é a ação da etapa (cancelar o pedido) |
 | `Pill` | Estado em duas ou três palavras, com texto e cor (`good`, `warn`, `bad`, `neutral`) |
 | `pageOf` + `Pager` | Fatia de uma lista e o rodapé "1–8 de 133 · ‹ 1 de 17 ›" |
+| `ListQuery` + `ListPager` (`src/components/ListQuery.tsx`) | Busca, filtros, ordenação, quantidade por página, salto direto e paginação das listas operacionais |
 | `FitRows` (`src/components/FitRows.tsx`) | Mede quantas linhas cabem na tela de quem olha e guarda no cookie `erp_linhas` |
 | `EquipmentPicker` | Escolher um equipamento buscando por nome ou código, em vez de lista com o catálogo inteiro |
 
@@ -82,7 +83,8 @@ na página, troque pela peça.
 
 `npm run test:telas` (Playwright, `tests/visual/telas.spec.ts`) entra com o login local como
 Diretoria, percorre todas as telas que o menu alcança (uma de cada tipo) e mede cada uma nos
-cinco tamanhos. Falha quando a tela rola para o lado, quando algo que se toca tem menos de 44 px
+cinco tamanhos. A matriz de consultas em escala acrescenta 956×440 para cobrir celular em
+paisagem. Falha quando a tela rola para o lado, quando algo que se toca tem menos de 44 px
 ou quando a página dá erro. Quantas telas de altura cada página ocupa vai para `telas.json`, sem
 falhar: meta de 1,0 em todos, e o que passar disso entra na lista de pendências abaixo, com o
 motivo. Os prints de cada tela nos cinco tamanhos ficam em `test-results/telas/`.
@@ -93,24 +95,26 @@ Para rodar na própria máquina, num banco com nome terminado em `_demo` e com `
 
 ```bash
 npm run db:migrate
-npm run db:seed-demo -- --empresa ludus   # clientes, pedidos, funil e contas fictícios
+npm run db:seed-demo -- --empresa ludus   # massa funcional comum
+# ou, no mesmo banco ainda vazio, quatro listas com 3.000 registros:
+npm run db:seed-demo -- --empresa ludus --escala 3000
 npm run test:telas
 ```
 
 O CI roda o mesmo em todo pull request (job "Telas nos cinco tamanhos") e guarda os prints.
 
-## Pendências conhecidas (09/10/2026)
+## Pendências conhecidas (18/10/2026)
 
 Telas que ainda não obedecem à regra e o caminho previsto para cada uma:
 
 | Tela | Situação | Caminho |
 |---|---|---|
-| Produtos e custos | Catálogo paginado desde 10/10/2026 (1 a 1,7 tela, por causa do cabeçalho com as ferramentas) | Enxugar o cabeçalho; edição em tela própria também no computador |
+| Produtos e custos | Consulta em escala, edição por ficha abaixo de 1536 px e revisão da publicação desde 18/10/2026 | Nenhuma pendência desta auditoria |
 | Parâmetros | Em abas desde 10/10/2026: índice por assunto, Regra de preço, Empresa e Aprovação. A Regra de preço mostra uma parte por vez (política, impostos, canal, provisões, despesas, ICMS por estado), gravadas juntas: 1,2 tela no computador, no celular o quadro Resultado é uma aba própria e a regra fica em 1,7 a 2,2 telas | Dividir as partes mais longas (ICMS por estado) |
 | Dashboard | Em abas desde 10/10/2026 (Resumo, Vendas, Em aberto, Dinheiro): 1 tela no computador, até 1,7 no celular (2,3 na aba Dinheiro em 360×640) | Trocar as tabelas da aba Dinheiro por linhas compactas |
 | Preços e metas | Em abas desde 10/10/2026 (Resumo, Metas, Tabela): 1 tela, salvo a aba Tabela no celular (2 a 2,6) | Paginar as publicações e o quadro por destino no celular |
-| Fornecedores | Lista paginada e cadastro separado desde 10/10/2026; o formulário de novo fornecedor passa de uma tela no celular | Formulário em etapas, se incomodar |
+| Fornecedores | Busca, filtros, ordenação e paginação em escala desde 18/10/2026; o formulário de novo fornecedor passa de uma tela no celular | Formulário em etapas, se incomodar |
 | Pedido (um pedido) | Longa, com abas de âncora | Partes do pedido como etapas reais |
 | Tabela de preços e Simulador em 360×640 | 1,05 a 1,25 tela | Rever o cabeçalho de página para telas muito baixas |
-| Clientes, Comissões, Recebimentos, Aprovações, Equipe | Desde 10/10/2026 a tabela empilha as células no celular (classe `stack-sm`), sem rolagem lateral. Recebimentos está em abas (em aberto, estornos, recebidos) e Comissões dobra os lançamentos por vendedor; no celular ainda chegam a 1,5 e 1,9 tela em 360×640 | Paginar as parcelas em aberto |
+| Comissões, Recebimentos, Aprovações, Equipe | Recebimentos está em abas (em aberto, estornos, recebidos) e Comissões dobra os lançamentos por vendedor; no celular ainda chegam a 1,5 e 1,9 tela em 360×640 | Paginar as parcelas em aberto |
 | Novo pedido, Comissões, Recebimentos no celular | 1,2 a 1,8 tela | Usar `EquipmentPicker` no novo pedido; paginar as listas |

@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { after, before, test } from "node:test";
 import type { CustomerInput } from "@/lib/customer";
-import { createCustomer, deleteCustomer, findCustomerByDocument, getCustomer, listCustomers, updateCustomer } from "@/lib/db/customers";
+import { createCustomer, deleteCustomer, findCustomerByDocument, getCustomer, listCustomers, queryCustomers, updateCustomer } from "@/lib/db/customers";
+import { parseListQuery } from "@/lib/list-query";
+import type { Queryable } from "@/lib/db/pool";
 import { openTestDb, SKIP_WITHOUT_DB } from "./db-helpers.ts";
 import type { TestDb } from "./db-helpers.ts";
 
@@ -105,6 +107,59 @@ test("alterar: grava a ficha e quem alterou; tipo e documento não mudam", { ski
 test("a lista vem por nome, com todos", { skip }, async () => {
   const names = (await listCustomers(db.pool)).map((customer) => customer.name);
   assert.deepEqual(names, ["Academia Alfa", "Academia Teste Ltda", "Maria da Silva"]);
+});
+
+test("consulta paginada de clientes conta com os mesmos filtros e traz somente a página pedida", async () => {
+  const calls: { text: string; values: unknown[] | undefined }[] = [];
+  const conn = {
+    async query(text: string, values?: unknown[]) {
+      calls.push({ text, values });
+      if (/^SELECT count\(\*\)/.test(text)) return { rows: [{ total: "52" }] };
+      return {
+        rows: [{
+          id: 26, kind: "PJ", document: "48240052000161", name: "Ávila", trade_name: "Ludus", contact_name: null,
+          state_registration: "ISENTO", rg: null, phone: null, email: null, cep: null, street: null, street_number: null,
+          complement: null, district: null, city: "São Paulo", uf: "SP", closed_orders: "2", total_bought: "1234.56",
+          last_purchase: new Date("2026-10-01T12:00:00Z"),
+        }],
+      };
+    },
+  } as unknown as Queryable;
+  const query = parseListQuery(
+    { q: " avila ", pagina: "2", porPagina: "25", ordenar: "ultima_compra", direcao: "desc", tipo: "PJ", uf: "SP", compra: "com" },
+    {
+      sorts: ["nome", "cadastro", "ultima_compra"] as const,
+      defaultSort: "nome",
+      filters: { tipo: ["PJ", "PF"], uf: ["SP", "RJ"], compra: ["com", "sem"] },
+    },
+  );
+
+  const result = await queryCustomers(query, conn);
+  assert.deepEqual([result.total, result.page, result.pageSize, result.from, result.to], [52, 2, 25, 26, 26]);
+  assert.deepEqual(result.items[0], {
+    ...COMPANY,
+    name: "Ávila",
+    tradeName: "Ludus",
+    contactName: null,
+    phone: null,
+    email: null,
+    cep: null,
+    street: null,
+    streetNumber: null,
+    district: null,
+    city: "São Paulo",
+    uf: "SP",
+    id: 26,
+    closedOrders: 2,
+    totalBought: 1234.56,
+    lastPurchase: new Date("2026-10-01T12:00:00Z"),
+  });
+  assert.equal(calls.length, 2);
+  assert.match(calls[0].text, /^SELECT count\(\*\)/);
+  assert.match(calls[1].text, /LIMIT \$\d+ OFFSET \$\d+/);
+  assert.deepEqual(calls[1].values?.slice(-2), [25, 25]);
+  assert.ok(calls.every((call) => call.values?.some((value) => Array.isArray(value) && value.includes("PJ"))));
+  assert.ok(calls.every((call) => call.values?.some((value) => Array.isArray(value) && value.includes("SP"))));
 });
 
 test("o banco recusa o que não é cliente válido, mesmo sem passar pela camada", { skip }, async () => {

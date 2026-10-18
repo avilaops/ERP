@@ -1,185 +1,83 @@
 import Link from "next/link";
-import { cookies } from "next/headers";
-import { FitRows } from "@/components/FitRows";
-import { CARD, PRIMARY, SECONDARY, MetricSummary, Pager, pageOf } from "@/components/ui";
-import { rowsPerPage } from "@/lib/rows";
+import { ListPager, ListQuery } from "@/components/ListQuery";
+import { CARD, MetricSummary, PageHeader, Pill, PRIMARY } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { menuItem, seesAllOrders } from "@/lib/auth/permissions";
-import { listOrders } from "@/lib/db/orders";
+import { loadOrderOverview, queryOrders } from "@/lib/db/orders";
 import { tenantDb } from "@/lib/db/pool";
 import { isoDate, showMoney, showPercent } from "@/lib/format";
-import { ORDER_TABS, ordersCount, ordersView, parseOrderTab } from "@/lib/orders-view";
+import { listHref, parseListQuery } from "@/lib/list-query";
+import { ORDER_TABS, ordersCount, ordersView } from "@/lib/orders-view";
 
-export const metadata = { title: `${menuItem("pedidos").label} · ERP` };
+const ITEM = menuItem("pedidos");
+const HERE = ITEM.href;
+const OPTIONS = {
+  sorts: ["atualizacao", "numero", "cliente", "vendedor"] as const,
+  defaultSort: "atualizacao" as const,
+  defaultDirection: "desc" as const,
+  filters: { aba: ["abertos", "aprovacao", "fechados", "perdidos", "todos"] },
+};
+
+export const metadata = { title: `${ITEM.label} · ERP` };
 export const dynamic = "force-dynamic";
 
-const HERE = menuItem("pedidos").href;
-
-const STATUS_COLORS = {
-  em_negociacao: "bg-slate-200 text-slate-800",
-  aguardando_aprovacao: "bg-amber-100 text-amber-900",
-  fechado: "bg-emerald-100 text-emerald-900",
-  perdido: "bg-red-100 text-red-900",
-  cancelado: "bg-slate-100 text-slate-600",
-} as const;
-
-const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
+const STATUS_TONES = { em_negociacao: "neutral", aguardando_aprovacao: "warn", fechado: "good", perdido: "bad", cancelado: "neutral" } as const;
 
 export default async function PedidosPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const session = await requirePermission("pedidos");
   const conn = tenantDb(session.tenant.slug);
-  const query = await searchParams;
-
-  const tab = parseOrderTab(first(query.aba));
-  const search = (first(query.busca) ?? "").trim();
-  // A seller receives only their own orders from the database; the others, all of them.
+  const raw = await searchParams;
+  const query = parseListQuery({ ...raw, q: raw.q ?? raw.busca }, OPTIONS);
+  const tab = (query.filters.aba?.[0] ?? "abertos") as (typeof ORDER_TABS)[number]["key"];
   const everyone = seesAllOrders(session);
-  const orders = await listOrders({ sellerEmail: everyone ? null : session.email }, conn);
-  const { rows, counts, indicators } = ordersView(orders, { tab, search, me: session.email, month: isoDate(new Date()).slice(0, 7) });
-  const size = rowsPerPage((await cookies()).get("erp_linhas_pedidos")?.value, 1);
-  const slice = pageOf(rows, first(query.p), size);
-
-  const address = (key: string) => {
-    const params = new URLSearchParams();
-    if (key !== "abertos") params.set("aba", key);
-    if (search !== "") params.set("busca", search);
-    const text = params.toString();
-    return text === "" ? HERE : `${HERE}?${text}`;
-  };
-
+  const scope = { sellerEmail: everyone ? null : session.email };
+  const month = isoDate(new Date()).slice(0, 7);
+  const [result, overview] = await Promise.all([queryOrders(query, scope, conn), loadOrderOverview(scope, month, conn)]);
+  const rows = ordersView(result.items, { tab: "todos", search: "", me: session.email, month }).rows;
+  const page = result;
+  const monthLabel = new Date(`${month}-01T12:00:00-03:00`).toLocaleDateString("pt-BR", { month: "short", year: "numeric", timeZone: "America/Sao_Paulo" });
+  const indicators = overview.indicators;
   const cards = [
     ["Em aberto", showMoney(indicators.open.total), ordersCount(indicators.open.count)],
-    ["Fechados no mês", showMoney(indicators.closedInMonth.total), ordersCount(indicators.closedInMonth.count)],
+    [`Fechados em ${monthLabel}`, showMoney(indicators.closedInMonth.total), ordersCount(indicators.closedInMonth.count)],
     ["Taxa de fechamento", indicators.closeRate === null ? "—" : showPercent(indicators.closeRate, 0), "fechados sobre fechados e perdidos"],
     ["Desconto médio", indicators.averageClosedDiscount === null ? "—" : showPercent(indicators.averageClosedDiscount), "nos pedidos fechados"],
   ] as const;
 
   return (
     <>
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold">{menuItem("pedidos").label}</h1>
-          <p className="mt-1 text-sm text-slate-600">{everyone ? "Pedidos de toda a equipe." : "Os seus pedidos."}</p>
-        </div>
-        <Link href={`${HERE}/novo`} className={PRIMARY}>
-          + Novo pedido
-        </Link>
-      </div>
-
+      <PageHeader title={ITEM.label} hint={everyone ? "Pedidos de toda a equipe." : "Os seus pedidos."} actions={<Link href={`${HERE}/novo`} className={PRIMARY}>+ Novo pedido</Link>} />
       <MetricSummary items={cards.map(([label, value, note]) => ({ label, value, note }))} />
 
-      <div className="mt-6 flex flex-wrap items-end justify-between gap-3">
-        <nav aria-label="Situação" className="view-tabs">
-          {ORDER_TABS.map((item) => (
-            <Link
-              key={item.key}
-              href={address(item.key)}
-              aria-current={item.key === tab ? "page" : undefined}
-              className={`inline-flex min-h-[var(--control)] items-center rounded-md px-3 font-medium ${item.key === tab ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100"}`}
-            >
-              {item.label} ({counts[item.key]})
-            </Link>
-          ))}
-        </nav>
-        <form method="get" action={HERE} role="search" className="flex w-full gap-2 sm:w-auto">
-          {tab !== "abertos" && <input type="hidden" name="aba" value={tab} />}
-          <input
-            type="search"
-            name="busca"
-            defaultValue={search}
-            placeholder="Cliente, CNPJ/CPF ou número"
-            aria-label="Buscar pedido por cliente, CNPJ/CPF ou número"
-            className="min-h-[var(--control)] min-w-0 flex-1 rounded border border-slate-300 bg-white px-3 text-sm sm:w-64 sm:flex-none outline-none focus:ring-2 focus:ring-brand"
-          />
-          <button type="submit" className={SECONDARY}>
-            Buscar
-          </button>
-        </form>
-      </div>
+      <nav aria-label="Situação dos pedidos" className="view-tabs mt-4 flex-nowrap overflow-x-auto">
+        {ORDER_TABS.map((item) => {
+          const filters: Record<string, string[]> = item.key === "abertos" ? {} : { aba: [item.key] };
+          return <Link key={item.key} href={listHref(HERE, query, { filters, page: 1 }, OPTIONS)} aria-current={item.key === tab ? "page" : undefined}>{item.label}{item.key === "fechados" ? " (todos os períodos)" : ""} ({overview.counts[item.key]})</Link>;
+        })}
+      </nav>
 
-      <section id="lista-pedidos" className={`${CARD} mt-4`} aria-label="Lista de pedidos">
-        {rows.length === 0 ? (
-          <p className="p-6 text-sm text-slate-600">
-            {orders.length === 0
-              ? "Nenhum pedido ainda. Comece por + Novo pedido."
-              : search !== ""
-                ? `Nenhum pedido nesta aba para "${search}".`
-                : "Nenhum pedido nesta aba."}
-          </p>
-        ) : (
-          <>
-            {/* On a phone each order is a card; the table is for wider screens. */}
+      <section className={`${CARD} mt-3 list-screen`} aria-label="Lista de pedidos">
+        <ListQuery
+          path={HERE}
+          query={query}
+          options={OPTIONS}
+          searchLabel="Buscar pedido por cliente, CPF/CNPJ ou número"
+          searchPlaceholder="Cliente, CPF/CNPJ ou número"
+          sorts={[{ value: "atualizacao", label: "Última atualização" }, { value: "numero", label: "Número" }, { value: "cliente", label: "Cliente" }, { value: "vendedor", label: "Vendedor" }]}
+        />
+        {rows.length === 0 ? <p className="p-6 text-slate-600">{overview.counts.todos === 0 ? "Nenhum pedido ainda. Comece por + Novo pedido." : "Nenhum pedido corresponde à situação, busca e filtros aplicados."}</p> : (
+          <div className="list-results">
             <ul className="md:hidden">
-              {slice.rows.map((row) => (
-                <li data-row key={row.number} className="border-t border-slate-200 first:border-t-0">
-                  <Link href={`${HERE}/${row.number}`} className="block px-4 py-3 active:bg-slate-50">
-                    <div className="flex items-start justify-between gap-3">
-                      <span className="min-w-0 font-medium text-brand">{row.customer}</span>
-                      <span className="whitespace-nowrap font-semibold">{row.total}</span>
-                    </div>
-                    <p className="mt-0.5 text-xs text-slate-500">{[row.detail, everyone ? row.seller : null].filter(Boolean).join(" · ")}</p>
-                    <div className="mt-2 flex items-center justify-between gap-3 text-xs">
-                      <span className={`rounded-full px-2.5 py-0.5 font-medium ${STATUS_COLORS[row.status]}`}>{row.statusLabel}</span>
-                      <span className="text-slate-600">
-                        desconto {row.discount} · {row.updated}
-                      </span>
-                    </div>
-                  </Link>
-                </li>
-              ))}
+              {rows.map((row) => <li key={row.number} className="border-t border-slate-200 first:border-t-0"><Link href={`${HERE}/${row.number}`} className="block px-4 py-3 active:bg-slate-50"><span className="flex items-start justify-between gap-3"><span className="min-w-0 break-words font-medium text-brand">{row.customer}</span><span className="whitespace-nowrap font-semibold">{row.total}</span></span><span className="mt-1 block break-words text-xs text-slate-500">{[row.detail, everyone ? row.seller : null].filter(Boolean).join(" · ")}</span><span className="mt-2 flex items-center justify-between gap-3 text-xs"><Pill tone={STATUS_TONES[row.status]}>{row.statusLabel}</Pill><span className="text-right text-slate-600">desconto {row.discount} · {row.updated}</span></span></Link></li>)}
             </ul>
-            <div className="relative hidden overflow-x-auto md:block">
-              <table className="w-full text-sm">
-                <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                  <tr>
-                    <th scope="col" className="px-4 py-2 text-left font-semibold">
-                      Cliente
-                    </th>
-                    {everyone && (
-                      <th scope="col" className="px-4 py-2 text-left font-semibold">
-                        Vendedor
-                      </th>
-                    )}
-                    <th scope="col" className="px-4 py-2 text-right font-semibold">
-                      Desconto
-                    </th>
-                    <th scope="col" className="whitespace-nowrap px-4 py-2 text-right font-semibold">
-                      Total da nota
-                    </th>
-                    <th scope="col" className="px-4 py-2 text-left font-semibold">
-                      Situação
-                    </th>
-                    <th scope="col" className="px-4 py-2 text-left font-semibold">
-                      Atualizado
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {slice.rows.map((row) => (
-                    <tr data-row key={row.number} className="border-t border-slate-200 align-top hover:bg-slate-50">
-                      <td className="px-4 py-3">
-                        <Link href={`${HERE}/${row.number}`} className="font-medium text-brand underline-offset-2 hover:underline">
-                          {row.customer}
-                        </Link>
-                        <span className="block text-xs text-slate-500">{[row.detail, row.document].filter(Boolean).join(" · ")}</span>
-                      </td>
-                      {everyone && <td className="px-4 py-3">{row.seller}</td>}
-                      <td className="whitespace-nowrap px-4 py-3 text-right">{row.discount}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right font-semibold">{row.total}</td>
-                      <td className="px-4 py-3">
-                        <span className={`whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium ${STATUS_COLORS[row.status]}`}>{row.statusLabel}</span>
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-slate-600">{row.updated}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
+            <table className="hidden w-full table-fixed text-sm md:table">
+              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-3 py-2 text-left">Cliente</th>{everyone && <th className="px-3 py-2 text-left">Vendedor</th>}<th className="px-3 py-2 text-right">Desconto</th><th className="px-3 py-2 text-right">Total com IPI</th><th className="px-3 py-2 text-left">Situação</th><th className="px-3 py-2 text-left">Atualizado</th></tr></thead>
+              <tbody>{rows.map((row) => <tr key={row.number} className="border-t border-slate-200 align-top"><td className="px-3 py-3"><Link href={`${HERE}/${row.number}`} className="break-words font-medium text-brand underline">{row.customer}</Link><span className="block break-words text-xs text-slate-500">{[row.detail, row.document].filter(Boolean).join(" · ")}</span></td>{everyone && <td className="px-3 py-3">{row.seller}</td>}<td className="px-3 py-3 text-right">{row.discount}</td><td className="whitespace-nowrap px-3 py-3 text-right font-semibold">{row.total}</td><td className="px-3 py-3"><Pill tone={STATUS_TONES[row.status]}>{row.statusLabel}</Pill></td><td className="px-3 py-3 text-slate-600">{row.updated}</td></tr>)}</tbody>
+            </table>
+          </div>
         )}
+        <ListPager path={HERE} query={query} options={OPTIONS} result={page} noun={["pedido", "pedidos"]} />
       </section>
-      <Pager {...slice} noun={["pedido", "pedidos"]} hrefFor={(page) => `${address(tab)}${address(tab).includes("?") ? "&" : "?"}p=${page}`} />
-      <FitRows listId="lista-pedidos" shown={size} minimum={1} cookieName="erp_linhas_pedidos" />
     </>
   );
 }

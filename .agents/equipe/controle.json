@@ -4,6 +4,15 @@
   "members": [],
   "tasks": [
     {
+      "id": "T-20261018-consultas-em-escala",
+      "title": "Padronizar consultas do ERP para 3.000 registros",
+      "owner": null,
+      "status": "em-revisao",
+      "acceptance": ["Clientes, pedidos, produtos e fornecedores consultados no PostgreSQL com busca, filtros, ordenacao e paginacao comuns", "Dez a cem itens por pagina, salto direto e criterios ativos removiveis", "Mobile e paisagem mantem operacoes, abas, filtros, registros e paginador sem sobreposicao", "Revisao de publicacao mostra efeitos por produto e recusa rascunho alterado", "Suite, build e telas aprovados no GitHub antes da conclusao"],
+      "evidence": ["docs/superpowers/specs/2026-10-18-consultas-em-escala-design.md", "docs/superpowers/plans/2026-10-18-consultas-em-escala.md", "docs/revisao-telas/consultas-em-escala.md", "787 testes locais aprovados sem falhas ou pulos; lint, tipos, git diff --check e build de producao aprovados", "30 combinacoes locais aprovadas em 360x640, 390x844, 430x932, 956x440, 1366x768 e 1440x900", "Lighthouse local mediano: desempenho 94, TBT 93,5 ms e resposta inicial 63 ms"],
+      "next": "Enviar o modulo completo ao GitHub, aguardar CI obrigatorio e revisar os artefatos de telas antes do merge."
+    },
+    {
       "id": "T-20261017-modulo-fiscal-operacional",
       "title": "Concluir o módulo Fiscal operacional",
       "owner": null,

@@ -112,6 +112,15 @@ export async function loadPublishedSnapshot(version: number, conn: Queryable): P
   };
 }
 
+/** Published pricing rules without the product snapshot, for lightweight list summaries. */
+export async function loadPublishedParams(version: number, conn: Queryable): Promise<PricingParams | null> {
+  if (!Number.isSafeInteger(version) || version <= 0) return null;
+  const { rows } = await conn.query(`SELECT ${COLUMN_LIST} FROM price_table_versions WHERE version = $1`, [version]);
+  if (!rows[0]) return null;
+  const rates = await conn.query("SELECT uf, internal_icms, fcp, outbound_icms FROM price_table_state_rates WHERE version = $1", [version]);
+  return rowToParams(rows[0], rowsToStateRates(rates.rows));
+}
+
 /** Everything is checked before the database is touched: an invalid draft throws and nothing is written. */
 function assertDraft(draft: PriceTableDraft, version: number, publishedBy: string): void {
   validateParams(draft.params);

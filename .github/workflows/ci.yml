@@ -126,7 +126,7 @@ jobs:
 
       - run: npm run db:migrate
 
-      - run: npm run db:seed-demo -- --empresa ludus
+      - run: npm run db:seed-demo -- --empresa ludus --escala 3000
 
       # Falha com rolagem lateral, controle abaixo de 44 px ou erro na página (docs/ux.md).
       - name: Organização do menu nos cinco tamanhos
@@ -139,6 +139,9 @@ jobs:
         run: npm run test:telas -- harmonizacao.spec.ts --workers=1 --output=test-results/harmonizacao
 
       - run: npm run test:telas -- telas.spec.ts --output=test-results/varredura
+
+      - name: Consultas em escala nos seis tamanhos
+        run: npm run test:telas -- consultas-em-escala.spec.ts --output=test-results/consultas-em-escala
 
       # Os prints de cada tela e a altura de cada uma (telas.json), para conferir sem rodar nada.
       - uses: actions/upload-artifact@v4

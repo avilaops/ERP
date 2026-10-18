@@ -38,7 +38,7 @@ export function draftPriceTable(params: PricingParams, products: Product[]): Pri
 }
 
 /** Whether two sets of parameters are the same, the rates of every state included. */
-function sameParams(a: PricingParams, b: PricingParams): boolean {
+export function samePricingParams(a: PricingParams, b: PricingParams): boolean {
   const { stateRates: ratesA, ...scalarsA } = a;
   const { stateRates: ratesB, ...scalarsB } = b;
   const keys = Object.keys(scalarsA) as (keyof typeof scalarsA)[];
@@ -73,7 +73,7 @@ export function pendingChanges(draft: PriceTableDraft, published: PublishedSnaps
   if (!published) return { rules: false, costs: 0, added: draft.items.length, removed: 0, renamed: 0 };
 
   const pending: PendingChanges = {
-    rules: !sameParams(draft.params, published.params),
+    rules: !samePricingParams(draft.params, published.params),
     costs: 0,
     added: 0,
     removed: 0,
@@ -130,31 +130,21 @@ export function publishNotice(
   /** The number the next publication takes. With more than one product line it is not the one after `latest`: the numbering is one for the company. */
   nextNumber: number = (latest?.version ?? 0) + 1,
 ): PublishNotice {
-  const empty = draft.items.length === 0;
-  const next = empty ? null : nextNumber;
+  return publishNoticeFromCount(draft.items.length, latest, pending, nextNumber);
+}
 
-  if (!latest) {
-    return {
-      pending: true,
-      strong: "A equipe ainda não vê nenhuma tabela.",
-      text: empty ? NOTHING_TO_PUBLISH : `Pendente: primeira publicação, com ${equipment(draft.items.length)}.`,
-      next,
-    };
-  }
-  if (!pending) {
-    return {
-      pending: false,
-      strong: null,
-      text: `A equipe vê a tabela v${latest.version}, publicada em ${showDate(latest.publishedAt)} por ${latest.publishedBy}.`,
-      next: null,
-    };
-  }
-  return {
-    pending: true,
-    strong: `A equipe ainda vê a tabela v${latest.version}.`,
-    text: `Pendentes: ${pendingText(pending)}.${empty ? ` ${NOTHING_TO_PUBLISH}` : ""}`,
-    next,
-  };
+/** Same banner contract without allocating or loading the draft items on list pages. */
+export function publishNoticeFromCount(
+  itemCount: number,
+  latest: PriceTableVersion | null,
+  pending: PendingChanges | null,
+  nextNumber: number = (latest?.version ?? 0) + 1,
+): PublishNotice {
+  const empty = itemCount === 0;
+  const next = empty ? null : nextNumber;
+  if (!latest) return { pending: true, strong: "A equipe ainda não vê nenhuma tabela.", text: empty ? NOTHING_TO_PUBLISH : `Pendente: primeira publicação, com ${equipment(itemCount)}.`, next };
+  if (!pending) return { pending: false, strong: null, text: `A equipe vê a tabela v${latest.version}, publicada em ${showDate(latest.publishedAt)} por ${latest.publishedBy}.`, next: null };
+  return { pending: true, strong: `A equipe ainda vê a tabela v${latest.version}.`, text: `Pendentes: ${pendingText(pending)}.${empty ? ` ${NOTHING_TO_PUBLISH}` : ""}`, next };
 }
 
 /** What the publish action answers to the notice. */
