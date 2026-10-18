@@ -1442,6 +1442,9 @@ test("fila fiscal: clique repetido compartilha a emissão; perda de resposta ret
   const first = await enqueueNfeIssue(number, who, ALL, db.pool);
   const repeated = await enqueueNfeIssue(number, who, ALL, db.pool);
   assert.deepEqual([repeated.id, repeated.joined], [first.id, true]);
+  // enqueueNfeIssue usa o relógio do banco. Prenda a disponibilidade ao relógio
+  // fictício deste teste para ele não depender da hora em que o CI começou.
+  await db.pool.query("UPDATE fiscal_jobs SET run_after = $2 WHERE id = $1", [first.id, now]);
 
   const timeout = async () => { throw new SefazError("A SEFAZ não respondeu a tempo."); };
   const mail: string[] = [];
