@@ -1442,15 +1442,30 @@ test("fila fiscal: clique repetido compartilha a emissão; perda de resposta ret
   const first = await enqueueNfeIssue(number, who, ALL, db.pool);
   const repeated = await enqueueNfeIssue(number, who, ALL, db.pool);
   assert.deepEqual([repeated.id, repeated.joined], [first.id, true]);
+  const target = await db.pool.query("SELECT environment, series FROM fiscal_jobs WHERE id = $1", [first.id]);
+  assert.deepEqual([target.rows[0].environment, Number(target.rows[0].series)], ["homologacao", 1]);
   // enqueueNfeIssue usa o relógio do banco. Prenda a disponibilidade ao relógio
   // fictício deste teste para ele não depender da hora em que o CI começou.
   await db.pool.query("UPDATE fiscal_jobs SET run_after = $2 WHERE id = $1", [first.id, now]);
 
-  const timeout = async () => { throw new SefazError("A SEFAZ não respondeu a tempo."); };
+  // O ambiente confirmado no clique pertence ao job. Alterar a configuração
+  // antes de o worker acordar não pode transformar homologação em produção.
+  await db.pool.query("UPDATE company_settings SET nfe_environment = 'producao', nfe_series = 9");
+  await assert.rejects(() => enqueueNfeIssue(number, who, ALL, db.pool), /outra preparação fiscal/i);
+  const timeout = async (url: string, _action: string, envelope: string) => {
+    assert.match(url, /homologacao/);
+    assert.match(envelope, /<tpAmb>2<\/tpAmb>/);
+    assert.match(envelope, /<serie>1<\/serie>/);
+    throw new SefazError("A SEFAZ não respondeu a tempo.");
+  };
   const mail: string[] = [];
   const dependencies = { vault, send: timeout, check: null, env: { ERP_SMTP_HOST: "mail.teste", ERP_SMTP_USER: "fiscal@teste.local", ERP_SMTP_PASSWORD: "segredo", ERP_MAIL_FROM: "fiscal@teste.local" }, mailSend: async (_config: unknown, envelope: { to: string }) => void mail.push(envelope.to) };
-  assert.equal(await runOneFiscalJob(now, dependencies, db.pool), "retry");
-  assert.deepEqual((await listOrderInvoices(orderId, db.pool)).map((invoice) => [invoice.status, invoice.number]), [["assinada", 43]]);
+  try {
+    assert.equal(await runOneFiscalJob(now, dependencies, db.pool), "retry");
+  } finally {
+    await db.pool.query("UPDATE company_settings SET nfe_environment = 'homologacao', nfe_series = 1");
+  }
+  assert.deepEqual((await listOrderInvoices(orderId, db.pool)).map((invoice) => [invoice.status, invoice.number, invoice.environment, invoice.series]), [["assinada", 43, "homologacao", 1]]);
   const delayed = await db.pool.query("SELECT status, attempts, run_after FROM fiscal_jobs WHERE id = $1", [first.id]);
   assert.deepEqual([delayed.rows[0].status, Number(delayed.rows[0].attempts)], ["pendente", 1]);
 

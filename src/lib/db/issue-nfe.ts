@@ -38,6 +38,7 @@ async function checkLocalXml(xml: string, kind: FiscalXmlKind): Promise<void> {
 export type { Send } from "@/lib/fiscal/channel";
 
 export type IssueResult = { invoice: Invoice; message: string };
+export type FiscalIssueTarget = { fiscalJobId: number; environment: "homologacao" | "producao"; series: number };
 
 /**
  * Issues the invoice of a closed order: number, XML, signature, storage,
@@ -48,8 +49,8 @@ export type IssueResult = { invoice: Invoice; message: string };
  * The local XSD check is mandatory before numbering and before transmission.
  * `check` may add an external conference; it never replaces the local check.
  */
-export async function issueOrderNfe(orderNumber: string, who: string, now: Date, vault: Buffer, send: Send, conn: Queryable, check: LayoutCheck | null = null, fiscalJobId?: number): Promise<IssueResult> {
-  return withQueryableConnection(conn, held => issueOnConnection(orderNumber, who, now, vault, send, held, check, fiscalJobId));
+export async function issueOrderNfe(orderNumber: string, who: string, now: Date, vault: Buffer, send: Send, conn: Queryable, check: LayoutCheck | null = null, target?: FiscalIssueTarget): Promise<IssueResult> {
+  return withQueryableConnection(conn, held => issueOnConnection(orderNumber, who, now, vault, send, held, check, target));
 }
 
 async function linkInvoiceToJob(invoiceId: number, fiscalJobId: number | undefined, conn: Queryable): Promise<void> {
@@ -58,12 +59,12 @@ async function linkInvoiceToJob(invoiceId: number, fiscalJobId: number | undefin
   await conn.query("UPDATE fiscal_jobs SET invoice_id = $2 WHERE id = $1", [fiscalJobId, invoiceId]);
 }
 
-async function prepareOrderInvoice(orderNumber: string, who: string, now: Date, vault: Buffer, send: Send, conn: Queryable, check: LayoutCheck | null, fiscalJobId?: number) {
+async function prepareOrderInvoice(orderNumber: string, who: string, now: Date, vault: Buffer, send: Send, conn: Queryable, check: LayoutCheck | null, target?: FiscalIssueTarget) {
   await conn.query("BEGIN");
   try {
     // Serialize preparation of this order and roll back its number on any refusal.
     await conn.query("SELECT id FROM orders WHERE number=$1 FOR UPDATE", [orderNumber]);
-    const preview = await previewOrderNfe(orderNumber, now, conn);
+    const preview = await previewOrderNfe(orderNumber, now, conn, target);
     if (!preview) throw new IssueError("Pedido não encontrado ou ainda não fechado: só pedido fechado tem nota.");
     if (preview.problems.length > 0) throw new IssueError(`A nota ainda não pode ser emitida. Falta: ${preview.problems.join(" ")}`);
     const { environment, series } = preview.input;
@@ -95,7 +96,7 @@ async function prepareOrderInvoice(orderNumber: string, who: string, now: Date, 
       }
       if (known.status === "autorizada") {
         const saved = await recordVerdict(waiting.id, { status: "autorizada", code: known.code, reason: known.reason, protocol: known.protocol, authorizedXml: nfeProcXml(stored, known.protocolXml) }, conn);
-        await linkInvoiceToJob(saved.id, fiscalJobId, conn);
+        await linkInvoiceToJob(saved.id, target?.fiscalJobId, conn);
         await conn.query("COMMIT");
         return { completed: { invoice: saved, message: `A nota ${saved.number} já estava autorizada na SEFAZ. Protocolo ${known.protocol}.` } };
       }
@@ -126,7 +127,7 @@ async function prepareOrderInvoice(orderNumber: string, who: string, now: Date, 
       do randomCode = String(randomInt(0, 100_000_000)).padStart(8, "0");
       while (!isAcceptableRandomCode(randomCode, number));
 
-      const numbered = await previewOrderNfe(orderNumber, now, conn, { number, randomCode });
+      const numbered = await previewOrderNfe(orderNumber, now, conn, { number, randomCode, environment, series });
       if (!numbered || numbered.problems.length > 0 || numbered.rulesRevision !== preview.rulesRevision) throw new IssueError("O pedido ou a preparação fiscal mudou enquanto a nota era montada. Confira e tente de novo.");
       let built: { key: string; xml: string };
       try {
@@ -148,7 +149,7 @@ async function prepareOrderInvoice(orderNumber: string, who: string, now: Date, 
       }
     }
 
-    await linkInvoiceToJob(invoice.id, fiscalJobId, conn);
+    await linkInvoiceToJob(invoice.id, target?.fiscalJobId, conn);
 
     await conn.query("COMMIT");
     return { invoice, signedXml, certificate, url, environment, issuerUf:preview.issuerUf };
@@ -158,8 +159,8 @@ async function prepareOrderInvoice(orderNumber: string, who: string, now: Date, 
   }
 }
 
-async function issueOnConnection(orderNumber: string, who: string, now: Date, vault: Buffer, send: Send, conn: Queryable, check: LayoutCheck | null, fiscalJobId?: number): Promise<IssueResult> {
-  const prepared = await prepareOrderInvoice(orderNumber, who, now, vault, send, conn, check, fiscalJobId);
+async function issueOnConnection(orderNumber: string, who: string, now: Date, vault: Buffer, send: Send, conn: Queryable, check: LayoutCheck | null, target?: FiscalIssueTarget): Promise<IssueResult> {
+  const prepared = await prepareOrderInvoice(orderNumber, who, now, vault, send, conn, check, target);
   if (prepared.completed) return prepared.completed;
   const { invoice, signedXml, certificate, url, environment, issuerUf } = prepared;
 

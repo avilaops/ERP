@@ -123,6 +123,7 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "0073_fila_de_eventos_fiscais.sql",
     "0074_fila_inutilizacao_fiscal.sql",
     "0075_identidade_da_fila_fiscal.sql",
+    "0076_alvo_da_emissao_fiscal.sql",
   ]);
 
   const second = await withClient((client) => migrate(client, MIGRATIONS_DIR));
