@@ -67,7 +67,7 @@ export async function listProductMoves(productId: number, limit: number, conn: Q
  */
 export async function countStock(productId: number, counted: number, note: string, who: string, conn: Queryable): Promise<{ difference: number }> {
   if (who.trim() === "") throw new Error("Falta dizer quem está contando o estoque.");
-  if (!Number.isSafeInteger(counted) || counted < 0 || counted > 1_000_000) throw new StockError("Contagem: informe um número inteiro, zero ou maior.");
+  if (!Number.isFinite(counted) || counted < 0 || counted > 100_000_000 || Math.round(counted * 10_000) / 10_000 !== counted) throw new StockError("Contagem: informe zero ou mais, com até quatro casas decimais.");
   const text = note.trim();
   if (text.length > 200) throw new StockError("Observação: até 200 letras.");
   const { rows } = await conn.query(

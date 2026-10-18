@@ -29,7 +29,7 @@ export async function countStockAction(_previous: ActionState, formData: FormDat
   if (!/^\d{1,7}$/.test(typed)) return { error: "Contagem: informe um número inteiro, zero ou maior." };
   let difference: number;
   try {
-    ({ difference } = await countStock(id, Number(typed), field(formData, "note"), session.email, tenantDb(session.tenant.slug)));
+    ({ difference } = await countStock(id, Number(typed.replace(",", ".")), field(formData, "note"), session.email, tenantDb(session.tenant.slug)));
   } catch (error) {
     return problem(error);
   }

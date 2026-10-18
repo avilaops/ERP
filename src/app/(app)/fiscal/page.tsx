@@ -1,15 +1,18 @@
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { FitRows } from "@/components/FitRows";
-import { CARD, MetricSummary, PageHeader, Pager, Pill, SECONDARY, ViewTabs, pageOf } from "@/components/ui";
+import { CARD, INPUT, MetricSummary, PageHeader, Pager, Pill, PRIMARY, SECONDARY, ViewTabs, pageOf } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { allows, menuItem, seesAllOrders } from "@/lib/auth/permissions";
 import { loadFiscalSettings } from "@/lib/db/fiscal";
 import { listFiscalOverview } from "@/lib/db/fiscal-overview";
+import { listReceivedNfes } from "@/lib/db/received-nfes";
+import { distributionStanding } from "@/lib/db/nfe-distribution";
 import type { FiscalOrderOverview } from "@/lib/db/fiscal-overview";
 import { tenantDb } from "@/lib/db/pool";
 import { showDateTime } from "@/lib/format";
 import { rowsPerPage } from "@/lib/rows";
+import { importReceivedNfeAction, queryReceivedNfesAction } from "./actions";
 
 export const metadata = { title: `${menuItem("fiscal").label} · ERP` };
 export const dynamic = "force-dynamic";
@@ -44,16 +47,17 @@ function orderDetail(order: FiscalOrderOverview): string {
 export default async function FiscalPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const session = await requirePermission("fiscal");
   const conn = tenantDb(session.tenant.slug);
-  const [settings, query, store] = await Promise.all([loadFiscalSettings(conn), searchParams, cookies()]);
+  const [settings, query, store, received, distribution] = await Promise.all([loadFiscalSettings(conn), searchParams, cookies(), listReceivedNfes(conn), distributionStanding(conn)]);
   const overview = await listFiscalOverview({ sellerEmail: seesAllOrders(session) ? null : session.email, environment: settings.environment }, conn);
   const asked = first(query.ver);
-  const tab = asked === "notas" || asked === "inutilizacoes" ? asked : "pendencias";
+  const tab = asked === "notas" || asked === "inutilizacoes" || asked === "recebidas" ? asked : "pendencias";
   const size = rowsPerPage(store.get("erp_fiscal_linhas")?.value, 1);
   const page = first(query.pagina);
   const stageOrder = { revisao: 0, fila: 1, emitir: 2, concluido: 3 } as const;
   const pending = overview.orders.filter((order) => order.stage !== "concluido").sort((a, b) => stageOrder[a.stage] - stageOrder[b.stage] || b.closedAt.getTime() - a.closedAt.getTime());
   const pendingSlice = pageOf(pending, page, size);
   const invoiceSlice = pageOf(overview.invoices, page, size);
+  const receivedSlice = pageOf(received, page, size);
   const openVoidJobs = overview.voidJobs.filter((job) => job.status !== "concluido");
   const voidRows = [
     ...openVoidJobs.map((item) => ({ kind: "job" as const, item })),
@@ -77,8 +81,34 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
       <ViewTabs label="Partes do Fiscal" items={[
         { href: HERE, label: `Pendências (${pending.length})`, current: tab === "pendencias" },
         { href: `${HERE}?ver=notas`, label: `Notas (${overview.invoices.length})`, current: tab === "notas" },
+        { href: `${HERE}?ver=recebidas`, label: `Recebidas (${received.length})`, current: tab === "recebidas" },
         { href: `${HERE}?ver=inutilizacoes`, label: `Inutilizações (${openVoidJobs.length + overview.voids.length})`, current: tab === "inutilizacoes" },
       ]} />
+
+      {tab === "recebidas" && (
+        <section className={`${CARD} mt-3`} aria-labelledby="fiscal-recebidas">
+          <div className="border-b border-slate-200 p-4">
+            <h2 id="fiscal-recebidas" className="text-sm font-semibold uppercase tracking-wide">NF-e recebidas completas</h2>
+            <p className="mt-1 text-sm text-slate-600">Importe o nfeProc autorizado. Um resNFe é apenas resumo e não contém produtos nem o XML completo.</p>
+            <p className="mt-1 text-xs text-slate-600">Distribuição SEFAZ: NSU {distribution.lastNsu} de {distribution.maxNsu} · {distribution.full} XML completo(s), {distribution.summaries} resumo(s), {distribution.events} evento(s){distribution.lastReason ? ` · ${distribution.lastReason}` : ""}.</p>
+            {first(query.erro) && <p className="mt-3 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-900">{first(query.erro)}</p>}
+            {first(query.aviso) && <p className="mt-3 rounded border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">{first(query.aviso)}</p>}
+            <form action={importReceivedNfeAction} className="mt-3 flex flex-wrap items-end gap-2">
+              <label className="min-w-0 flex-1 text-sm font-medium">XML completo (.xml)<input className={`${INPUT} mt-1`} type="file" name="xml" accept=".xml,application/xml,text/xml" required /></label>
+              <button className={PRIMARY} type="submit">Importar e conferir</button>
+            </form>
+            <form action={queryReceivedNfesAction} className="mt-2"><button className={SECONDARY} type="submit">Consultar próximo lote na SEFAZ</button></form>
+          </div>
+          {received.length === 0 ? <p className="p-4 text-sm text-slate-600">Nenhuma NF-e completa importada.</p> : (
+            <ul id="fiscal-list" className="divide-y divide-slate-200">{receivedSlice.rows.map((note) => <li data-row key={note.id} className="p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-semibold">{note.issuerName}</p><p className="text-xs text-slate-600">NF-e {note.number} · série {note.series} · {note.itemCount} item(ns) · {showDateTime(note.issuedAt)}</p></div><Pill tone={note.purchaseId ? "good" : "warn"}>{note.purchaseId ? "Compra vinculada" : "Conferir"}</Pill></div>
+              <p className="mt-1 break-all text-xs text-slate-600">Chave {note.accessKey}</p>
+              <div className="mt-2 flex flex-wrap gap-2"><Link href={`/fiscal/recebidas/${note.id}`} className={SECONDARY}>Conferir nota</Link><a href={`/api/fiscal/recebidas/${note.id}/xml`} className={SECONDARY}>Baixar XML completo</a><a href={`/api/fiscal/recebidas/${note.id}/danfe`} className={SECONDARY}>Abrir DANFE</a></div>
+            </li>)}</ul>
+          )}
+          <Pager {...receivedSlice} noun={["nota recebida", "notas recebidas"]} hrefFor={(number) => `${HERE}?ver=recebidas${number > 1 ? `&pagina=${number}` : ""}`} />
+        </section>
+      )}
 
       {tab === "pendencias" && (
         <section className={`${CARD} mt-3`} aria-label="Próximo trabalho">

@@ -110,8 +110,32 @@
       "acceptance": ["Preparar regras por pedido sem alterar o padrão da empresa", "Preservar validação fiscal, XML assinado e edições concorrentes", "Conferir UI, persistência e cinco tamanhos"],
       "evidence": ["https://linear.app/avilaops/issue/AVL-28", "704 testes sem falhas ou pulos; lint e tipos aprovados", "Demo isolado erp_note_rules_demo, pedido 261017-DM07: regras preenchidas pela UI e refletidas na pré-validação", "12 etapas e cinco tamanhos: 60 amostras com uma tela, sem rolagem lateral e áreas de toque >=44 px", "docs/nfe-por-nota.md"],
       "next": "Acompanhar publicação e aceite na AVL-28. Regras reais devem ser escolhidas pela pessoa autorizada; nenhum código real foi presumido ou emitido."
+    },
+    {
+      "id": "T-20261018-nfe-recebida-operacional",
+      "title": "Transformar NF-e recebida em compra, custo e estoque",
+      "owner": null,
+      "status": "em-andamento",
+      "acceptance": ["Preservar e validar o XML completo autorizado por empresa", "Disponibilizar XML completo e DANFE sem chamar resNFe de nota completa", "Revisar fornecedor e vincular todos os itens a produtos", "Registrar custos historicos e entrada de estoque idempotente somente apos confirmacao", "Integrar o Lojas pela API versionada do ERP"],
+      "evidence": ["https://linear.app/avilaops/issue/AVL-95", "https://linear.app/avilaops/issue/AVL-91", "https://linear.app/avilaops/issue/AVL-94", "https://linear.app/avilaops/issue/AVL-97", "https://linear.app/avilaops/issue/AVL-254", "docs/superpowers/specs/2026-10-18-nfe-recebida-operacional.md", "Suite ERP sem banco: 791 testes, 540 aprovados, 251 integracoes puladas, zero falhas", "PostgreSQL focal: 26 de 26 aprovados, incluindo XML, custo, estoque, NSU 656 e manifestacao", "Lojas: 1122 de 1122 testes aprovados", "Capturas desktop e mobile em docs/revisao-telas/avl-95-nfe-recebida"],
+      "next": "Criar commits e PRs do ERP e do Lojas; exigir CI verde e revisar os artefatos antes de qualquer merge ou publicacao."
     }
   ],
-  "decisions": [],
-  "integrations": []
+  "decisions": [
+    {
+      "id": "D-20261018-nfe-entrada-no-erp",
+      "decision": "O ERP e a fonte de verdade da NF-e recebida; o Lojas consome uma API versionada.",
+      "reason": "O ERP ja possui fornecedor, compra, custo e estoque. Duplicar essas regras no Lojas criaria divergencia operacional e fiscal.",
+      "evidence": "docs/superpowers/specs/2026-10-18-nfe-recebida-operacional.md"
+    }
+  ],
+  "integrations": [
+    {
+      "id": "I-20261018-lojas-erp-nfe-recebida",
+      "environment": "desenvolvimento",
+      "identity": "tenant da sessao do Lojas para empresa do ERP",
+      "status": "em-andamento",
+      "evidence": "API v1 tenant-scoped, proxy server-side do Lojas, consulta SEFAZ unica no ERP e capturas desktop/mobile validadas"
+    }
+  ]
 }

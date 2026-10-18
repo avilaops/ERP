@@ -283,9 +283,9 @@ test("certificado digital: só a diretoria envia; arquivo e senha não voltam pa
   }
   // Fora da camada fiscal ninguém abre o certificado guardado.
   const users = SOURCES_UNDER_SRC().filter(([, code]) => code.includes("openCertificate("));
-  // Só a emissão abre o certificado guardado: para assinar a nota e falar com a SEFAZ.
+  // Só as operações fiscais abrem o certificado guardado: emissão, distribuição e manifestação na SEFAZ.
   // E o selo do contrato assinado, quando a empresa o liga: a mesma chave, só para assinar o PDF.
-  assert.deepEqual(users.map(([file]) => file).sort(), ["lib/db/contract-seal.ts", "lib/db/issue-nfe.ts", "lib/fiscal/certificate.ts"]);
+  assert.deepEqual(users.map(([file]) => file).sort(), ["lib/db/contract-seal.ts", "lib/db/issue-nfe.ts", "lib/db/recipient-manifestations.ts", "lib/db/run-nfe-distribution.ts", "lib/fiscal/certificate.ts"]);
 });
 
 test("e-mail das notas: a senha da caixa só é aberta para enviar, nunca volta à tela nem vai a log", () => {
@@ -346,7 +346,8 @@ test("não existe página no grupo protegido sem requirePermission", () => {
   // and the list of prospects; and the switch of the calls by the system;
   // and, of production, the materials, what will run short, the list of materials of one equipment and the hours.
   // and the preparation of the fiscal rules of one order's invoice.
-  assert.equal(all.length, MENU_ITEMS.length + 63);
+  // and, of incoming invoices, one invoice and the link of one of its items.
+  assert.equal(all.length, MENU_ITEMS.length + 65);
   for (const route of all) {
     assert.match(source(route), /await requirePermission\(/, route);
   }
