@@ -222,12 +222,13 @@ export async function publishPriceTableAction(_previous: PublishState, formData:
         if (!/^[a-f0-9]{32}$/.test(reviewedRevision) || revision !== reviewedRevision) {
           return publishError("Custos, cadastro ou regras mudaram depois da revisão. Confira a nova revisão antes de publicar.");
         }
-        const [params, products, latest, next] = await Promise.all([
-          loadParams(conn, line.id),
-          listProducts({ active: true, lineId: line.id }, conn),
-          latestVersion(conn, line.id),
-          nextVersionNumber(conn),
-        ]);
+        // This transaction is pinned to one pg client. Execute its reads in
+        // order: concurrent `client.query()` calls are deprecated and can hide
+        // which snapshot each value belongs to.
+        const params = await loadParams(conn, line.id);
+        const products = await listProducts({ active: true, lineId: line.id }, conn);
+        const latest = await latestVersion(conn, line.id);
+        const next = await nextVersionNumber(conn);
         const published = latest ? await loadPublishedSnapshot(latest.version, conn) : null;
         const draft = draftPriceTable(params, products);
         if (draft.items.length === 0) return publishError(NOTHING_TO_PUBLISH);

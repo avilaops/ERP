@@ -36,13 +36,17 @@ export default async function PublicacaoPage({ searchParams }: { searchParams: P
       }
       const options = { ...OPTIONS, filters: { ...OPTIONS.filters, linha: lines.map((item) => String(item.id)) } };
       const query = parseListQuery({ ...raw, linha: String(line.id) }, options);
-      const [params, latest, next, revision] = await Promise.all([loadParams(conn, line.id), latestVersion(conn, line.id), nextVersionNumber(conn), loadPriceTableDraftRevision(line.id, conn)]);
+      // `conn` is one pinned client so every read sees the same revision. A pg
+      // client executes one query at a time; keeping these reads sequential also
+      // avoids queued-query warnings becoming browser console errors.
+      const params = await loadParams(conn, line.id);
+      const latest = await latestVersion(conn, line.id);
+      const next = await nextVersionNumber(conn);
+      const revision = await loadPriceTableDraftRevision(line.id, conn);
       const publishedParams = latest ? await loadPublishedParams(latest.version, conn) : null;
       const rulesChanged = publishedParams ? !samePricingParams(params, publishedParams) : false;
-      const [summary, result] = await Promise.all([
-        loadProductPublicationSummary(line.id, latest?.version ?? null, rulesChanged, params.safetyMargin, conn),
-        queryPriceTableReview(query, line.id, latest?.version ?? null, rulesChanged, params.safetyMargin, conn),
-      ]);
+      const summary = await loadProductPublicationSummary(line.id, latest?.version ?? null, rulesChanged, params.safetyMargin, conn);
+      const result = await queryPriceTableReview(query, line.id, latest?.version ?? null, rulesChanged, params.safetyMargin, conn);
       const { items: rawItems, ...pagination } = result;
       const items = rawItems.map((row) => {
         const current = row.current ? draftPriceTable(params, [row.current]).items[0] ?? null : null;
