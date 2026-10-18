@@ -32,12 +32,12 @@ export type FiscalVoidJobSummary = {
 export async function enqueueNumberVoid(range: NumberVoidRange, who: string, now: Date, vault: Buffer, conn: Queryable): Promise<{ id: number; joined: boolean }> {
   const prepared = await prepareNumberVoid(range, now, vault, conn);
   const { rows } = await conn.query(
-    `INSERT INTO fiscal_void_jobs (environment, issuer_uf, series, first_number, last_number, reason, signed_xml, requested_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    `INSERT INTO fiscal_void_jobs (environment, issuer_uf, series, first_number, last_number, reason, signed_xml, requested_by, run_after)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
      ON CONFLICT (environment, series, first_number, last_number) WHERE status IN ('pendente', 'processando')
      DO UPDATE SET updated_at = now()
      RETURNING id, reason, (xmax <> 0) AS joined`,
-    [prepared.environment, prepared.issuerUf, prepared.series, prepared.first, prepared.last, prepared.reason, prepared.signedXml, who],
+    [prepared.environment, prepared.issuerUf, prepared.series, prepared.first, prepared.last, prepared.reason, prepared.signedXml, who, now],
   );
   if (String(rows[0].reason) !== prepared.reason) throw new IssueError("Já há uma inutilização pendente para esta faixa com outra justificativa. Aguarde a conclusão ou revise a pendência antes de confirmar novamente.");
   return { id: Number(rows[0].id), joined: rows[0].joined === true };
