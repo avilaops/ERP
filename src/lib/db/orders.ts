@@ -5,6 +5,7 @@ import { getCustomer } from "@/lib/db/customers";
 import type { Customer } from "@/lib/db/customers";
 import { pgErrorCode, withQueryableConnection } from "@/lib/db/pool";
 import type { Queryable } from "@/lib/db/pool";
+import { normalizedSearch, searchableText } from "@/lib/db/search";
 import { loadPublishedSnapshot, loadPublishedTable } from "@/lib/db/price-table";
 import { loadClosingProposal, EMPTY_PROPOSAL_DETAILS } from "@/lib/db/proposal-details";
 import { isoDate } from "@/lib/format";
@@ -926,10 +927,6 @@ export async function listOrders(scope: OrderScope, conn: Queryable, pagination?
 const ORDER_TAB_STATUSES: Record<OrderListTab, readonly OrderStatus[] | null> = {
   abertos: ["em_negociacao"], aprovacao: ["aguardando_aprovacao"], fechados: ["fechado"], perdidos: ["perdido"], todos: null,
 };
-const SEARCH_FROM = "áàâãäéèêëíìîïóòôõöúùûüç";
-const SEARCH_TO = "aaaaaeeeeiiiiooooouuuuc";
-const normalizedSearch = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR");
-
 /** One filtered order page. Price items are loaded only for the visible orders. */
 export async function queryOrders(query: ListQuery<OrderListSort>, scope: OrderScope, conn: Queryable): Promise<ListResult<OrderSummary>> {
   const tab = (query.filters.aba?.[0] ?? "abertos") as OrderListTab;
@@ -937,8 +934,8 @@ export async function queryOrders(query: ListQuery<OrderListSort>, scope: OrderS
   const documentSearch = orderDocumentSearch(query.search);
   const values: unknown[] = [scope.sellerEmail, normalizedSearch(query.search), documentSearch];
   const where = ["($1::text IS NULL OR o.seller_email = $1)", `($2 = '' OR
-    strpos(translate(lower(COALESCE(c.trade_name, c.name, '')), '${SEARCH_FROM}', '${SEARCH_TO}'), $2) > 0
-    OR strpos(lower(o.number), lower(regexp_replace($2, '^#', ''))) > 0
+    strpos(${searchableText("COALESCE(c.trade_name, c.name)")}, $2) > 0
+    OR (regexp_replace($2, '^#', '') <> '' AND strpos(lower(o.number), lower(regexp_replace($2, '^#', ''))) > 0)
     OR ($3 <> '' AND strpos(regexp_replace(upper(COALESCE(c.document, '')), '[^0-9A-Z]', '', 'g'), $3) > 0))`];
   if (statuses) {
     values.push(statuses);

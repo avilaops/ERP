@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { compactDocumentSearch, listHref, orderDocumentSearch, parseListQuery } from "@/lib/list-query";
+import { normalizedSearch } from "@/lib/db/search";
 
 const OPTIONS = {
   sorts: ["nome", "cadastro"] as const,
@@ -84,4 +85,5 @@ test("documentos: preserva letras do CNPJ e não confunde código curto de pedid
   assert.equal(orderDocumentSearch("1234"), "1234");
   assert.equal(orderDocumentSearch("12.ABC.345/0001-90"), "12ABC345000190");
   assert.equal(orderDocumentSearch("DM09"), "");
+  assert.equal(normalizedSearch("Muñoz"), "munoz");
 });

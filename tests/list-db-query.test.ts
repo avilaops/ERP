@@ -88,6 +88,7 @@ test("pedidos: lista paginada e indicadores usam consultas agregadas, sem carreg
   assert.ok(pageCall);
   assert.deepEqual(pageCall.values?.slice(0, 3), [null, "dm09", ""]);
   assert.match(pageCall.text, /\$3 <> ''/);
+  assert.match(pageCall.text, /regexp_replace\(\$2, '\^#', ''\) <> ''/);
   assert.deepEqual(pageCall.values?.slice(-2), [10, 2100]);
   assert.ok(calls.some((call) => call.text.includes("count(*) FILTER")));
   await assert.rejects(() => loadOrderOverview({ sellerEmail: null }, "18/10/2026", conn), /Mês inválido/);

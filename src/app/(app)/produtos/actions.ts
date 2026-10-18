@@ -14,6 +14,7 @@ import {
   deleteProduct,
   loadPriceTableDraftRevision,
   listProducts,
+  lockPriceTableDraft,
   ProductError,
   saveProductMeasures,
   setProductPlateLoaded,
@@ -216,6 +217,7 @@ export async function publishPriceTableAction(_previous: PublishState, formData:
       await conn.query("BEGIN ISOLATION LEVEL REPEATABLE READ");
       let committed = false;
       try {
+        await lockPriceTableDraft(conn);
         const line = exactLine(await listLines(conn), formData.get("lineId"));
         if (!line) return publishError(NO_LINE);
         const revision = await loadPriceTableDraftRevision(line.id, conn);

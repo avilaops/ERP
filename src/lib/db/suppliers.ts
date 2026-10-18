@@ -1,6 +1,7 @@
 import { isValidCnpj, isValidCpf, normalizeDocument } from "@/lib/customer";
 import { pgErrorCode } from "@/lib/db/pool";
 import type { Queryable } from "@/lib/db/pool";
+import { normalizedSearch, searchableText } from "@/lib/db/search";
 import { listResult } from "@/lib/list-query";
 import { compactDocumentSearch } from "@/lib/list-query";
 import type { ListQuery, ListResult } from "@/lib/list-query";
@@ -107,17 +108,13 @@ export async function listSupplierCountries(conn: Queryable): Promise<string[]> 
   return rows.map((row) => String(row.country));
 }
 
-const SEARCH_FROM = "áàâãäéèêëíìîïóòôõöúùûüç";
-const SEARCH_TO = "aaaaaeeeeiiiiooooouuuuc";
-const normalizedSearch = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR");
-const searchable = (column: string) => `translate(lower(COALESCE(${column}, '')), '${SEARCH_FROM}', '${SEARCH_TO}')`;
 
 /** A supplier page, searched and cut by PostgreSQL. */
 export async function querySuppliers(query: ListQuery<SupplierListSort>, conn: Queryable): Promise<ListResult<Supplier>> {
   const values: unknown[] = [normalizedSearch(query.search), compactDocumentSearch(query.search)];
   const where = [
-    `($1 = '' OR strpos(${searchable("name")}, $1) > 0 OR strpos(${searchable("trade_name")}, $1) > 0
-      OR strpos(${searchable("contact_name")}, $1) > 0 OR strpos(${searchable("country")}, $1) > 0
+    `($1 = '' OR strpos(${searchableText("name")}, $1) > 0 OR strpos(${searchableText("trade_name")}, $1) > 0
+      OR strpos(${searchableText("contact_name")}, $1) > 0 OR strpos(${searchableText("country")}, $1) > 0
       OR ($2 <> '' AND strpos(regexp_replace(upper(COALESCE(document, '')), '[^0-9A-Z]', '', 'g'), $2) > 0))`,
   ];
   const addArray = (column: string, selected: string[] | undefined) => {

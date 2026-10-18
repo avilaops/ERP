@@ -1,6 +1,7 @@
 import { MAIN_LINE } from "@/lib/product-line";
 import { pgErrorCode } from "@/lib/db/pool";
 import type { Queryable } from "@/lib/db/pool";
+import { normalizedSearch, searchableText } from "@/lib/db/search";
 import type { AdvisoryCostRow } from "@/lib/advisory-paste";
 import { assertAmount, assertRate } from "@/lib/pricing/money";
 import type { ProductCost } from "@/lib/pricing/product";
@@ -340,19 +341,15 @@ export async function listProducts({ active, lineId }: { active?: boolean; lineI
   return rows.map(toProduct);
 }
 
-const SEARCH_FROM = "áàâãäéèêëíìîïóòôõöúùûüç";
-const SEARCH_TO = "aaaaaeeeeiiiiooooouuuuc";
-const normalizedSearch = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR");
-
 /** The visible product slice. The complete cost projection is loaded separately only for publication calculations. */
 export async function queryProducts(query: ListQuery<ProductListSort>, lineId: number, conn: Queryable): Promise<ListResult<Product>> {
   const tab = query.filters.aba?.[0] ?? "ativos";
   const values: unknown[] = [lineId, normalizedSearch(query.search)];
   const where = [`line_id = $1`, `($2 = '' OR
-    strpos(translate(lower(name), '${SEARCH_FROM}', '${SEARCH_TO}'), $2) > 0
-    OR strpos(translate(lower(COALESCE(code, '')), '${SEARCH_FROM}', '${SEARCH_TO}'), $2) > 0
-    OR strpos(translate(lower(COALESCE(supplier_name, '')), '${SEARCH_FROM}', '${SEARCH_TO}'), $2) > 0
-    OR strpos(translate(lower(COALESCE(supplier_model, '')), '${SEARCH_FROM}', '${SEARCH_TO}'), $2) > 0)`];
+    strpos(${searchableText("name")}, $2) > 0
+    OR strpos(${searchableText("code")}, $2) > 0
+    OR strpos(${searchableText("supplier_name")}, $2) > 0
+    OR strpos(${searchableText("supplier_model")}, $2) > 0)`];
   if (tab === "ativos") where.push("active");
   else if (tab === "sem-custo") where.push("active AND (advisory_cost IS NULL OR advisory_cost <= 0)");
   else if (tab === "sem-codigo") where.push("active AND code IS NULL");
@@ -407,6 +404,15 @@ export async function loadPriceTableDraftRevision(lineId: number, conn: Queryabl
     [lineId],
   );
   return String(rows[0].revision);
+}
+
+/**
+ * Establishes the publication snapshot while every draft writer is blocked.
+ * The lock must be the first operation after BEGIN, before PostgreSQL creates
+ * the REPEATABLE READ snapshot. It is released automatically at COMMIT/ROLLBACK.
+ */
+export async function lockPriceTableDraft(conn: Queryable): Promise<void> {
+  await conn.query("LOCK TABLE products, pricing_params, state_tax_rates IN SHARE MODE");
 }
 
 /** Publication banner totals are calculated in PostgreSQL; no product row is sent to the list page. */

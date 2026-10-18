@@ -1,13 +1,12 @@
 import type { PriceTableItem } from "@/lib/db/price-table";
 import type { Product } from "@/lib/db/products";
 import type { Queryable } from "@/lib/db/pool";
+import { normalizedSearch, searchableText } from "@/lib/db/search";
 import { listResult } from "@/lib/list-query";
 import type { ListQuery, ListResult } from "@/lib/list-query";
 import type { ReviewCategory } from "@/lib/price-table-review";
 
 export type RawPriceTableReviewRow = { category: ReviewCategory; current: Product | null; published: PriceTableItem | null };
-
-const normalizedSearch = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR");
 
 const REVIEW_CTE = `WITH current_items AS (
       SELECT id, name, code, advisory_cost, tax_credit, packaging, line_id
@@ -35,8 +34,8 @@ const REVIEW_CTE = `WITH current_items AS (
     ), filtered AS (
       SELECT * FROM compared
        WHERE category IS NOT NULL
-         AND ($5 = '' OR strpos(translate(lower(COALESCE(current_name, old_name, '')), 'áàâãäéèêëíìîïóòôõöúùûüç', 'aaaaaeeeeiiiiooooouuuuc'), $5) > 0
-           OR strpos(translate(lower(COALESCE(current_code, old_code, '')), 'áàâãäéèêëíìîïóòôõöúùûüç', 'aaaaaeeeeiiiiooooouuuuc'), $5) > 0)
+         AND ($5 = '' OR strpos(${searchableText("COALESCE(current_name, old_name)")}, $5) > 0
+           OR strpos(${searchableText("COALESCE(current_code, old_code)")}, $5) > 0)
          AND ($6::text IS NULL OR category = $6)
     )`;
 const REVIEW_COUNT_SQL = `${REVIEW_CTE} SELECT count(*) AS total FROM filtered`;

@@ -2,6 +2,7 @@ import { isValidDocument } from "@/lib/customer";
 import type { CustomerInput, CustomerKind } from "@/lib/customer";
 import { pgErrorCode } from "@/lib/db/pool";
 import type { Queryable } from "@/lib/db/pool";
+import { normalizedSearch, searchableText } from "@/lib/db/search";
 import type { Uf } from "@/lib/pricing/states";
 import { normalizedAddress } from "@/lib/address";
 import { listResult } from "@/lib/list-query";
@@ -151,8 +152,6 @@ export async function listCustomers(conn: Queryable): Promise<Customer[]> {
   return rows.map(toCustomer);
 }
 
-const SEARCH_FROM = "áàâãäéèêëíìîïóòôõöúùûüç";
-const SEARCH_TO = "aaaaaeeeeiiiiooooouuuuc";
 const QUALIFIED_COLUMNS = COLUMNS.split(", ").map((column) => `c.${column}`).join(", ");
 const CUSTOMER_FROM = `FROM customers c
   LEFT JOIN LATERAL (
@@ -161,14 +160,12 @@ const CUSTOMER_FROM = `FROM customers c
       JOIN order_closings k ON k.order_id = o.id AND k.reopened_at IS NULL
      WHERE o.customer_id = c.id AND o.status = 'fechado'
   ) b ON true`;
-const searchable = (column: string) => `translate(lower(COALESCE(${column}, '')), '${SEARCH_FROM}', '${SEARCH_TO}')`;
-const searchText = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR");
 
 /** A customer page. Filters and count are applied in PostgreSQL before any row reaches Next.js. */
 export async function queryCustomers(query: ListQuery<CustomerListSort>, conn: Queryable): Promise<ListResult<CustomerListItem>> {
-  const values: unknown[] = [searchText(query.search), compactDocumentSearch(query.search)];
+  const values: unknown[] = [normalizedSearch(query.search), compactDocumentSearch(query.search)];
   const where = [
-    `($1 = '' OR strpos(${searchable("c.name")}, $1) > 0 OR strpos(${searchable("c.trade_name")}, $1) > 0
+    `($1 = '' OR strpos(${searchableText("c.name")}, $1) > 0 OR strpos(${searchableText("c.trade_name")}, $1) > 0
       OR ($2 <> '' AND strpos(regexp_replace(upper(COALESCE(c.document, '')), '[^0-9A-Z]', '', 'g'), $2) > 0))`,
   ];
   const addArray = (column: string, selected: string[] | undefined) => {

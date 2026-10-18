@@ -85,6 +85,7 @@ test("produto: código é ordenado pelo número, e busca trata porcentagem e sub
   await createProduct({ name: "Natural dez", code: "NATURAL-10" }, WHO, db.pool);
   await createProduct({ name: "Natural dois", code: "NATURAL-2" }, WHO, db.pool);
   await createProduct({ name: "Símbolos 100%_literal", code: "SYMBOL" }, WHO, db.pool);
+  await createProduct({ name: "Equipamento Muñoz", code: "MUNOZ" }, WHO, db.pool);
   const options = { sorts: ["codigo", "nome"] as const, defaultSort: "codigo" as const, filters: { aba: ["ativos", "sem-custo", "sem-codigo", "inativos"] } };
 
   const ordered = await queryProducts(parseListQuery({ q: "NATURAL-", porPagina: "10" }, options), 1, db.pool);
@@ -92,6 +93,9 @@ test("produto: código é ordenado pelo número, e busca trata porcentagem e sub
 
   const literal = await queryProducts(parseListQuery({ q: "%_", porPagina: "10" }, options), 1, db.pool);
   assert.deepEqual(literal.items.map((product) => product.code), ["SYMBOL"]);
+
+  const diacritic = await queryProducts(parseListQuery({ q: "Munoz", porPagina: "10" }, options), 1, db.pool);
+  assert.deepEqual(diacritic.items.map((product) => product.code), ["MUNOZ"]);
 });
 
 test("produto: o motor recebe só os ativos que já têm custo", { skip }, async () => {

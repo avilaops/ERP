@@ -3,7 +3,7 @@ import { after, before, test } from "node:test";
 import { loadParams, saveParams } from "@/lib/db/params";
 import { publishPriceTable } from "@/lib/db/price-table";
 import { queryPriceTableReview } from "@/lib/db/price-table-review";
-import { createProduct, listProducts, loadPriceTableDraftRevision, loadProductPublicationSummary, loadProductTabCounts, updateProduct } from "@/lib/db/products";
+import { createProduct, listProducts, loadPriceTableDraftRevision, loadProductPublicationSummary, loadProductTabCounts, lockPriceTableDraft, updateProduct } from "@/lib/db/products";
 import { parseListQuery } from "@/lib/list-query";
 import { draftPriceTable } from "@/lib/price-table";
 import { openTestDb, SKIP_WITHOUT_DB } from "./db-helpers.ts";
@@ -42,4 +42,23 @@ test("resumo, revisão paginada e token de concorrência acompanham o rascunho",
   const review = await queryPriceTableReview(query, 1, 1, true, changed.safetyMargin, db.pool);
   assert.equal(review.total, 2);
   assert.ok(review.items.every((row) => row.category === "regras"));
+});
+
+test("publicação bloqueia alterações do rascunho até terminar a transação", { skip }, async () => {
+  const product = await createProduct({ name: "Concorrente", code: "LOCK", advisoryCost: 100 }, WHO, db.pool);
+  const publisher = await db.pool.connect();
+  const writer = await db.pool.connect();
+  try {
+    await publisher.query("BEGIN ISOLATION LEVEL REPEATABLE READ");
+    await lockPriceTableDraft(publisher);
+    await writer.query("SET lock_timeout = '100ms'");
+    await assert.rejects(() => updateProduct(product.id, { packaging: 1 }, WHO, writer), (error: { code?: string }) => error.code === "55P03");
+    await publisher.query("COMMIT");
+    await writer.query("SET lock_timeout = 0");
+    assert.equal((await updateProduct(product.id, { packaging: 2 }, WHO, writer)).packaging, 2);
+  } finally {
+    await publisher.query("ROLLBACK");
+    publisher.release();
+    writer.release();
+  }
 });
