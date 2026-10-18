@@ -62,9 +62,9 @@ test("pedido fechado vira nota: preço com o desconto do pedido, ICMS de saída 
   assert.equal(input.rules.additionalInfo, "Texto fixo - Pedido 261008-W9LG");
   const { xml } = buildNfeXml(input);
   assert.ok(xml.includes("<CFOP>6108</CFOP>") && xml.includes("<nNF>7</nNF>") && xml.includes("<tpAmb>2</tpAmb>"));
-  // Frete: sem escolha, vale a sugestão (FOB sem frete por nossa conta, CIF com); a escolha do pedido manda.
-  assert.ok(xml.includes("<modFrete>1</modFrete>"));
-  assert.equal(orderNfe({ ...SOURCE, order: { ...SOURCE.order, freight: 350 } }).input.freightMode, "0");
+  // Sem escolha, o ERP não presume quem contrata o frete: informa que não houve modalidade declarada.
+  assert.ok(xml.includes("<modFrete>9</modFrete>"));
+  assert.equal(orderNfe({ ...SOURCE, order: { ...SOURCE.order, freight: 350 } }).input.freightMode, "9");
   assert.equal(orderNfe({ ...SOURCE, freightMode: "9" }).input.freightMode, "9");
 });
 

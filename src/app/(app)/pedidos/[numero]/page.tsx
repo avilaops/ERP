@@ -613,7 +613,7 @@ export default async function PedidoPage({
             <input type="hidden" name="number" value={order.number} />
             <div className="sm:col-span-2">
               <label htmlFor="freightMode" className="block text-xs font-medium text-slate-600">
-                Modalidade do frete na nota
+                Modalidade do frete na nota (opcional)
               </label>
               <select key={invoice.input.freightMode} id="freightMode" name="freightMode" defaultValue={invoice.input.freightMode} className={`${INPUT} mt-1 w-full`}>
                 {FREIGHT_MODES.map(([code, label]) => (

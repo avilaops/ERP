@@ -23,7 +23,7 @@ export type OrderNfeSource = {
   receipts: { method: string | null; amount: number }[];
   /** The code of the invoice (`tPag`) of each form of payment of the company, by its name. */
   paymentCodes: ReadonlyMap<string, string | null>;
-  /** What was chosen for the invoice of this order, or `null`: then the suggestion holds. */
+  /** What was chosen for the invoice of this order, or `null` when no transport mode was informed. */
   freightMode: FreightMode | null;
   transport: NfeTransport;
   /** Where the goods go when it is not the customer's address, or `null`. */
@@ -33,9 +33,6 @@ export type OrderNfeSource = {
   issuedAt: string;
   software: string;
 };
-
-/** Freight paid by the company in the order is CIF; otherwise the customer hires it. A suggestion: the screen lets it be changed. */
-export const suggestedFreightMode = (freight: number): FreightMode => (freight > 0 ? "0" : "1");
 
 /**
  * The invoice of an order, as the layout takes it. What the registers do not
@@ -74,7 +71,9 @@ export function orderNfe(source: OrderNfeSource): { input: NfeInput; problems: s
 
   const input: NfeInput = {
     environment: settings.environment,
-    freightMode: source.freightMode ?? suggestedFreightMode(source.order.freight),
+    // The XML requires modFrete. Without an explicit choice, do not infer who
+    // hired the freight from commercial values: report no transport occurrence.
+    freightMode: source.freightMode ?? "9",
     transport: source.transport,
     series: settings.series,
     number: source.number,
