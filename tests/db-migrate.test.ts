@@ -43,6 +43,14 @@ test("migração: jobs de evento antigos só recebem uma nota inequívoca", () =
   assert.match(migration, /Evento criado antes da identificação da nota/);
 });
 
+test("migração: emissão sem XML antigo exige nova confirmação da preparação", () => {
+  const migration = readFileSync(join(MIGRATIONS_DIR, "0077_preparacao_confirmada_da_emissao.sql"), "utf8");
+  assert.match(migration, /ADD COLUMN preparation_hash text/);
+  assert.match(migration, /status IN \('pendente', 'processando'\)/);
+  assert.match(migration, /invoice_id IS NULL/);
+  assert.match(migration, /preparação fiscal ser preservada/);
+});
+
 test("migração: aplica em ordem, registra e rodar de novo não muda nada", { skip }, async () => {
   const first = await withClient((client) => migrate(client, MIGRATIONS_DIR));
   assert.deepEqual(first, [
@@ -124,6 +132,7 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "0074_fila_inutilizacao_fiscal.sql",
     "0075_identidade_da_fila_fiscal.sql",
     "0076_alvo_da_emissao_fiscal.sql",
+    "0077_preparacao_confirmada_da_emissao.sql",
   ]);
 
   const second = await withClient((client) => migrate(client, MIGRATIONS_DIR));

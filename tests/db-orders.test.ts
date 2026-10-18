@@ -1445,7 +1445,13 @@ test("fila fiscal: clique repetido compartilha a emissão; perda de resposta ret
   const target = await db.pool.query("SELECT environment, series, invoice_number FROM fiscal_jobs WHERE id = $1", [first.id]);
   assert.deepEqual([target.rows[0].environment, Number(target.rows[0].series), Number(target.rows[0].invoice_number)], ["homologacao", 1, 43]);
   assert.equal(Number((await db.pool.query("SELECT nfe_next_number FROM company_settings")).rows[0].nfe_next_number), 44);
-  await db.pool.query("UPDATE fiscal_jobs SET status = 'revisao_manual' WHERE id = $1", [first.id]);
+  await db.pool.query("UPDATE customers SET street_number = '2' WHERE id = $1", [customerSp]);
+  await db.pool.query("UPDATE fiscal_jobs SET run_after = $2 WHERE id = $1", [first.id, now]);
+  let changedPreparationCalls = 0;
+  assert.equal(await runOneFiscalJob(now, { vault, check: null, env: {}, send: async () => { changedPreparationCalls += 1; return ""; } }, db.pool), "manual_review");
+  assert.equal(changedPreparationCalls, 0);
+  assert.match(String((await db.pool.query("SELECT last_error FROM fiscal_jobs WHERE id = $1", [first.id])).rows[0].last_error), /preparação fiscal mudou/i);
+  await db.pool.query("UPDATE customers SET street_number = '1' WHERE id = $1", [customerSp]);
   const reservationLock = await db.pool.connect();
   await reservationLock.query("BEGIN");
   await reservationLock.query("SELECT pg_advisory_xact_lock(hashtext('erp-fiscal-numbering'), hashtext(current_schema() || ':' || $1 || ':' || $2::text))", ["homologacao", 1]);

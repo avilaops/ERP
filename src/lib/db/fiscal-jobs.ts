@@ -3,7 +3,7 @@ import { loadMailInfo } from "@/lib/db/mail";
 import { loadFiscalSettings } from "@/lib/db/fiscal";
 import { lockFiscalNumbering } from "@/lib/db/fiscal-number-lock";
 import { isNumberVoided, listOrderInvoices, takeNextNumber } from "@/lib/db/invoices";
-import { previewOrderNfe } from "@/lib/db/order-nfe";
+import { nfePreparationFingerprint, previewOrderNfe } from "@/lib/db/order-nfe";
 import { getOrder } from "@/lib/db/orders";
 import type { OrderScope } from "@/lib/db/orders";
 import { withQueryableConnection } from "@/lib/db/pool";
@@ -32,6 +32,7 @@ export type FiscalJob = {
   environment: "homologacao" | "producao" | null;
   series: number | null;
   invoiceNumber: number | null;
+  preparationHash: string | null;
 };
 
 export type FiscalJobSummary = {
@@ -57,7 +58,8 @@ export async function listOrderFiscalJobs(orderId: number, environment: "homolog
           OR (j.kind IN ('correcao_nfe', 'cancelamento_nfe')
               AND j.status = 'revisao_manual' AND j.invoice_id IS NULL)
         )
-      ORDER BY j.id DESC LIMIT 5`,
+      ORDER BY CASE j.status WHEN 'revisao_manual' THEN 0 WHEN 'processando' THEN 1 WHEN 'pendente' THEN 2 ELSE 3 END,
+               j.id DESC`,
     [orderId, environment],
   );
   return rows.map((row) => ({ id: Number(row.id), kind: row.kind as FiscalJobSummary["kind"], status: row.status as FiscalJobSummary["status"], attempts: Number(row.attempts), lastError: row.last_error === null ? null : String(row.last_error), runAfter: row.run_after as Date }));
@@ -84,13 +86,23 @@ export async function enqueueNfeIssue(orderNumber: string, who: string, scope: O
       await lockFiscalNumbering(preview.input.environment, preview.input.series, held);
 
       const active = await held.query(
-        "SELECT id, kind, environment, series FROM fiscal_jobs WHERE order_id = $1 AND status IN ('pendente', 'processando') FOR UPDATE",
+        "SELECT id, kind, environment, series, invoice_number, preparation_hash, invoice_id FROM fiscal_jobs WHERE order_id = $1 AND status IN ('pendente', 'processando') FOR UPDATE",
         [order.id],
       );
       if (active.rows[0]) {
         if (active.rows[0].kind !== "emitir_nfe") throw new IssueError("Há um evento fiscal pendente neste pedido. Aguarde a conclusão ou revise a pendência antes de emitir.");
         if (active.rows[0].environment !== preview.input.environment || Number(active.rows[0].series) !== preview.input.series) {
           throw new IssueError("Já há uma emissão pendente com outra preparação fiscal. Aguarde a conclusão ou revise a pendência antes de confirmar novamente.");
+        }
+        if (active.rows[0].invoice_id === null) {
+          const activePreview = await previewOrderNfe(orderNumber, new Date(), held, {
+            environment: preview.input.environment,
+            series: preview.input.series,
+            number: Number(active.rows[0].invoice_number),
+          });
+          if (!activePreview || nfePreparationFingerprint(activePreview.input) !== active.rows[0].preparation_hash) {
+            throw new IssueError("A preparação fiscal mudou depois da confirmação. Revise os dados antes de emitir.");
+          }
         }
         await held.query("COMMIT");
         return { id: Number(active.rows[0].id), joined: true };
@@ -128,22 +140,27 @@ export async function enqueueNfeIssue(orderNumber: string, who: string, scope: O
       );
       if (!waiting && reusable === null && reservation.rows[0]) {
         const id = Number(reservation.rows[0].id);
+        const invoiceNumber = Number(reservation.rows[0].invoice_number);
+        const confirmed = await previewOrderNfe(orderNumber, new Date(), held, { environment: preview.input.environment, series: preview.input.series, number: invoiceNumber });
+        if (!confirmed || confirmed.problems.length > 0) throw new IssueError("A preparação fiscal mudou. Confira os dados antes de emitir.");
         await held.query(
           `UPDATE fiscal_jobs
               SET status = 'pendente', requested_by = $2, attempts = 0, run_after = now(),
-                  lease_until = NULL, completed_at = NULL, last_error = NULL, updated_at = now()
+                  lease_until = NULL, completed_at = NULL, last_error = NULL, preparation_hash = $3, updated_at = now()
             WHERE id = $1`,
-          [id, who],
+          [id, who, nfePreparationFingerprint(confirmed.input)],
         );
         await held.query("COMMIT");
         return { id, joined: false };
       }
       const invoiceNumber = waiting?.number ?? reusable ?? await takeNextNumber(held);
+      const confirmed = await previewOrderNfe(orderNumber, new Date(), held, { environment: preview.input.environment, series: preview.input.series, number: invoiceNumber });
+      if (!confirmed || confirmed.problems.length > 0) throw new IssueError("A preparação fiscal mudou. Confira os dados antes de emitir.");
       const { rows } = await held.query(
-        `INSERT INTO fiscal_jobs (kind, order_id, requested_by, environment, series, invoice_number)
-         VALUES ('emitir_nfe', $1, $2, $3, $4, $5)
+        `INSERT INTO fiscal_jobs (kind, order_id, requested_by, environment, series, invoice_number, preparation_hash)
+         VALUES ('emitir_nfe', $1, $2, $3, $4, $5, $6)
          RETURNING id`,
-        [order.id, who, preview.input.environment, preview.input.series, invoiceNumber],
+        [order.id, who, preview.input.environment, preview.input.series, invoiceNumber, nfePreparationFingerprint(confirmed.input)],
       );
       await held.query("COMMIT");
       return { id: Number(rows[0].id), joined: false };
@@ -223,12 +240,12 @@ export async function claimFiscalJob(now: Date, conn: Queryable): Promise<Fiscal
         SET status = 'processando', attempts = attempts + 1, lease_until = $2, updated_at = $1
        FROM candidate c
       WHERE j.id = c.id
-      RETURNING j.id, j.order_id, j.requested_by, j.attempts, j.kind, j.event_text, j.invoice_id, j.environment, j.series, j.invoice_number,
+      RETURNING j.id, j.order_id, j.requested_by, j.attempts, j.kind, j.event_text, j.invoice_id, j.environment, j.series, j.invoice_number, j.preparation_hash,
                 (SELECT number FROM orders WHERE id = j.order_id) AS order_number`,
     [now, leaseUntil, MAX_ATTEMPTS],
   );
   const row = rows[0];
-  return row ? { id: Number(row.id), orderId: Number(row.order_id), orderNumber: String(row.order_number), requestedBy: String(row.requested_by), attempts: Number(row.attempts), kind: row.kind as FiscalJob["kind"], eventText: row.event_text === null ? null : String(row.event_text), invoiceId: row.invoice_id === null ? null : Number(row.invoice_id), environment: row.environment === null ? null : row.environment as FiscalJob["environment"], series: row.series === null ? null : Number(row.series), invoiceNumber: row.invoice_number === null ? null : Number(row.invoice_number) } : null;
+  return row ? { id: Number(row.id), orderId: Number(row.order_id), orderNumber: String(row.order_number), requestedBy: String(row.requested_by), attempts: Number(row.attempts), kind: row.kind as FiscalJob["kind"], eventText: row.event_text === null ? null : String(row.event_text), invoiceId: row.invoice_id === null ? null : Number(row.invoice_id), environment: row.environment === null ? null : row.environment as FiscalJob["environment"], series: row.series === null ? null : Number(row.series), invoiceNumber: row.invoice_number === null ? null : Number(row.invoice_number), preparationHash: row.preparation_hash === null ? null : String(row.preparation_hash) } : null;
 }
 
 export async function completeFiscalJob(id: number, now: Date, conn: Queryable): Promise<void> {
@@ -315,7 +332,7 @@ export async function runOneFiscalJob(now: Date, dependencies: FiscalJobDependen
         await completeFiscalJob(job.id, finishedAt, conn);
         return "completed";
       }
-      const result = await issueOrderNfe(job.orderNumber, job.requestedBy, now, dependencies.vault, dependencies.send, conn, dependencies.check, { fiscalJobId: job.id, environment: job.environment, series: job.series, invoiceNumber: job.invoiceNumber });
+      const result = await issueOrderNfe(job.orderNumber, job.requestedBy, now, dependencies.vault, dependencies.send, conn, dependencies.check, { fiscalJobId: job.id, environment: job.environment, series: job.series, invoiceNumber: job.invoiceNumber, preparationHash: job.preparationHash });
       const finishedAt = clock();
       if (result.invoice.status === "autorizada") await sendAutomaticMail("nota", result.invoice.id, job.requestedBy, finishedAt, dependencies, conn);
       if (result.invoice.status === "assinada") {

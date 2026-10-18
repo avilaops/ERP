@@ -2,7 +2,7 @@ import { randomInt } from "node:crypto";
 import { loadFiscalSettings, loadSealedCertificate } from "@/lib/db/fiscal";
 import { countCorrections, isNumberVoided, listOrderInvoices, recordNumberVoid, usedNumbersIn, loadSignedXml, recordInvoiceEvent, recordVerdict, saveSignedInvoice, takeNextNumber, InvoicePreparationChanged } from "@/lib/db/invoices";
 import type { Invoice } from "@/lib/db/invoices";
-import { issueInstant, previewOrderNfe } from "@/lib/db/order-nfe";
+import { issueInstant, nfePreparationFingerprint, previewOrderNfe } from "@/lib/db/order-nfe";
 import { getOrder } from "@/lib/db/orders";
 import type { Queryable } from "@/lib/db/pool";
 import { withQueryableConnection } from "@/lib/db/pool";
@@ -38,7 +38,7 @@ async function checkLocalXml(xml: string, kind: FiscalXmlKind): Promise<void> {
 export type { Send } from "@/lib/fiscal/channel";
 
 export type IssueResult = { invoice: Invoice; message: string };
-export type FiscalIssueTarget = { fiscalJobId: number; environment: "homologacao" | "producao"; series: number; invoiceNumber: number };
+export type FiscalIssueTarget = { fiscalJobId: number; environment: "homologacao" | "producao"; series: number; invoiceNumber: number; preparationHash: string | null };
 
 /**
  * Issues the invoice of a closed order: number, XML, signature, storage,
@@ -78,6 +78,9 @@ async function prepareOrderInvoice(orderNumber: string, who: string, now: Date, 
     const previous = (await listOrderInvoices(preview.orderId, conn)).filter((invoice) => invoice.environment === environment);
     if (previous.some((invoice) => invoice.status === "autorizada")) throw new IssueError("Este pedido já tem nota autorizada.");
     const waiting = previous.find((invoice) => invoice.status === "assinada");
+    if (!waiting && target && (target.preparationHash === null || nfePreparationFingerprint(preview.input) !== target.preparationHash)) {
+      throw new IssueError("A preparação fiscal mudou depois da confirmação. Confira os dados e confirme a emissão novamente.");
+    }
 
     let invoice: Invoice;
     let signedXml: string;
@@ -130,7 +133,10 @@ async function prepareOrderInvoice(orderNumber: string, who: string, now: Date, 
       while (!isAcceptableRandomCode(randomCode, number));
 
       const numbered = await previewOrderNfe(orderNumber, now, conn, { number, randomCode, environment, series });
-      if (!numbered || numbered.problems.length > 0 || numbered.rulesRevision !== preview.rulesRevision) throw new IssueError("O pedido ou a preparação fiscal mudou enquanto a nota era montada. Confira e tente de novo.");
+      if (!numbered || numbered.problems.length > 0 || numbered.rulesRevision !== preview.rulesRevision
+        || (target && nfePreparationFingerprint(numbered.input) !== target.preparationHash)) {
+        throw new IssueError("O pedido ou a preparação fiscal mudou enquanto a nota era montada. Confira e tente de novo.");
+      }
       let built: { key: string; xml: string };
       try {
         built = buildNfeXml(numbered.input);

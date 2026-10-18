@@ -10,7 +10,7 @@ import type { Order } from "@/lib/db/orders";
 import type { Queryable } from "@/lib/db/pool";
 import { loadPublishedSnapshot, loadPublishedTable } from "@/lib/db/price-table";
 import { isAcceptableRandomCode } from "@/lib/fiscal/nfe";
-import type { FreightMode } from "@/lib/fiscal/nfe";
+import type { FreightMode, NfeInput } from "@/lib/fiscal/nfe";
 import { orderNfe } from "@/lib/fiscal/order-nfe";
 import { APP_NAME } from "@/lib/app-identity";
 import { isoDate } from "@/lib/format";
@@ -20,6 +20,11 @@ import { paymentOf, saleOf } from "@/lib/order-quote";
 export function issueInstant(now: Date): string {
   const local = new Date(now.getTime() - 3 * 3_600_000).toISOString().slice(0, 19);
   return `${local}-03:00`;
+}
+
+/** Identifies every confirmed fiscal input except the emission instant, which belongs to the worker. */
+export function nfePreparationFingerprint(input: NfeInput): string {
+  return createHash("sha256").update(JSON.stringify({ ...input, randomCode: "", issuedAt: "" })).digest("hex");
 }
 
 /**
