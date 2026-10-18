@@ -38,7 +38,7 @@ async function checkLocalXml(xml: string, kind: FiscalXmlKind): Promise<void> {
 export type { Send } from "@/lib/fiscal/channel";
 
 export type IssueResult = { invoice: Invoice; message: string };
-export type FiscalIssueTarget = { fiscalJobId: number; environment: "homologacao" | "producao"; series: number };
+export type FiscalIssueTarget = { fiscalJobId: number; environment: "homologacao" | "producao"; series: number; invoiceNumber: number };
 
 /**
  * Issues the invoice of a closed order: number, XML, signature, storage,
@@ -64,7 +64,7 @@ async function prepareOrderInvoice(orderNumber: string, who: string, now: Date, 
   try {
     // Serialize preparation of this order and roll back its number on any refusal.
     await conn.query("SELECT id FROM orders WHERE number=$1 FOR UPDATE", [orderNumber]);
-    const preview = await previewOrderNfe(orderNumber, now, conn, target);
+    const preview = await previewOrderNfe(orderNumber, now, conn, target ? { environment: target.environment, series: target.series, number: target.invoiceNumber } : undefined);
     if (!preview) throw new IssueError("Pedido não encontrado ou ainda não fechado: só pedido fechado tem nota.");
     if (preview.problems.length > 0) throw new IssueError(`A nota ainda não pode ser emitida. Falta: ${preview.problems.join(" ")}`);
     const { environment, series } = preview.input;
@@ -82,6 +82,7 @@ async function prepareOrderInvoice(orderNumber: string, who: string, now: Date, 
     let invoice: Invoice;
     let signedXml: string;
     if (waiting) {
+      if (target && waiting.number !== target.invoiceNumber) throw new IssueError("A nota aguardando resposta não é a numeração reservada por esta emissão.");
       const stored = await loadSignedXml(waiting.id, conn);
       if (!stored) throw new Error("A nota aguardando resposta perdeu o XML.");
       invoice = waiting;
@@ -121,7 +122,8 @@ async function prepareOrderInvoice(orderNumber: string, who: string, now: Date, 
       // A rejected invoice is issued again with its number, unless that number was made unusable meanwhile
       // or the rejection itself says the number already belongs to another invoice at SEFAZ (204, 539…).
       const reuse = rejected && !NUMBER_TAKEN.has(rejected.statusCode ?? "") && !(await isNumberVoided(environment, series, rejected.number, conn)) ? rejected.number : null;
-      const number = reuse ?? (await takeNextNumber(conn));
+      if (target && reuse !== null && reuse !== target.invoiceNumber) throw new IssueError("A nota rejeitada não é a numeração reservada por esta emissão.");
+      const number = reuse ?? target?.invoiceNumber ?? (await takeNextNumber(conn));
       // Rule B03-10: never the number of the invoice, nor repeated or sequential digits (rejection 897).
       let randomCode: string;
       do randomCode = String(randomInt(0, 100_000_000)).padStart(8, "0");

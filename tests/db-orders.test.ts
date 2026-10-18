@@ -1442,28 +1442,31 @@ test("fila fiscal: clique repetido compartilha a emissão; perda de resposta ret
   const first = await enqueueNfeIssue(number, who, ALL, db.pool);
   const repeated = await enqueueNfeIssue(number, who, ALL, db.pool);
   assert.deepEqual([repeated.id, repeated.joined], [first.id, true]);
-  const target = await db.pool.query("SELECT environment, series FROM fiscal_jobs WHERE id = $1", [first.id]);
-  assert.deepEqual([target.rows[0].environment, Number(target.rows[0].series)], ["homologacao", 1]);
+  const target = await db.pool.query("SELECT environment, series, invoice_number FROM fiscal_jobs WHERE id = $1", [first.id]);
+  assert.deepEqual([target.rows[0].environment, Number(target.rows[0].series), Number(target.rows[0].invoice_number)], ["homologacao", 1, 43]);
+  assert.equal(Number((await db.pool.query("SELECT nfe_next_number FROM company_settings")).rows[0].nfe_next_number), 44);
   // enqueueNfeIssue usa o relógio do banco. Prenda a disponibilidade ao relógio
   // fictício deste teste para ele não depender da hora em que o CI começou.
   await db.pool.query("UPDATE fiscal_jobs SET run_after = $2 WHERE id = $1", [first.id, now]);
 
   // O ambiente confirmado no clique pertence ao job. Alterar a configuração
   // antes de o worker acordar não pode transformar homologação em produção.
-  await db.pool.query("UPDATE company_settings SET nfe_environment = 'producao', nfe_series = 9");
+  await db.pool.query("UPDATE company_settings SET nfe_environment = 'producao', nfe_series = 9, nfe_next_number = 1");
   await assert.rejects(() => enqueueNfeIssue(number, who, ALL, db.pool), /outra preparação fiscal/i);
   const timeout = async (url: string, _action: string, envelope: string) => {
     assert.match(url, /homologacao/);
     assert.match(envelope, /<tpAmb>2<\/tpAmb>/);
     assert.match(envelope, /<serie>1<\/serie>/);
+    assert.match(envelope, /<nNF>43<\/nNF>/);
     throw new SefazError("A SEFAZ não respondeu a tempo.");
   };
   const mail: string[] = [];
   const dependencies = { vault, send: timeout, check: null, env: { ERP_SMTP_HOST: "mail.teste", ERP_SMTP_USER: "fiscal@teste.local", ERP_SMTP_PASSWORD: "segredo", ERP_MAIL_FROM: "fiscal@teste.local" }, mailSend: async (_config: unknown, envelope: { to: string }) => void mail.push(envelope.to) };
   try {
     assert.equal(await runOneFiscalJob(now, dependencies, db.pool), "retry");
+    assert.equal(Number((await db.pool.query("SELECT nfe_next_number FROM company_settings")).rows[0].nfe_next_number), 1);
   } finally {
-    await db.pool.query("UPDATE company_settings SET nfe_environment = 'homologacao', nfe_series = 1");
+    await db.pool.query("UPDATE company_settings SET nfe_environment = 'homologacao', nfe_series = 1, nfe_next_number = 44");
   }
   assert.deepEqual((await listOrderInvoices(orderId, db.pool)).map((invoice) => [invoice.status, invoice.number, invoice.environment, invoice.series]), [["assinada", 43, "homologacao", 1]]);
   const delayed = await db.pool.query("SELECT status, attempts, run_after FROM fiscal_jobs WHERE id = $1", [first.id]);
@@ -1539,6 +1542,18 @@ test("nota autorizada: carta de correção numera 1, 2…; cancelamento grava o 
   // O cofre do teste anterior ficou com ele: o certificado é enviado de novo, com uma chave nova.
   const vault = randomBytes(32);
   await saveCertificate(testPfx({ name: "EMPRESA DE TESTE LTDA:11222333000181" }), "senha-de-teste", vault, who, now, db.pool);
+
+  const beforeReopening = await db.pool.query("SELECT closed_at FROM orders WHERE number = $1", [number]);
+  await db.pool.query("UPDATE orders SET status = 'em_negociacao', closed_at = NULL WHERE number = $1", [number]);
+  try {
+    await assert.rejects(
+      () => enqueueNfeEvent(number, "correcao", "Corrigir o peso bruto informado no transporte.", who, ALL, db.pool),
+      /pedido não está fechado/i,
+    );
+  } finally {
+    await db.pool.query("DELETE FROM fiscal_jobs WHERE order_id = (SELECT id FROM orders WHERE number = $1) AND status IN ('pendente', 'processando')", [number]);
+    await db.pool.query("UPDATE orders SET status = 'fechado', closed_at = $2 WHERE number = $1", [number, beforeReopening.rows[0].closed_at]);
+  }
 
   const answer = (envelope: string, code: string, reason: string) => {
     const key = /<chNFe>(\d{44})<\/chNFe>/.exec(envelope)![1];

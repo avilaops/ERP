@@ -1,14 +1,18 @@
--- O ambiente e a série confirmados no clique pertencem ao trabalho. Alterar os
--- parâmetros da empresa enquanto o worker está dormindo não pode redirecionar
--- uma emissão de homologação para produção, nem trocar a série escolhida.
+-- O ambiente, a série e o número confirmados no clique pertencem ao trabalho.
+-- Alterar os parâmetros da empresa enquanto o worker está dormindo não pode
+-- redirecionar uma emissão nem consumir o contador da nova configuração.
 ALTER TABLE fiscal_jobs
     ADD COLUMN environment text CHECK (environment IN ('homologacao', 'producao')),
     ADD COLUMN series integer CHECK (series >= 1 AND series <= 999),
-    ADD CONSTRAINT fiscal_jobs_issue_target_pair CHECK ((environment IS NULL) = (series IS NULL));
+    ADD COLUMN invoice_number integer CHECK (invoice_number >= 1 AND invoice_number <= 999999999),
+    ADD CONSTRAINT fiscal_jobs_issue_target_pair CHECK (
+        (environment IS NULL AND series IS NULL AND invoice_number IS NULL)
+        OR (environment IS NOT NULL AND series IS NOT NULL AND invoice_number IS NOT NULL)
+    );
 
 -- Jobs já ligados a uma nota têm uma identidade comprovável.
 UPDATE fiscal_jobs j
-   SET environment = i.environment, series = i.series, updated_at = now()
+   SET environment = i.environment, series = i.series, invoice_number = i.number, updated_at = now()
   FROM fiscal_invoices i
  WHERE j.kind = 'emitir_nfe'
    AND j.invoice_id = i.id;

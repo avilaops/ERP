@@ -1,16 +1,18 @@
 import { IssueError, issueOrderNfe, registerOrderNfeEvent } from "@/lib/db/issue-nfe";
 import { loadMailInfo } from "@/lib/db/mail";
 import { loadFiscalSettings } from "@/lib/db/fiscal";
-import { listOrderInvoices } from "@/lib/db/invoices";
+import { isNumberVoided, listOrderInvoices, takeNextNumber } from "@/lib/db/invoices";
 import { previewOrderNfe } from "@/lib/db/order-nfe";
 import { getOrder } from "@/lib/db/orders";
 import type { OrderScope } from "@/lib/db/orders";
+import { withQueryableConnection } from "@/lib/db/pool";
 import type { Queryable } from "@/lib/db/pool";
 import { sendInvoiceMail } from "@/lib/db/send-nfe-mail";
 import type { Send } from "@/lib/fiscal/channel";
 import type { LayoutCheck } from "@/lib/fiscal/precheck";
 import { vaultKey } from "@/lib/fiscal/certificate";
 import { eventText } from "@/lib/fiscal/events";
+import { NUMBER_TAKEN } from "@/lib/fiscal/sefaz";
 import { sendMail } from "@/lib/mail/smtp";
 import type { MailSender } from "@/lib/db/send-nfe-mail";
 
@@ -28,6 +30,7 @@ export type FiscalJob = {
   invoiceId: number | null;
   environment: "homologacao" | "producao" | null;
   series: number | null;
+  invoiceNumber: number | null;
 };
 
 export type FiscalJobSummary = {
@@ -59,53 +62,104 @@ export async function listOrderFiscalJobs(orderId: number, environment: "homolog
 
 /** A request is durable before it returns to the screen. Repeated clicks join its active job. */
 export async function enqueueNfeIssue(orderNumber: string, who: string, scope: OrderScope, conn: Queryable): Promise<{ id: number; joined: boolean }> {
-  const order = await getOrder(orderNumber, scope, conn);
-  if (!order) throw new IssueError("Pedido não encontrado.");
-  const preview = await previewOrderNfe(orderNumber, new Date(), conn);
-  if (!preview) throw new IssueError("Pedido não encontrado ou ainda não fechado: só pedido fechado tem nota.");
-  if (preview.problems.length > 0) throw new IssueError(`A nota ainda não pode ser emitida. Falta: ${preview.problems.join(" ")}`);
-  const { rows } = await conn.query(
-    `INSERT INTO fiscal_jobs (kind, order_id, requested_by, environment, series)
-     VALUES ('emitir_nfe', $1, $2, $3, $4)
-     ON CONFLICT (order_id) WHERE status IN ('pendente', 'processando')
-     DO UPDATE SET updated_at = now()
-     RETURNING id, kind, environment, series, (xmax <> 0) AS joined`,
-    [order.id, who, preview.input.environment, preview.input.series],
-  );
-  if (rows[0].kind !== "emitir_nfe") throw new IssueError("Há um evento fiscal pendente neste pedido. Aguarde a conclusão ou revise a pendência antes de emitir.");
-  if (rows[0].environment !== preview.input.environment || Number(rows[0].series) !== preview.input.series) {
-    throw new IssueError("Já há uma emissão pendente com outra preparação fiscal. Aguarde a conclusão ou revise a pendência antes de confirmar novamente.");
-  }
-  return { id: Number(rows[0].id), joined: rows[0].joined === true };
+  return withQueryableConnection(conn, async (held) => {
+    await held.query("BEGIN");
+    try {
+      const locked = await held.query(
+        `SELECT id FROM orders
+          WHERE number = $1 AND status = 'fechado' AND ($2::text IS NULL OR seller_email = $2)
+          FOR UPDATE`,
+        [orderNumber, scope.sellerEmail],
+      );
+      if (!locked.rows[0]) throw new IssueError("Pedido não encontrado ou ainda não fechado: só pedido fechado tem nota.");
+      const order = await getOrder(orderNumber, scope, held);
+      if (!order) throw new IssueError("Pedido não encontrado.");
+      await held.query("SELECT id FROM company_settings FOR UPDATE");
+      const preview = await previewOrderNfe(orderNumber, new Date(), held);
+      if (!preview) throw new IssueError("Pedido não encontrado ou ainda não fechado: só pedido fechado tem nota.");
+      if (preview.problems.length > 0) throw new IssueError(`A nota ainda não pode ser emitida. Falta: ${preview.problems.join(" ")}`);
+
+      const active = await held.query(
+        "SELECT id, kind, environment, series FROM fiscal_jobs WHERE order_id = $1 AND status IN ('pendente', 'processando') FOR UPDATE",
+        [order.id],
+      );
+      if (active.rows[0]) {
+        if (active.rows[0].kind !== "emitir_nfe") throw new IssueError("Há um evento fiscal pendente neste pedido. Aguarde a conclusão ou revise a pendência antes de emitir.");
+        if (active.rows[0].environment !== preview.input.environment || Number(active.rows[0].series) !== preview.input.series) {
+          throw new IssueError("Já há uma emissão pendente com outra preparação fiscal. Aguarde a conclusão ou revise a pendência antes de confirmar novamente.");
+        }
+        await held.query("COMMIT");
+        return { id: Number(active.rows[0].id), joined: true };
+      }
+
+      const previous = (await listOrderInvoices(order.id, held)).filter((invoice) => invoice.environment === preview.input.environment);
+      if (previous.some((invoice) => invoice.status === "autorizada")) throw new IssueError("Este pedido já tem nota autorizada.");
+      const waiting = previous.find((invoice) => invoice.status === "assinada");
+      if (waiting && waiting.series !== preview.input.series) {
+        throw new IssueError(`A nota ${waiting.number} da série ${waiting.series} ainda aguarda resposta da SEFAZ. Confira-a antes de trocar a série.`);
+      }
+      const rejected = previous.find((invoice) => invoice.status === "rejeitada" && invoice.series === preview.input.series);
+      const reusable = rejected && !NUMBER_TAKEN.has(rejected.statusCode ?? "")
+        && !(await isNumberVoided(preview.input.environment, preview.input.series, rejected.number, held)) ? rejected.number : null;
+      const invoiceNumber = waiting?.number ?? reusable ?? await takeNextNumber(held);
+      const { rows } = await held.query(
+        `INSERT INTO fiscal_jobs (kind, order_id, requested_by, environment, series, invoice_number)
+         VALUES ('emitir_nfe', $1, $2, $3, $4, $5)
+         RETURNING id`,
+        [order.id, who, preview.input.environment, preview.input.series, invoiceNumber],
+      );
+      await held.query("COMMIT");
+      return { id: Number(rows[0].id), joined: false };
+    } catch (error) {
+      await held.query("ROLLBACK");
+      throw error;
+    }
+  });
 }
 
 /** CC-e and cancellation are stored before the screen returns; repeated clicks join the same active event. */
 export async function enqueueNfeEvent(orderNumber: string, kind: "correcao" | "cancelamento", text: string, who: string, scope: OrderScope, conn: Queryable): Promise<{ id: number; joined: boolean }> {
-  const order = await getOrder(orderNumber, scope, conn);
-  if (!order) throw new IssueError("Pedido não encontrado.");
-  let detail: string;
-  try {
-    detail = eventText(kind, text);
-  } catch (error) {
-    throw new IssueError(error instanceof Error ? error.message : "O texto do evento não é válido.");
-  }
-  const settings = await loadFiscalSettings(conn);
-  const invoice = (await listOrderInvoices(order.id, conn)).find((item) => item.status === "autorizada" && item.environment === settings.environment);
-  if (!invoice) throw new IssueError("Este pedido não tem nota autorizada neste ambiente.");
-  const jobKind = kind === "correcao" ? "correcao_nfe" : "cancelamento_nfe";
-  const { rows } = await conn.query(
-    `INSERT INTO fiscal_jobs (kind, order_id, requested_by, event_text, invoice_id)
-     VALUES ($1, $2, $3, $4, $5)
-     ON CONFLICT (order_id) WHERE status IN ('pendente', 'processando')
-     DO UPDATE SET updated_at = now()
-     RETURNING id, kind, event_text, invoice_id, (xmax <> 0) AS joined`,
-    [jobKind, order.id, who, detail, invoice.id],
-  );
-  if (rows[0].kind !== jobKind) throw new IssueError("Já há outra operação fiscal pendente neste pedido. Aguarde a conclusão ou revise a pendência antes de enviar este evento.");
-  if (String(rows[0].event_text) !== detail || Number(rows[0].invoice_id) !== invoice.id) {
-    throw new IssueError("Já há este tipo de evento pendente com outro texto ou para outra nota. Aguarde a conclusão ou revise a pendência antes de confirmar novamente.");
-  }
-  return { id: Number(rows[0].id), joined: rows[0].joined === true };
+  return withQueryableConnection(conn, async (held) => {
+    await held.query("BEGIN");
+    try {
+      const locked = await held.query(
+        `SELECT id FROM orders
+          WHERE number = $1 AND status = 'fechado' AND ($2::text IS NULL OR seller_email = $2)
+          FOR UPDATE`,
+        [orderNumber, scope.sellerEmail],
+      );
+      if (!locked.rows[0]) throw new IssueError("Pedido não encontrado ou o pedido não está fechado.");
+      const order = await getOrder(orderNumber, scope, held);
+      if (!order) throw new IssueError("Pedido não encontrado.");
+      let detail: string;
+      try {
+        detail = eventText(kind, text);
+      } catch (error) {
+        throw new IssueError(error instanceof Error ? error.message : "O texto do evento não é válido.");
+      }
+      const settings = await loadFiscalSettings(held);
+      const invoice = (await listOrderInvoices(order.id, held)).find((item) => item.status === "autorizada" && item.environment === settings.environment);
+      if (!invoice) throw new IssueError("Este pedido não tem nota autorizada neste ambiente.");
+      const jobKind = kind === "correcao" ? "correcao_nfe" : "cancelamento_nfe";
+      const { rows } = await held.query(
+        `INSERT INTO fiscal_jobs (kind, order_id, requested_by, event_text, invoice_id)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (order_id) WHERE status IN ('pendente', 'processando')
+         DO UPDATE SET updated_at = now()
+         RETURNING id, kind, event_text, invoice_id, (xmax <> 0) AS joined`,
+        [jobKind, order.id, who, detail, invoice.id],
+      );
+      if (rows[0].kind !== jobKind) throw new IssueError("Já há outra operação fiscal pendente neste pedido. Aguarde a conclusão ou revise a pendência antes de enviar este evento.");
+      if (String(rows[0].event_text) !== detail || Number(rows[0].invoice_id) !== invoice.id) {
+        throw new IssueError("Já há este tipo de evento pendente com outro texto ou para outra nota. Aguarde a conclusão ou revise a pendência antes de confirmar novamente.");
+      }
+      await held.query("COMMIT");
+      return { id: Number(rows[0].id), joined: rows[0].joined === true };
+    } catch (error) {
+      await held.query("ROLLBACK");
+      throw error;
+    }
+  });
 }
 
 /** Claims one due job without holding a transaction open while SEFAZ is called. */
@@ -132,12 +186,12 @@ export async function claimFiscalJob(now: Date, conn: Queryable): Promise<Fiscal
         SET status = 'processando', attempts = attempts + 1, lease_until = $2, updated_at = $1
        FROM candidate c
       WHERE j.id = c.id
-      RETURNING j.id, j.order_id, j.requested_by, j.attempts, j.kind, j.event_text, j.invoice_id, j.environment, j.series,
+      RETURNING j.id, j.order_id, j.requested_by, j.attempts, j.kind, j.event_text, j.invoice_id, j.environment, j.series, j.invoice_number,
                 (SELECT number FROM orders WHERE id = j.order_id) AS order_number`,
     [now, leaseUntil, MAX_ATTEMPTS],
   );
   const row = rows[0];
-  return row ? { id: Number(row.id), orderId: Number(row.order_id), orderNumber: String(row.order_number), requestedBy: String(row.requested_by), attempts: Number(row.attempts), kind: row.kind as FiscalJob["kind"], eventText: row.event_text === null ? null : String(row.event_text), invoiceId: row.invoice_id === null ? null : Number(row.invoice_id), environment: row.environment === null ? null : row.environment as FiscalJob["environment"], series: row.series === null ? null : Number(row.series) } : null;
+  return row ? { id: Number(row.id), orderId: Number(row.order_id), orderNumber: String(row.order_number), requestedBy: String(row.requested_by), attempts: Number(row.attempts), kind: row.kind as FiscalJob["kind"], eventText: row.event_text === null ? null : String(row.event_text), invoiceId: row.invoice_id === null ? null : Number(row.invoice_id), environment: row.environment === null ? null : row.environment as FiscalJob["environment"], series: row.series === null ? null : Number(row.series), invoiceNumber: row.invoice_number === null ? null : Number(row.invoice_number) } : null;
 }
 
 export async function completeFiscalJob(id: number, now: Date, conn: Queryable): Promise<void> {
@@ -213,7 +267,7 @@ export async function runOneFiscalJob(now: Date, dependencies: FiscalJobDependen
   if (!job) return "none";
   try {
     if (job.kind === "emitir_nfe") {
-      if (job.environment === null || job.series === null) throw new IssueError("A emissão pendente não preservou o ambiente e a série; revise-a manualmente.");
+      if (job.environment === null || job.series === null || job.invoiceNumber === null) throw new IssueError("A emissão pendente não preservou o ambiente, a série e o número; revise-a manualmente.");
       const prior = await conn.query("SELECT id, status FROM fiscal_invoices WHERE fiscal_job_id = $1 LIMIT 1", [job.id]);
       if (prior.rows[0] && prior.rows[0].status !== "assinada") {
         const finishedAt = clock();
@@ -221,7 +275,7 @@ export async function runOneFiscalJob(now: Date, dependencies: FiscalJobDependen
         await completeFiscalJob(job.id, finishedAt, conn);
         return "completed";
       }
-      const result = await issueOrderNfe(job.orderNumber, job.requestedBy, now, dependencies.vault, dependencies.send, conn, dependencies.check, { fiscalJobId: job.id, environment: job.environment, series: job.series });
+      const result = await issueOrderNfe(job.orderNumber, job.requestedBy, now, dependencies.vault, dependencies.send, conn, dependencies.check, { fiscalJobId: job.id, environment: job.environment, series: job.series, invoiceNumber: job.invoiceNumber });
       const finishedAt = clock();
       if (result.invoice.status === "autorizada") await sendAutomaticMail("nota", result.invoice.id, job.requestedBy, finishedAt, dependencies, conn);
       if (result.invoice.status === "assinada") {
