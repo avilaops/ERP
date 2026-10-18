@@ -99,8 +99,10 @@ Cada arquivo de teste de banco cria um esquema `test_…` só dele, aplica as mi
 ## Integração contínua
 
 A cada push na `main` e em todo PR, o GitHub Actions sobe um PostgreSQL 16, instala as
-dependências e roda lint, tipos, testes (falha se algum teste de banco for pulado) e build.
-**Não faz deploy.**
+dependências e roda lint, tipos, testes (falha se algum teste de banco for pulado), build e
+validação do pacote standalone. Em `main`, guarda por sete dias o pacote identificado pelo SHA.
+A publicação continua deliberada: o GitHub compila; a máquina do operador somente baixa o
+artefato aprovado e o envia ao servidor.
 
 ## Produção: `erp.avilaops.com` no servidor `applications`
 
@@ -156,13 +158,15 @@ backup original está em `/opt/backups/backup-todos-bancos.sh.bak-20261006-antes
 ### Publicar
 
 ```bash
-bash deploy/subir.sh
+bash deploy/publicar-do-github.sh
 ```
 
-O script recusa publicar com alteração não commitada; roda lint, tipos e testes; faz o build;
-envia o pacote; monta a imagem no servidor; **aplica as migrações de cada empresa antes de trocar
-o container**; sobe; e só termina com sucesso se `/api/health` responder com a revisão enviada.
-Se a migração falhar, a versão antiga continua no ar.
+O script exige `main` limpa e idêntica a `origin/main`, localiza o CI verde daquele SHA e baixa o
+pacote produzido no GitHub. Antes das migrações, grava e valida um dump novo do banco `erp` em
+`/opt/backups`. Depois envia o pacote, monta apenas a imagem de runtime no servidor, **aplica as
+migrações de cada empresa antes de trocar o container**, sobe e só termina com sucesso se
+`/api/health` responder com a revisão enviada. Se o backup ou a migração falhar, a versão antiga
+continua no ar. `deploy/subir.sh` permanece como contingência manual.
 
 ### Conferir depois de publicar
 
@@ -173,7 +177,8 @@ Se a migração falhar, a versão antiga continua no ar.
 
 ### O que ainda falta depois da primeira publicação
 
-- Deploy automático pelo GitHub Actions (hoje é o script, à mão).
+- Publicação totalmente automática após aprovação (hoje o build é do GitHub, mas a promoção do
+  artefato para produção continua deliberada pelo script).
 - Backup diário do banco `erp` de produção, com restauração testada.
 - Usuários e empresas em tela, em vez de variável de ambiente.
 

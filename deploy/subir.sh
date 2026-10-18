@@ -4,13 +4,16 @@
 # imagem de runtime → migração de cada empresa → docker compose up → conferência.
 # Só sai 0 se /api/health responder com a revisão enviada.
 #
-# Uso: bash deploy/subir.sh            (BUILD_HOST=local faz o build nesta máquina)
+# Uso: bash deploy/subir.sh
+#      PACOTE_PRONTO=/caminho/standalone.tgz bash deploy/subir.sh
+# O segundo modo publica o artefato produzido pelo GitHub e não executa build.
 # Pré-requisitos (uma vez, ver docs/operacao.md): acesso por SSH ao servidor,
 # /opt/erp/.env preenchido, banco e bloco do Caddy criados.
 set -euo pipefail
 SERVIDOR="${SERVIDOR:-applications}"
 # Onde o `next build` roda. Pedido do Nicolas (2026-10-08): no apps-noclient, não no creators.
 BUILD_HOST="${BUILD_HOST:-apps-noclient}"
+PACOTE_PRONTO="${PACOTE_PRONTO:-}"
 BUILD_DIR="/opt/build/erp"
 PASTA="/opt/erp"
 PORTA=3140
@@ -24,7 +27,14 @@ AGORA="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 echo "=== ERP → $SERVIDOR ($COMMIT) ==="
 
 ssh "$SERVIDOR" "mkdir -p $PASTA && [ -f $PASTA/.env ] || { echo '! falta $PASTA/.env (copie .env.example e preencha)'; exit 1; }"
-if [ "$BUILD_HOST" = "local" ]; then
+if [ -n "$PACOTE_PRONTO" ]; then
+  [ -f "$PACOTE_PRONTO" ] || { echo "! pacote do GitHub não encontrado: $PACOTE_PRONTO"; exit 1; }
+  gzip -t "$PACOTE_PRONTO"
+  [ "$(tar -tzf "$PACOTE_PRONTO" | grep -cxF './server.js' || true)" = "1" ] \
+    || { echo "! pacote do GitHub sem server.js"; exit 1; }
+  echo "▸ enviando pacote aprovado pelo GitHub"
+  ssh "$SERVIDOR" "cat > $PASTA/standalone.tgz" < "$PACOTE_PRONTO"
+elif [ "$BUILD_HOST" = "local" ]; then
   # A pasta temporária sai no fim, com sucesso ou não: cada publicação deixava 14 MB em /tmp.
   TEMPORARIA="$(mktemp -d)"
   trap 'rm -rf "$TEMPORARIA"' EXIT
@@ -53,6 +63,20 @@ REMOTO
 fi
 scp -q Dockerfile "$SERVIDOR:$PASTA/Dockerfile"
 scp -q deploy/docker-compose.yml "$SERVIDOR:$PASTA/docker-compose.yml"
+
+echo "▸ backup anterior às migrações"
+BACKUP="/opt/backups/erp-antes-deploy-$COMMIT-$(date -u +%Y%m%dT%H%M%SZ).dump"
+ssh "$SERVIDOR" "bash -s" <<REMOTO
+set -euo pipefail
+PARCIAL="$BACKUP.parcial"
+rm -f "\$PARCIAL"
+sudo -u postgres pg_dump -Fc -f "\$PARCIAL" erp
+test -s "\$PARCIAL"
+sudo -u postgres pg_restore -l "\$PARCIAL" >/dev/null
+mv "\$PARCIAL" "$BACKUP"
+chmod 640 "$BACKUP"
+echo "· $BACKUP"
+REMOTO
 
 echo "▸ imagem, migração e subida"
 ssh "$SERVIDOR" "bash -s" <<REMOTO

@@ -63,6 +63,20 @@ jobs:
 
       - run: npm run build
 
+      # O mesmo build aprovado acima vira o pacote de runtime. Não recompila em
+      # servidor próprio e também valida, no PR, que o standalone está completo.
+      - name: Empacotar runtime de produção
+        run: ETAPA=empacotar bash deploy/empacotar.sh "$RUNNER_TEMP/standalone.tgz"
+
+      - name: Guardar pacote de produção
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: erp-production-${{ github.sha }}
+          path: ${{ runner.temp }}/standalone.tgz
+          if-no-files-found: error
+          retention-days: 7
+
   telas:
     name: Telas nos cinco tamanhos
     runs-on: ubuntu-latest

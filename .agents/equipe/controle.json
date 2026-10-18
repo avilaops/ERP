@@ -7,10 +7,10 @@
       "id": "T-20261017-modulo-fiscal-operacional",
       "title": "Concluir o módulo Fiscal operacional",
       "owner": null,
-      "status": "em-revisao",
+      "status": "em-andamento",
       "acceptance": ["Menu Fiscal visível para a Diretoria", "Pedidos fechados, fila, revisões, notas, e-mails e inutilizações consultáveis por empresa", "Resumo do pedido indica contrato, emissão e envio ao contato", "Lint, tipos, testes, build e telas nos cinco tamanhos aprovados no GitHub Actions"],
       "evidence": ["docs/superpowers/plans/2026-10-17-modulo-fiscal-operacional.md", "https://github.com/avilaops/ERP/pull/21", "https://github.com/avilaops/ERP/actions/runs/39047714624", "Auditoria final: escopo por vendedor e ambiente, concorrência de reabertura, quinta tentativa, relógio do lote, transição segura de jobs antigos, permissões dependentes e inutilização concorrente cobertos no lote consolidado da PR 21"],
-      "next": "Mesclar a PR 21 somente com os checks obrigatórios do HEAD verdes; não há implantação autorizada nesta tarefa."
+      "next": "Autorização recebida em 18/10/2026: validar o empacotamento no GitHub, mesclar a PR 21, criar backup imediato e publicar o mesmo artefato verde em produção."
     },
     {
       "id": "T-20261017-validacao-fiscal-local",

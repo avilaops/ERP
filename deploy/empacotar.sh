@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Confere, faz o build standalone e empacota em standalone.tgz.
 # Uso: bash deploy/empacotar.sh [arquivo-de-saida]
-# ETAPA=conferir só confere (lint, tipos, testes); ETAPA=montar só faz o build e o
-# pacote, para rodar no servidor de build; sem ETAPA, faz as duas coisas aqui.
+# ETAPA=conferir só confere (lint, tipos, testes); ETAPA=montar faz o build e o
+# pacote; ETAPA=empacotar aproveita o build já aprovado pelo GitHub Actions; sem
+# ETAPA, faz conferência, build e pacote nesta máquina.
 #
 # Armadilhas conhecidas:
 # 1. nunca gerar o .tgz dentro da pasta empacotada;
@@ -22,9 +23,13 @@ rm -f /tmp/erp-testes.$$
 fi
 [ "$ETAPA" = "conferir" ] && exit 0
 
-echo "▸ build"
-rm -rf .next
-npm run build >/dev/null
+if [ "$ETAPA" != "empacotar" ]; then
+  echo "▸ build"
+  rm -rf .next
+  npm run build >/dev/null
+else
+  [ -f .next/standalone/server.js ] || { echo "! o build standalone aprovado não foi encontrado"; exit 1; }
+fi
 
 echo "▸ montando o pacote"
 RAIZ=.next/standalone
