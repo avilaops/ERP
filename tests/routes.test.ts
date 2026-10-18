@@ -495,7 +495,7 @@ test("nota fiscal: a conferência do XML só sai para quem opera o Fiscal, de pe
   assert.doesNotMatch(route, /certificate|vaultKey|fetch\(|sefaz/i);
   const order = readFileSync(new URL("../src/app/(app)/pedidos/[numero]/page.tsx", import.meta.url), "utf8");
   assert.ok(order.includes('order.status === "fechado" && allows(session, "fiscal") ? await previewOrderNfe('));
-  assert.ok(order.includes('allows(session, "parametros") && <Link href="/parametros/transportadoras"'));
+  assert.match(order, /allows\(session, "parametros"\)[\s\S]{0,80}<Link href="\/parametros\/transportadoras"/);
   const loader = readFileSync(new URL("../src/lib/db/order-nfe.ts", import.meta.url), "utf8");
   assert.ok(loader.includes('order.status !== "fechado"'));
   assert.doesNotMatch(loader, /UPDATE|INSERT|DELETE/);
