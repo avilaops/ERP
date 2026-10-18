@@ -1516,13 +1516,22 @@ test("fila fiscal: clique repetido compartilha a emissão; perda de resposta ret
   assert.deepEqual([delayed.rows[0].status, Number(delayed.rows[0].attempts)], ["pendente", 1]);
 
   const stillProcessing = async (url: string, _action: string, envelope: string) => {
+    assert.match(url, /\.sp\.gov\.br/);
     if (/nfeconsultaprotocolo4/.test(url)) {
       const key = /<chNFe>(\d{44})<\/chNFe>/.exec(envelope)![1];
       return `<retConsSitNFe versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe"><cStat>217</cStat><xMotivo>NF-e não consta</xMotivo><chNFe>${key}</chNFe></retConsSitNFe>`;
     }
     return `<retEnviNFe versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe"><cStat>105</cStat><xMotivo>Lote em processamento</xMotivo></retEnviNFe>`;
   };
-  assert.equal(await runOneFiscalJob(delayed.rows[0].run_after as Date, { ...dependencies, send: stillProcessing }, db.pool), "retry");
+  const originalIssuer = (await db.pool.query("SELECT city, city_code, uf, cep FROM company_settings")).rows[0];
+  try {
+    // A nota assinada pertence à UF codificada na chave. Uma alteração posterior
+    // do cadastro não pode consultar nem retransmitir por outra autoridade.
+    await db.pool.query("UPDATE company_settings SET city = 'Rio de Janeiro', city_code = '3304557', uf = 'RJ', cep = '20040002'");
+    assert.equal(await runOneFiscalJob(delayed.rows[0].run_after as Date, { ...dependencies, send: stillProcessing }, db.pool), "retry");
+  } finally {
+    await db.pool.query("UPDATE company_settings SET city = $1, city_code = $2, uf = $3, cep = $4", [originalIssuer.city, originalIssuer.city_code, originalIssuer.uf, originalIssuer.cep]);
+  }
   const delayedAgain = await db.pool.query("SELECT status, attempts, run_after FROM fiscal_jobs WHERE id = $1", [first.id]);
   assert.deepEqual([delayedAgain.rows[0].status, Number(delayedAgain.rows[0].attempts)], ["pendente", 2]);
 

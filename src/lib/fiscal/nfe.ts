@@ -16,6 +16,12 @@ export const UF_CODES: Record<string, string> = {
   AL: "27", SE: "28", BA: "29", MG: "31", ES: "32", RJ: "33", SP: "35", PR: "41", SC: "42", RS: "43", MS: "50", MT: "51", GO: "52", DF: "53",
 };
 
+/** The issuing state encoded in the first two positions of an NF-e access key. */
+export function accessKeyUf(key: string): string | null {
+  const stateCode = key.slice(0, 2);
+  return Object.entries(UF_CODES).find(([, code]) => code === stateCode)?.[0] ?? null;
+}
+
 export type NfeAddress = {
   street: string;
   number: string;
