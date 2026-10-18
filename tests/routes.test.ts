@@ -503,6 +503,16 @@ test("nota fiscal: a conferência do XML só sai para quem opera o Fiscal, de pe
   assert.doesNotMatch(loader, /UPDATE|INSERT|DELETE/);
 });
 
+test("nota fiscal: emissão continua visível quando bloqueada e o reenvio oferece os anexos disponíveis", () => {
+  const order = readFileSync(new URL("../src/app/(app)/pedidos/[numero]/page.tsx", import.meta.url), "utf8");
+  assert.match(order, /firstProblemStep\(invoice\.problems\)/);
+  assert.match(order, /disabled[\s\S]{0,160}Emitir nota fiscal/);
+  assert.match(order, /Corrigir \{invoice\.problems\.length\} pendência/);
+  for (const document of ["xml", "danfe", "evento", "contrato"]) {
+    assert.ok(order.includes(`name="documents" value="${document}"`), `anexo ${document} não está disponível no formulário`);
+  }
+});
+
 test("nota fiscal: só quem opera o Fiscal coloca a emissão na fila; a verificação da SEFAZ nunca é desligada; o XML autorizado segue o alcance do pedido", () => {
   const action = readFileSync(new URL("../src/app/(app)/pedidos/nfe-actions.ts", import.meta.url), "utf8");
   assert.ok(action.indexOf('await requirePermission("fiscal")') < action.indexOf("enqueueNfeIssue("));

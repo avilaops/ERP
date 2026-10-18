@@ -9,7 +9,8 @@ import { CarrierError, saveOrderTransport } from "@/lib/db/carriers";
 import { saveFreightMode } from "@/lib/db/invoices";
 import { DeliveryError, saveOrderDelivery } from "@/lib/db/order-delivery";
 import { getOrder } from "@/lib/db/orders";
-import { sendInvoiceMail } from "@/lib/db/send-nfe-mail";
+import { INVOICE_MAIL_DOCUMENTS, sendInvoiceMail } from "@/lib/db/send-nfe-mail";
+import type { InvoiceMailDocument } from "@/lib/db/send-nfe-mail";
 import { tenantDb } from "@/lib/db/pool";
 import { vaultKey } from "@/lib/fiscal/certificate";
 import { MailError } from "@/lib/mail/message";
@@ -142,13 +143,14 @@ export async function sendNfeMailAction(_previous: ActionState, formData: FormDa
   const number = formData.get("number");
   const invoiceId = Number(formData.get("invoiceId"));
   const to = formData.get("to");
+  const documents = formData.getAll("documents").filter((value): value is InvoiceMailDocument => typeof value === "string" && INVOICE_MAIL_DOCUMENTS.includes(value as InvoiceMailDocument));
   if (typeof number !== "string" || !ORDER_NUMBER.test(number) || !Number.isInteger(invoiceId)) return { error: "Nota não encontrada." };
   const order = await getOrder(number, { sellerEmail: seesAllOrders(session) ? null : session.email }, conn);
   const owned = order ? await conn.query("SELECT 1 FROM fiscal_invoices WHERE id = $1 AND order_id = $2", [invoiceId, order.id]) : null;
   if (!order || !owned?.rows[0]) return { error: "Nota não encontrada." };
   try {
     const result = await sendInvoiceMail(
-      { invoiceId, to: typeof to === "string" && to.trim() !== "" ? to : null, sentBy: session.email, now: new Date(), env: process.env, key: () => vaultKey(process.env.ERP_CERT_KEY), send: sendMail },
+      { invoiceId, to: typeof to === "string" && to.trim() !== "" ? to : null, documents, sentBy: session.email, now: new Date(), env: process.env, key: () => vaultKey(process.env.ERP_CERT_KEY), send: sendMail },
       conn,
     );
     revalidatePath(`${menuItem("pedidos").href}/${number}`);

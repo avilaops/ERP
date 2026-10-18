@@ -41,6 +41,7 @@ import { DiscountFields } from "@/components/DiscountFields";
 import { proposalText } from "@/lib/quote/text";
 import { decideApprovalAction } from "../../aprovacoes/actions";
 import { FREIGHT_MODES } from "@/lib/fiscal/nfe";
+import { firstProblemStep } from "@/lib/fiscal/rules-form";
 import { cancelContractAction, resendContractAction, sendContractAction, sendUploadedContractAction, signContractAction } from "../contract-actions";
 import { issueNfeAction, registerNfeEventAction, saveDeliveryAction, saveTransportAction, sendNfeMailAction } from "../nfe-actions";
 import { CustomerForm } from "../../clientes/CustomerForm";
@@ -217,6 +218,7 @@ export default async function PedidoPage({
   const now = new Date();
   const contracts = await listOrderContracts(order.id, conn);
   const waiting = contracts.find((contract) => contract.status === "enviado") ?? null;
+  const signedContract = contracts.find((contract) => contract.status === "assinado") ?? null;
   // When the company asks for the second code, sending a contract also asks for the mobile phone of who signs.
   const asksPhone = order.status === "fechado" ? (await loadContractSettings(conn)).secondFactor : false;
   const contractDraft =
@@ -568,17 +570,38 @@ export default async function PedidoPage({
                       </span>
                     ))}
                   {(item.status === "autorizada" || item.status === "cancelada") && (
-                    <ActionForm action={sendNfeMailAction} className="mt-2 flex flex-wrap items-end gap-2 text-slate-900">
+                    <ActionForm action={sendNfeMailAction} className="mt-3 rounded-md border border-slate-300 bg-white p-3 text-slate-900">
                       <input type="hidden" name="number" value={order.number} />
                       <input type="hidden" name="invoiceId" value={item.id} />
-                      <div>
-                        <label htmlFor={`email-${item.id}`} className="block text-xs font-medium">
-                          Enviar {item.status === "cancelada" ? "o cancelamento" : "XML, DANFE e última CC-e, se houver"} por e-mail para
-                        </label>
-                        <input key={order.customer?.email ?? ""} id={`email-${item.id}`} name="to" type="email" defaultValue={order.customer?.email ?? ""} autoComplete="off" className={`${INPUT} mt-1 w-72 max-w-full`} />
-                      </div>
-                      <button type="submit" className={SECONDARY}>
-                        Enviar por e-mail
+                      <label htmlFor={`email-${item.id}`} className="block text-xs font-medium">
+                        Enviar documentos por e-mail para
+                      </label>
+                      <input key={order.customer?.email ?? ""} id={`email-${item.id}`} name="to" type="email" defaultValue={order.customer?.email ?? ""} autoComplete="email" className={`${INPUT} mt-1 w-full sm:max-w-md`} />
+                      <fieldset className="mt-3">
+                        <legend className="text-xs font-medium">Escolha os anexos</legend>
+                        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                          <label className="flex items-center gap-2 rounded border border-slate-200 px-3 py-2">
+                            <input name="documents" value="xml" type="checkbox" defaultChecked /> XML autorizado
+                          </label>
+                          {item.status === "autorizada" && (
+                            <label className="flex items-center gap-2 rounded border border-slate-200 px-3 py-2">
+                              <input name="documents" value="danfe" type="checkbox" defaultChecked /> DANFE em PDF
+                            </label>
+                          )}
+                          {events.some((event) => event.invoiceId === item.id && event.kind === (item.status === "cancelada" ? "cancelamento" : "correcao")) && (
+                            <label className="flex items-center gap-2 rounded border border-slate-200 px-3 py-2">
+                              <input name="documents" value="evento" type="checkbox" defaultChecked /> {item.status === "cancelada" ? "XML do cancelamento" : "Última CC-e"}
+                            </label>
+                          )}
+                          {signedContract && (
+                            <label className="flex items-center gap-2 rounded border border-slate-200 px-3 py-2">
+                              <input name="documents" value="contrato" type="checkbox" /> Contrato assinado
+                            </label>
+                          )}
+                        </div>
+                      </fieldset>
+                      <button type="submit" className={`${SECONDARY} mt-3`}>
+                        Enviar documentos
                       </button>
                     </ActionForm>
                   )}
@@ -727,14 +750,23 @@ export default async function PedidoPage({
             </ActionForm>
           </details>
           {invoice.problems.length > 0 ? (
-            <>
-              <p className="mt-3 font-medium">Para montar a nota, falta:</p>
+            <div className="mt-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-amber-950">
+              <p className="font-semibold">A emissão está bloqueada por {invoice.problems.length} {invoice.problems.length === 1 ? "pendência" : "pendências"}.</p>
               <ul className="mt-1 list-disc pl-5 text-slate-700">
                 {invoice.problems.map((problem) => (
                   <li key={problem}>{problem}</li>
                 ))}
               </ul>
-            </>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <Link href={`/pedidos/${order.number}/fiscal?etapa=${firstProblemStep(invoice.problems)}`} className={PRIMARY}>
+                  Corrigir {invoice.problems.length} pendência{invoice.problems.length === 1 ? "" : "s"}
+                </Link>
+                <button type="button" disabled className={`${PRIMARY} cursor-not-allowed opacity-50`}>
+                  Emitir nota fiscal
+                </button>
+              </div>
+              <p className="mt-2 text-xs">O botão de emissão será liberado assim que as pendências acima forem corrigidas.</p>
+            </div>
           ) : (
             <>
               <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1 sm:grid-cols-4">
