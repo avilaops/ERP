@@ -110,7 +110,9 @@ export async function listFiscalOverview(scope: FiscalOverviewScope, conn: Query
                 SELECT 1 FROM fiscal_invoices job_invoice
                  WHERE job_invoice.id = fj.invoice_id AND job_invoice.environment = $2
               ))
-            ORDER BY fj.id DESC LIMIT 1
+            ORDER BY CASE fj.status WHEN 'revisao_manual' THEN 0 WHEN 'processando' THEN 1 WHEN 'pendente' THEN 2 ELSE 3 END,
+                     fj.id DESC
+            LIMIT 1
          ) j ON true
         WHERE o.status = 'fechado' AND ($1::text IS NULL OR o.seller_email = $1)
         ORDER BY o.closed_at DESC, o.id DESC`,

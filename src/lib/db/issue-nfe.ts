@@ -9,7 +9,7 @@ import { withQueryableConnection } from "@/lib/db/pool";
 import type { Send } from "@/lib/fiscal/channel";
 import type { LayoutCheck } from "@/lib/fiscal/precheck";
 import { openCertificate } from "@/lib/fiscal/certificate";
-import { NfeError, accessKey, buildNfeXml, isAcceptableRandomCode } from "@/lib/fiscal/nfe";
+import { NfeError, accessKey, accessKeyUf, buildNfeXml, isAcceptableRandomCode } from "@/lib/fiscal/nfe";
 import {
   AUTHORIZATION_ACTION, CONSULT_ACTION, NUMBER_TAKEN, SefazError, VOID_ACTION, authorizationEnvelope, authorizationUrl, consultEnvelope, consultEvents, consultUrl, nfeProcXml,
   parseAuthorization, parseConsult, parseVoid, voidEnvelope, voidUrl, voidXml,
@@ -73,11 +73,12 @@ async function prepareOrderInvoice(orderNumber: string, who: string, now: Date, 
     if (!sealed) throw new IssueError("Envie o certificado digital A1 em Parâmetros → Fiscal antes de emitir.");
     if (sealed.validUntil.getTime() <= now.getTime()) throw new IssueError("O certificado digital venceu. Envie o certificado em vigor em Parâmetros → Fiscal.");
     const certificate = openCertificate(sealed, vault);
-    const url = authorizationUrl(preview.issuerUf, environment);
-
     const previous = (await listOrderInvoices(preview.orderId, conn)).filter((invoice) => invoice.environment === environment);
     if (previous.some((invoice) => invoice.status === "autorizada")) throw new IssueError("Este pedido já tem nota autorizada.");
     const waiting = previous.find((invoice) => invoice.status === "assinada");
+    const issuerUf = waiting ? accessKeyUf(waiting.accessKey) : preview.issuerUf;
+    if (!issuerUf) throw new IssueError("A nota aguardando resposta tem uma chave de acesso com estado desconhecido; confira-a antes de tentar novamente.");
+    const url = authorizationUrl(issuerUf, environment);
     if (!waiting && target && (target.preparationHash === null || nfePreparationFingerprint(preview.input) !== target.preparationHash)) {
       throw new IssueError("A preparação fiscal mudou depois da confirmação. Confira os dados e confirme a emissão novamente.");
     }
@@ -93,7 +94,7 @@ async function prepareOrderInvoice(orderNumber: string, who: string, now: Date, 
       // Sent before without an answer: first ask SEFAZ what it has. Only an invoice it never received is sent again.
       let known;
       try {
-        known = parseConsult(await send(consultUrl(preview.issuerUf, environment), CONSULT_ACTION, consultEnvelope(waiting.accessKey, environment), { pfx: certificate.pfx, passphrase: certificate.password }), waiting.accessKey);
+        known = parseConsult(await send(consultUrl(issuerUf, environment), CONSULT_ACTION, consultEnvelope(waiting.accessKey, environment), { pfx: certificate.pfx, passphrase: certificate.password }), waiting.accessKey);
       } catch (error) {
         if (error instanceof SefazError) throw new IssueError(`${error.message} A nota ${waiting.number} continua aguardando resposta.`);
         throw error;
@@ -160,7 +161,7 @@ async function prepareOrderInvoice(orderNumber: string, who: string, now: Date, 
     await linkInvoiceToJob(invoice.id, target?.fiscalJobId, conn);
 
     await conn.query("COMMIT");
-    return { invoice, signedXml, certificate, url, environment, issuerUf:preview.issuerUf };
+    return { invoice, signedXml, certificate, url, environment, issuerUf };
   } catch (error) {
     await conn.query("ROLLBACK");
     throw error;
