@@ -1522,6 +1522,16 @@ test("fila fiscal: clique repetido compartilha a emissão; perda de resposta ret
   assert.deepEqual((await listOrderInvoices(orderId, db.pool)).map((invoice) => [invoice.status, invoice.number, invoice.protocol]), [["autorizada", 43, "135260000000071"]]);
   assert.deepEqual((await listOrderFiscalJobs(orderId, "homologacao", db.pool)).map((job) => job.id), [first.id]);
   assert.deepEqual(await listOrderFiscalJobs(orderId, "producao", db.pool), []);
+  const legacyEvent = await db.pool.query(
+    `INSERT INTO fiscal_jobs (kind, order_id, requested_by, status, event_text, last_error)
+     VALUES ('correcao_nfe', $1, $2, 'revisao_manual', 'Evento legado sem nota identificada.', 'Confira a nota e a SEFAZ.')
+     RETURNING id`,
+    [orderId, who],
+  );
+  const legacyEventId = Number(legacyEvent.rows[0].id);
+  assert.deepEqual((await listOrderFiscalJobs(orderId, "homologacao", db.pool)).map((job) => job.id), [legacyEventId, first.id]);
+  assert.deepEqual((await listOrderFiscalJobs(orderId, "producao", db.pool)).map((job) => job.id), [legacyEventId]);
+  await db.pool.query("DELETE FROM fiscal_jobs WHERE id = $1", [legacyEventId]);
   assert.deepEqual(mail, ["fila@cliente.test"]);
   const done = await db.pool.query("SELECT status, attempts, lease_until, completed_at FROM fiscal_jobs WHERE id = $1", [first.id]);
   assert.equal(done.rows[0].status, "concluido");

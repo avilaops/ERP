@@ -54,6 +54,8 @@ export async function listOrderFiscalJobs(orderId: number, environment: "homolog
           OR EXISTS (SELECT 1 FROM fiscal_invoices i WHERE i.fiscal_job_id = j.id AND i.environment = $2)
           OR (j.kind = 'emitir_nfe' AND j.invoice_id IS NULL AND j.environment = $2
               AND NOT EXISTS (SELECT 1 FROM fiscal_invoices i WHERE i.fiscal_job_id = j.id))
+          OR (j.kind IN ('correcao_nfe', 'cancelamento_nfe')
+              AND j.status = 'revisao_manual' AND j.invoice_id IS NULL)
         )
       ORDER BY j.id DESC LIMIT 5`,
     [orderId, environment],
