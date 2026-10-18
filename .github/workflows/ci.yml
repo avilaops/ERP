@@ -126,7 +126,7 @@ jobs:
 
       - run: npm run db:migrate
 
-      - run: npm run db:seed-demo -- --empresa ludus
+      - run: npm run db:seed-demo -- --empresa ludus --escala 3000
 
       # Falha com rolagem lateral, controle abaixo de 44 px ou erro na página (docs/ux.md).
       - name: Organização do menu nos cinco tamanhos
