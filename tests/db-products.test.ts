@@ -82,9 +82,9 @@ test("produto: a lista filtra por ativo e vem em ordem de nome", { skip }, async
 });
 
 test("produto: código é ordenado pelo número, e busca trata porcentagem e sublinhado como texto", { skip }, async () => {
-  await createProduct({ name: "Natural dez", code: "NATURAL-10", advisoryCost: 10 }, WHO, db.pool);
-  await createProduct({ name: "Natural dois", code: "NATURAL-2", advisoryCost: 10 }, WHO, db.pool);
-  await createProduct({ name: "Símbolos 100%_literal", code: "SYMBOL", advisoryCost: 10 }, WHO, db.pool);
+  await createProduct({ name: "Natural dez", code: "NATURAL-10" }, WHO, db.pool);
+  await createProduct({ name: "Natural dois", code: "NATURAL-2" }, WHO, db.pool);
+  await createProduct({ name: "Símbolos 100%_literal", code: "SYMBOL" }, WHO, db.pool);
   const options = { sorts: ["codigo", "nome"] as const, defaultSort: "codigo" as const, filters: { aba: ["ativos", "sem-custo", "sem-codigo", "inativos"] } };
 
   const ordered = await queryProducts(parseListQuery({ q: "NATURAL-", porPagina: "10" }, options), 1, db.pool);
