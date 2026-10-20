@@ -21,6 +21,7 @@ import { listOrderInvoiceEvents, listOrderInvoices } from "@/lib/db/invoices";
 import { previewOrderNfe } from "@/lib/db/order-nfe";
 import { findCustomerByDocument } from "@/lib/db/customers";
 import { getOrder, listPaymentMethods, loadOrderStanding } from "@/lib/db/orders";
+import { diagnoseOrderFinance } from "@/lib/db/order-finance-diagnosis";
 import { loadClosingProposal } from "@/lib/db/proposal-details";
 import { ContractError, isOpen, listOrderContracts, loadContractSettings, standingText } from "@/lib/db/contracts";
 import { draftOrderContract } from "@/lib/db/send-contract";
@@ -146,6 +147,7 @@ export default async function PedidoPage({
   const today = isoDate(new Date());
   const dates = dueDates(order, table, today);
   const editable = order.status === "em_negociacao";
+  const financeDiagnosis = session.role === "DIRETORIA" ? await diagnoseOrderFinance(order.number, conn) : null;
   const plan = paymentOf(order, sale, table, today);
   // The installments of the balance, as they stand: the rows the seller may change one by one.
   const installmentRows = plan.receipts.filter((receipt) => receipt.label !== "Entrada");
@@ -1502,6 +1504,17 @@ export default async function PedidoPage({
               </button>
             </ActionForm>
           </div>
+        </section>
+      )}
+      {financeDiagnosis && (
+        <section className={`${CARD} mt-4 p-4`} aria-label="Diagnóstico financeiro do pedido">
+          <h2 className="font-semibold">Conferência financeira e fiscal</h2>
+          <p className="mt-1 text-sm text-slate-600">Consulta administrativa: não altera nem exclui lançamentos.</p>
+          <ul className="mt-2 list-disc pl-5 text-sm">
+            {Object.entries(financeDiagnosis.counts).filter(([, count]) => count > 0).map(([kind, count]) => <li key={kind}>{kind}: {count}</li>)}
+            {financeDiagnosis.reasons.map((reason) => <li key={reason}>{reason}</li>)}
+            {financeDiagnosis.reasons.length === 0 && <li>Nenhum bloqueio financeiro ou fiscal identificado nesta consulta.</li>}
+          </ul>
         </section>
       )}
       {editable && <div data-part="resumo" className="mt-4">
