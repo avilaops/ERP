@@ -2,7 +2,7 @@ import { monthLabel } from "@/lib/commissions-view";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { FitRows } from "@/components/FitRows";
-import { CARD, DANGER_OUTLINE, pageOf, Pager, PRIMARY, SECONDARY, PageHeader, MetricSummary, ViewTabs } from "@/components/ui";
+import { CARD, INPUT, DANGER_OUTLINE, pageOf, Pager, PRIMARY, SECONDARY, PageHeader, MetricSummary, ViewTabs } from "@/components/ui";
 import { rowsPerPage } from "@/lib/rows";
 import { OrderReference } from "@/components/OrderReference";
 import { requirePermission } from "@/lib/auth";
@@ -20,7 +20,6 @@ import { ReceiptForm } from "./ReceiptForm";
 export const metadata = { title: `${menuItem("recebimentos").label} · ERP` };
 export const dynamic = "force-dynamic";
 
-const INPUT = "min-h-[var(--control)] rounded border border-slate-300 bg-white px-2 text-sm outline-none focus:ring-2 focus:ring-brand";
 const count = (n: number) => `${n} ${n === 1 ? "valor" : "valores"}`;
 
 const HERE = menuItem("recebimentos").href;
@@ -97,6 +96,7 @@ export default async function RecebimentosPage({ searchParams }: { searchParams:
                       </p>
                     </div>
                   </div>
+                  <p className="mt-2 text-xs text-slate-600">Para corrigir uma cobrança incorreta, não use Dar baixa. Consulte o pedido e seus vínculos financeiros; a edição administrativa depende de validação.</p>
                   <ReceiptForm key={`${item.id}:${item.open}`} id={item.id} openAmount={item.open} today={today} initialMethod={item.method} methods={methods} initiallyOpen={false} />
                 </li>
               );
