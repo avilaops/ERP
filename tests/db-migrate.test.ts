@@ -143,6 +143,7 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "0076_alvo_da_emissao_fiscal.sql",
     "0077_preparacao_confirmada_da_emissao.sql",
     "0078_reserva_unica_da_numeracao.sql",
+    "0079_auditoria_ajustes_recebiveis.sql",
   ]);
 
   const second = await withClient((client) => migrate(client, MIGRATIONS_DIR));
@@ -244,6 +245,7 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "purchase_items",
     "purchases",
     "receipts",
+    "receivable_adjustments",
     "receivable_bills",
     "receivables",
     "refund_requests",
