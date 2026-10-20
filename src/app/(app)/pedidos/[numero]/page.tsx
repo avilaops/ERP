@@ -147,7 +147,7 @@ export default async function PedidoPage({
   const today = isoDate(new Date());
   const dates = dueDates(order, table, today);
   const editable = order.status === "em_negociacao";
-  const financeDiagnosis = session.role === "DIRETORIA" ? await diagnoseOrderFinance(order.number, conn) : null;
+  const financeDiagnosis = seesCosts(session) ? await diagnoseOrderFinance(order.number, conn) : null;
   const plan = paymentOf(order, sale, table, today);
   // The installments of the balance, as they stand: the rows the seller may change one by one.
   const installmentRows = plan.receipts.filter((receipt) => receipt.label !== "Entrada");
