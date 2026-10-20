@@ -345,3 +345,49 @@ export async function decideRefund(requestId: number, confirm: boolean, who: str
   );
   if (rows.length === 0) throw new ReceivableError(DECIDED);
 }
+
+/**
+ * Controlled administrative adjustment. Never changes a paid installment or
+ * any order with fiscal, signed-contract or production obligations.
+ * Uses one SQL statement so the validation, mutation and audit are atomic.
+ */
+export async function adjustOpenReceivable(
+  id: number,
+  input: { action: "editar" | "cancelar"; dueDate: string | null; method: string | null; reason: string },
+  who: string,
+  conn: Queryable,
+): Promise<void> {
+  if (!Number.isSafeInteger(id) || id < 1) throw new ReceivableError("Recebível inválido.");
+  if (input.reason.trim().length < 10) throw new ReceivableError("Explique o motivo com pelo menos 10 caracteres.");
+  if (!who.trim()) throw new ReceivableError("Usuário responsável obrigatório.");
+  if (input.action === "editar" && input.dueDate !== null) parseDate(input.dueDate);
+  const { rows } = await conn.query(`
+    WITH eligible AS (
+      SELECT r.id, r.order_id, r.due_date, r.method, r.status, r.amount
+      FROM receivables r JOIN orders o ON o.id = r.order_id
+      WHERE r.id=$1 AND r.status='aberta' AND o.status='fechado'
+        AND NOT EXISTS (SELECT 1 FROM receipts p WHERE p.receivable_id=r.id)
+        AND NOT EXISTS (SELECT 1 FROM refund_requests q WHERE q.receivable_id=r.id)
+        AND NOT EXISTS (SELECT 1 FROM refunds f WHERE f.receivable_id=r.id)
+        AND NOT EXISTS (SELECT 1 FROM fiscal_invoices i WHERE i.order_id=o.id)
+        AND NOT EXISTS (SELECT 1 FROM fiscal_jobs j WHERE j.order_id=o.id)
+        AND NOT EXISTS (SELECT 1 FROM order_contracts k WHERE k.order_id=o.id AND k.status='assinado')
+        AND NOT EXISTS (SELECT 1 FROM production_orders w WHERE w.order_id=o.id)
+      FOR UPDATE OF r, o
+    ), changed AS (
+      UPDATE receivables r
+      SET due_date = CASE WHEN $2='editar' THEN $3::date ELSE r.due_date END,
+          method = CASE WHEN $2='editar' THEN $4::text ELSE r.method END,
+          status = CASE WHEN $2='cancelar' THEN 'cancelada' ELSE r.status END,
+          updated_by=$6, updated_at=now()
+      FROM eligible e WHERE r.id=e.id
+      RETURNING r.id, r.due_date, r.method, r.status, r.amount
+    ), audit AS (
+      INSERT INTO receivable_adjustments(receivable_id, action, previous_state, new_state, reason, changed_by)
+      SELECT e.id, $2, to_jsonb(e), to_jsonb(c), $5, $6
+      FROM eligible e JOIN changed c ON c.id=e.id RETURNING id
+    )
+    SELECT id FROM audit
+  `, [id, input.action, input.dueDate, input.method, input.reason.trim(), who]);
+  if (rows.length !== 1) throw new ReceivableError("Lançamento não pode ser alterado: verifique baixas, estornos, nota fiscal, contrato, produção ou situação do pedido.");
+}
