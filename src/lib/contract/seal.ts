@@ -73,6 +73,9 @@ export async function sealPdf(pdf: Uint8Array, key: SigningKey, info: SealInfo):
   const p7 = forge.pkcs7.createSignedData();
   p7.content = forge.util.createBuffer(latin1(signed));
   p7.addCertificate(certificate);
+  for (const derBase64 of key.certificateChainBase64 ?? []) {
+    p7.addCertificate(forge.pki.certificateFromAsn1(forge.asn1.fromDer(forge.util.decode64(derBase64))));
+  }
   p7.addSigner({
     key: forge.pki.privateKeyFromPem(key.privateKeyPem),
     certificate,
