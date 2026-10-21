@@ -1,5 +1,4 @@
 import { certificateHolder } from "@/lib/contract/seal";
-import { loadContractSettings } from "@/lib/db/contracts";
 import { loadSealedCertificate } from "@/lib/db/fiscal";
 import type { Queryable } from "@/lib/db/pool";
 import { openCertificate } from "@/lib/fiscal/certificate";
@@ -13,7 +12,6 @@ export type SealStanding = "desligado" | "sem-certificado" | "vencido" | null;
 
 /** Whether the company's signed contracts are being sealed, without opening the certificate. */
 export async function sealStanding(conn: Queryable, now: Date): Promise<SealStanding> {
-  if (!(await loadContractSettings(conn)).seal) return "desligado";
   const stored = await loadSealedCertificate(conn);
   if (!stored) return "sem-certificado";
   return stored.validUntil.getTime() <= now.getTime() ? "vencido" : null;
