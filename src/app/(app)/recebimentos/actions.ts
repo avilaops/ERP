@@ -5,7 +5,7 @@ import { requirePermission } from "@/lib/auth";
 import { confirmsRefunds, menuItem, seesCosts } from "@/lib/auth/permissions";
 import { listPaymentMethods } from "@/lib/db/orders";
 import { tenantDb } from "@/lib/db/pool";
-import { adjustOpenReceivable, decideRefund, ReceivableError, recordReceipt, requestRefund } from "@/lib/db/receivables";
+import { adjustOpenReceivable, createManualReceivable, decideRefund, ReceivableError, recordReceipt, requestRefund } from "@/lib/db/receivables";
 import { isoDate, parseMoney } from "@/lib/format";
 import type { ActionState } from "@/lib/order-form";
 
@@ -112,5 +112,25 @@ export async function adjustReceivableAction(_previous: ActionState, formData: F
   revalidatePath(menuItem("recebimentos").href);
   revalidatePath(menuItem("dashboard").href);
   revalidatePath(menuItem("contas-pagar").href);
+  return { error: null };
+}
+
+/** Manual provision is not a receipt: only an unpaid expected amount. */
+export async function createManualReceivableAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
+  const session = await requirePermission("recebimentos");
+  if (!seesCosts(session)) return { error: "Somente a Diretoria pode incluir uma cobrança manual." };
+  const conn = tenantDb(session.tenant.slug);
+  const method = field(formData, "method");
+  if (method && !(await listPaymentMethods(conn)).includes(method)) return { error: "Forma de cobrança inválida." };
+  const amount = parseMoney(field(formData, "amount"));
+  if (amount === null) return { error: "Informe um valor válido." };
+  try {
+    await createManualReceivable(field(formData, "orderNumber"), {
+      amount, dueDate: field(formData, "dueDate"), method: method || null, reason: field(formData, "reason"),
+    }, session.email, conn);
+  } catch (error) {
+    return refused("incluir cobrança manual", error);
+  }
+  revalidatePath(menuItem("recebimentos").href);
   return { error: null };
 }
