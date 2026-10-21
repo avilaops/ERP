@@ -394,3 +394,40 @@ export async function adjustOpenReceivable(
   `, [id, input.action, input.dueDate, input.method, input.reason.trim(), who]);
   if (rows.length !== 1) throw new ReceivableError("Lançamento não pode ser alterado: verifique baixas, estornos, contas a pagar, boletos, nota fiscal, contrato, produção ou situação do pedido.");
 }
+
+/** Manual financial provision attached to a closed order. No cash movement is recorded. */
+export async function createManualReceivable(
+  orderNumber: string,
+  input: { amount: number; dueDate: string; method: string | null; reason: string },
+  who: string,
+  conn: Queryable,
+): Promise<number> {
+  if (!Number.isFinite(input.amount) || input.amount <= 0 || !Number.isSafeInteger(Math.round(input.amount * 100))) throw new ReceivableError("Valor inválido.");
+  parseDate(input.dueDate);
+  if (input.reason.trim().length < 10) throw new ReceivableError("Justificativa obrigatória (mínimo 10 caracteres).");
+  if (!who.trim()) throw new ReceivableError("Usuário obrigatório.");
+  const { rows } = await conn.query(`
+    WITH eligible AS (
+      SELECT o.id FROM orders o
+      WHERE o.number=$1 AND o.status='fechado'
+        AND NOT EXISTS (SELECT 1 FROM fiscal_invoices i WHERE i.order_id=o.id)
+        AND NOT EXISTS (SELECT 1 FROM fiscal_jobs j WHERE j.order_id=o.id)
+        AND NOT EXISTS (SELECT 1 FROM order_contracts k WHERE k.order_id=o.id AND k.status='assinado')
+        AND NOT EXISTS (SELECT 1 FROM production_orders p WHERE p.order_id=o.id)
+        AND NOT EXISTS (SELECT 1 FROM receipts p JOIN receivables r ON r.id=p.receivable_id WHERE r.order_id=o.id)
+        AND NOT EXISTS (SELECT 1 FROM refund_requests q WHERE q.order_id=o.id)
+        AND NOT EXISTS (SELECT 1 FROM payables b WHERE b.order_id=o.id)
+      FOR UPDATE OF o
+    ), inserted AS (
+      INSERT INTO receivables(order_id,kind,number,due_date,amount,method,updated_by)
+      SELECT id,'parcela',(SELECT COALESCE(max(r.number),0)+1 FROM receivables r WHERE r.order_id=eligible.id),$2::date,$3::numeric,$4,$6
+      FROM eligible RETURNING id
+    ), audit AS (
+      INSERT INTO receivable_adjustments(receivable_id,action,previous_state,new_state,reason,changed_by)
+      SELECT id,'incluir','{}'::jsonb,jsonb_build_object('amount',$3::numeric,'dueDate',$2::date,'method',$4),$5,$6
+      FROM inserted RETURNING id
+    ) SELECT id FROM inserted WHERE EXISTS (SELECT 1 FROM audit)
+  `, [orderNumber, input.dueDate, input.amount, input.method, input.reason.trim(), who]);
+  if (rows.length !== 1) throw new ReceivableError("Não foi possível incluir: confira a situação e os vínculos financeiros, fiscais e operacionais do pedido.");
+  return Number(rows[0].id);
+}
