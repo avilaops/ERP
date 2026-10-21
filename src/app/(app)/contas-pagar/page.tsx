@@ -169,7 +169,7 @@ export default async function ContasPagarPage({ searchParams }: { searchParams: 
                 {allows(session, "comissoes") && (
                   <p className="mt-2 text-sm">
                     <Link href={`${menuItem("comissoes").href}?mes=${item.month}`} className="font-medium text-brand underline">
-                      Pagar em Comissões
+                      Ver e corrigir em Comissões
                     </Link>
                   </p>
                 )}
