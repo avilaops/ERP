@@ -14,7 +14,7 @@ import { isoDate, showDateTime, showIsoDate, showMoney } from "@/lib/format";
 import { addDays } from "@/lib/pricing/payment";
 import { isOverdue, receivablesSummary } from "@/lib/receivables-view";
 import { ActionForm } from "../pedidos/ActionForm";
-import { adjustReceivableAction, decideRefundAction, requestRefundAction } from "./actions";
+import { adjustReceivableAction, createManualReceivableAction, decideRefundAction, requestRefundAction } from "./actions";
 import { ReceiptForm } from "./ReceiptForm";
 
 export const metadata = { title: `${menuItem("recebimentos").label} · ERP` };
