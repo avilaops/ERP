@@ -2,7 +2,7 @@
 CREATE TABLE receivable_adjustments (
   id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   receivable_id integer NOT NULL REFERENCES receivables(id),
-  action text NOT NULL CHECK (action IN ('editar', 'cancelar')),
+  action text NOT NULL CHECK (action IN ('incluir', 'editar', 'cancelar')),
   previous_state jsonb NOT NULL,
   new_state jsonb NOT NULL,
   reason text NOT NULL CHECK (length(btrim(reason)) >= 10),
