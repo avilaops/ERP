@@ -369,6 +369,8 @@ export async function adjustOpenReceivable(
         AND NOT EXISTS (SELECT 1 FROM receipts p WHERE p.receivable_id=r.id)
         AND NOT EXISTS (SELECT 1 FROM refund_requests q WHERE q.receivable_id=r.id)
         AND NOT EXISTS (SELECT 1 FROM refunds f WHERE f.receivable_id=r.id)
+        AND NOT EXISTS (SELECT 1 FROM payables b WHERE b.order_id=o.id)
+        AND NOT EXISTS (SELECT 1 FROM receivable_bills bill WHERE bill.receivable_id=r.id)
         AND NOT EXISTS (SELECT 1 FROM fiscal_invoices i WHERE i.order_id=o.id)
         AND NOT EXISTS (SELECT 1 FROM fiscal_jobs j WHERE j.order_id=o.id)
         AND NOT EXISTS (SELECT 1 FROM order_contracts k WHERE k.order_id=o.id AND k.status='assinado')
@@ -389,5 +391,5 @@ export async function adjustOpenReceivable(
     )
     SELECT id FROM audit
   `, [id, input.action, input.dueDate, input.method, input.reason.trim(), who]);
-  if (rows.length !== 1) throw new ReceivableError("Lançamento não pode ser alterado: verifique baixas, estornos, nota fiscal, contrato, produção ou situação do pedido.");
+  if (rows.length !== 1) throw new ReceivableError("Lançamento não pode ser alterado: verifique baixas, estornos, contas a pagar, boletos, nota fiscal, contrato, produção ou situação do pedido.");
 }
