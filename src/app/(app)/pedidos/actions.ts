@@ -5,7 +5,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { notify } from "@/lib/api/notify";
 import { requirePermission } from "@/lib/auth";
-import { tenantDb } from "@/lib/db/pool";
+import { tenantDb, withTenantConnection } from "@/lib/db/pool";
+import { cancelForMcp } from "@/lib/db/mcp-commercial";
 import type { Session } from "@/lib/auth";
 import { approvesAtLoss, menuItem, seesAllOrders } from "@/lib/auth/permissions";
 import { isPlates } from "@/lib/plates";
@@ -332,4 +333,30 @@ export async function saveInstallmentsAction(_previous: ActionState, formData: F
   }
   revalidatePath(`${ORDERS}/${number}`);
   return { error: null, notice: "Parcelas gravadas." };
+}
+
+/** Cancel an eligible order with its open provisions, without deleting fiscal or cash history. */
+export async function cancelOrderAdministrativeAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
+  const session = await requirePermission("pedidos");
+  if (!approvesAtLoss(session)) return { error: "Somente a Diretoria pode cancelar pedidos por esta tela." };
+  const number = reader(formData)("number") ?? "";
+  const reason = reader(formData)("reason") ?? "";
+  try {
+    await withTenantConnection(session.tenant.slug, async (conn) => {
+      await conn.query("BEGIN");
+      try {
+        await cancelForMcp(number, scopeOf(session), reason, { email: session.email, role: "DIRETORIA" }, conn);
+        await conn.query("COMMIT");
+      } catch (error) {
+        await conn.query("ROLLBACK");
+        throw error;
+      }
+    });
+  } catch (error) {
+    return { error: problem("cancelar pedido", error) };
+  }
+  revalidatePath(ORDERS);
+  revalidatePath(`${ORDERS}/${number}`);
+  revalidatePath(menuItem("recebimentos").href);
+  return OK;
 }
