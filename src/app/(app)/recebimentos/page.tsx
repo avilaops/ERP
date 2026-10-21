@@ -60,6 +60,30 @@ export default async function RecebimentosPage({ searchParams }: { searchParams:
     <>
       <PageHeader title={menuItem("recebimentos").label} hint="Entradas e parcelas dos pedidos fechados." />
 
+      {seesCosts(session) && (
+        <details className={`${CARD} mt-3`}>
+          <summary className="disclosure-heading">Incluir cobrança manual<span className="disclosure-marker" aria-hidden="true">+</span></summary>
+          <ActionForm action={createManualReceivableAction} className="grid gap-3 border-t border-slate-200 p-4 sm:grid-cols-2">
+            <label className="text-sm">Número do pedido
+              <input name="orderNumber" className={INPUT} required placeholder="261008-RUZL" />
+            </label>
+            <label className="text-sm">Valor
+              <input name="amount" className={INPUT} required inputMode="decimal" placeholder="0,00" />
+            </label>
+            <label className="text-sm">Vencimento
+              <input name="dueDate" className={INPUT} type="date" required />
+            </label>
+            <label className="text-sm">Forma
+              <select name="method" className={INPUT}><option value="">Não definida</option>{methods.map((m) => <option key={m} value={m}>{m}</option>)}</select>
+            </label>
+            <label className="text-sm sm:col-span-2">Motivo
+              <textarea name="reason" className={INPUT} rows={2} minLength={10} required placeholder="Justifique a cobrança adicional" />
+            </label>
+            <p className="text-xs text-slate-600 sm:col-span-2">Cria uma provisão sem registrar dinheiro recebido. Pedidos com vínculos fiscais, contratos assinados, produção ou movimentação financeira ficam bloqueados.</p>
+            <button className={PRIMARY} type="submit">Incluir cobrança</button>
+          </ActionForm>
+        </details>
+      )}
       <ViewTabs label="Partes dos recebimentos" items={TABS.map(([key, label]) => ({ href: `${HERE}?ver=${key}`, label, current: key === tab }))} />
       {tab === "aberto" && (
         <>
