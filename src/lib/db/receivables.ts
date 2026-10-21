@@ -360,6 +360,7 @@ export async function adjustOpenReceivable(
   if (!Number.isSafeInteger(id) || id < 1) throw new ReceivableError("Recebível inválido.");
   if (input.reason.trim().length < 10) throw new ReceivableError("Explique o motivo com pelo menos 10 caracteres.");
   if (!who.trim()) throw new ReceivableError("Usuário responsável obrigatório.");
+  if (input.action !== "editar" && input.action !== "cancelar") throw new ReceivableError("Operação inválida.");
   if (input.action === "editar" && input.dueDate !== null) parseDate(input.dueDate);
   const { rows } = await conn.query(`
     WITH eligible AS (
