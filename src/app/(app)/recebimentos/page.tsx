@@ -106,7 +106,7 @@ export default async function RecebimentosPage({ searchParams }: { searchParams:
                     <div>
                       <OrderReference access={session} number={item.orderNumber} customer={item.customerName} />
                       <p className="text-xs text-slate-500">
-                        #{item.orderNumber} · {item.label} · vendedor: {item.sellerName}
+                        <Link href={`${menuItem("pedidos").href}/${item.orderNumber}`} className="font-medium text-brand underline">Abrir pedido #{item.orderNumber}</Link> · {item.label} · vendedor: {item.sellerName}
                       </p>
                       <Link href={`${menuItem("recebimentos").href}/${item.id}/pix`} className="text-sm font-medium text-brand underline">
                         Cobrar por PIX
