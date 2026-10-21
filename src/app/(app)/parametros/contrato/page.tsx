@@ -160,7 +160,7 @@ export default async function ContractSettingsPage() {
         </section>) },
 { title: "Selo digital", content: (<section key="selo" className={`${CARD} p-4`} aria-label="Selo digital">
             <label className="flex items-start gap-3">
-              <input key={String(settings.seal)} type="checkbox" name="seal" value="sim" defaultChecked={settings.seal} className="mt-1 h-5 w-5" />
+              <input type="hidden" name="seal" value="sim" /><span className="mt-1 text-sm font-semibold text-brand">Obrigatório</span>
               <span className="text-sm">
                 <span className="block font-semibold">Selar o contrato assinado com o certificado digital da empresa</span>
                 <span className="block text-slate-600">
@@ -171,8 +171,8 @@ export default async function ContractSettingsPage() {
                   {certificateValid
                     ? `Certificado em vigor: ${certificate.subject}, válido até ${showDate(certificate.validUntil)}.`
                     : certificate
-                      ? "O certificado enviado está vencido: enquanto não houver um em vigor, o contrato sai sem o selo."
-                      : "Ainda não há certificado: envie o A1 em Parâmetros → Fiscal. Até lá, o contrato sai sem o selo."}
+                      ? "O certificado enviado está vencido: a assinatura do contrato fica bloqueada até a renovação."
+                      : "Ainda não há certificado: envie o A1 em Parâmetros → Fiscal. Sem ele, não é possível concluir a assinatura do contrato."}
                 </span>
               </span>
             </label>
