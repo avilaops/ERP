@@ -6,7 +6,7 @@ import { CARD, INPUT, DANGER_OUTLINE, pageOf, Pager, PRIMARY, SECONDARY, PageHea
 import { rowsPerPage } from "@/lib/rows";
 import { OrderReference } from "@/components/OrderReference";
 import { requirePermission } from "@/lib/auth";
-import { confirmsRefunds, menuItem, seesCosts } from "@/lib/auth/permissions";
+import { allows, confirmsRefunds, menuItem, seesCosts } from "@/lib/auth/permissions";
 import { listPaymentMethods } from "@/lib/db/orders";
 import { tenantDb } from "@/lib/db/pool";
 import { listOpenReceivables, listPendingRefunds, listReceipts, receivedInMonth } from "@/lib/db/receivables";
@@ -106,7 +106,7 @@ export default async function RecebimentosPage({ searchParams }: { searchParams:
                     <div>
                       <OrderReference access={session} number={item.orderNumber} customer={item.customerName} />
                       <p className="text-xs text-slate-500">
-                        <Link href={`${menuItem("pedidos").href}/${item.orderNumber}`} className="font-medium text-brand underline">Abrir pedido #{item.orderNumber}</Link> · {item.label} · vendedor: {item.sellerName}
+                        {allows(session, "pedidos") ? <Link href={`${menuItem("pedidos").href}/${item.orderNumber}`} className="font-medium text-brand underline">Abrir pedido #{item.orderNumber}</Link> : <span>Pedido #{item.orderNumber}</span>} · {item.label} · vendedor: {item.sellerName}
                       </p>
                       <Link href={`${menuItem("recebimentos").href}/${item.id}/pix`} className="text-sm font-medium text-brand underline">
                         Cobrar por PIX
