@@ -20,6 +20,8 @@ test("administrative correction writes audit atomically and scopes to eligible r
   assert.match(calls[0].sql, /INSERT INTO receivable_adjustments/);
   assert.match(calls[0].sql, /NOT EXISTS \(SELECT 1 FROM receipts/);
   assert.match(calls[0].sql, /FOR UPDATE OF r, o/);
+  assert.match(calls[0].sql, /NOT EXISTS \(SELECT 1 FROM payables/);
+  assert.match(calls[0].sql, /NOT EXISTS \(SELECT 1 FROM receivable_bills/);
 });
 
 test("refuses adjustment when financial or fiscal obligations block it", async () => {
