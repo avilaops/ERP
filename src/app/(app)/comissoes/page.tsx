@@ -4,7 +4,7 @@ import Link from "next/link";
 import { CARD, PRIMARY, PageHeader, MetricSummary } from "@/components/ui";
 import { OrderReference } from "@/components/OrderReference";
 import { requirePermission } from "@/lib/auth";
-import { managesCommissions, menuItem } from "@/lib/auth/permissions";
+import { allows, managesCommissions, menuItem } from "@/lib/auth/permissions";
 import { chooseMonth, commissionsView, monthLabel } from "@/lib/commissions-view";
 import { listCarriedBalances, listCommissionMonths, listCommissions } from "@/lib/db/commissions";
 import { loadCommissionDay } from "@/lib/db/company";
@@ -138,6 +138,9 @@ export default async function ComissoesPage({ searchParams }: { searchParams: Pr
                         <td data-label="Taxa" className="whitespace-nowrap px-4 py-3 text-right">{showPercent(entry.rate)}</td>
                         <td data-label="Comissão" className={`whitespace-nowrap px-4 py-3 text-right font-semibold ${entry.amount < 0 ? "text-red-700" : ""}`}>
                           {showMoney(entry.amount)}
+                          {manages && allows(session, "recebimentos") && !entry.refund && !entry.paidAt && (
+                            <Link href={menuItem("recebimentos").href + "?ver=recebidos"} className="mt-1 block text-xs font-medium text-brand underline">Corrigir origem / solicitar estorno</Link>
+                          )}
                         </td>
                         <td className="whitespace-nowrap px-4 py-3 text-slate-600">{entry.paidAt ? `paga em ${showDate(entry.paidAt)}` : "em aberto"}</td>
                       </tr>
