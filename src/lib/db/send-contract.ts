@@ -12,7 +12,7 @@ import {
   loadEvidence, nextContractSequence, renewContractLink, signWithCode, startCode,
 } from "@/lib/db/contracts";
 import type { Contract, SigningContract } from "@/lib/db/contracts";
-import { loadContractSeal } from "@/lib/db/contract-seal";
+import { loadContractSeal, sealStanding } from "@/lib/db/contract-seal";
 import { loadFiscalSettings } from "@/lib/db/fiscal";
 import { loadMailInfo, mailChannel } from "@/lib/db/mail";
 import type { Order } from "@/lib/db/orders";
@@ -235,15 +235,16 @@ export async function contractFile(contract: Contract, context: { company: strin
   const pdf = await loadContractPdf(contract.id, conn);
   if (!pdf) throw new Error(`Contrato ${contract.id} sem arquivo.`);
   const plain = async () => withEvidence(pdf, await loadEvidence(contract, context, conn));
-  if (contract.status !== "assinado" || !context.vault) return plain();
+  if (contract.status !== "assinado") return plain();
+  if (!context.vault) throw new ContractError("Certificado ICP-Brasil obrigatório: cofre indisponível. O PDF assinado não será entregue sem selo.");
   try {
     const seal = await loadContractSeal(conn, context.vault, context.now);
-    if (!seal) return await plain();
+    if (!seal) throw new ContractError("Certificado ICP-Brasil obrigatório: habilite o selo e configure um certificado A1 válido.");
     const file = await withEvidence(pdf, await loadEvidence(contract, { ...context, sealedBy: seal.holder }, conn));
     return await sealPdf(file, seal.key, { name: seal.holder, reason: `Contrato nº ${contractNumber(context.orderNumber, contract.sequence)} assinado eletronicamente`, at: context.now });
   } catch (error) {
-    console.error("[contrato] o selo digital não pôde ser aplicado; o arquivo sai sem ele:", error instanceof Error ? error.message : error);
-    return plain();
+    console.error("[contrato] falha no selo ICP-Brasil; entrega bloqueada:", error instanceof Error ? error.message : error);
+    throw new ContractError("Não foi possível aplicar o selo ICP-Brasil. O contrato assinado não será entregue sem assinatura digital válida.");
   }
 }
 
@@ -311,6 +312,8 @@ export async function signOrderContract(
   if (!/^\d{6}$/.test(code)) throw new ContractError("O código do e-mail tem 6 números.");
   const phoneCode = context.phoneCode ?? "";
   if (contract.recipientPhone && !/^\d{6}$/.test(phoneCode)) throw new ContractError("Informe também o código de 6 números que chegou por SMS no celular.");
+  if (await sealStanding(conn, context.now) !== null) throw new ContractError("Assinatura indisponível: configure o selo ICP-Brasil e um certificado A1 válido antes de concluir.");
+  await loadContractSeal(conn, context.way.key, context.now).then((seal) => { if (!seal) throw new ContractError("Certificado ICP-Brasil obrigatório."); });
   await signWithCode(contract.id, { codeHash: hashCode(token, code), phoneCodeHash: contract.recipientPhone ? hashCode(token, `sms:${phoneCode}`) : null, ip: context.ip, agent: context.agent }, conn);
   try {
     const signed = (await getOrderContract(contract.orderId, contract.id, conn))!;
