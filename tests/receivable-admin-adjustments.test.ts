@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { QueryResult, QueryResultRow } from "pg";
 import type { Queryable } from "@/lib/db/pool";
-import { adjustOpenReceivable, ReceivableError } from "@/lib/db/receivables";
+import { adjustOpenReceivable, createManualReceivable, ReceivableError } from "@/lib/db/receivables";
 
 function dbFor(rows: QueryResultRow[], calls: { sql: string; args?: unknown[] }[]): Queryable {
   return {
@@ -33,4 +33,13 @@ test("rejects missing justification without database access", async () => {
   const calls: { sql: string; args?: unknown[] }[] = [];
   await assert.rejects(() => adjustOpenReceivable(4, { action: "cancelar", dueDate: null, method: null, reason: "teste" }, "diretor@empresa.com", dbFor([], calls)), /pelo menos 10/);
   assert.equal(calls.length, 0);
+});
+
+test("manual provision does not record a receipt and writes audit", async () => {
+  const calls: { sql: string; args?: unknown[] }[] = [];
+  const id = await createManualReceivable("261008-RUZL", { amount: 100, dueDate: "2026-11-05", method: "PIX", reason: "Ajuste de provisão comercial" }, "diretor@empresa.com", dbFor([{ id: 12 }], calls));
+  assert.equal(id, 12);
+  assert.match(calls[0].sql, /INSERT INTO receivables/);
+  assert.match(calls[0].sql, /INSERT INTO receivable_adjustments/);
+  assert.doesNotMatch(calls[0].sql, /INSERT INTO receipts/);
 });
