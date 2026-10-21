@@ -52,6 +52,7 @@ import { ActionForm } from "../ActionForm";
 import {
   addItemAction,
   closeOrderAction,
+  cancelOrderAdministrativeAction,
   deleteOrderAction,
   removeItemAction,
   reopenOrderAction,
@@ -1516,6 +1517,19 @@ export default async function PedidoPage({
             {financeDiagnosis.reasons.length === 0 && <li>Nenhum bloqueio financeiro ou fiscal identificado nesta consulta.</li>}
           </ul>
         </section>
+      )}
+      {financeDiagnosis && ["em_negociacao", "aguardando_aprovacao", "fechado"].includes(order.status) && (
+        <details className={`${CARD} mt-4 p-4`}>
+          <summary className="cursor-pointer font-semibold text-red-700">Cancelar pedido</summary>
+          <p className="mt-2 text-sm text-slate-600">Cancela somente quando não existem baixas, notas fiscais, contratos ativos, produção, estoque ou contas vinculadas. Mantém histórico e registra o motivo.</p>
+          <ActionForm action={cancelOrderAdministrativeAction} className="mt-3 flex flex-col gap-3">
+            <input type="hidden" name="number" value={order.number} />
+            <label className="text-sm">Motivo obrigatório
+              <textarea className={INPUT} name="reason" required minLength={5} maxLength={300} rows={2} />
+            </label>
+            <ConfirmButton label="Cancelar pedido" confirmLabel="Confirmar cancelamento" className={DANGER_OUTLINE} />
+          </ActionForm>
+        </details>
       )}
       {editable && <div data-part="resumo" className="mt-4">
             <ActionForm action={deleteOrderAction}>
