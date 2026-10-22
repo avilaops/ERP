@@ -284,7 +284,7 @@ test("selo digital: o PDF sai assinado com o certificado da empresa, cobre o arq
   assert.equal(seal.range[2] + seal.range[3], sealed.length);
   assert.equal(seal.signed.length, sealed.length - (seal.range[2] - seal.range[1]));
   const text = Buffer.from(sealed).toString("latin1");
-  for (const expected of ["/SubFilter /adbe.pkcs7.detached", "/Type /Sig", "/FT /Sig", "/SigFlags 3"]) assert.ok(text.includes(expected), expected);
+  for (const expected of ["/Filter /PBAD_PAdES", "/SubFilter /PBAD.PAdES", "/Type /Sig", "/FT /Sig", "/SigFlags 3"]) assert.ok(text.includes(expected), expected);
   // A chave privada não vai para o arquivo.
   assert.ok(!text.includes("PRIVATE KEY"));
 
