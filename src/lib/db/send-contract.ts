@@ -317,6 +317,18 @@ export async function signOrderContract(
   if (contract.recipientPhone && !/^\d{6}$/.test(phoneCode)) throw new ContractError("Informe também o código de 6 números que chegou por SMS no celular.");
   if (await sealStanding(conn, context.now) !== null) throw new ContractError("Assinatura indisponível: configure o selo ICP-Brasil e um certificado A1 válido antes de concluir.");
   await loadContractSeal(conn, context.way.key, context.now).then((seal) => { if (!seal) throw new ContractError("Certificado ICP-Brasil obrigatório."); });
+  const seal = await loadContractSeal(conn, context.way.key, context.now);
+  if (!seal) throw new ContractError("Certificado ICP-Brasil obrigatório.");
+  const sourcePdf = await loadContractPdf(contract.id, conn);
+  if (!sourcePdf) throw new ContractError("PDF do contrato não encontrado.");
+  try {
+    const probe = await sealPdf(sourcePdf, seal.key, {
+      name: seal.holder, reason: "Validação PAdES antes da assinatura", at: context.now,
+    });
+    assertPadesBaselineAttributes(probe);
+  } catch {
+    throw new ContractError("Assinatura indisponível: gerador PAdES ainda não atende aos requisitos ICP-Brasil.");
+  }
   await signWithCode(contract.id, { codeHash: hashCode(token, code), phoneCodeHash: contract.recipientPhone ? hashCode(token, `sms:${phoneCode}`) : null, ip: context.ip, agent: context.agent }, conn);
   try {
     const signed = (await getOrderContract(contract.orderId, contract.id, conn))!;
