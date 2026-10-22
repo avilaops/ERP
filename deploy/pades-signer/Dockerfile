@@ -14,9 +14,9 @@ COPY scripts/pades-signer.ts scripts/register.mjs scripts/loader.mjs ./scripts/
 
 ENV NODE_ENV=production
 USER node
-EXPOSE 8443
 
-# O healthcheck fala com o loopback e confere o certificado pelo nome em
+# Sem EXPOSE: `docker run -P` publicaria a porta em 0.0.0.0. O healthcheck
+# fala com o loopback e confere o certificado pelo nome em
 # ERP_PADES_TLS_NAME (padrão localhost). A CA está em NODE_EXTRA_CA_CERTS.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD node --input-type=module -e "import { readFileSync } from 'node:fs'; import { request } from 'node:https'; const ca = process.env.NODE_EXTRA_CA_CERTS ? readFileSync(process.env.NODE_EXTRA_CA_CERTS) : undefined; const req = request({ hostname: '127.0.0.1', port: 8443, path: '/health', method: 'GET', ca, servername: process.env.ERP_PADES_TLS_NAME || 'localhost', rejectUnauthorized: true }, (res) => process.exit(res.statusCode === 200 ? 0 : 1)); req.on('error', () => process.exit(1)); req.end();"
