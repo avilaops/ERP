@@ -10,7 +10,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { clientIp, openSigning, publicAppUrl } from "@/lib/contract/public";
-import { certificateHolder, sealOf, sealPdf } from "@/lib/contract/seal";
+import { certificateHolder, cmsDerFromContents, sealOf, sealPdf } from "@/lib/contract/seal";
 import { maskedPhone, mobileNumber, sendSms, smsAvailable, smsConfig, SmsError } from "@/lib/contract/sms";
 import { linkDelivers } from "@/lib/db/contracts";
 import { signingKeyOf } from "@/lib/fiscal/sign";
@@ -315,6 +315,29 @@ test("selo digital: o PDF sai assinado com o certificado da empresa, cobre o arq
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test("selo: zero no fim do CMS permanece; o enchimento do /Contents não entra na assinatura", () => {
+  // 30 03 01 00 00 — SEQUENCE de 3 bytes que termina em 00. Cortar pares 00 do final deixaria 30 03 01.
+  const der = Buffer.from("3003010000", "hex");
+  assert.equal(cmsDerFromContents(`${der.toString("hex")}0000`)?.toString("hex"), der.toString("hex"));
+  assert.equal(cmsDerFromContents("308200030100000000")?.length, 7);
+  assert.equal(cmsDerFromContents("30800000"), null);
+  assert.equal(cmsDerFromContents("30030"), null);
+
+  const contents = Buffer.from(`<${der.toString("hex")}0000>`);
+  const tail = Buffer.from("\n%%EOF");
+  const decoy = Buffer.from("/ByteRange [0 1 4 1]\n");
+  const reserved = `/ByteRange [0 ${"0".repeat(6)} ${"0".repeat(6)} ${"0".repeat(6)}]`;
+  const start = decoy.length + reserved.length;
+  const end = start + contents.length;
+  const range = Buffer.from(`/ByteRange [0 ${String(start).padStart(6, "0")} ${String(end).padStart(6, "0")} ${String(tail.length).padStart(6, "0")}]`);
+  assert.equal(range.length, reserved.length);
+  const file = Buffer.concat([decoy, range, contents, tail]);
+  const seal = sealOf(file)!;
+  assert.equal(seal.signature.toString("hex"), der.toString("hex"));
+  assert.equal(seal.range[1], file.indexOf(contents));
+  assert.equal(file[seal.range[1]], 0x3c);
 });
 
 test("segundo código: só celular brasileiro recebe, o número aparece mascarado e a credencial do SMS vem do servidor", async () => {

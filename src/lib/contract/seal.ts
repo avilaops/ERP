@@ -97,12 +97,47 @@ export async function sealPdf(pdf: Uint8Array, key: SigningKey, info: SealInfo, 
   });
 }
 
+/**
+ * CMS gravado em /Contents. O PDF enche o resto do campo com zeros.
+ * Um zero no fim do DER é byte da assinatura: o tamanho sai do cabeçalho
+ * ASN.1 (forma curta ou longa), nunca de cortar pares 00 do final.
+ * Devolve null se o hex não for um DER de tamanho definido.
+ */
+export function cmsDerFromContents(hex: string): Buffer | null {
+  if (hex.length < 4 || hex.length % 2 !== 0 || !/^[0-9a-fA-F]+$/.test(hex)) return null;
+  const lengthByte = Number.parseInt(hex.slice(2, 4), 16);
+  let header = 2;
+  let body = lengthByte;
+  if (lengthByte >= 0x80) {
+    const count = lengthByte & 0x7f;
+    if (count < 1 || count > 4) return null;
+    header = 2 + count;
+    const digits = hex.slice(4, 4 + count * 2);
+    if (digits.length !== count * 2) return null;
+    body = Number.parseInt(digits, 16);
+    if (!Number.isSafeInteger(body)) return null;
+  }
+  const total = header + body;
+  if (!Number.isSafeInteger(total) || total < 2 || total * 2 > hex.length) return null;
+  return Buffer.from(hex.slice(0, total * 2), "hex");
+}
+
 /** Where the signature of a sealed PDF is and what it covers. `null` for a file that is not sealed. For tests and conference. */
 export function sealOf(pdf: Uint8Array): { range: [number, number, number, number]; signed: Buffer; signature: Buffer } | null {
   const bytes = Buffer.from(pdf.buffer, pdf.byteOffset, pdf.byteLength);
-  const match = /\/ByteRange \[(\d+) (\d+) (\d+) (\d+)\]/.exec(bytes.toString("latin1"));
-  if (!match) return null;
-  const range = match.slice(1).map(Number) as [number, number, number, number];
-  const hex = bytes.toString("latin1", range[1] + 1, range[2] - 1).replace(/(00)+$/, "");
-  return { range, signed: Buffer.concat([bytes.subarray(range[0], range[0] + range[1]), bytes.subarray(range[2], range[2] + range[3])]), signature: Buffer.from(hex, "hex") };
+  const pattern = /\/ByteRange \[(\d+) (\d+) (\d+) (\d+)\]/g;
+  for (const match of bytes.toString("latin1").matchAll(pattern)) {
+    const range = match.slice(1).map(Number) as [number, number, number, number];
+    if (range.some((value) => !Number.isSafeInteger(value) || value < 0)) continue;
+    if (range[1] < 1 || range[2] <= range[1] + 2 || range[2] + range[3] > bytes.length) continue;
+    if (bytes[range[1]] !== 0x3c || bytes[range[2] - 1] !== 0x3e) continue;
+    const signature = cmsDerFromContents(bytes.toString("latin1", range[1] + 1, range[2] - 1));
+    if (!signature) continue;
+    const signed = Buffer.concat([
+      bytes.subarray(range[0], range[0] + range[1]),
+      bytes.subarray(range[2], range[2] + range[3]),
+    ]);
+    return { range, signed, signature };
+  }
+  return null;
 }
