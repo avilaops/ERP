@@ -1,4 +1,8 @@
 import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import forge from "node-forge";
 import { sealOf } from "@/lib/contract/seal";
 import { assertPadesBaselineAttributes } from "@/lib/contract/pades-policy";
@@ -64,6 +68,32 @@ export async function signPadesViaService(
       return createHash("sha256").update(Buffer.from(der, "binary")).digest("hex") === fingerprint;
     });
     if (!matches) throw new Error("Certificado do PDF não corresponde ao A1 selecionado.");
+    // Verify the actual CMS signature over PDF ByteRange using an independent
+    // implementation. -noverify disables ONLY trust-chain checking; that must
+    // be performed separately by the ICP-Brasil validator.
+    if (signature.range[0] !== 0 ||
+        signature.range[2] + signature.range[3] !== signed.length ||
+        signature.range[1] < 0 || signature.range[2] <= signature.range[1]) {
+      throw new Error("ByteRange da assinatura PDF inválido.");
+    }
+    const dir = mkdtempSync(join(tmpdir(), "erp-pades-verify-"));
+    try {
+      const cmsFile = join(dir, "signature.der");
+      const bytesFile = join(dir, "signed-bytes.bin");
+      const outputFile = join(dir, "verified.bin");
+      writeFileSync(cmsFile, signature.signature, { mode: 0o600 });
+      writeFileSync(bytesFile, signature.signed, { mode: 0o600 });
+      try {
+        execFileSync("openssl", [
+          "cms", "-verify", "-binary", "-inform", "DER", "-in", cmsFile,
+          "-content", bytesFile, "-noverify", "-out", outputFile,
+        ], { timeout: 10_000, stdio: "ignore" });
+      } catch {
+        throw new Error("Assinatura CMS inválida: verificação criptográfica independente falhou.");
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
     return new Uint8Array(signed);
   } finally {
     clearTimeout(timeout);
