@@ -52,6 +52,12 @@ O CMS é montado com PKIjs 3.3.3 (SignedData, RFC 5652), não com o PKCS#7 do
 node-forge. O node-forge continua na nota fiscal e na leitura do PFX. Quem assina
 o contrato é o processo `scripts/pades-signer.ts`.
 
+O DSS da Comissão Europeia também monta esse perfil pela API pública
+(`setFilter`, `setSubFilter`, política com hash informado e nível B, que não
+grava `signingTime`). A avaliação está em `docs/assinador-pades-infra.md`.
+Ele não substitui este processo: seria um serviço Java, e o CI deste
+repositório não tem Java. Nenhum PDF gerado pelo DSS foi ao VALIDAR/ITI.
+
 O ERP manda `POST /assinar` com perfil, tenant, impressão SHA-256 do certificado,
 PDF, motivo e data. Não manda PFX, senha nem chave. O assinador só acha a chave
 se o par (tenant, impressão) for o dele. HTTPS com token no cabeçalho. A CA

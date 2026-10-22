@@ -5,21 +5,45 @@ Proposta. Não há deploy neste documento. Nenhum serviço foi publicado.
 ## Decisão sobre o DSS da Comissão Europeia
 
 O DSS (https://ec.europa.eu/digital-building-blocks/sites/display/DIGITAL/Digital+Signature+Service+-+DSS)
-é um assinador Java maduro, da Comissão Europeia, para CAdES/PAdES/XAdES no
-perfil ETSI. Foi avaliado como serviço separado e **não entra nesta entrega**.
+é um assinador Java da Comissão Europeia. O código abaixo foi lido no
+`master` de https://github.com/esig/dss em 2026-10-22.
 
-Motivo: o PDF que o VALIDAR/ITI espera neste perfil usa Filter `PBAD_PAdES` e
-SubFilter `PBAD.PAdES`, com DSS/VRI como o DOC-ICP-15.03 descreve nas tabelas
-A.18 a A.22. O DSS da Comissão, na configuração de fábrica, emite PAdES
-baseline com `ETSI.CAdES.detached`. Forçar o subfiltro da ICP-Brasil seria um
-serviço Java novo. Este repositório não ganha outro projeto, e o CI não tem
-Java.
+Ele consegue o perfil pedido, com a API pública, sem alterar o projeto:
 
-O assinador desta entrega é um processo Node no mesmo repositório
-(`scripts/pades-signer.ts`), com PKIjs para o CMS (RFC 5652) e os DER oficiais
-da LPA/PA. O DSS europeu só volta a ser candidato depois de um ensaio no
-VALIDAR, com certificado real autorizado, mostrar que um subfiltro customizado
-passa. Esse ensaio não foi feito.
+- `PAdESSignatureParameters.setFilter` e `setSubFilter` são `String`. O padrão
+  é Filter `Adobe.PPKLite` e SubFilter `ETSI.CAdES.detached`. O mesmo
+  `setSubFilter` que aceita `adbe.pkcs7.detached` aceita `PBAD.PAdES`.
+  `setFilter("PBAD_PAdES")` troca o Filter. Fonte:
+  `dss-pades/.../PAdESSignatureParameters.java`.
+- O CMS não muda de construtor por causa do SubFilter.
+  `CMSForPAdESBuilderHelper.initCAdESProfile` devolve sempre
+  `PAdESLevelBaselineB`. `isCAdESDetached` só decide se o PDF ganha a extensão
+  de desenvolvedor ESIC. `PBAD.PAdES` não entra em `hasPKCS7SubFilter`, que
+  compara só com `adbe.pkcs7.detached` e `adbe.pkcs7.sha1`.
+- `PAdESLevelBaselineB.addSigningTimeAttribute` está vazio, com o comentário
+  da ETSI TS 102 778-3, cláusula 4.5.3. O CMS do nível B não leva
+  `signingTime`. A data vai para a entrada `/M` do dicionário PDF.
+- Com SHA-256, `CAdESUtils.addSigningCertificateAttribute` grava
+  `id-aa-signingCertificateV2`. O algoritmo dentro do `ESSCertIDv2` fica
+  ausente: no DSS, SHA-256 é o default do RFC 5035. Com SHA-1 o atributo
+  seria o v1, que este perfil não usa.
+- `CAdESLevelBaselineB.addSignaturePolicyId` grava `id-aa-ets-sigPolicyId`
+  com o OID, o algoritmo, o hash que o chamador passou e, se houver
+  `Policy.setSpuri`, um qualificador `id-spq-ets-uri`. O DSS não calcula o
+  hash interno da PA. Quem chama passa os bytes do OCTET STRING final da PA
+  (DOC-ICP-15.03, nota 2), não o hash do arquivo.
+
+O nível `PAdES_BASELINE_LT` não serve para a PA AD-RB vigente.
+`PAdESLevelBaselineLT` estende `PAdESLevelBaselineT` e, ao subir o nível,
+embute `signature-time-stamp`. A PA AD-RB diz que carimbo não é usado, e este
+ERP recusa esse atributo. CRL e OCSP sem carimbo saem de outra chamada, já
+pública: `PDFSignatureService.addDssDictionary` sobre o PDF do nível B, com
+`setIncludeVRIDictionary(true)`. O padrão do VRI no DSS é falso.
+
+Esta entrega continua no PKIjs (`scripts/pades-signer.ts`). O motivo não é
+SubFilter travado. É que usar o DSS aqui seria um processo Java novo, com
+PDFBox, num CI que só tem Node. Isso não foi feito, e nenhum PDF do DSS foi
+levado ao VALIDAR/ITI.
 
 ## Onde
 
