@@ -1,4 +1,6 @@
 import { createHash } from "node:crypto";
+import forge from "node-forge";
+import { sealOf } from "@/lib/contract/seal";
 import { assertPadesBaselineAttributes } from "@/lib/contract/pades-policy";
 import type { SigningKey } from "@/lib/fiscal/sign";
 import type { SealInfo } from "@/lib/contract/seal";
@@ -49,6 +51,19 @@ export async function signPadesViaService(
       throw new Error("Tamanho inválido do PDF assinado.");
     }
     assertPadesBaselineAttributes(signed);
+    const signature = sealOf(signed);
+    if (!signature) throw new Error("Serviço PAdES não retornou assinatura.");
+    const message = forge.pkcs7.messageFromAsn1(
+      forge.asn1.fromDer(forge.util.createBuffer(signature.signature.toString("binary"))),
+    );
+    if (!("certificates" in message) || !Array.isArray(message.certificates)) {
+      throw new Error("Serviço PAdES não retornou certificados CMS.");
+    }
+    const matches = message.certificates.some((cert) => {
+      const der = forge.asn1.toDer(forge.pki.certificateToAsn1(cert)).getBytes();
+      return createHash("sha256").update(Buffer.from(der, "binary")).digest("hex") === fingerprint;
+    });
+    if (!matches) throw new Error("Certificado do PDF não corresponde ao A1 selecionado.");
     return new Uint8Array(signed);
   } finally {
     clearTimeout(timeout);
