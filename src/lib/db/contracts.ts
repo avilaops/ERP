@@ -3,7 +3,7 @@ import type { ContractEvidence } from "@/lib/contract/pdf";
 import { maskedPhone } from "@/lib/contract/sms";
 import { contractNumber } from "@/lib/contract/text";
 import { formatDocument } from "@/lib/customer";
-import { pgErrorCode } from "@/lib/db/pool";
+import { pgErrorCode, withQueryableConnection } from "@/lib/db/pool";
 import type { Queryable } from "@/lib/db/pool";
 import { EMPTY_PROPOSAL_DETAILS } from "@/lib/db/proposal-details";
 import { showDateTime } from "@/lib/format";
@@ -180,6 +180,13 @@ export async function loadContractPdf(contractId: number, conn: Queryable): Prom
   return rows[0] ? new Uint8Array(rows[0].pdf as Buffer) : null;
 }
 
+/** O PDF já selado, gravado quando a assinatura foi concluída. Não assina de novo. */
+export async function loadSealedContractPdf(contractId: number, conn: Queryable): Promise<Uint8Array | null> {
+  const { rows } = await conn.query("SELECT sealed_pdf FROM order_contracts WHERE id = $1", [contractId]);
+  const stored = rows[0]?.sealed_pdf as Buffer | null | undefined;
+  return stored ? new Uint8Array(stored) : null;
+}
+
 export type ContractEventKind = "enviado" | "email" | "visualizado" | "codigo_enviado" | "codigo_errado" | "assinado" | "assinado_empresa" | "recusado" | "cancelado";
 
 export async function addContractEvent(contractId: number, kind: ContractEventKind, event: { detail?: string | null; ip?: string | null; actor: string }, conn: Queryable): Promise<void> {
@@ -289,37 +296,87 @@ export async function startCode(contractId: number, signer: { name: string; docu
   throw new ContractError("Foram pedidos códigos demais para este contrato. Peça à empresa um novo link.");
 }
 
+export type SigningProof = {
+  codeHash: string;
+  /** Hash of what was typed as the code of the phone; `null` when none was typed. */
+  phoneCodeHash?: string | null;
+  ip: string | null;
+  agent?: string | null;
+};
+
 /**
- * Signs, when the code is the one that went to the e-mail. Everything is
- * checked in the same statement that writes the signature: a contract is never
- * signed twice, after its time or with a code that ran out of tries.
+ * Confere o código sem concluir a assinatura. Código errado conta tentativa.
+ * Código certo deixa o contrato como está, para a assinatura do PDF acontecer
+ * antes. Um contrato já assinado responde `already` e não gera outro evento.
  */
-export async function signWithCode(contractId: number, proof: { codeHash: string; /** Hash of what was typed as the code of the phone; `null` when none was typed. */ phoneCodeHash?: string | null; ip: string | null; agent: string | null }, conn: Queryable): Promise<void> {
+export async function signingCodeState(contractId: number, proof: SigningProof, conn: Queryable): Promise<"ready" | "already"> {
   const { rows } = await conn.query(
-    `UPDATE order_contracts
-        SET status = 'assinado', signed_at = now(), signer_name = pending_name, signer_document = pending_document, signer_ip = $3, signer_agent = $4,
-            code_hash = NULL, phone_code_hash = NULL, code_expires_at = NULL
-      WHERE id = $1 AND status = 'enviado' AND expires_at > now() AND code_hash = $2 AND code_expires_at > now() AND code_attempts < $5::int
-        AND pending_name IS NOT NULL AND pending_document IS NOT NULL
-        -- A contract that asks for the code of the phone is signed only with both.
-        AND (recipient_phone IS NULL OR phone_code_hash = $6)
-      RETURNING signer_name, signer_document, recipient_phone`,
-    [contractId, proof.codeHash, proof.ip, proof.agent?.slice(0, 300) ?? null, CODE_MAX_ATTEMPTS, proof.phoneCodeHash ?? null],
+    `SELECT status,
+            expires_at > now() AS in_time,
+            code_hash IS NOT NULL AND code_expires_at > now() AS code_alive,
+            code_attempts < $4::int AS attempts_left,
+            pending_name IS NOT NULL AND pending_document IS NOT NULL AS pending_ok,
+            code_hash = $2 AS code_ok,
+            (recipient_phone IS NULL OR phone_code_hash = $3) AS phone_ok
+       FROM order_contracts WHERE id = $1`,
+    [contractId, proof.codeHash, proof.phoneCodeHash ?? null, CODE_MAX_ATTEMPTS],
   );
-  if (rows.length > 0) {
-    await addContractEvent(contractId, "assinado", { detail: `${rows[0].signer_name}, CPF ${formatDocument(String(rows[0].signer_document))}, com código enviado ao e-mail${rows[0].recipient_phone ? " e código enviado ao celular" : ""}`, ip: proof.ip, actor: "cliente" }, conn);
-    return;
+  const row = rows[0];
+  if (!row) throw new ContractError("O código venceu ou não foi pedido. Peça um código novo.");
+  if (row.status === "assinado") return "already";
+  if (row.status === "enviado" && row.in_time && row.code_alive && row.attempts_left && row.pending_ok && row.code_ok && row.phone_ok) return "ready";
+  if (row.status === "enviado" && row.in_time && row.code_alive && row.attempts_left) {
+    const tried = await conn.query(
+      `UPDATE order_contracts SET code_attempts = code_attempts + 1
+        WHERE id = $1 AND status = 'enviado' AND expires_at > now() AND code_hash IS NOT NULL AND code_expires_at > now() AND code_attempts < $2::int
+        RETURNING code_attempts`,
+      [contractId, CODE_MAX_ATTEMPTS],
+    );
+    if (tried.rows.length === 0) throw new ContractError("O código venceu ou não foi pedido. Peça um código novo.");
+    await addContractEvent(contractId, "codigo_errado", { ip: proof.ip, actor: "cliente" }, conn);
+    const left = CODE_MAX_ATTEMPTS - Number(tried.rows[0].code_attempts);
+    throw new ContractError(left > 0 ? `Código incorreto. ${left === 1 ? "Resta 1 tentativa" : `Restam ${left} tentativas`}.` : "Código incorreto. As tentativas acabaram: peça um código novo.");
   }
-  const tried = await conn.query(
-    `UPDATE order_contracts SET code_attempts = code_attempts + 1
-      WHERE id = $1 AND status = 'enviado' AND expires_at > now() AND code_hash IS NOT NULL AND code_expires_at > now() AND code_attempts < $2::int
-      RETURNING code_attempts`,
-    [contractId, CODE_MAX_ATTEMPTS],
-  );
-  if (tried.rows.length === 0) throw new ContractError("O código venceu ou não foi pedido. Peça um código novo.");
-  await addContractEvent(contractId, "codigo_errado", { ip: proof.ip, actor: "cliente" }, conn);
-  const left = CODE_MAX_ATTEMPTS - Number(tried.rows[0].code_attempts);
-  throw new ContractError(left > 0 ? `Código incorreto. ${left === 1 ? "Resta 1 tentativa" : `Restam ${left} tentativas`}.` : "Código incorreto. As tentativas acabaram: peça um código novo.");
+  throw new ContractError("O código venceu ou não foi pedido. Peça um código novo.");
+}
+
+/**
+ * Conclui a assinatura e grava o PDF selado na mesma transação, com um único
+ * evento. Se o código já não vale, nada é gravado. Se outra requisição concluiu
+ * antes, devolve `already` sem novo evento.
+ */
+export async function commitSignedContract(
+  contractId: number,
+  proof: SigningProof & { sealedPdf: Uint8Array; audit: string; signedAt: Date },
+  conn: Queryable,
+): Promise<"signed" | "already"> {
+  return withQueryableConnection(conn, async (held) => {
+    await held.query("BEGIN");
+    try {
+      const { rows } = await held.query(
+        `UPDATE order_contracts
+            SET status = 'assinado', signed_at = $7, signer_name = pending_name, signer_document = pending_document, signer_ip = $3, signer_agent = $4,
+                code_hash = NULL, phone_code_hash = NULL, code_expires_at = NULL, sealed_pdf = $8
+          WHERE id = $1 AND status = 'enviado' AND expires_at > now() AND code_hash = $2 AND code_expires_at > now() AND code_attempts < $5::int
+            AND pending_name IS NOT NULL AND pending_document IS NOT NULL
+            AND (recipient_phone IS NULL OR phone_code_hash = $6)
+          RETURNING id`,
+        [contractId, proof.codeHash, proof.ip, proof.agent?.slice(0, 300) ?? null, CODE_MAX_ATTEMPTS, proof.phoneCodeHash ?? null, proof.signedAt, Buffer.from(proof.sealedPdf)],
+      );
+      if (rows.length > 0) {
+        await addContractEvent(contractId, "assinado", { detail: proof.audit, ip: proof.ip, actor: "cliente" }, held);
+        await held.query("COMMIT");
+        return "signed";
+      }
+      const current = await held.query("SELECT status FROM order_contracts WHERE id = $1", [contractId]);
+      await held.query("COMMIT");
+      if (current.rows[0]?.status === "assinado") return "already";
+      throw new ContractError("Não foi possível concluir a assinatura. Nada foi registrado. Peça um código novo e tente de novo.");
+    } catch (error) {
+      await held.query("ROLLBACK");
+      throw error;
+    }
+  });
 }
 
 /** The customer says no. The reason is theirs to give or not. */
