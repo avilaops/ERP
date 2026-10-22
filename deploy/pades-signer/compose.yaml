@@ -1,0 +1,28 @@
+# Proposta de execução. Não sobe nada sozinho e não aponta para produção.
+# A porta no anfitrião fica em 127.0.0.1. Dentro do container o processo escuta
+# 0.0.0.0 para o mapeamento do Docker alcançar; a publicação não abre a rede.
+services:
+  pades-signer:
+    build:
+      context: ../..
+      dockerfile: deploy/pades-signer/Dockerfile
+    environment:
+      ERP_PADES_BIND: 0.0.0.0
+      ERP_PADES_SIGNER_PORT: "8443"
+      ERP_PADES_SIGNER_TOKEN: ${ERP_PADES_SIGNER_TOKEN}
+      ERP_PADES_TLS_CERT: /tls/cert.pem
+      ERP_PADES_TLS_KEY: /tls/key.pem
+      ERP_PADES_KEY_DIR: /chaves
+      ERP_PADES_KEY_PASSWORD: ${ERP_PADES_KEY_PASSWORD:-}
+      NODE_EXTRA_CA_CERTS: /tls/ca.pem
+      # Nome no certificado TLS, usado só pelo healthcheck ao falar com 127.0.0.1.
+      ERP_PADES_TLS_NAME: ${ERP_PADES_TLS_NAME:-localhost}
+    volumes:
+      - ./tls:/tls:ro
+      - ./chaves:/chaves:ro
+    ports:
+      - "127.0.0.1:8443:8443"
+    read_only: true
+    tmpfs:
+      - /tmp
+    restart: unless-stopped
