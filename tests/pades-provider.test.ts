@@ -19,3 +19,21 @@ test("PAdES fails closed without configured signing provider", async () => {
     else process.env.ERP_PADES_SIGNER_TOKEN = oldToken;
   }
 });
+
+test("PAdES refuses non-HTTPS signer without transmitting PDF or private key", async () => {
+  const oldUrl = process.env.ERP_PADES_SIGNER_URL;
+  const oldToken = process.env.ERP_PADES_SIGNER_TOKEN;
+  process.env.ERP_PADES_SIGNER_URL = "http://example.invalid/sign";
+  process.env.ERP_PADES_SIGNER_TOKEN = "test-only";
+  try {
+    await assert.rejects(
+      signPadesViaService(new Uint8Array([1, 2]), key, info),
+      /HTTPS/,
+    );
+  } finally {
+    if (oldUrl === undefined) delete process.env.ERP_PADES_SIGNER_URL;
+    else process.env.ERP_PADES_SIGNER_URL = oldUrl;
+    if (oldToken === undefined) delete process.env.ERP_PADES_SIGNER_TOKEN;
+    else process.env.ERP_PADES_SIGNER_TOKEN = oldToken;
+  }
+});
