@@ -14,6 +14,7 @@ import {
 import type { Contract, SigningContract } from "@/lib/db/contracts";
 import { loadContractSeal, sealStanding } from "@/lib/db/contract-seal";
 import { assertPadesBaselineAttributes } from "@/lib/contract/pades-policy";
+import { signPadesViaService } from "@/lib/contract/pades-provider";
 import { loadFiscalSettings } from "@/lib/db/fiscal";
 import { loadMailInfo, mailChannel } from "@/lib/db/mail";
 import type { Order } from "@/lib/db/orders";
@@ -242,7 +243,7 @@ export async function contractFile(contract: Contract, context: { company: strin
     const seal = await loadContractSeal(conn, context.vault, context.now);
     if (!seal) throw new ContractError("Certificado ICP-Brasil obrigatório: habilite o selo e configure um certificado A1 válido.");
     const file = await withEvidence(pdf, await loadEvidence(contract, { ...context, sealedBy: seal.holder }, conn));
-    const signedPdf = await sealPdf(file, seal.key, { name: seal.holder, reason: `Contrato nº ${contractNumber(context.orderNumber, contract.sequence)} assinado eletronicamente`, at: context.now });
+    const signedPdf = await signPadesViaService(file, seal.key, { name: seal.holder, reason: `Contrato nº ${contractNumber(context.orderNumber, contract.sequence)} assinado eletronicamente`, at: context.now });
     assertPadesBaselineAttributes(signedPdf);
     return signedPdf;
   } catch (error) {
@@ -322,7 +323,7 @@ export async function signOrderContract(
   const sourcePdf = await loadContractPdf(contract.id, conn);
   if (!sourcePdf) throw new ContractError("PDF do contrato não encontrado.");
   try {
-    const probe = await sealPdf(sourcePdf, seal.key, {
+    const probe = await signPadesViaService(sourcePdf, seal.key, {
       name: seal.holder, reason: "Validação PAdES antes da assinatura", at: context.now,
     });
     assertPadesBaselineAttributes(probe);
