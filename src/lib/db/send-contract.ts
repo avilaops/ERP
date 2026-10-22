@@ -1,6 +1,5 @@
 import { PDFDocument } from "pdf-lib";
 import { renderContractPdf, withEvidence } from "@/lib/contract/pdf";
-import { sealPdf } from "@/lib/contract/seal";
 import { maskedPhone, mobileNumber, smsAvailable, smsConfig, SmsError } from "@/lib/contract/sms";
 import type { SmsSender } from "@/lib/contract/sms";
 import { blankWords, contractNumber, contractValues, DEFAULT_CONTRACT_BODY, DEFAULT_CONTRACT_TITLE, fillContract } from "@/lib/contract/text";
