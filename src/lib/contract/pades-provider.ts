@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, X509Certificate } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -25,7 +25,13 @@ export async function signPadesViaService(
   if (url.protocol !== "https:" || url.username || url.password) {
     throw new Error("Serviço PAdES deve usar HTTPS sem credenciais na URL.");
   }
+  if (pdf.length === 0 || pdf.length > 20_000_000) throw new Error("PDF de entrada excede o limite do assinador.");
   const certificate = Buffer.from(key.certificateBase64, "base64");
+  const x509 = new X509Certificate(certificate);
+  const at = info.at.getTime();
+  if (!Number.isFinite(at) || at < Date.parse(x509.validFrom) || at > Date.parse(x509.validTo)) {
+    throw new Error("Certificado A1 fora do período de validade na data da assinatura.");
+  }
   const fingerprint = createHash("sha256").update(certificate).digest("hex");
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 20_000);
