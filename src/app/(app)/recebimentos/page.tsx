@@ -65,7 +65,7 @@ export default async function RecebimentosPage({ searchParams }: { searchParams:
           <summary className="disclosure-heading">Incluir cobrança manual<span className="disclosure-marker" aria-hidden="true">+</span></summary>
           <ActionForm action={createManualReceivableAction} className="grid gap-3 border-t border-slate-200 p-4 sm:grid-cols-2">
             <label className="text-sm">Número do pedido
-              <input name="orderNumber" className={INPUT} required placeholder="261008-RUZL" />
+              <input name="orderNumber" className={INPUT} required placeholder="AAMMDD-XXXX" />
             </label>
             <label className="text-sm">Valor
               <input name="amount" className={INPUT} required inputMode="decimal" placeholder="0,00" />

@@ -37,9 +37,25 @@ test("rejects missing justification without database access", async () => {
 
 test("manual provision does not record a receipt and writes audit", async () => {
   const calls: { sql: string; args?: unknown[] }[] = [];
-  const id = await createManualReceivable("261008-RUZL", { amount: 100, dueDate: "2026-11-05", method: "PIX", reason: "Ajuste de provisão comercial" }, "diretor@empresa.com", dbFor([{ id: 12 }], calls));
+  const id = await createManualReceivable("261022-T001", { amount: 100, dueDate: "2026-11-05", method: "PIX", reason: "Ajuste de provisão comercial" }, "diretor@empresa.com", dbFor([{ id: 12 }], calls));
   assert.equal(id, 12);
-  assert.match(calls[0].sql, /INSERT INTO receivables/);
-  assert.match(calls[0].sql, /INSERT INTO receivable_adjustments/);
-  assert.doesNotMatch(calls[0].sql, /INSERT INTO receipts/);
+  assert.ok(calls.some((call) => /INSERT INTO receivables/.test(call.sql)));
+  assert.ok(calls.some((call) => /INSERT INTO receivable_adjustments/.test(call.sql)));
+  assert.ok(calls.some((call) => call.sql === "COMMIT"));
+  assert.equal(calls.some((call) => /INSERT INTO receipts/.test(call.sql)), false);
+});
+
+test("manual provision rolls back when the audit write fails", async () => {
+  const calls: string[] = [];
+  const db: Queryable = {
+    query: async <Row extends QueryResultRow = QueryResultRow>(sql: string): Promise<QueryResult<Row>> => {
+      calls.push(sql);
+      if (sql.includes("auditar-recebivel-manual")) throw new Error("falha injetada");
+      const rows = (sql.includes("INSERT INTO receivables") ? [{ id: 12 }] : []) as unknown as Row[];
+      return { rows, command: "SELECT", rowCount: rows.length, oid: 0, fields: [] };
+    },
+  };
+  await assert.rejects(() => createManualReceivable("261022-T001", { amount: 100, dueDate: "2026-11-05", method: "PIX", reason: "Ajuste de provisão comercial" }, "diretor@empresa.com", db), /falha injetada/);
+  assert.ok(calls.includes("ROLLBACK"));
+  assert.equal(calls.includes("COMMIT"), false);
 });

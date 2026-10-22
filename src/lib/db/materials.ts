@@ -167,9 +167,9 @@ export async function materialNeeds(conn: Queryable): Promise<{ needs: MaterialN
   const { rows } = await conn.query(
     `SELECT m.id, m.name, m.unit, m.stock, sum(round(b.quantity * w.quantity, 3)) AS needed, count(DISTINCT w.id) AS orders
        FROM production_orders w JOIN product_materials b ON b.product_id = w.product_id JOIN materials m ON m.id = b.material_id
-      WHERE w.finished_at IS NULL GROUP BY m.id ORDER BY (m.stock - sum(round(b.quantity * w.quantity, 3))), lower(m.name)`,
+      WHERE w.finished_at IS NULL AND w.cancelled_at IS NULL GROUP BY m.id ORDER BY (m.stock - sum(round(b.quantity * w.quantity, 3))), lower(m.name)`,
   );
-  const bare = await conn.query("SELECT count(*) AS total FROM production_orders w WHERE w.finished_at IS NULL AND NOT EXISTS (SELECT 1 FROM product_materials b WHERE b.product_id = w.product_id)");
+  const bare = await conn.query("SELECT count(*) AS total FROM production_orders w WHERE w.finished_at IS NULL AND w.cancelled_at IS NULL AND NOT EXISTS (SELECT 1 FROM product_materials b WHERE b.product_id = w.product_id)");
   return {
     needs: rows.map((row) => ({ materialId: Number(row.id), name: String(row.name), unit: row.unit as MaterialUnit, needed: Number(row.needed), stock: Number(row.stock), missing: Math.max(0, Number(row.needed) - Number(row.stock)), orders: Number(row.orders) })),
     withoutList: Number(bare.rows[0].total),

@@ -1,7 +1,7 @@
 import { futureCommission } from "@/lib/db/receivables";
 import { roundCents } from "@/lib/pricing/money";
 import Link from "next/link";
-import { CARD, PRIMARY, PageHeader, MetricSummary } from "@/components/ui";
+import { CARD, DANGER_OUTLINE, INPUT, PRIMARY, SECONDARY, PageHeader, MetricSummary } from "@/components/ui";
 import { OrderReference } from "@/components/OrderReference";
 import { requirePermission } from "@/lib/auth";
 import { allows, managesCommissions, menuItem } from "@/lib/auth/permissions";
@@ -11,7 +11,7 @@ import { loadCommissionDay } from "@/lib/db/company";
 import { tenantDb } from "@/lib/db/pool";
 import { isoDate, showDate, showIsoDate, showMoney, showPercent } from "@/lib/format";
 import { ActionForm } from "../pedidos/ActionForm";
-import { payCommissionsAction } from "./actions";
+import { adjustManualCommissionAction, createManualCommissionAction, payCommissionsAction } from "./actions";
 
 export const metadata = { title: `${menuItem("comissoes").label} · ERP` };
 export const dynamic = "force-dynamic";
@@ -51,6 +51,34 @@ export default async function ComissoesPage({ searchParams }: { searchParams: Pr
   return (
     <>
       <PageHeader title={manages ? menuItem("comissoes").label : "Minhas comissões"} hint={`A comissão nasce quando o valor é recebido, sobre a parte sem IPI. O que entra num mês é pago no dia ${paymentDay} do mês seguinte. Estorno devolve a comissão e desconta do próximo pagamento.`} />
+
+      {manages && (
+        <details className={`${CARD} mt-3`}>
+          <summary className="disclosure-heading">Lançar comissão manual<span className="disclosure-marker" aria-hidden="true">+</span></summary>
+          <ActionForm action={createManualCommissionAction} className="grid gap-3 border-t border-slate-200 p-4 sm:grid-cols-2">
+            <label className="text-sm">Número do pedido
+              <input name="orderNumber" className={INPUT} required placeholder="AAMMDD-XXXX" />
+            </label>
+            <label className="text-sm">Valor
+              <input name="amount" className={INPUT} required inputMode="decimal" placeholder="0,00" />
+            </label>
+            <label className="text-sm">Tipo
+              <select name="direction" className={INPUT} defaultValue="credito">
+                <option value="credito">Crédito a pagar</option>
+                <option value="debito">Débito a descontar</option>
+              </select>
+            </label>
+            <label className="text-sm">Competência
+              <input name="month" className={INPUT} type="month" required defaultValue={current} />
+            </label>
+            <label className="text-sm sm:col-span-2">Motivo
+              <textarea name="reason" className={INPUT} rows={2} minLength={10} required placeholder="Justifique o lançamento" />
+            </label>
+            <p className="text-xs text-slate-600 sm:col-span-2">Vai para o vendedor do pedido. Não registra dinheiro recebido. Comissão de baixa continua nascendo no recebimento.</p>
+            <button className={SECONDARY} type="submit">Lançar comissão</button>
+          </ActionForm>
+        </details>
+      )}
 
       <MetricSummary items={(
           [
@@ -123,8 +151,8 @@ export default async function ComissoesPage({ searchParams }: { searchParams: Pr
                     </tr>
                   </thead>
                   <tbody>
-                    {group.entries.map((entry, index) => (
-                      <tr key={index} className="border-t border-slate-200">
+                    {group.entries.map((entry) => (
+                      <tr key={entry.id} className="border-t border-slate-200">
                         <td className="px-4 py-3">
                           <OrderReference access={session} number={entry.orderNumber} customer={entry.customerName} />
                           <span className="block text-xs text-slate-500">
@@ -142,7 +170,34 @@ export default async function ComissoesPage({ searchParams }: { searchParams: Pr
                             <Link href={menuItem("recebimentos").href + "?ver=recebidos"} className="mt-1 block text-xs font-medium text-brand underline">Corrigir origem / solicitar estorno</Link>
                           )}
                         </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-slate-600">{entry.paidAt ? `paga em ${showDate(entry.paidAt)}` : "em aberto"}</td>
+                        <td className="px-4 py-3 text-slate-600">
+                          {entry.cancelled ? "cancelada" : entry.paidAt ? `paga em ${showDate(entry.paidAt)}` : "em aberto"}
+                          {entry.origin === "manual" ? <span className="block text-xs text-slate-500">lançamento manual</span> : null}
+                          {manages && entry.origin === "manual" && !entry.paidAt && !entry.cancelled && (
+                            <details className="mt-2">
+                              <summary className="disclosure-heading !px-0 text-brand">Corrigir lançamento<span className="disclosure-marker" aria-hidden="true">+</span></summary>
+                              <ActionForm action={adjustManualCommissionAction} className="mt-2 grid gap-2">
+                                <input type="hidden" name="id" value={entry.id} />
+                                <label className="text-sm">Novo valor
+                                  <input name="amount" className={INPUT} required inputMode="decimal" defaultValue={Math.abs(entry.amount).toFixed(2).replace(".", ",")} />
+                                </label>
+                                <label className="text-sm">Tipo
+                                  <select name="direction" className={INPUT} defaultValue={entry.amount < 0 ? "debito" : "credito"}>
+                                    <option value="credito">Crédito a pagar</option>
+                                    <option value="debito">Débito a descontar</option>
+                                  </select>
+                                </label>
+                                <label className="text-sm">Motivo
+                                  <textarea name="reason" className={INPUT} rows={2} minLength={10} required />
+                                </label>
+                                <div className="flex flex-wrap gap-2">
+                                  <button className={SECONDARY} name="action" value="editar" type="submit">Salvar correção</button>
+                                  <button className={DANGER_OUTLINE} name="action" value="cancelar" type="submit">Cancelar lançamento</button>
+                                </div>
+                              </ActionForm>
+                            </details>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>

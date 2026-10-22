@@ -1,4 +1,5 @@
 -- Alterações administrativas sem apagar a origem do recebível.
+-- Reversão: DROP INDEX IF EXISTS receivable_adjustments_receivable_idx; DROP TABLE IF EXISTS receivable_adjustments;
 CREATE TABLE receivable_adjustments (
   id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   receivable_id integer NOT NULL REFERENCES receivables(id),

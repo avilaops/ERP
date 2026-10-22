@@ -31,20 +31,21 @@ export function commissionsView(entries: CommissionEntry[], carried: ReadonlyMap
   for (const entry of entries) groups.set(entry.sellerEmail, [...(groups.get(entry.sellerEmail) ?? []), entry]);
 
   return [...groups.entries()].map(([sellerEmail, own]) => {
-    const open = sum(own.filter((entry) => entry.paidAt === null).map((entry) => entry.amount));
+    const active = own.filter((entry) => !entry.cancelled);
+    const open = sum(active.filter((entry) => entry.paidAt === null).map((entry) => entry.amount));
     const before = roundCents(carried.get(sellerEmail) ?? 0);
-    const hasOpen = own.some((entry) => entry.paidAt === null);
+    const hasOpen = active.some((entry) => entry.paidAt === null);
     const payable = Math.max(0, roundCents(open + before));
     return {
       sellerEmail,
       sellerName: own[0].sellerName,
       entries: own,
-      received: sum(own.map((entry) => entry.base)),
-      total: sum(own.map((entry) => entry.amount)),
+      received: sum(active.map((entry) => entry.base)),
+      total: sum(active.map((entry) => entry.amount)),
       open,
       carried: before,
       payable,
-      status: !hasOpen ? "paga" : payable > 0 ? "em-aberto" : "sem-saldo",
+      status: active.length === 0 ? "sem-saldo" : !hasOpen ? "paga" : payable > 0 ? "em-aberto" : "sem-saldo",
     };
   });
 }

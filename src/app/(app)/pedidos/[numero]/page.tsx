@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { requirePermission } from "@/lib/auth";
 import { listOnDeliveryMethods } from "@/lib/db/payment-methods";
 import { tenantDb } from "@/lib/db/pool";
-import { allows, menuItem, seesAllOrders, seesCosts } from "@/lib/auth/permissions";
+import { allows, approvesAtLoss, menuItem, seesAllOrders, seesCosts } from "@/lib/auth/permissions";
 import { ufFromCep } from "@/lib/cep";
 import { completenessText, isComplete, isRequired, normalizeDocument, taxpayerFromRegistration } from "@/lib/customer";
 import type { CustomerKind } from "@/lib/customer";
@@ -1518,14 +1518,18 @@ export default async function PedidoPage({
           </ul>
         </section>
       )}
-      {financeDiagnosis && ["em_negociacao", "aguardando_aprovacao", "fechado"].includes(order.status) && (
-        <details className={`${CARD} mt-4 p-4`}>
-          <summary className="cursor-pointer font-semibold text-red-700">Cancelar pedido</summary>
-          <p className="mt-2 text-sm text-slate-600">Cancela somente quando não existem baixas, notas fiscais, contratos ativos, produção, estoque ou contas vinculadas. Mantém histórico e registra o motivo.</p>
-          <ActionForm action={cancelOrderAdministrativeAction} className="mt-3 flex flex-col gap-3">
+      {financeDiagnosis && approvesAtLoss(session) && ["em_negociacao", "aguardando_aprovacao", "fechado"].includes(order.status) && (
+        <details className={`${CARD} mt-4`}>
+          <summary className="disclosure-heading text-red-700">Cancelar pedido<span className="disclosure-marker" aria-hidden="true">+</span></summary>
+          <p className="px-4 py-3 text-sm text-slate-600">
+            {order.status === "fechado"
+              ? "Estorna o que já entrou, cancela cobranças, comissões não pagas, contas em aberto e a produção, e pede o cancelamento da nota. Se algo falhar no meio, nada muda."
+              : "Cancela este orçamento quando não há baixa, nota, contrato, produção, estoque ou conta vinculada. O histórico fica."}
+          </p>
+          <ActionForm action={cancelOrderAdministrativeAction} className="flex flex-col gap-3 border-t border-slate-200 p-4">
             <input type="hidden" name="number" value={order.number} />
             <label className="text-sm">Motivo obrigatório
-              <textarea className={INPUT} name="reason" required minLength={5} maxLength={300} rows={2} />
+              <textarea className={INPUT} name="reason" required minLength={15} maxLength={300} rows={2} />
             </label>
             <ConfirmButton label="Cancelar pedido" confirmLabel="Confirmar cancelamento" className={DANGER_OUTLINE} />
           </ActionForm>

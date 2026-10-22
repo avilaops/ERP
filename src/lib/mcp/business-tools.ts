@@ -174,7 +174,7 @@ const cashTool: Tool = {
          SELECT r.due_date AS due, 'entrada' AS kind, r.amount - COALESCE((SELECT sum(p.amount) FROM receipts p WHERE p.receivable_id = r.id AND NOT EXISTS (SELECT 1 FROM refund_requests q WHERE q.receipt_id = p.id AND q.status = 'confirmada')), 0) AS amount
            FROM receivables r JOIN orders o ON o.id = r.order_id WHERE r.status = 'aberta' AND o.status = 'fechado'
          UNION ALL SELECT due_date, 'saida', amount FROM payables WHERE status = 'aberta'
-         UNION ALL SELECT max(payment_due), 'comissao', sum(amount) FROM commissions WHERE paid_at IS NULL GROUP BY seller_email, competence HAVING sum(amount) <> 0
+         UNION ALL SELECT max(payment_due), 'comissao', sum(amount) FROM commissions WHERE paid_at IS NULL AND cancelled_at IS NULL GROUP BY seller_email, competence HAVING sum(amount) <> 0
        ) SELECT CASE WHEN due IS NULL THEN 'sem_vencimento' WHEN due < $1::date THEN 'anterior_ao_inicio' ELSE to_char(date_trunc($3, due), 'YYYY-MM-DD') END AS period,
            COALESCE(sum(amount) FILTER (WHERE kind = 'entrada'), 0) AS incoming,
            COALESCE(sum(amount) FILTER (WHERE kind = 'saida'), 0) AS outgoing,
