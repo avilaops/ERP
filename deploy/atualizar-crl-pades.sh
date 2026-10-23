@@ -11,7 +11,12 @@ trap 'rm -f "$TEMPORARIO"' EXIT
 
 curl --fail --silent --show-error --location --max-time 60 "$URL" -o "$TEMPORARIO"
 openssl crl -inform DER -in "$TEMPORARIO" -verify -CAfile "$CADEIA" -noout
-openssl crl -inform DER -in "$TEMPORARIO" -checkend 3600 -noout
+PROXIMA_ATUALIZACAO="$(openssl crl -inform DER -in "$TEMPORARIO" -nextupdate -noout | sed 's/^nextUpdate=//')"
+LIMITE="$(( $(date -u +%s) + 3600 ))"
+[ "$(date -u -d "$PROXIMA_ATUALIZACAO" +%s)" -gt "$LIMITE" ] || {
+  echo "A LCR vence em menos de uma hora" >&2
+  exit 1
+}
 chown --reference="$DESTINO" "$TEMPORARIO"
 chmod --reference="$DESTINO" "$TEMPORARIO"
 mv -f "$TEMPORARIO" "$DESTINO"
