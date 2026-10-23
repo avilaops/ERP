@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { LineTabs } from "@/components/LineTabs";
 import { ListPager, ListQuery } from "@/components/ListQuery";
-import { CARD, SECONDARY } from "@/components/ui";
+import { CARD, EmptyState, PageHeader, SECONDARY } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { menuItem } from "@/lib/auth/permissions";
 import { loadParams } from "@/lib/db/params";
@@ -11,7 +11,7 @@ import type { Product } from "@/lib/db/products";
 import { listLines } from "@/lib/db/product-lines";
 import { tenantDb } from "@/lib/db/pool";
 import { showMoney, showPercent } from "@/lib/format";
-import { LINE_PARAM, pickLine } from "@/lib/lines-view";
+import { LINE_PARAM, lineHref, pickLine } from "@/lib/lines-view";
 import { listHref, parseListQuery } from "@/lib/list-query";
 import { lineWords } from "@/lib/line-words";
 import { publishNoticeFromCount, samePricingParams } from "@/lib/price-table";
@@ -61,7 +61,7 @@ export default async function ProdutosPage({ searchParams }: { searchParams: Pro
 
   return (
     <>
-      <ProductTools create={createProductAction} paste={pasteAdvisoryCostsAction} lineId={line.id} imported={line.imported} heading={<><h1 className="text-2xl font-semibold">{ITEM.label}</h1><p className="mt-1 hidden max-w-2xl text-sm text-slate-600 sm:block">Custos e preços dos equipamentos. Alterações chegam à equipe após publicar.</p></>} />
+      <ProductTools create={createProductAction} paste={pasteAdvisoryCostsAction} lineId={line.id} imported={line.imported} heading={<PageHeader title={ITEM.label} hint="Custos e preços dos equipamentos. Alterações chegam à equipe após publicar." />} />
       <LineTabs lines={lines} current={line.id} path={ITEM.href} />
       <PublishBanner key={line.id} notice={notice} lineId={line.id} />
 
@@ -77,7 +77,7 @@ export default async function ProdutosPage({ searchParams }: { searchParams: Pro
         <p className="px-4 pb-3 text-xs text-slate-600">{counterText(result.total, params.safetyMargin)}</p>
         {tab === "sem-codigo" && query.search === "" && result.total > 0 && <ActionForm action={deleteProductsWithoutCodeAction} className="border-t border-slate-200 px-4 py-3"><input type="hidden" name="lineId" value={line.id} /><ConfirmButton label={`Excluir os ${result.total} sem código`} confirmLabel={`Confirmar: excluir os ${result.total}`} className={`${SECONDARY} text-red-700`} /><p className="mt-1 text-xs text-slate-600">Saem do cadastro e da tabela publicada. Itens com histórico permanecem.</p></ActionForm>}
 
-        {rows.length === 0 ? <p className="border-t border-slate-200 p-6 text-slate-600">Nenhum equipamento corresponde à aba, busca e filtros aplicados.</p> : <div className="list-results">
+        {rows.length === 0 ? <div className="border-t border-slate-200"><EmptyState title="Nenhum equipamento encontrado" description="Ajuste a aba, a busca ou os filtros para ver outros equipamentos." action={<Link href={lineHref(ITEM.href, line.id)} className={SECONDARY}>Limpar busca e filtros</Link>} /></div> : <div className="list-results">
           <ul className="2xl:hidden">
             {rows.map((row) => <li key={row.id} className="border-t border-slate-200 px-4 py-3 first:border-t-0"><div className="flex items-start justify-between gap-4"><div className="min-w-0"><Link href={`${ITEM.href}/${row.id}`} className="break-words font-medium text-brand underline">{row.values.name}</Link><p className="mt-1 break-words text-xs text-slate-500">{[row.values.code || "sem código", row.supplier, row.ncm].filter(Boolean).join(" · ")}</p></div><div className="shrink-0 text-right"><strong className="block">{row.tableWithIpi ?? "Sem custo"}</strong><span className="block text-xs text-slate-500">{row.tableWithIpi ? "Preço com IPI" : "Preço indisponível"}</span></div></div><dl className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4"><div><dt className="text-slate-500">{words.cost}</dt><dd>{row.values.advisoryCost || NONE}</dd></div><div><dt className="text-slate-500">Crédito tributário</dt><dd>{row.taxCreditDisplay}</dd></div><div><dt className="text-slate-500">Embalagem</dt><dd>{row.values.packaging || "0,00"}</dd></div><div><dt className="text-slate-500">Desconto máximo</dt><dd>SP {row.maxSp} · contribuinte {row.maxTaxpayer}</dd></div></dl><Link href={`${ITEM.href}/${row.id}`} className={`${SECONDARY} mt-3 w-full sm:w-auto`}>Editar custos e cadastro</Link></li>)}
           </ul>

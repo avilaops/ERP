@@ -3,7 +3,7 @@ import { lineWords } from "@/lib/line-words";
 import { listLines } from "@/lib/db/product-lines";
 import { LINE_PARAM, lineHref, pickLine } from "@/lib/lines-view";
 import Link from "next/link";
-import { CARD, SECONDARY } from "@/components/ui";
+import { CARD, PageHeader, SECONDARY } from "@/components/ui";
 import { Kpi } from "@/components/Charts";
 import { requirePermission } from "@/lib/auth";
 import { menuItem, seesCosts, setsGoals } from "@/lib/auth/permissions";
@@ -95,8 +95,10 @@ export default async function PrecosMetasPage({ searchParams }: { searchParams: 
 
   return (
     <>
-      <h1 className="text-2xl font-semibold">{menuItem("precos-metas").label}</h1>
-      <p className="mt-1 text-slate-600">Como estão a tabela, as metas de {monthLabel(month)} e o que espera decisão.</p>
+      <PageHeader
+        title={menuItem("precos-metas").label}
+        hint={`Como estão a tabela, as metas de ${monthLabel(month)} e o que espera decisão.`}
+      />
       <LineTabs lines={lines} current={line.id} path={menuItem("precos-metas").href} />
 
       <nav aria-label="Partes de preços e metas" className="view-tabs">

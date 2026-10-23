@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CARD, DANGER_OUTLINE, INPUT, LABEL, PRIMARY, SECONDARY } from "@/components/ui";
+import { CARD, DANGER_OUTLINE, INPUT, LABEL, PageHeader, PRIMARY, SECONDARY } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { menuItem } from "@/lib/auth/permissions";
 import { DEFAULT_NFE_BODY, DEFAULT_NFE_SUBJECT, defaultMailbox, loadInboxInfo, loadMailInfo } from "@/lib/db/mail";
@@ -26,16 +26,7 @@ export default async function EmailPage({ searchParams }: { searchParams: Promis
 
   return (
     <>
-      <p className="text-sm">
-        <Link href={menuItem("parametros").href} className="text-brand underline">
-          ← {menuItem("parametros").label}
-        </Link>
-      </p>
-      <h1 className="mt-2 text-2xl font-semibold">E-mail das notas</h1>
-      <details className="mt-1 max-w-3xl text-sm text-slate-600"><summary className="inline-flex min-h-[var(--control)] cursor-pointer items-center text-brand">Como funciona</summary><p className="pb-3">
-        Quando uma nota fiscal é autorizada, o cliente recebe o XML e o DANFE por e-mail. A mensagem sai com o nome da sua empresa. Se a nota for
-        cancelada, quem recebeu a nota recebe o aviso do cancelamento.
-      </p></details>
+      <PageHeader title="E-mail das notas" hint="Quando uma nota fiscal é autorizada, o cliente recebe o XML e o DANFE por e-mail. A mensagem sai com o nome da sua empresa. Se a nota for cancelada, quem recebeu a nota recebe o aviso do cancelamento." actions={<Link href={menuItem("parametros").href} className={SECONDARY}>Configurações</Link>} />
 
       {/* One part at a time: each is a decision of its own. */}
       <nav aria-label="Partes do e-mail" className="view-tabs">

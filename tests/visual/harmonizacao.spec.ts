@@ -52,6 +52,112 @@ test("harmonização: pilotos, cinco tamanhos e ambos os temas", async ({ page }
   expect(errors).toEqual([]);
 });
 
+test("aprovações: cabeçalho e conteúdo seguem o contrato visual", async ({ page }) => {
+  await page.goto("/aprovacoes", { waitUntil: "networkidle" });
+  const header = page.locator(".page-header");
+  await expect(header.getByRole("heading", { name: "Aprovações", exact: true })).toBeVisible();
+  await expect(header).toContainText("Pedidos fora das regras comerciais aguardam sua decisão.");
+  const empty = page.getByRole("status", { name: "Nenhuma aprovação pendente" });
+  const pending = page.locator('section[aria-label^="Pedido "]');
+  if (await empty.count()) {
+    await expect(empty).toContainText("Quando um pedido precisar de decisão, ele aparecerá aqui.");
+    await expect(empty.getByRole("link", { name: "Ver pedidos" })).toBeVisible();
+  } else {
+    await expect(pending.first()).toBeVisible();
+  }
+});
+
+for (const [width, height] of SIZES) {
+  test(`fluxos comerciais: cabeçalhos compartilham a mesma hierarquia em ${width}px`, async ({ page }, testInfo) => {
+    test.setTimeout(90_000);
+    await page.setViewportSize({ width, height });
+    for (const [route, title] of [
+      ["/clientes", "Clientes"],
+      ["/pedidos", "Pedidos"],
+      ["/aprovacoes", "Aprovações"],
+      ["/tabela-precos", "Tabela de preços"],
+      ["/simulador", "Simulador"],
+      ["/precos-metas", "Preços e metas"],
+    ] as const) {
+      await page.goto(route, { waitUntil: "networkidle" });
+      await expect(page.locator(".page-header").getByRole("heading", { name: title, exact: true })).toBeVisible();
+      await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(0);
+      await page.screenshot({ path: testInfo.outputPath(`${route.slice(1)}-${width}.png`), fullPage: true, caret: "initial" });
+    }
+  });
+}
+
+for (const [width, height] of SIZES) {
+  test(`fluxos comerciais: buscas vazias orientam a próxima ação em ${width}px`, async ({ page }, testInfo) => {
+    test.setTimeout(60_000);
+    await page.setViewportSize({ width, height });
+    for (const [route, title, action] of [
+      ["/clientes?q=cliente-inexistente-harmonizacao", "Nenhum cliente encontrado", "Limpar busca e filtros"],
+      ["/pedidos?q=pedido-inexistente-harmonizacao", "Nenhum pedido encontrado", "Limpar busca e filtros"],
+      ["/tabela-precos?q=equipamento-inexistente-harmonizacao", "Nenhum equipamento encontrado", "Limpar busca"],
+    ] as const) {
+      await page.goto(route, { waitUntil: "networkidle" });
+      const empty = page.getByRole("status", { name: title });
+      await expect(empty).toBeVisible();
+      await expect(empty.getByRole("link", { name: action, exact: true })).toBeVisible();
+      await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(0);
+      await page.screenshot({ path: testInfo.outputPath(`vazio-${route.slice(1).split("?")[0]}-${width}.png`), fullPage: true, caret: "initial" });
+    }
+  });
+}
+
+for (const [width, height] of SIZES) {
+  test(`operação e gestão: cabeçalhos mantêm a hierarquia em ${width}px`, async ({ page }, testInfo) => {
+    test.setTimeout(120_000);
+    await page.setViewportSize({ width, height });
+    for (const [route, title] of [
+      ["/dashboard", "Painel"],
+      ["/estoque", "Estoque"],
+      ["/compras", "Nova compra"],
+      ["/fornecedores", "Fornecedores"],
+      ["/produtos", "Produtos e custos"],
+      ["/recebimentos", "Recebimentos"],
+      ["/contas-pagar", "Contas a pagar"],
+      ["/comissoes", "Comissões"],
+      ["/fiscal", "Fiscal"],
+      ["/relatorios", "Relatórios"],
+      ["/documentos", "Documentos"],
+      ["/equipe", "Equipe e acessos"],
+    ] as const) {
+      await page.goto(route, { waitUntil: "networkidle" });
+      await expect(page.locator(".page-header").getByRole("heading", { name: title, exact: true })).toBeVisible();
+      await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(0);
+      if (["/dashboard", "/produtos", "/fiscal", "/equipe"].includes(route)) {
+        await page.screenshot({ path: testInfo.outputPath(`${route.slice(1)}-${width}.png`), fullPage: true, caret: "initial" });
+      }
+    }
+  });
+}
+
+for (const [width, height] of SIZES) {
+  test(`parâmetros: índice e cadastros mantêm a hierarquia em ${width}px`, async ({ page }, testInfo) => {
+    test.setTimeout(90_000);
+    await page.setViewportSize({ width, height });
+    for (const [route, title] of [
+      ["/parametros", "Parâmetros do sistema"],
+      ["/parametros/categorias-de-contas", "Categorias de contas a pagar"],
+      ["/parametros/despesas-fixas", "Despesas fixas"],
+      ["/parametros/email", "E-mail das notas"],
+      ["/parametros/formas-de-pagamento", "Formas de pagamento"],
+      ["/parametros/linhas", "Linhas de produto"],
+      ["/parametros/transportadoras", "Transportadoras"],
+      ["/parametros/usuarios", "Usuários de Ludus Equipamentos"],
+    ] as const) {
+      await page.goto(route, { waitUntil: "networkidle" });
+      await expect(page.locator(".page-header").getByRole("heading", { name: title, exact: true })).toBeVisible();
+      await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(0);
+      if (["/parametros", "/parametros/email", "/parametros/transportadoras"].includes(route)) {
+        await page.screenshot({ path: testInfo.outputPath(`${route.slice(1).replaceAll("/", "-")}-${width}.png`), fullPage: true, caret: "initial" });
+      }
+    }
+  });
+}
+
 test("cadastro: etapas e erro de validação preservam o preenchimento", async ({ page }) => {
   await page.goto("/clientes/novo");
   const name = page.getByLabel("Razão social", { exact: false });
@@ -95,8 +201,9 @@ test("configurações: todas as etapas são alcançáveis nos cinco tamanhos", a
   for (const [width, height] of SIZES) {
     await page.setViewportSize({ width, height });
     for (const [route, label] of routes) {
-      await page.goto(route, { waitUntil: "networkidle" });
+      await page.goto(route, { waitUntil: "domcontentloaded" });
       const chooser = page.getByRole("combobox", { name: label, exact: true });
+      await expect(chooser).toBeVisible();
       const steps = await chooser.locator("option").evaluateAll((options) => options.map((option) => (option as HTMLOptionElement).value).filter((value) => value !== "-1"));
       for (const step of steps) {
         await chooser.selectOption(step);

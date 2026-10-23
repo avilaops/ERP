@@ -2,7 +2,7 @@ import { LineTabs } from "@/components/LineTabs";
 import { listLines } from "@/lib/db/product-lines";
 import { LINE_PARAM, pickLine } from "@/lib/lines-view";
 import Link from "next/link";
-import { PRIMARY, SECONDARY } from "@/components/ui";
+import { PageHeader, PRIMARY, SECONDARY } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { tenantDb } from "@/lib/db/pool";
 import { menuItem } from "@/lib/auth/permissions";
@@ -110,8 +110,7 @@ export default async function ParametrosPage({ searchParams }: { searchParams: P
 
   return (
     <>
-      <h1 className="text-2xl font-semibold">{menuItem("parametros").label}</h1>
-      <p className="mt-1 text-slate-600">Impostos, canal e política. Tudo que muda aqui recalcula a tabela inteira.</p>
+      <PageHeader title={menuItem("parametros").label} hint="Impostos, canal e política. Tudo que muda aqui recalcula a tabela inteira." />
       <nav aria-label="Partes dos parâmetros" className="view-tabs">
         {TABS.map(([key, label]) => (
           <Link

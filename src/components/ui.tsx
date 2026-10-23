@@ -93,6 +93,21 @@ export function PageHeader({ title, hint, actions }: { title: string; hint?: Rea
   );
 }
 
+/** An empty list still explains what belongs here and where the person can go next. */
+export function EmptyState({ title, description, action }: { title: string; description: string; action?: ReactNode }) {
+  return (
+    <section
+      role="status"
+      aria-label={title}
+      className="flex min-h-44 flex-col items-center justify-center px-5 py-8 text-center"
+    >
+      <h2 className="text-base font-semibold text-slate-900">{title}</h2>
+      <p className="mt-1 max-w-prose text-sm text-slate-600">{description}</p>
+      {action && <div className="mt-4">{action}</div>}
+    </section>
+  );
+}
+
 const TONES = {
   good: "border-emerald-300 bg-emerald-50 text-emerald-900",
   warn: "border-amber-300 bg-amber-50 text-amber-900",

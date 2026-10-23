@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ListPager, ListQuery } from "@/components/ListQuery";
-import { CARD, PageHeader, Pill, SECONDARY } from "@/components/ui";
+import { CARD, EmptyState, PageHeader, Pill, SECONDARY } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { menuItem } from "@/lib/auth/permissions";
 import { completenessText, formatDocument, formatPhone, isComplete, taxpayerFromRegistration } from "@/lib/customer";
@@ -49,7 +49,11 @@ export default async function ClientesPage({ searchParams }: { searchParams: Pro
         />
 
         {items.length === 0 ? (
-          <p className="p-6 text-slate-600">{result.total === 0 && query.search === "" && Object.keys(query.filters).length === 0 ? "Nenhum cliente cadastrado ainda. Cadastre o primeiro cliente para iniciar um pedido." : "Nenhum cliente corresponde à busca e aos filtros aplicados."}</p>
+          <EmptyState
+            title={result.total === 0 && query.search === "" && Object.keys(query.filters).length === 0 ? "Nenhum cliente cadastrado" : "Nenhum cliente encontrado"}
+            description={result.total === 0 && query.search === "" && Object.keys(query.filters).length === 0 ? "Cadastre o primeiro cliente para iniciar um pedido." : "Ajuste a busca ou remova os filtros para ver outros clientes."}
+            action={result.total === 0 && query.search === "" && Object.keys(query.filters).length === 0 ? <Link href={`${ITEM.href}/novo?tipo=pj`} className={SECONDARY}>Cadastrar cliente</Link> : <Link href={ITEM.href} className={SECONDARY}>Limpar busca e filtros</Link>}
+          />
         ) : (
           <div className="list-results">
             <ul className="md:hidden">
