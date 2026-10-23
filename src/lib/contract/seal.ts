@@ -1,19 +1,21 @@
 import forge from "node-forge";
 import { PDFArray, PDFDocument, PDFHexString, PDFName, PDFNumber, PDFString } from "pdf-lib";
+import { padesAdRbPolicy } from "@/lib/contract/icp/lpa";
+import { buildDetachedPades } from "@/lib/contract/pades-cms";
+import { appendDss } from "@/lib/contract/pades-dss";
 import type { SigningKey } from "@/lib/fiscal/sign";
 
 /**
- * The digital signature of the company on a PDF (PAdES basic, `adbe.pkcs7.detached`,
- * SHA-256 with the RSA key of its A1 certificate). The whole file is covered,
- * so any change made after this shows in a PDF reader as a broken signature.
- * The signature is invisible: the sheets look the same.
+ * The company's signature on a PDF, in the ICP-Brasil PAdES AD-RB profile
+ * (Filter and SubFilter come from the official PA). The CMS is detached.
+ * Bytes inside the ByteRange are what was signed. CRL and OCSP, when given,
+ * go in a later increment (the PDF DSS), so they do not change those bytes.
+ * The signature widget is invisible: the sheets look the same.
  */
 
-/** Room kept for the signature inside the file, in bytes. A signature with its certificate takes about 3 kB. */
-const SIGNATURE_BYTES = 12_288;
+/** Room kept for the CMS. The chain, the policy and the signing certificate need more than the old PKCS#7. */
+const SIGNATURE_BYTES = 32_768;
 const MARK = "**********";
-
-const latin1 = (bytes: Uint8Array) => Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength).toString("latin1");
 
 export type SealInfo = {
   /** Who signs: the name on the certificate. */
@@ -29,7 +31,16 @@ export function certificateHolder(key: SigningKey): string {
   return String(certificate.subject.getField("CN")?.value ?? "");
 }
 
-export async function sealPdf(pdf: Uint8Array, key: SigningKey, info: SealInfo): Promise<Uint8Array> {
+export type SealExtras = {
+  /** CRL DER da AC de teste ou da cadeia real. Vai para o DSS, fora do ByteRange. */
+  crl?: Uint8Array | null;
+  /** OCSP basic response DER. Vai para o DSS junto com a CRL. */
+  ocsp?: Uint8Array | null;
+  /** Troca o CMS de propósito. Os testes de atributo incompatível usam isto. */
+  cms?: (content: Uint8Array) => Promise<Uint8Array>;
+};
+
+export async function sealPdf(pdf: Uint8Array, key: SigningKey, info: SealInfo, extras: SealExtras = {}): Promise<Uint8Array> {
   const document = await PDFDocument.load(pdf);
   const context = document.context;
 
@@ -37,17 +48,20 @@ export async function sealPdf(pdf: Uint8Array, key: SigningKey, info: SealInfo):
   const range = PDFArray.withContext(context);
   range.push(PDFNumber.of(0));
   for (let index = 0; index < 3; index += 1) range.push(PDFName.of(MARK));
+  const transformParams = context.obj({ Type: "TransformParams", P: 1, V: PDFName.of("1.2") });
+  const docMdp = context.obj({ Type: "SigRef", TransformMethod: "DocMDP", TransformParams: transformParams });
   const signature = context.register(
     context.obj({
       Type: "Sig",
-      Filter: "Adobe.PPKLite",
-      SubFilter: "adbe.pkcs7.detached",
+      Filter: padesAdRbPolicy().pdfDictionary.Filter,
+      SubFilter: padesAdRbPolicy().pdfDictionary.SubFilter,
       ByteRange: range,
       Contents: PDFHexString.of("0".repeat(SIGNATURE_BYTES * 2)),
       Name: PDFString.of(info.name),
       Reason: PDFString.of(info.reason),
       ...(info.location ? { Location: PDFString.of(info.location) } : {}),
       M: PDFString.fromDate(info.at),
+      Reference: [docMdp],
     }),
   );
   const [page] = document.getPages();
@@ -56,6 +70,7 @@ export async function sealPdf(pdf: Uint8Array, key: SigningKey, info: SealInfo):
   annotations.push(widget);
   page.node.set(PDFName.of("Annots"), annotations);
   document.catalog.set(PDFName.of("AcroForm"), context.obj({ SigFlags: 3, Fields: [widget] }));
+  document.catalog.set(PDFName.of("Perms"), context.obj({ DocMDP: signature }));
 
   const bytes = Buffer.from(await document.save({ useObjectStreams: false }));
   const placeholder = `/ByteRange [ 0 /${MARK} /${MARK} /${MARK} ]`;
@@ -69,33 +84,64 @@ export async function sealPdf(pdf: Uint8Array, key: SigningKey, info: SealInfo):
 
   // What is signed is everything but the room of the signature itself.
   const signed = Buffer.concat([bytes.subarray(0, start), bytes.subarray(end)]);
-  const certificate = forge.pki.certificateFromAsn1(forge.asn1.fromDer(forge.util.decode64(key.certificateBase64)));
-  const p7 = forge.pkcs7.createSignedData();
-  p7.content = forge.util.createBuffer(latin1(signed));
-  p7.addCertificate(certificate);
-  p7.addSigner({
-    key: forge.pki.privateKeyFromPem(key.privateKeyPem),
-    certificate,
-    digestAlgorithm: forge.pki.oids.sha256,
-    authenticatedAttributes: [
-      { type: forge.pki.oids.contentType, value: forge.pki.oids.data },
-      { type: forge.pki.oids.messageDigest },
-      { type: forge.pki.oids.signingTime, value: info.at as unknown as string },
-    ],
-  });
-  p7.sign({ detached: true });
-  const der = Buffer.from(forge.asn1.toDer(p7.toAsn1()).getBytes(), "latin1");
+  const certificateDer = Buffer.from(key.certificateBase64, "base64");
+  const chainDer = (key.certificateChainBase64 ?? []).map((der) => Buffer.from(der, "base64"));
+  const der = Buffer.from(extras.cms
+    ? await extras.cms(signed)
+    : await buildDetachedPades(signed, { privateKeyPem: key.privateKeyPem, certificateDer, chainDer }));
   if (der.length > SIGNATURE_BYTES) throw new Error("A assinatura não coube no lugar reservado para ela.");
   bytes.write(der.toString("hex").padEnd(SIGNATURE_BYTES * 2, "0"), start + 1, "latin1");
-  return new Uint8Array(bytes);
+  const sealed = new Uint8Array(bytes);
+  if (!extras.crl && !extras.ocsp) return sealed;
+  return appendDss(sealed, {
+    certificates: [certificateDer, ...chainDer],
+    crl: extras.crl ?? null,
+    ocsp: extras.ocsp ?? null,
+    signature: der,
+  });
+}
+
+/**
+ * CMS gravado em /Contents. O PDF enche o resto do campo com zeros.
+ * Um zero no fim do DER é byte da assinatura: o tamanho sai do cabeçalho
+ * ASN.1 (forma curta ou longa), nunca de cortar pares 00 do final.
+ * Devolve null se o hex não for um DER de tamanho definido.
+ */
+export function cmsDerFromContents(hex: string): Buffer | null {
+  if (hex.length < 4 || hex.length % 2 !== 0 || !/^[0-9a-fA-F]+$/.test(hex)) return null;
+  const lengthByte = Number.parseInt(hex.slice(2, 4), 16);
+  let header = 2;
+  let body = lengthByte;
+  if (lengthByte >= 0x80) {
+    const count = lengthByte & 0x7f;
+    if (count < 1 || count > 4) return null;
+    header = 2 + count;
+    const digits = hex.slice(4, 4 + count * 2);
+    if (digits.length !== count * 2) return null;
+    body = Number.parseInt(digits, 16);
+    if (!Number.isSafeInteger(body)) return null;
+  }
+  const total = header + body;
+  if (!Number.isSafeInteger(total) || total < 2 || total * 2 > hex.length) return null;
+  return Buffer.from(hex.slice(0, total * 2), "hex");
 }
 
 /** Where the signature of a sealed PDF is and what it covers. `null` for a file that is not sealed. For tests and conference. */
 export function sealOf(pdf: Uint8Array): { range: [number, number, number, number]; signed: Buffer; signature: Buffer } | null {
   const bytes = Buffer.from(pdf.buffer, pdf.byteOffset, pdf.byteLength);
-  const match = /\/ByteRange \[(\d+) (\d+) (\d+) (\d+)\]/.exec(bytes.toString("latin1"));
-  if (!match) return null;
-  const range = match.slice(1).map(Number) as [number, number, number, number];
-  const hex = bytes.toString("latin1", range[1] + 1, range[2] - 1).replace(/(00)+$/, "");
-  return { range, signed: Buffer.concat([bytes.subarray(range[0], range[0] + range[1]), bytes.subarray(range[2], range[2] + range[3])]), signature: Buffer.from(hex, "hex") };
+  const pattern = /\/ByteRange \[(\d+) (\d+) (\d+) (\d+)\]/g;
+  for (const match of bytes.toString("latin1").matchAll(pattern)) {
+    const range = match.slice(1).map(Number) as [number, number, number, number];
+    if (range.some((value) => !Number.isSafeInteger(value) || value < 0)) continue;
+    if (range[1] < 1 || range[2] <= range[1] + 2 || range[2] + range[3] > bytes.length) continue;
+    if (bytes[range[1]] !== 0x3c || bytes[range[2] - 1] !== 0x3e) continue;
+    const signature = cmsDerFromContents(bytes.toString("latin1", range[1] + 1, range[2] - 1));
+    if (!signature) continue;
+    const signed = Buffer.concat([
+      bytes.subarray(range[0], range[0] + range[1]),
+      bytes.subarray(range[2], range[2] + range[3]),
+    ]);
+    return { range, signed, signature };
+  }
+  return null;
 }

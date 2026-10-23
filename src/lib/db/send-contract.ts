@@ -1,18 +1,20 @@
 import { PDFDocument } from "pdf-lib";
 import { renderContractPdf, withEvidence } from "@/lib/contract/pdf";
-import { sealPdf } from "@/lib/contract/seal";
 import { maskedPhone, mobileNumber, smsAvailable, smsConfig, SmsError } from "@/lib/contract/sms";
 import type { SmsSender } from "@/lib/contract/sms";
 import { blankWords, contractNumber, contractValues, DEFAULT_CONTRACT_BODY, DEFAULT_CONTRACT_TITLE, fillContract } from "@/lib/contract/text";
 import { CODE_MINUTES, fingerprint, hashCode, hashToken, newCode, newToken } from "@/lib/contract/token";
-import { isValidCpf, normalizeDocument } from "@/lib/customer";
+import { formatDocument, isValidCpf, normalizeDocument } from "@/lib/customer";
 import { loadLogo, loadProposalSettings } from "@/lib/db/company";
 import {
-  addContractEvent, ContractError, createContract, DEFAULT_CONTRACT_MAIL_BODY, DEFAULT_CONTRACT_MAIL_SUBJECT, fillContractMail, getOrderContract, isOpen, loadContractPdf, loadContractSettings,
-  loadEvidence, nextContractSequence, renewContractLink, signWithCode, startCode,
+  addContractEvent, commitSignedContract, ContractError, createContract, DEFAULT_CONTRACT_MAIL_BODY, DEFAULT_CONTRACT_MAIL_SUBJECT, fillContractMail, getOrderContract, isOpen, loadContractPdf, loadContractSettings,
+  loadEvidence, loadSealedContractPdf, nextContractSequence, renewContractLink, signingCodeState, startCode,
 } from "@/lib/db/contracts";
 import type { Contract, SigningContract } from "@/lib/db/contracts";
-import { loadContractSeal } from "@/lib/db/contract-seal";
+import { loadContractSeal, sealStanding } from "@/lib/db/contract-seal";
+import { padesAdRbPolicy } from "@/lib/contract/icp/lpa";
+import { signPadesViaService } from "@/lib/contract/pades-provider";
+import { tenantSchema } from "@/lib/db/config";
 import { loadFiscalSettings } from "@/lib/db/fiscal";
 import { loadMailInfo, mailChannel } from "@/lib/db/mail";
 import type { Order } from "@/lib/db/orders";
@@ -225,26 +227,19 @@ export async function resendOrderContract(order: Pick<Order, "id" | "number">, c
 }
 
 /**
- * The contract with its record of signatures, as it stands now. A signed
- * contract of a company that turned the seal on leaves signed with the
- * company's digital certificate (`vault` opens it). A seal that cannot be made
- * (no key on the server, certificate that does not open) never keeps the
- * contract from the person: the file leaves without it, and the log says why.
+ * The contract with its record of signatures. A signed contract is the PDF
+ * stored when the signature was accepted. It is not signed again on download,
+ * and it is not handed over unsigned.
  */
 export async function contractFile(contract: Contract, context: { company: string; orderNumber: string; now: Date; vault?: () => Buffer }, conn: Queryable): Promise<Uint8Array> {
+  if (contract.status === "assinado") {
+    const sealed = await loadSealedContractPdf(contract.id, conn);
+    if (!sealed) throw new ContractError("O contrato está assinado, mas o PDF com o selo ICP-Brasil não foi guardado. Peça à empresa para enviar o contrato de novo.");
+    return sealed;
+  }
   const pdf = await loadContractPdf(contract.id, conn);
   if (!pdf) throw new Error(`Contrato ${contract.id} sem arquivo.`);
-  const plain = async () => withEvidence(pdf, await loadEvidence(contract, context, conn));
-  if (contract.status !== "assinado" || !context.vault) return plain();
-  try {
-    const seal = await loadContractSeal(conn, context.vault, context.now);
-    if (!seal) return await plain();
-    const file = await withEvidence(pdf, await loadEvidence(contract, { ...context, sealedBy: seal.holder }, conn));
-    return await sealPdf(file, seal.key, { name: seal.holder, reason: `Contrato nº ${contractNumber(context.orderNumber, contract.sequence)} assinado eletronicamente`, at: context.now });
-  } catch (error) {
-    console.error("[contrato] o selo digital não pôde ser aplicado; o arquivo sai sem ele:", error instanceof Error ? error.message : error);
-    return plain();
-  }
+  return withEvidence(pdf, await loadEvidence(contract, context, conn));
 }
 
 export const contractFileName = (orderNumber: string, contract: Pick<Contract, "sequence" | "status">) =>
@@ -303,19 +298,98 @@ export async function requestSigningCode(contract: SigningContract, token: strin
  * signatures goes to the customer and to the seller; a copy that does not
  * leave never undoes the signature.
  */
+const RETRY = " Nada foi registrado. Tente de novo.";
+
+/** Turns a signer failure into a sentence the person can act on. The code stays unused. */
+function signingFailure(error: unknown): ContractError {
+  const message = error instanceof Error ? error.message : "";
+  if (message.includes("Nada foi registrado")) return new ContractError(message);
+  if (/fora do período de validade|certificado-vencido/.test(message)) {
+    return new ContractError(`O certificado da empresa está vencido.${RETRY} Renove o certificado e tente de novo.`);
+  }
+  if (/certificado-revogado/.test(message)) {
+    return new ContractError(`O certificado da empresa está revogado.${RETRY} Renove o certificado e tente de novo.`);
+  }
+  if (/certificado-de-outra-empresa|HTTP 403/.test(message)) {
+    return new ContractError(`O certificado desta empresa não está disponível no assinador.${RETRY}`);
+  }
+  if (/não respondeu a tempo|falar com o serviço|HTTP 5|não configurado|Prazo do assinador/.test(message)) {
+    return new ContractError(`Não foi possível falar com o serviço de assinatura.${RETRY}`);
+  }
+  return new ContractError(`A assinatura do PDF não foi aceita.${RETRY}`);
+}
+
 export async function signOrderContract(
   contract: SigningContract, token: string, code: string,
-  context: { company: string; now: Date; ip: string | null; agent: string | null; way: MailWay; /** What was typed as the code of the phone. */ phoneCode?: string | null },
+  context: {
+    company: string;
+    /** Slug da empresa. O assinador só usa a chave deste identificador. */
+    tenant: string;
+    now: Date;
+    ip: string | null;
+    agent: string | null;
+    way: MailWay;
+    /** What was typed as the code of the phone. */
+    phoneCode?: string | null;
+    /** Ambiente do assinador. Omissão lê o processo. Os testes passam o deles. */
+    signerEnv?: Record<string, string | undefined>;
+  },
   conn: Queryable,
 ): Promise<void> {
   if (!/^\d{6}$/.test(code)) throw new ContractError("O código do e-mail tem 6 números.");
   const phoneCode = context.phoneCode ?? "";
   if (contract.recipientPhone && !/^\d{6}$/.test(phoneCode)) throw new ContractError("Informe também o código de 6 números que chegou por SMS no celular.");
-  await signWithCode(contract.id, { codeHash: hashCode(token, code), phoneCodeHash: contract.recipientPhone ? hashCode(token, `sms:${phoneCode}`) : null, ip: context.ip, agent: context.agent }, conn);
+  try {
+    tenantSchema(context.tenant);
+  } catch {
+    throw new ContractError(`Empresa inválida.${RETRY}`);
+  }
+  const proof = { codeHash: hashCode(token, code), phoneCodeHash: contract.recipientPhone ? hashCode(token, `sms:${phoneCode}`) : null, ip: context.ip, agent: context.agent };
+  if (await signingCodeState(contract.id, proof, conn) === "already") return;
+
+  const standing = await sealStanding(conn, context.now);
+  if (standing === "vencido") throw new ContractError(`O certificado da empresa está vencido.${RETRY} Renove o certificado e tente de novo.`);
+  const seal = await loadContractSeal(conn, context.now);
+  if (!seal) throw new ContractError(`Assinatura indisponível: configure um certificado A1 válido.${RETRY}`);
+  if (seal.validUntil.getTime() - context.now.getTime() <= 30 * 86_400_000) {
+    console.warn("[contrato] certificado próximo do vencimento fingerprint=%s valido_ate=%s", seal.fingerprint, seal.validUntil.toISOString());
+  }
+  const sourcePdf = await loadContractPdf(contract.id, conn);
+  if (!sourcePdf) throw new ContractError(`PDF do contrato não encontrado.${RETRY}`);
+  const pending = await conn.query("SELECT pending_name, pending_document FROM order_contracts WHERE id = $1", [contract.id]);
+  const signerName = String(pending.rows[0]?.pending_name ?? "");
+  const signerDocument = String(pending.rows[0]?.pending_document ?? "");
+  const preview: SigningContract = { ...contract, status: "assinado", signerName, signerDocument, signedAt: context.now, signerIp: context.ip };
+  const evidence = await loadEvidence(preview, { company: context.company, orderNumber: contract.orderNumber, now: context.now, sealedBy: seal.holder }, conn);
+  const file = await withEvidence(sourcePdf, evidence);
+  let signedPdf: Uint8Array;
+  try {
+    signedPdf = await signPadesViaService(file, {
+      tenantId: context.tenant, fingerprint: seal.fingerprint, validFrom: seal.validFrom, validUntil: seal.validUntil,
+    }, {
+      name: seal.holder, reason: `Contrato nº ${contractNumber(contract.orderNumber, contract.sequence)} assinado eletronicamente`, at: context.now,
+    }, context.signerEnv);
+  } catch (error) {
+    throw signingFailure(error);
+  }
+  let outcome: "signed" | "already";
+  try {
+    const phone = contract.recipientPhone ? " e código enviado ao celular" : "";
+    outcome = await commitSignedContract(contract.id, {
+      ...proof,
+      sealedPdf: signedPdf,
+      signedAt: context.now,
+      audit: `${signerName}, CPF ${formatDocument(signerDocument)}, com código enviado ao e-mail${phone} certificado ${seal.fingerprint} política ${padesAdRbPolicy().oid}`,
+    }, conn);
+  } catch (error) {
+    if (error instanceof ContractError) throw error;
+    console.error("[contrato] falha ao gravar o PDF selado");
+    throw new ContractError(`Não foi possível concluir a assinatura.${RETRY}`);
+  }
+  if (outcome === "already") return;
   try {
     const signed = (await getOrderContract(contract.orderId, contract.id, conn))!;
-    const file = await contractFile(signed, { company: context.company, orderNumber: contract.orderNumber, now: context.now, vault: context.way.key }, conn);
-    const attachments: MailAttachment[] = [{ filename: contractFileName(contract.orderNumber, signed), contentType: "application/pdf", content: file }];
+    const attachments: MailAttachment[] = [{ filename: contractFileName(contract.orderNumber, signed), contentType: "application/pdf", content: signedPdf }];
     const number = contractNumber(contract.orderNumber, signed.sequence);
     for (const to of [...new Set([signed.recipientEmail, contract.sellerEmail].filter((address) => isMailAddress(address)))]) {
       const delivery = await deliver(

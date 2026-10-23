@@ -307,9 +307,9 @@ test("certificado digital: só a diretoria envia; arquivo e senha não voltam pa
   }
   // Fora da camada fiscal ninguém abre o certificado guardado.
   const users = SOURCES_UNDER_SRC().filter(([, code]) => code.includes("openCertificate("));
-  // Só as operações fiscais abrem o certificado guardado: emissão, distribuição e manifestação na SEFAZ.
-  // E o selo do contrato assinado, quando a empresa o liga: a mesma chave, só para assinar o PDF.
-  assert.deepEqual(users.map(([file]) => file).sort(), ["lib/db/contract-seal.ts", "lib/db/issue-nfe.ts", "lib/db/recipient-manifestations.ts", "lib/db/run-nfe-distribution.ts", "lib/fiscal/certificate.ts"]);
+  // Só operações fiscais abrem o PFX: emissão, distribuição e manifestação na SEFAZ.
+  // O contrato não abre esse PFX. A chave do PDF fica no assinador, por empresa.
+  assert.deepEqual(users.map(([file]) => file).sort(), ["lib/db/issue-nfe.ts", "lib/db/recipient-manifestations.ts", "lib/db/run-nfe-distribution.ts", "lib/fiscal/certificate.ts"]);
 });
 
 test("e-mail das notas: a senha da caixa só é aberta para enviar, nunca volta à tela nem vai a log", () => {
