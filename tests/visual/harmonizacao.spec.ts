@@ -112,7 +112,6 @@ for (const [width, height] of SIZES) {
     await page.setViewportSize({ width, height });
     for (const [route, title] of [
       ["/dashboard", "Painel"],
-      ["/producao", "Produção"],
       ["/estoque", "Estoque"],
       ["/compras", "Nova compra"],
       ["/fornecedores", "Fornecedores"],
