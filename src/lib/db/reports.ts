@@ -170,7 +170,7 @@ async function payables(filter: ReportFilter, conn: Queryable): Promise<ReportDa
       money("A pagar", sum(open.map((row) => amount(row.amount)))), money("Vencido", sum(open.filter((row) => row.late === true).map((row) => amount(row.amount)))),
     ],
     columns: [{ label: "Conta", kind: "text" }, { label: "Fornecedor", kind: "text" }, { label: "Categoria", kind: "text" }, { label: "Vence em", kind: "date" }, { label: "Valor", kind: "money" }, { label: "Situação", kind: "text" }, { label: "Paga em", kind: "date" }, { label: "Valor pago", kind: "money" }],
-    rows: rows.map((row) => [text(row.description), text(row.supplier), text(row.category), text(row.due_on), amount(row.amount), row.status === "paga" ? "Paga" : row.late ? "Vencida" : "A pagar", text(row.paid_on), amount(row.paid_amount)]),
+    rows: rows.map((row) => [text(row.description), text(row.supplier), text(row.category), text(row.due_on), amount(row.amount), row.status === "paga" ? "Paga" : row.status === "cancelada" ? "Cancelada" : row.late ? "Vencida" : "A pagar", text(row.paid_on), amount(row.paid_amount)]),
   };
 }
 
@@ -178,7 +178,8 @@ const COMMISSIONS = `
   SELECT COALESCE(u.name, (SELECT o.seller_name FROM orders o WHERE o.seller_email = c.seller_email ORDER BY o.id DESC LIMIT 1), c.seller_email) AS seller, to_char(c.competence, 'YYYY-MM-DD') AS competence, c.base_amount, c.rate, c.amount,
          to_char(c.payment_due, 'YYYY-MM-DD') AS due_on, to_char(c.paid_at ${DAY}, 'YYYY-MM-DD') AS paid_on
     FROM commissions c LEFT JOIN users u ON u.email = c.seller_email
-   WHERE ($1::date IS NULL OR c.competence >= $1) AND ($2::date IS NULL OR c.competence <= $2)
+   WHERE c.cancelled_at IS NULL
+     AND ($1::date IS NULL OR c.competence >= $1) AND ($2::date IS NULL OR c.competence <= $2)
      AND ($3::text IS NULL OR c.seller_email = $3)
    ORDER BY c.competence DESC, seller, c.id`;
 

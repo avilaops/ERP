@@ -2,11 +2,11 @@ import { monthLabel } from "@/lib/commissions-view";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { FitRows } from "@/components/FitRows";
-import { CARD, DANGER_OUTLINE, pageOf, Pager, PRIMARY, SECONDARY, PageHeader, MetricSummary, ViewTabs } from "@/components/ui";
+import { CARD, INPUT, DANGER_OUTLINE, pageOf, Pager, PRIMARY, SECONDARY, PageHeader, MetricSummary, ViewTabs } from "@/components/ui";
 import { rowsPerPage } from "@/lib/rows";
 import { OrderReference } from "@/components/OrderReference";
 import { requirePermission } from "@/lib/auth";
-import { confirmsRefunds, menuItem } from "@/lib/auth/permissions";
+import { allows, confirmsRefunds, menuItem, seesCosts } from "@/lib/auth/permissions";
 import { listPaymentMethods } from "@/lib/db/orders";
 import { tenantDb } from "@/lib/db/pool";
 import { listOpenReceivables, listPendingRefunds, listReceipts, receivedInMonth } from "@/lib/db/receivables";
@@ -14,13 +14,12 @@ import { isoDate, showDateTime, showIsoDate, showMoney } from "@/lib/format";
 import { addDays } from "@/lib/pricing/payment";
 import { isOverdue, receivablesSummary } from "@/lib/receivables-view";
 import { ActionForm } from "../pedidos/ActionForm";
-import { decideRefundAction, requestRefundAction } from "./actions";
+import { adjustReceivableAction, createManualReceivableAction, decideRefundAction, requestRefundAction } from "./actions";
 import { ReceiptForm } from "./ReceiptForm";
 
 export const metadata = { title: `${menuItem("recebimentos").label} · ERP` };
 export const dynamic = "force-dynamic";
 
-const INPUT = "min-h-[var(--control)] rounded border border-slate-300 bg-white px-2 text-sm outline-none focus:ring-2 focus:ring-brand";
 const count = (n: number) => `${n} ${n === 1 ? "valor" : "valores"}`;
 
 const HERE = menuItem("recebimentos").href;
@@ -61,6 +60,30 @@ export default async function RecebimentosPage({ searchParams }: { searchParams:
     <>
       <PageHeader title={menuItem("recebimentos").label} hint="Entradas e parcelas dos pedidos fechados." />
 
+      {seesCosts(session) && (
+        <details className={`${CARD} mt-3`}>
+          <summary className="disclosure-heading">Incluir cobrança manual<span className="disclosure-marker" aria-hidden="true">+</span></summary>
+          <ActionForm action={createManualReceivableAction} className="grid gap-3 border-t border-slate-200 p-4 sm:grid-cols-2">
+            <label className="text-sm">Número do pedido
+              <input name="orderNumber" className={INPUT} required placeholder="AAMMDD-XXXX" />
+            </label>
+            <label className="text-sm">Valor
+              <input name="amount" className={INPUT} required inputMode="decimal" placeholder="0,00" />
+            </label>
+            <label className="text-sm">Vencimento
+              <input name="dueDate" className={INPUT} type="date" required />
+            </label>
+            <label className="text-sm">Forma
+              <select name="method" className={INPUT}><option value="">Não definida</option>{methods.map((m) => <option key={m} value={m}>{m}</option>)}</select>
+            </label>
+            <label className="text-sm sm:col-span-2">Motivo
+              <textarea name="reason" className={INPUT} rows={2} minLength={10} required placeholder="Justifique a cobrança adicional" />
+            </label>
+            <p className="text-xs text-slate-600 sm:col-span-2">Cria uma provisão sem registrar dinheiro recebido. Pedidos com vínculos fiscais, contratos assinados, produção ou movimentação financeira ficam bloqueados.</p>
+            <button className={PRIMARY} type="submit">Incluir cobrança</button>
+          </ActionForm>
+        </details>
+      )}
       <ViewTabs label="Partes dos recebimentos" items={TABS.map(([key, label]) => ({ href: `${HERE}?ver=${key}`, label, current: key === tab }))} />
       {tab === "aberto" && (
         <>
@@ -83,7 +106,7 @@ export default async function RecebimentosPage({ searchParams }: { searchParams:
                     <div>
                       <OrderReference access={session} number={item.orderNumber} customer={item.customerName} />
                       <p className="text-xs text-slate-500">
-                        #{item.orderNumber} · {item.label} · vendedor: {item.sellerName}
+                        {allows(session, "pedidos") ? <Link href={`${menuItem("pedidos").href}/${item.orderNumber}`} className="font-medium text-brand underline">Abrir pedido #{item.orderNumber}</Link> : <span>Pedido #{item.orderNumber}</span>} · {item.label} · vendedor: {item.sellerName}
                       </p>
                       <Link href={`${menuItem("recebimentos").href}/${item.id}/pix`} className="text-sm font-medium text-brand underline">
                         Cobrar por PIX
@@ -97,6 +120,32 @@ export default async function RecebimentosPage({ searchParams }: { searchParams:
                       </p>
                     </div>
                   </div>
+                  <p className="mt-2 text-xs text-slate-600">Para corrigir uma cobrança incorreta, não use Dar baixa. Consulte o pedido e seus vínculos financeiros; a edição administrativa depende de validação.</p>
+                  {seesCosts(session) && (
+                    <details className="mt-3 rounded-lg border border-slate-200 p-3">
+                      <summary className="cursor-pointer font-medium text-brand">Editar ou cancelar cobrança</summary>
+                      <p className="mt-2 text-xs text-slate-600">Somente sem baixas ou vínculos fiscais, contratuais e de produção. Toda alteração exige justificativa e fica registrada.</p>
+                      <ActionForm action={adjustReceivableAction} className="mt-3 grid gap-3 sm:grid-cols-2">
+                        <input type="hidden" name="id" value={item.id} />
+                        <label className="text-sm">Vencimento
+                          <input className={INPUT} name="dueDate" type="date" defaultValue={item.dueDate ?? ""} />
+                        </label>
+                        <label className="text-sm">Forma de cobrança
+                          <select className={INPUT} name="method" defaultValue={item.method ?? ""}>
+                            <option value="">Não definida</option>
+                            {[...new Set([...methods, ...(item.method ? [item.method] : [])])].map((method) => <option key={method} value={method}>{method}</option>)}
+                          </select>
+                        </label>
+                        <label className="text-sm sm:col-span-2">Justificativa obrigatória
+                          <textarea className={INPUT} name="reason" required minLength={10} rows={2} placeholder="Descreva o motivo da alteração" />
+                        </label>
+                        <div className="flex flex-wrap gap-2 sm:col-span-2">
+                          <button className={SECONDARY} name="action" value="editar" type="submit">Salvar alteração</button>
+                          <button className={DANGER_OUTLINE} name="action" value="cancelar" type="submit">Cancelar cobrança</button>
+                        </div>
+                      </ActionForm>
+                    </details>
+                  )}
                   <ReceiptForm key={`${item.id}:${item.open}`} id={item.id} openAmount={item.open} today={today} initialMethod={item.method} methods={methods} initiallyOpen={false} />
                 </li>
               );

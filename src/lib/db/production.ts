@@ -11,7 +11,7 @@ export type ProductionStage = { id: number; name: string; position: number; kind
 /** The stages in the order of the factory floor, the one where an order ends last. */
 export async function listProductionStages(conn: Queryable): Promise<ProductionStage[]> {
   const { rows } = await conn.query(
-    "SELECT s.id, s.name, s.position, s.kind, (SELECT count(*) FROM production_orders o WHERE o.stage_id = s.id) AS orders FROM production_stages s ORDER BY (s.kind = 'pronta'), s.position, s.id",
+    "SELECT s.id, s.name, s.position, s.kind, (SELECT count(*) FROM production_orders o WHERE o.stage_id = s.id AND o.cancelled_at IS NULL) AS orders FROM production_stages s ORDER BY (s.kind = 'pronta'), s.position, s.id",
   );
   return rows.map((row) => ({ id: Number(row.id), name: String(row.name), position: Number(row.position), kind: row.kind as ProductionStage["kind"], orders: Number(row.orders) }));
 }
@@ -153,7 +153,7 @@ const toOrder = (row: Record<string, unknown>): ProductionOrder => ({
 
 /** The production orders of one stage: the ones due first on top; in "ready", the last finished first. */
 export async function listProductionOrders(stageId: number, conn: Queryable): Promise<ProductionOrder[]> {
-  const { rows } = await conn.query(`SELECT ${COLUMNS} FROM ${FROM} WHERE w.stage_id = $1 ORDER BY w.finished_at DESC NULLS LAST, w.due_on NULLS LAST, w.id`, [stageId]);
+  const { rows } = await conn.query(`SELECT ${COLUMNS} FROM ${FROM} WHERE w.stage_id = $1 AND w.cancelled_at IS NULL ORDER BY w.finished_at DESC NULLS LAST, w.due_on NULLS LAST, w.id`, [stageId]);
   return rows.map(toOrder);
 }
 
@@ -166,6 +166,8 @@ const ORDER_GONE = "Ordem de produção não encontrada. Recarregue a página.";
 
 /** Moves a production order to a stage. Reaching "ready" marks when it was finished; leaving it clears the mark. */
 export async function moveProductionOrder(id: number, stageId: number, who: string, conn: Queryable): Promise<void> {
+  const state = await conn.query("SELECT cancelled_at IS NOT NULL AS cancelled FROM production_orders WHERE id = $1", [id]);
+  if (state.rows[0]?.cancelled === true) throw new ProductionError("Ordem cancelada não volta para a fábrica.");
   const { rows } = await conn.query(
     `WITH stage AS (SELECT id, name, kind FROM production_stages WHERE id = $2),
           moved AS (

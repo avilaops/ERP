@@ -154,6 +154,8 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "0080_nfe_recebida_completa.sql",
     "0081_quantidades_fracionadas.sql",
     "0082_distribuicao_manifestacao_nfe.sql",
+    "0083_auditoria_ajustes_recebiveis.sql",
+    "0084_comissoes_e_cancelamento_de_pedido.sql",
   ]);
 
   const second = await withClient((client) => migrate(client, MIGRATIONS_DIR));
@@ -179,6 +181,7 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "capture_forms",
     "capture_submissions",
     "carriers",
+    "commission_adjustments",
     "commissions",
     "company_settings",
     "contract_settings",
@@ -231,6 +234,7 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "opportunity_messages",
     "opportunity_moves",
     "order_approvals",
+    "order_cancellations",
     "order_closings",
     "order_contract_events",
     "order_contract_signatures",
@@ -263,6 +267,7 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "purchase_items",
     "purchases",
     "receipts",
+    "receivable_adjustments",
     "receivable_bills",
     "receivables",
     "refund_requests",

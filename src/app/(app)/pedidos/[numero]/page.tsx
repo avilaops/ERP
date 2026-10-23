@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { requirePermission } from "@/lib/auth";
 import { listOnDeliveryMethods } from "@/lib/db/payment-methods";
 import { tenantDb } from "@/lib/db/pool";
-import { allows, menuItem, seesAllOrders, seesCosts } from "@/lib/auth/permissions";
+import { allows, approvesAtLoss, menuItem, seesAllOrders, seesCosts } from "@/lib/auth/permissions";
 import { ufFromCep } from "@/lib/cep";
 import { completenessText, isComplete, isRequired, normalizeDocument, taxpayerFromRegistration } from "@/lib/customer";
 import type { CustomerKind } from "@/lib/customer";
@@ -21,6 +21,7 @@ import { listOrderInvoiceEvents, listOrderInvoices } from "@/lib/db/invoices";
 import { previewOrderNfe } from "@/lib/db/order-nfe";
 import { findCustomerByDocument } from "@/lib/db/customers";
 import { getOrder, listPaymentMethods, loadOrderStanding } from "@/lib/db/orders";
+import { diagnoseOrderFinance } from "@/lib/db/order-finance-diagnosis";
 import { loadClosingProposal } from "@/lib/db/proposal-details";
 import { ContractError, isOpen, listOrderContracts, loadContractSettings, standingText } from "@/lib/db/contracts";
 import { draftOrderContract } from "@/lib/db/send-contract";
@@ -51,6 +52,7 @@ import { ActionForm } from "../ActionForm";
 import {
   addItemAction,
   closeOrderAction,
+  cancelOrderAdministrativeAction,
   deleteOrderAction,
   removeItemAction,
   reopenOrderAction,
@@ -146,6 +148,7 @@ export default async function PedidoPage({
   const today = isoDate(new Date());
   const dates = dueDates(order, table, today);
   const editable = order.status === "em_negociacao";
+  const financeDiagnosis = seesCosts(session) ? await diagnoseOrderFinance(order.number, conn) : null;
   const plan = paymentOf(order, sale, table, today);
   // The installments of the balance, as they stand: the rows the seller may change one by one.
   const installmentRows = plan.receipts.filter((receipt) => receipt.label !== "Entrada");
@@ -1503,6 +1506,34 @@ export default async function PedidoPage({
             </ActionForm>
           </div>
         </section>
+      )}
+      {financeDiagnosis && (
+        <section className={`${CARD} mt-4 p-4`} aria-label="Diagnóstico financeiro do pedido">
+          <h2 className="font-semibold">Conferência financeira e fiscal</h2>
+          <p className="mt-1 text-sm text-slate-600">Consulta administrativa: não altera nem exclui lançamentos.</p>
+          <ul className="mt-2 list-disc pl-5 text-sm">
+            {Object.entries(financeDiagnosis.counts).filter(([, count]) => count > 0).map(([kind, count]) => <li key={kind}>{kind}: {count}</li>)}
+            {financeDiagnosis.reasons.map((reason) => <li key={reason}>{reason}</li>)}
+            {financeDiagnosis.reasons.length === 0 && <li>Nenhum bloqueio financeiro ou fiscal identificado nesta consulta.</li>}
+          </ul>
+        </section>
+      )}
+      {financeDiagnosis && approvesAtLoss(session) && ["em_negociacao", "aguardando_aprovacao", "fechado"].includes(order.status) && (
+        <details className={`${CARD} mt-4`}>
+          <summary className="disclosure-heading text-red-700">Cancelar pedido<span className="disclosure-marker" aria-hidden="true">+</span></summary>
+          <p className="px-4 py-3 text-sm text-slate-600">
+            {order.status === "fechado"
+              ? "Estorna o que já entrou, cancela cobranças, comissões não pagas, contas em aberto e a produção, e pede o cancelamento da nota. Se algo falhar no meio, nada muda."
+              : "Cancela este orçamento quando não há baixa, nota, contrato, produção, estoque ou conta vinculada. O histórico fica."}
+          </p>
+          <ActionForm action={cancelOrderAdministrativeAction} className="flex flex-col gap-3 border-t border-slate-200 p-4">
+            <input type="hidden" name="number" value={order.number} />
+            <label className="text-sm">Motivo obrigatório
+              <textarea className={INPUT} name="reason" required minLength={15} maxLength={300} rows={2} />
+            </label>
+            <ConfirmButton label="Cancelar pedido" confirmLabel="Confirmar cancelamento" className={DANGER_OUTLINE} />
+          </ActionForm>
+        </details>
       )}
       {editable && <div data-part="resumo" className="mt-4">
             <ActionForm action={deleteOrderAction}>

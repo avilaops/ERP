@@ -29,8 +29,8 @@ export const metadata = { title: `${menuItem("contas-pagar").label} · ERP` };
 export const dynamic = "force-dynamic";
 
 const HERE = menuItem("contas-pagar").href;
-const SMALL = "mt-1 min-h-[var(--control)] rounded border border-slate-300 bg-white px-2 text-sm outline-none focus:ring-2 focus:ring-brand";
-const LABEL = "block text-sm font-medium";
+const SMALL = INPUT;
+const LABEL = "block text-sm font-medium text-slate-700";
 const count = (n: number) => `${n} ${n === 1 ? "conta" : "contas"}`;
 const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
 
@@ -157,7 +157,7 @@ export default async function ContasPagarPage({ searchParams }: { searchParams: 
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="font-medium">Comissão de {item.sellerName}</p>
-                    <p className="text-xs text-slate-500">Comissões · {monthLabel(item.month)} · conta automática</p>
+                    <p className="text-xs text-slate-500">Comissões · {monthLabel(item.month)} · valor automático vinculado a recebimentos</p>
                   </div>
                   <div className="text-right">
                     <p className="text-lg font-bold">{showMoney(item.amount)}</p>
@@ -169,7 +169,7 @@ export default async function ContasPagarPage({ searchParams }: { searchParams: 
                 {allows(session, "comissoes") && (
                   <p className="mt-2 text-sm">
                     <Link href={`${menuItem("comissoes").href}?mes=${item.month}`} className="font-medium text-brand underline">
-                      Pagar em Comissões
+                      Ver e corrigir em Comissões
                     </Link>
                   </p>
                 )}

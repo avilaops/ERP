@@ -58,7 +58,7 @@ export function payablesCsv(payables: Payable[]): string {
   const header = ["Descrição", "Fornecedor", "Categoria", "Valor", "Vencimento", "Forma", "Situação", "Pago em", "Valor pago"];
   const rows = payables.map((item) => [
     item.description, item.supplierName, item.category, item.amount, brDate(item.dueDate), item.method,
-    item.status === "paga" ? "Paga" : "A pagar", brDate(item.paidOn), item.paidAmount,
+    item.status === "paga" ? "Paga" : item.status === "cancelada" ? "Cancelada" : "A pagar", brDate(item.paidOn), item.paidAmount,
   ]);
   return [header, ...rows].map((row) => row.map(cell).join(";")).join("\r\n") + "\r\n";
 }

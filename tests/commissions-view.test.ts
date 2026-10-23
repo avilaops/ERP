@@ -4,6 +4,7 @@ import { chooseMonth, commissionsView, monthLabel } from "@/lib/commissions-view
 import type { CommissionEntry } from "@/lib/db/commissions";
 
 const entry = (sellerEmail: string, amount: number, paid = false): CommissionEntry => ({
+  id: 1, origin: amount < 0 ? "estorno" : "recebimento", cancelled: false,
   sellerEmail, sellerName: sellerEmail.split("@")[0], orderNumber: "260930-BBMN", customerName: "Academia", refund: amount < 0,
   happenedOn: "2026-10-02", base: amount * 50, rate: 0.02, amount, paymentDue: "2026-11-05",
   paidAt: paid ? new Date("2026-11-05T12:00:00Z") : null, paidBy: paid ? "financeiro@teste.local" : null,

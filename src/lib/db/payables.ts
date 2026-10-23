@@ -18,7 +18,7 @@ export type PayableInput = {
 export type Payable = PayableInput & {
   id: number;
   supplierName: string | null;
-  status: "aberta" | "paga";
+  status: "aberta" | "paga" | "cancelada";
   /** `AAAA-MM-DD`. */
   paidOn: string | null;
   paidAmount: number | null;
@@ -143,7 +143,7 @@ export async function listCommissionsDue(conn: Queryable): Promise<CommissionDue
             sum(m.amount) AS amount,
             (SELECT o.seller_name FROM orders o WHERE o.seller_email = m.seller_email ORDER BY o.id DESC LIMIT 1) AS seller_name
        FROM commissions m
-      WHERE m.paid_at IS NULL
+      WHERE m.paid_at IS NULL AND m.cancelled_at IS NULL
       GROUP BY m.seller_email, m.competence
      HAVING sum(m.amount) <> 0
       ORDER BY max(m.payment_due), m.seller_email`,

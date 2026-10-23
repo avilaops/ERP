@@ -5,7 +5,9 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { notify } from "@/lib/api/notify";
 import { requirePermission } from "@/lib/auth";
-import { tenantDb } from "@/lib/db/pool";
+import { tenantDb, withTenantConnection } from "@/lib/db/pool";
+import { cancelClosedOrder } from "@/lib/db/order-cancellation";
+import { cancelForMcp } from "@/lib/db/mcp-commercial";
 import type { Session } from "@/lib/auth";
 import { approvesAtLoss, menuItem, seesAllOrders } from "@/lib/auth/permissions";
 import { isPlates } from "@/lib/plates";
@@ -332,4 +334,43 @@ export async function saveInstallmentsAction(_previous: ActionState, formData: F
   }
   revalidatePath(`${ORDERS}/${number}`);
   return { error: null, notice: "Parcelas gravadas." };
+}
+
+/** Cancel an order. A closed one also reverses its financial, fiscal and production consequences, or changes nothing. */
+export async function cancelOrderAdministrativeAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
+  const session = await requirePermission("pedidos");
+  if (!approvesAtLoss(session)) return { error: "Somente a Diretoria pode cancelar pedidos por esta tela." };
+  const number = (reader(formData)("number") ?? "").trim().toUpperCase();
+  const reason = (reader(formData)("reason") ?? "").trim();
+  if (reason.length < 15 || reason.length > 300) return { error: "Informe o motivo com 15 a 300 caracteres." };
+  const scope = scopeOf(session);
+  try {
+    const order = await getOrder(number, scope, tenantDb(session.tenant.slug));
+    if (!order) return { error: "Pedido não encontrado." };
+    if (order.status === "fechado") {
+      await cancelClosedOrder(number, scope, reason, { email: session.email, role: "DIRETORIA" }, isoDate(new Date()), tenantDb(session.tenant.slug));
+    } else {
+      await withTenantConnection(session.tenant.slug, async (conn) => {
+        await conn.query("BEGIN");
+        try {
+          await cancelForMcp(number, scope, reason, { email: session.email, role: "DIRETORIA" }, conn);
+          await conn.query("COMMIT");
+        } catch (error) {
+          await conn.query("ROLLBACK");
+          throw error;
+        }
+      });
+    }
+  } catch (error) {
+    return { error: problem("cancelar pedido", error) };
+  }
+  revalidatePath(ORDERS);
+  revalidatePath(`${ORDERS}/${number}`);
+  revalidatePath(menuItem("recebimentos").href);
+  revalidatePath(menuItem("comissoes").href);
+  revalidatePath(menuItem("contas-pagar").href);
+  revalidatePath(menuItem("producao").href);
+  revalidatePath(menuItem("fiscal").href);
+  revalidatePath(menuItem("estoque").href);
+  return OK;
 }

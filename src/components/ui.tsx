@@ -62,11 +62,11 @@ export function MetricSummary({ items }: { items: SummaryMetric[] }) {
     <details aria-label="Resumo financeiro" className={`${CARD} mt-3`}>
       <summary className="disclosure-heading">
         <span className="grid min-w-0 flex-1 grid-cols-2 gap-3">
-          {items.slice(0, 2).map((item) => <span key={item.label} className="min-w-0"><span className="block font-normal text-slate-600">{item.label}</span><span className={`block whitespace-nowrap text-xs font-semibold tabular-nums sm:text-base ${item.attention ? "text-red-700" : ""}`}>{item.value}</span></span>)}
+          {items.slice(0, 2).map((item) => <span key={item.label} className="min-w-0"><span className="block font-normal text-slate-600">{item.label}</span><span className={`block break-words text-sm font-semibold tabular-nums sm:text-base ${item.attention ? "text-red-700" : ""}`}>{item.value}</span></span>)}
         </span>
         <span className="ml-2 shrink-0 text-sm font-medium text-brand"><span className="hidden sm:inline">Ver indicadores</span><span className="sm:hidden">Ver</span></span><span className="disclosure-marker" aria-hidden="true">+</span>
       </summary>
-      <dl className="grid grid-cols-2 gap-3 border-t border-slate-200 p-3">{metrics(items)}</dl>
+      <dl className="grid grid-cols-1 gap-3 border-t border-slate-200 p-3 sm:grid-cols-2">{metrics(items)}</dl>
     </details>
   );
 }
@@ -78,7 +78,7 @@ export function MetricSummary({ items }: { items: SummaryMetric[] }) {
  */
 export function PageHeader({ title, hint, actions }: { title: string; hint?: ReactNode; actions?: ReactNode }) {
   return (
-    <header className="page-header flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+    <header className="page-header flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
       <div className="min-w-0">
         <h1>{title}</h1>
         {typeof hint === "string" && hint.length > 130 ? (
@@ -88,7 +88,7 @@ export function PageHeader({ title, hint, actions }: { title: string; hint?: Rea
           </details>
         ) : hint ? <p className="mt-1 max-w-prose text-sm text-slate-600">{hint}</p> : null}
       </div>
-      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+      {actions && <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">{actions}</div>}
     </header>
   );
 }
@@ -123,7 +123,7 @@ export function Pager({ page, pages, from, to, total, noun, hrefFor }: { page: n
       </span>
     );
   return (
-    <nav aria-label="Páginas" data-after-rows className="flex items-center justify-between gap-3 border-t border-slate-200 px-3 py-2 text-sm">
+    <nav aria-label="Páginas" data-after-rows className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-3 py-2 text-sm">
       <p className="min-w-0 text-slate-600">
         {total === 0 ? `Nenhum ${noun[0]}` : `${from}–${to} de ${total} ${total === 1 ? noun[0] : noun[1]}`}
       </p>
