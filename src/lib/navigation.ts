@@ -3,14 +3,20 @@ import type { MenuItem } from "@/lib/auth/permissions";
 export type NavigationGroup = { title: string; items: { href: string; label: string }[] };
 
 const GROUPS = [
-  ["Visão geral", ["dashboard", "relatorios", "documentos"]],
-  ["Vendas", ["pedidos", "funil", "clientes", "aprovacoes"]],
-  ["Preços e propostas", ["tabela-precos", "simulador", "precos-metas"]],
+  ["Início", ["dashboard"]],
+  ["Comercial", ["funil", "clientes", "pedidos", "aprovacoes"]],
+  ["Preços", ["tabela-precos", "simulador", "precos-metas"]],
+  ["Operação", ["producao", "estoque", "compras", "fornecedores", "produtos"]],
   ["Financeiro", ["recebimentos", "contas-pagar", "comissoes"]],
   ["Fiscal", ["fiscal"]],
-  ["Produtos e operação", ["produtos", "estoque", "compras", "fornecedores", "producao"]],
-  ["Administração", ["equipe", "parametros"]],
+  ["Gestão", ["relatorios", "documentos", "equipe", "parametros"]],
 ] as const;
+
+const MENU_LABELS: Partial<Record<MenuItem["key"], string>> = {
+  dashboard: "Painel",
+  fiscal: "Notas fiscais",
+  parametros: "Parâmetros do sistema",
+};
 
 /** Organizes only destinations already authorized by the server. */
 export function navigationGroups(items: readonly MenuItem[]): NavigationGroup[] {
@@ -19,7 +25,7 @@ export function navigationGroups(items: readonly MenuItem[]): NavigationGroup[] 
     items: keys.flatMap((key) => {
       const item = items.find((candidate) => candidate.key === key);
       if (!item) return [];
-      const label = key === "dashboard" ? "Painel" : key === "parametros" ? "Configurações" : item.label;
+      const label = MENU_LABELS[item.key] ?? item.label;
       return [{ href: item.href, label }];
     }),
   })).filter((group) => group.items.length > 0);
