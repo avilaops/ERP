@@ -160,7 +160,7 @@ export default async function ContractSettingsPage() {
         </section>) },
 { title: "Selo digital", content: (<section key="selo" className={`${CARD} p-4`} aria-label="Selo digital">
             <label className="flex items-start gap-3">
-              <input type="hidden" name="seal" value="sim" /><span className="mt-1 text-sm font-semibold text-brand">Obrigatório</span>
+              <input type="hidden" name="seal" value="sim" /><span className="mt-1 shrink-0 whitespace-nowrap text-sm font-semibold text-brand">Obrigatório</span>
               <span className="text-sm">
                 <span className="block font-semibold">Selar o contrato assinado com o certificado digital da empresa</span>
                 <span className="block text-slate-600">
