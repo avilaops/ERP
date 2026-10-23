@@ -170,6 +170,7 @@ que exija o PDF selado nos contratos já assinados antes desta coluna.
 - O pedido de assinatura corta em 15 s no assinador. O ERP espera `ERP_PADES_SIGNER_TIMEOUT_MS` (padrão 20 s, entre 100 ms e 60 s).
 - Log: `assinatura tenant=… certificado=… resultado=…`. Resultado é uma palavra (`assinado`, `recusado-tenant`, `recusado-revogado`, `falha`). Não entra PDF, token, PEM, senha nem corpo do pedido.
 - Monitorar: o health, a taxa de `falha` e de `recusado-revogado`, e o prazo do certificado (o aviso dos 30 dias). Alerta se o health cair ou se o certificado estiver a menos de 30 dias do fim.
+- A LCR da AC SAFEWEB vale por poucas horas. `deploy/atualizar-crl-pades.sh` deve rodar a cada três horas com `ERP_PADES_CRL_URL`; ele confere a assinatura e a validade da nova LCR, troca o arquivo atomicamente e reinicia somente o assinador. LCR vencida bloqueia a assinatura.
 - Volta atrás: parar o container do assinador. O ERP passa a recusar a conclusão e não grava contrato assinado. PDF já selado continua no banco. Não se apaga contrato selado para "desfazer". A imagem do ERP volta junto com a do assinador, senão um ERP novo fala com um assinador velho.
 
 ## Imagem

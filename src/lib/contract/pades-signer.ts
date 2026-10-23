@@ -59,6 +59,12 @@ export async function keyIsRevoked(key: TenantKey): Promise<boolean> {
   if (!key.crl && !key.ocsp) throw new Error("Sem evidência de revogação.");
   if (key.crl) {
     const crl = pkijs.CertificateRevocationList.fromBER(derBuffer(key.crl));
+    const now = Date.now();
+    const starts = crl.thisUpdate.value.getTime();
+    const ends = crl.nextUpdate?.value.getTime();
+    if (!Number.isFinite(starts) || starts > now || !Number.isFinite(ends) || (ends ?? 0) < now) {
+      throw new Error("CRL fora da validade.");
+    }
     if (crl.isCertificateRevoked(certificate)) return true;
   }
   if (key.ocsp) {
