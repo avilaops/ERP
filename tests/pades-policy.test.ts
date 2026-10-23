@@ -63,6 +63,9 @@ test("assinatura AD-RB de teste não tem problemas de atributo, cadeia, DSS nem 
   const text = Buffer.from(signed).toString("latin1");
   assert.equal(text.includes("/Filter /PBAD_PAdES"), true);
   assert.equal(text.includes("/SubFilter /PBAD.PAdES"), true);
+  assert.equal(text.includes("/TransformMethod /DocMDP"), true);
+  assert.match(text, /\/TransformParams\s*<<[\s\S]*?\/P 1\b/);
+  assert.match(text, /\/Perms\s*<<[\s\S]*?\/DocMDP\s+\d+\s+0\s+R/);
 });
 
 test("assinatura AD-RB aceita somente a CRL quando a autoridade não oferece OCSP", async () => {

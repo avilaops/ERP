@@ -48,6 +48,8 @@ export async function sealPdf(pdf: Uint8Array, key: SigningKey, info: SealInfo, 
   const range = PDFArray.withContext(context);
   range.push(PDFNumber.of(0));
   for (let index = 0; index < 3; index += 1) range.push(PDFName.of(MARK));
+  const transformParams = context.obj({ Type: "TransformParams", P: 1, V: PDFName.of("1.2") });
+  const docMdp = context.obj({ Type: "SigRef", TransformMethod: "DocMDP", TransformParams: transformParams });
   const signature = context.register(
     context.obj({
       Type: "Sig",
@@ -59,6 +61,7 @@ export async function sealPdf(pdf: Uint8Array, key: SigningKey, info: SealInfo, 
       Reason: PDFString.of(info.reason),
       ...(info.location ? { Location: PDFString.of(info.location) } : {}),
       M: PDFString.fromDate(info.at),
+      Reference: [docMdp],
     }),
   );
   const [page] = document.getPages();
@@ -67,6 +70,7 @@ export async function sealPdf(pdf: Uint8Array, key: SigningKey, info: SealInfo, 
   annotations.push(widget);
   page.node.set(PDFName.of("Annots"), annotations);
   document.catalog.set(PDFName.of("AcroForm"), context.obj({ SigFlags: 3, Fields: [widget] }));
+  document.catalog.set(PDFName.of("Perms"), context.obj({ DocMDP: signature }));
 
   const bytes = Buffer.from(await document.save({ useObjectStreams: false }));
   const placeholder = `/ByteRange [ 0 /${MARK} /${MARK} /${MARK} ]`;

@@ -29,6 +29,11 @@ export async function padesAttributeProblems(pdf: Uint8Array, expectedFingerprin
   if (!text.includes(`/SubFilter /${policy.pdfDictionary.SubFilter}`)) {
     return [`SubFilter PDF diferente do exigido pela PA (${policy.pdfDictionary.SubFilter}).`];
   }
+  if (!/\/TransformMethod\s*\/DocMDP/.test(text)
+      || !/\/TransformParams\s*<<[\s\S]*?\/P\s+1\b[\s\S]*?>>/.test(text)
+      || !/\/Perms\s*<<[\s\S]*?\/DocMDP\s+\d+\s+0\s+R[\s\S]*?>>/.test(text)) {
+    return ["PDF sem DocMDP de nível 1 ligado à assinatura."];
+  }
   let parsed;
   try {
     parsed = parsePadesCms(seal.signature);

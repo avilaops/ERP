@@ -66,7 +66,7 @@ por `ERP_PADES_TLS_CA`.
 
 A resposta é conferida de novo neste processo: atributos da PA, política, hash
 interno, ausência de signingTime e de carimbo, cadeia, DSS, CRL ou OCSP, ByteRange
-e `openssl cms -verify`. O `-noverify` desliga só a confiança da cadeia. Não é
+e DocMDP de nível 1, além de `openssl cms -verify`. O `-noverify` desliga só a confiança da cadeia. Não é
 o VALIDAR/ITI.
 
 ## O que ainda não é o VALIDAR
