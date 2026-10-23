@@ -6,7 +6,8 @@ import { padesAdRbPolicy } from "@/lib/contract/icp/lpa";
 /**
  * CRL e OCSP de uma AC de teste, ou da AC que o assinador consulta.
  * O perfil AD-RB não embute revogação no CMS (DOC-ICP-15.03, tabela A.15, ND).
- * Ela vai no DSS do PDF. A política aceita LCR ou OCSP; o assinador grava os dois.
+ * Ela vai no DSS do PDF. A política aceita LCR ou OCSP; o assinador grava o que
+ * a autoridade certificadora disponibiliza.
  */
 
 const derBuffer = (value: Uint8Array): ArrayBuffer => {

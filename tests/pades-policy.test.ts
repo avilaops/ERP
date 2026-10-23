@@ -65,6 +65,13 @@ test("assinatura AD-RB de teste não tem problemas de atributo, cadeia, DSS nem 
   assert.equal(text.includes("/SubFilter /PBAD.PAdES"), true);
 });
 
+test("assinatura AD-RB aceita somente a CRL quando a autoridade não oferece OCSP", async () => {
+  const signed = await sealPdf(await sample(), chain.key, {
+    name: "Empresa de teste", reason: "Teste PAdES", at: new Date("2026-10-21T12:00:00Z"),
+  }, { crl: chain.crl });
+  assert.deepEqual(await padesAttributeProblems(signed, chain.fingerprint), []);
+});
+
 test("atributos incompatíveis com a PA AD-RB continuam reprovados", async () => {
   const at = new Date("2026-10-21T12:00:00Z");
   const info = { name: "Empresa de teste", reason: "Teste PAdES", at };

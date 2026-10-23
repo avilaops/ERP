@@ -41,7 +41,7 @@ OIDs que a PA não lista, e que o código cita pela norma:
 - `id-spq-ets-uri` `1.2.840.113549.1.9.16.5.1` — RFC 5126. Um qualificador, com a URI da PA (DOC-ICP-15.03, nota 1).
 - `id-data` e `id-signedData` — RFC 5652.
 
-CRL e OCSP não vão no CMS (tabela A.15, ND para PAdES). Vão no dicionário DSS, num
+CRL ou OCSP não vão no CMS (tabela A.15, ND para PAdES). Vão no dicionário DSS, num
 incremento depois do ByteRange (tabelas A.19, A.20 e A.22; ETSI EN 319 142). O perfil
 AD-RB permite DSS. Este ERP exige os dois, cadeia completa e VRI. É mais estrito que
 o mínimo da PA.
@@ -64,7 +64,7 @@ se o par (tenant, impressão) for o dele. HTTPS com token no cabeçalho. A CA
 privada, quando houver, entra em `ERP_PADES_TLS_CA`.
 
 A resposta é conferida de novo neste processo: atributos da PA, política, hash
-interno, ausência de signingTime e de carimbo, cadeia, DSS, CRL/OCSP, ByteRange
+interno, ausência de signingTime e de carimbo, cadeia, DSS, CRL ou OCSP, ByteRange
 e `openssl cms -verify`. O `-noverify` desliga só a confiança da cadeia. Não é
 o VALIDAR/ITI.
 

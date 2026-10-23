@@ -102,7 +102,7 @@ No assinador, a chave privada fica no disco, um diretório por empresa
 - `cert.pem` — certificado do signatário
 - `chain.pem` — intermediárias e raiz
 - `key.pem` — chave privada, PKCS#8
-- `crl.der` e `ocsp.der` — os dois são obrigatórios; sem um deles o diretório é ignorado
+- `crl.der` ou `ocsp.der` — pelo menos uma evidência oficial de revogação é obrigatória; sem ambas o diretório é ignorado
 
 O slug tem de casar com `^[a-z][a-z0-9_]{1,30}$`. A busca é
 `<slug>:<sha256 do DER de cert.pem>`. A chave de uma empresa não assina PDF

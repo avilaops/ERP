@@ -1,7 +1,7 @@
 import { createHash, createPrivateKey, timingSafeEqual, X509Certificate } from "node:crypto";
 import { createServer } from "node:https";
 import type { Server } from "node:https";
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import * as pkijs from "pkijs";
 import { PADES_PROFILE } from "@/lib/contract/icp/lpa";
@@ -24,8 +24,8 @@ export type TenantKey = {
   privateKeyPem: string;
   certificateDer: Uint8Array;
   chainDer: Uint8Array[];
-  crl: Uint8Array;
-  ocsp: Uint8Array;
+  crl: Uint8Array | null;
+  ocsp: Uint8Array | null;
   validFrom: Date;
   validUntil: Date;
 };
@@ -56,13 +56,19 @@ const holderOf = (der: Uint8Array): string => {
 /** A CRL ou o OCSP desta chave acusam o certificado do signatário. */
 export async function keyIsRevoked(key: TenantKey): Promise<boolean> {
   const certificate = pkijs.Certificate.fromBER(derBuffer(key.certificateDer));
-  const crl = pkijs.CertificateRevocationList.fromBER(derBuffer(key.crl));
-  if (crl.isCertificateRevoked(certificate)) return true;
-  const ocsp = pkijs.BasicOCSPResponse.fromBER(derBuffer(key.ocsp));
-  const issuer = ocsp.certs?.[0];
-  if (!issuer) return true;
-  const status = await ocsp.getCertificateStatus(certificate, issuer);
-  return status.status === 1;
+  if (!key.crl && !key.ocsp) throw new Error("Sem evidência de revogação.");
+  if (key.crl) {
+    const crl = pkijs.CertificateRevocationList.fromBER(derBuffer(key.crl));
+    if (crl.isCertificateRevoked(certificate)) return true;
+  }
+  if (key.ocsp) {
+    const ocsp = pkijs.BasicOCSPResponse.fromBER(derBuffer(key.ocsp));
+    const issuer = ocsp.certs?.[0];
+    if (!issuer) throw new Error("OCSP sem emissor.");
+    const status = await ocsp.getCertificateStatus(certificate, issuer);
+    if (status.status === 1) return true;
+  }
+  return false;
 }
 
 const logResult = (tenantId: string, fingerprint: string, result: string) => {
@@ -71,9 +77,9 @@ const logResult = (tenantId: string, fingerprint: string, result: string) => {
 
 /**
  * Lê `/chaves/<tenant>/` montado só para leitura.
- * Arquivos: cert.pem, chain.pem, key.pem, crl.der, ocsp.der.
+ * Arquivos: cert.pem, chain.pem, key.pem e pelo menos um entre crl.der e ocsp.der.
  * Senha de chave cifrada só por argumento, vindo de variável de ambiente. Não é registrada.
- * Devolve quantos tenants entraram. Um diretório sem CRL ou OCSP fica de fora.
+ * Devolve quantos tenants entraram. Um diretório sem CRL e sem OCSP fica de fora.
  */
 export function loadKeysFromDirectory(dir: string, password?: string): number {
   let loaded = 0;
@@ -84,8 +90,11 @@ export function loadKeysFromDirectory(dir: string, password?: string): number {
       const leaf = new X509Certificate(readFileSync(join(base, "cert.pem")));
       const chainPem = readFileSync(join(base, "chain.pem"), "utf8");
       const keyPem = readFileSync(join(base, "key.pem"));
-      const crl = readFileSync(join(base, "crl.der"));
-      const ocsp = readFileSync(join(base, "ocsp.der"));
+      const crlPath = join(base, "crl.der");
+      const ocspPath = join(base, "ocsp.der");
+      const crl = existsSync(crlPath) ? readFileSync(crlPath) : null;
+      const ocsp = existsSync(ocspPath) ? readFileSync(ocspPath) : null;
+      if (!crl && !ocsp) throw new Error("Sem evidência de revogação.");
       const encrypted = keyPem.includes("ENCRYPTED");
       const opened = createPrivateKey(encrypted && password ? { key: keyPem, passphrase: password } : keyPem);
       const privateKeyPem = opened.export({ type: "pkcs8", format: "pem" });
