@@ -1,0 +1,25 @@
+# Proposta de execução. Não sobe nada sozinho e não aponta para produção.
+# Nenhuma porta é publicada no anfitrião. O processo escuta 0.0.0.0 só dentro
+# do container, para outro serviço da mesma rede Docker alcançar o nome
+# pades-signer. Isso não abre a interface do servidor.
+services:
+  pades-signer:
+    image: ghcr.io/avilaops/erp-pades-signer:${ERP_PADES_IMAGE_TAG:?informe o SHA aprovado}
+    environment:
+      ERP_PADES_BIND: 0.0.0.0
+      ERP_PADES_SIGNER_PORT: "8443"
+      ERP_PADES_SIGNER_TOKEN: ${ERP_PADES_SIGNER_TOKEN}
+      ERP_PADES_TLS_CERT: /tls/cert.pem
+      ERP_PADES_TLS_KEY: /tls/key.pem
+      ERP_PADES_KEY_DIR: /chaves
+      ERP_PADES_KEY_PASSWORD: ${ERP_PADES_KEY_PASSWORD:-}
+      NODE_EXTRA_CA_CERTS: /tls/ca.pem
+      # Nome no certificado TLS, usado só pelo healthcheck ao falar com 127.0.0.1.
+      ERP_PADES_TLS_NAME: ${ERP_PADES_TLS_NAME:-localhost}
+    volumes:
+      - ./tls:/tls:ro
+      - ./chaves:/chaves:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+    restart: unless-stopped

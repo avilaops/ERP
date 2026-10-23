@@ -67,7 +67,7 @@ export async function signAction(_previous: ActionState, formData: FormData): Pr
   try {
     await signOrderContract(
       signing.contract, signing.token, field(formData, "code").replace(/\D/g, ""),
-      { company: signing.tenant.name, now: new Date(), ip: clientIp(requestHeaders), agent: requestHeaders.get("user-agent"), way, phoneCode: field(formData, "phoneCode").replace(/\D/g, "") },
+      { company: signing.tenant.name, tenant: signing.tenant.slug, now: new Date(), ip: clientIp(requestHeaders), agent: requestHeaders.get("user-agent"), way, phoneCode: field(formData, "phoneCode").replace(/\D/g, "") },
       signing.conn,
     );
   } catch (error) {

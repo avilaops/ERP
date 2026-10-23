@@ -12,7 +12,7 @@ Onde fica cada função no menu lateral e os atalhos comuns a todas as telas.
 
 ## Menu lateral
 
-O menu fica à esquerda em todas as telas. Ele mostra apenas os itens liberados para o seu perfil.
+O menu fica à esquerda em todas as telas. Ele mostra apenas os itens liberados para o seu perfil. As telas são organizadas em Início, Comercial, Preços, Operação, Financeiro, Fiscal e Gestão. Você pode manter mais de uma área aberta.
 
 ![Menu lateral no perfil Diretoria, com o card Seu acesso e o botão + Novo pedido](../img/menu.jpg)
 *Menu lateral no perfil Diretoria, com o card Seu acesso e o botão + Novo pedido*
@@ -33,10 +33,10 @@ O menu fica à esquerda em todas as telas. Ele mostra apenas os itens liberados 
 | Contas a pagar | Despesas e pagamentos da empresa. |
 | Fornecedores | Fábricas, assessoria e prestadores. |
 | Comissões | Comissão de cada vendedor por mês. |
-| Fiscal | Pedidos a emitir, fila, revisões manuais, notas fiscais, e-mails e inutilizações. |
+| Notas fiscais | Pedidos a emitir, fila, revisões manuais, notas fiscais, e-mails e inutilizações. |
 | Tabela de preços | Preços publicados para a equipe. |
 | Produtos e custos | Equipamentos e custos da assessoria. |
-| Configurações | Impostos, canal e política comercial. |
+| Parâmetros do sistema | Impostos, canal e política comercial. |
 | Simulador | Simulação de preço e desconto sem criar pedido. |
 | Equipe e acessos | Usuários e perfis. |
 | Documentos | Biblioteca técnica com busca, originais, versões, fonte e páginas. Coletas administradas pela Diretoria. |

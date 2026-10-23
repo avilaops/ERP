@@ -60,7 +60,7 @@ export async function Sidebar({ session }: { session: Session }) {
 
   return (
     <MobileMenu brand={brand} tabs={tabs} more={<Icon path={MORE_ICON} />}>
-      <details name="menu-secoes" className="rounded-lg border border-slate-200 bg-slate-50">
+      <details className="rounded-lg border border-slate-200 bg-slate-50">
         <summary className="min-h-[var(--control)] cursor-pointer px-3 py-2">
           <span className="block font-semibold">Minha conta</span>
           <span className="block text-sm text-slate-600">{session.name.split(" ")[0]} · {session.profile ?? ROLE_LABELS[session.role]}</span>

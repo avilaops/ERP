@@ -85,7 +85,7 @@ export default async function CompraPage({ params, searchParams }: { params: Pro
                           <label htmlFor={`q-${item.productId}`} className={LABEL}>
                             Quantidade
                           </label>
-                          <input id={`q-${item.productId}`} name="quantity" type="text" inputMode="numeric" defaultValue={item.quantity} key={item.quantity} className={INPUT} />
+                            <input id={`q-${item.productId}`} name="quantity" type="text" inputMode="decimal" defaultValue={item.quantity} key={item.quantity} className={INPUT} />
                         </div>
                         <div className="basis-36">
                           <label htmlFor={`p-${item.productId}`} className={LABEL}>
@@ -129,7 +129,7 @@ export default async function CompraPage({ params, searchParams }: { params: Pro
                 <label htmlFor="quantity" className={LABEL}>
                   Quantidade
                 </label>
-                <input id="quantity" name="quantity" type="text" inputMode="numeric" required className={INPUT} />
+                <input id="quantity" name="quantity" type="text" inputMode="decimal" required className={INPUT} />
               </div>
               <div className="basis-36">
                 <label htmlFor="unitPrice" className={LABEL}>

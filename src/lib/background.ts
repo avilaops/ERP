@@ -11,6 +11,8 @@ import { tenantDb } from "@/lib/db/pool";
 import { runProspectLoad } from "@/lib/db/prospect-load";
 import { fiscalJobDependencies, runFiscalJobBatch } from "@/lib/db/fiscal-jobs";
 import { runOneNumberVoidJob } from "@/lib/db/fiscal-void-jobs";
+import { runNfeDistribution } from "@/lib/db/run-nfe-distribution";
+import { runOneRecipientManifestation } from "@/lib/db/recipient-manifestations";
 import { vaultKey } from "@/lib/fiscal/certificate";
 import { sendToSefaz } from "@/lib/fiscal/channel";
 import { layoutCheck } from "@/lib/fiscal/precheck";
@@ -68,6 +70,8 @@ export async function runBackground(env: Record<string, string | undefined>, now
       ["avisos", () => deliverPending(key, now, conn)],
       ["fila fiscal", () => runFiscalJobBatch(fiscalJobDependencies(env, sendToSefaz, layoutCheck({ ERP_FISCAL_URL: env.ERP_FISCAL_URL, ERP_FISCAL_TOKEN: env.ERP_FISCAL_TOKEN })), conn)],
       ["fila de inutilização", () => runOneNumberVoidJob(new Date(), vaultKey(env.ERP_CERT_KEY), sendToSefaz, conn)],
+      ["distribuição de NF-e", () => runNfeDistribution(now, key, sendToSefaz, conn)],
+      ["manifestação de NF-e recebida", () => runOneRecipientManifestation(now, key, sendToSefaz, conn)],
     ] as const) {
       try {
         await job();

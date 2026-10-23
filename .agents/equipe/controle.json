@@ -4,6 +4,23 @@
   "members": [],
   "tasks": [
     {
+      "id": "T-20261023-nfe-pagamento-eletronico",
+      "title": "Informar pagamento eletrônico não integrado na NF-e",
+      "owner": null,
+      "status": "em-revisao",
+      "acceptance": "PIX, crédito e débito informam o grupo eletrônico exigido pela SEFAZ SP\nO ERP não inventa credenciadora, bandeira ou autorização\nPagamentos não eletrônicos permanecem sem o grupo card\nXML passa no XSD oficial e testes fiscais afetados",
+      "evidence": "Homologação SP em 23/10/2026 reproduziu cStat 391 com PIX sem card\nTeste de regressão falhou antes da correção e passou depois\n12 testes de NF-e, 12 de conformidade, 4 de assinatura e 8 de SEFAZ aprovados\nLint e tipos aprovados\nSem alteração visual; screenshots não aplicáveis",
+      "next": "Enviar o módulo completo ao GitHub, aguardar o CI obrigatório e repetir a homologação PIX após a publicação.",
+      "blocker": "",
+      "history": [
+        {
+          "at": "2026-10-23",
+          "status": "em-revisao",
+          "note": "Rejeição real 391 reproduzida e correção implementada para pagamento eletrônico não integrado."
+        }
+      ]
+    },
+    {
       "id": "T-20261018-consultas-em-escala",
       "title": "Padronizar consultas do ERP para 3.000 registros",
       "owner": null,
@@ -215,8 +232,40 @@
           "note": "Registro legado normalizado para o contrato central."
         }
       ]
+    },
+    {
+      "id": "T-20261018-nfe-recebida-operacional",
+      "title": "Transformar NF-e recebida em compra, custo e estoque",
+      "owner": null,
+      "status": "em-revisao",
+      "acceptance": "Preservar e validar o XML completo autorizado por empresa\nDisponibilizar XML completo e DANFE sem chamar resNFe de nota completa\nRevisar fornecedor e vincular todos os itens a produtos\nRegistrar custos historicos e entrada de estoque idempotente somente apos confirmacao\nIntegrar o Lojas pela API versionada do ERP",
+      "evidence": "https://linear.app/avilaops/issue/AVL-95\nhttps://linear.app/avilaops/issue/AVL-91\nhttps://linear.app/avilaops/issue/AVL-94\nhttps://linear.app/avilaops/issue/AVL-97\nhttps://linear.app/avilaops/issue/AVL-254\ndocs/superpowers/specs/2026-10-18-nfe-recebida-operacional.md\nSuite ERP sem banco: 804 testes, 548 aprovados, 256 integracoes puladas, zero falhas\nPostgreSQL focal: 32 de 32 aprovados, incluindo XML, custo, estoque, NSU 656 e manifestacao\nLojas: 1122 de 1122 testes aprovados\nCapturas desktop e mobile em docs/revisao-telas/avl-95-nfe-recebida",
+      "next": "Revalidar a interface após a integração com main, publicar a branch e exigir CI verde antes de qualquer merge ou publicação.",
+      "blocker": "",
+      "history": [
+        {
+          "at": "2026-10-23",
+          "status": "em-revisao",
+          "note": "Correções pós-revisão e integração com main em validação."
+        }
+      ]
     }
   ],
-  "decisions": [],
-  "integrations": []
+  "decisions": [
+    {
+      "id": "D-20261018-nfe-entrada-no-erp",
+      "decision": "O ERP e a fonte de verdade da NF-e recebida; o Lojas consome uma API versionada.",
+      "reason": "O ERP ja possui fornecedor, compra, custo e estoque. Duplicar essas regras no Lojas criaria divergencia operacional e fiscal.",
+      "evidence": "docs/superpowers/specs/2026-10-18-nfe-recebida-operacional.md"
+    }
+  ],
+  "integrations": [
+    {
+      "id": "I-20261018-lojas-erp-nfe-recebida",
+      "environment": "desenvolvimento",
+      "identity": "tenant da sessao do Lojas para empresa do ERP",
+      "status": "em-andamento",
+      "evidence": "API v1 tenant-scoped, proxy server-side do Lojas, consulta SEFAZ unica no ERP e capturas desktop/mobile validadas"
+    }
+  ]
 }

@@ -21,6 +21,8 @@ export type SigningKey = {
   privateKeyPem: string;
   /** The certificate of the company, DER in base64, as `X509Certificate` carries it. */
   certificateBase64: string;
+  /** Intermediate certificates from the PFX, for PDF/CMS chain construction. */
+  certificateChainBase64?: string[];
 };
 
 /** The key and the certificate of the company out of its A1 file. */
@@ -46,6 +48,7 @@ export function signingKeyOf(pfx: Uint8Array, password: string): SigningKey {
   return {
     privateKeyPem: forge.pki.privateKeyToPem(keyBag.key),
     certificateBase64: forge.util.encode64(forge.asn1.toDer(forge.pki.certificateToAsn1(own)).getBytes()),
+    certificateChainBase64: certificates.filter((cert) => cert !== own).map((cert) => forge.util.encode64(forge.asn1.toDer(forge.pki.certificateToAsn1(cert)).getBytes())),
   };
 }
 
