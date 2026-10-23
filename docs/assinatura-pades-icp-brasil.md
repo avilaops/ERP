@@ -61,7 +61,8 @@ repositório não tem Java. Nenhum PDF gerado pelo DSS foi ao VALIDAR/ITI.
 O ERP manda `POST /assinar` com perfil, tenant, impressão SHA-256 do certificado,
 PDF, motivo e data. Não manda PFX, senha nem chave. O assinador só acha a chave
 se o par (tenant, impressão) for o dele. HTTPS com token no cabeçalho. A CA
-privada, quando houver, entra em `ERP_PADES_TLS_CA`.
+privada entra pelo arquivo `ERP_PADES_TLS_CA_FILE` ou, em instalações legadas,
+por `ERP_PADES_TLS_CA`.
 
 A resposta é conferida de novo neste processo: atributos da PA, política, hash
 interno, ausência de signingTime e de carimbo, cadeia, DSS, CRL ou OCSP, ByteRange

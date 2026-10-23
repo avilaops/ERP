@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { request as httpsRequest } from "node:https";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -79,8 +79,15 @@ function postJson(
   signal: AbortSignal,
   timeout: number,
 ): Promise<SignerResponse> {
+  let ca: string | Buffer | undefined = env.ERP_PADES_TLS_CA;
+  if (env.ERP_PADES_TLS_CA_FILE) {
+    try {
+      ca = readFileSync(env.ERP_PADES_TLS_CA_FILE);
+    } catch {
+      return Promise.reject(new Error("CA TLS do assinador não pôde ser lida."));
+    }
+  }
   return new Promise((resolve, reject) => {
-    const ca = env.ERP_PADES_TLS_CA;
     const servername = env.ERP_PADES_TLS_SERVERNAME;
     const req = httpsRequest({
       protocol: url.protocol,

@@ -49,11 +49,11 @@ levado ao VALIDAR/ITI.
 
 | Máquina | Por que não, ou por que sim |
 | --- | --- |
-| `applications` | Já roda o ERP, o banco e o site. A chave de assinatura não fica no mesmo container do ERP. |
+| `applications` | É aqui. Já roda o ERP; a chave fica em outro container, com volume próprio, na rede privada do Compose. |
 | `orchestrator` | Plano de controle. Não assina PDF de cliente. |
-| `apps-noclient` | É aqui. Já hospedou o ERP e hoje não tem esse processo. O assinador escuta só na rede privada. O ERP, em `applications`, chama por HTTPS. |
+| `apps-noclient` | Não é necessário. Separar por máquina exigiria publicar uma porta ou manter uma rede sobreposta. |
 
-Nada disso foi instalado. A instalação antiga do ERP nessa máquina não é reativada.
+Nada disso foi instalado.
 
 ## Porta
 
@@ -84,7 +84,7 @@ O ERP, do outro lado:
 | --- | --- |
 | URL | `ERP_PADES_SIGNER_URL`, obrigatoriamente `https`, sem usuário nem senha na URL. Homologação: `https://pades-signer:8443/assinar`. |
 | Token | o mesmo `ERP_PADES_SIGNER_TOKEN`, no cabeçalho `Authorization: Bearer`. |
-| CA | `ERP_PADES_TLS_CA` é o PEM da CA, o texto, não um caminho. Sem ela, o Node usa as CAs públicas. |
+| CA | `ERP_PADES_TLS_CA_FILE` aponta para o PEM montado no container. `ERP_PADES_TLS_CA` continua aceito para instalações legadas. |
 | Nome esperado no certificado | `ERP_PADES_TLS_SERVERNAME`. Tem de ser um nome que esteja no certificado TLS do assinador. |
 | Prazo | `ERP_PADES_SIGNER_TIMEOUT_MS`, opcional. Padrão 20000. Inteiro de 100 a 60000. |
 
@@ -140,7 +140,7 @@ Para concluir um contrato assinado, além dessas:
 - `ERP_CERT_KEY` — a mesma chave que cifrou o A1 desta instalação
 - `ERP_PADES_SIGNER_URL`
 - `ERP_PADES_SIGNER_TOKEN`
-- `ERP_PADES_TLS_CA`
+- `ERP_PADES_TLS_CA_FILE` (ou `ERP_PADES_TLS_CA` em instalações legadas)
 - `ERP_PADES_TLS_SERVERNAME`
 
 Para enviar o link do contrato, a caixa de e-mail: `ERP_SMTP_HOST`,
@@ -186,7 +186,7 @@ construído. Este servidor não builda o Next.
 
 ## Compose de homologação
 
-Sugestão para o apps-noclient. Não foi executada. O assinador e o banco não
+Sugestão para uma homologação isolada. Não foi executada. O assinador e o banco não
 publicam porta. O ERP publica só em `127.0.0.1:3140`, no mesmo desenho do
 servidor de produção, para um túnel. Quem coloca o nome público na frente fica
 fora deste arquivo.
