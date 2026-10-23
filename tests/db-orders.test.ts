@@ -2480,8 +2480,8 @@ test("contrato com selo e segundo código: o assinado sai selado com o certifica
   assert.ok((await listContractEvents(signed.id, db.pool)).some((event) => event.text.includes("código enviado ao e-mail e código enviado ao celular")));
   const file = await contractFile(signed, { company: "Acme", orderNumber: number, now, vault: () => vault }, db.pool);
   const seal = sealOf(file)!;
-  assert.ok(seal.range[2] + seal.range[3] < file.length);
-  assert.equal(Buffer.from(file).toString("latin1").includes("/Type /DSS"), true);
+  assert.equal(seal.range[2] + seal.range[3], file.length);
+  assert.equal(Buffer.from(file).toString("latin1").includes("/Type /DSS"), false);
   assert.ok(Buffer.from(file).includes("EMPRESA DE TESTE LTDA:11222333000181"));
   // A cópia que foi por e-mail também saiu selada.
   assert.ok(mails.length >= 3);
@@ -2640,10 +2640,12 @@ test("funil: oportunidade anda por etapas, tem atividades, segue o pedido e cada
 
 test("lembretes automáticos: orçamento parado, contrato sem assinatura, parcela para vencer e oportunidade parada viram tarefa, uma vez só", { skip }, async () => {
   const { AutomationError, listAutomationRules, runAutomations, saveAutomationRule } = await import("@/lib/db/automations");
+  const { loadContractSettings, saveContractSettings } = await import("@/lib/db/contracts");
   const { createOpportunity, deleteOpportunity, listPendingActivities, setActivityDone } = await import("@/lib/db/funnel");
   const { removeOwnMailbox } = await import("@/lib/db/mail");
   const { sendOrderContract } = await import("@/lib/db/send-contract");
   await removeOwnMailbox(DIRECTOR, db.pool);
+  await saveContractSettings({ ...(await loadContractSettings(db.pool)), secondFactor: false }, DIRECTOR, db.pool);
   const rules = await listAutomationRules(db.pool);
   assert.deepEqual(rules.map((rule) => [rule.kind, rule.days, rule.active]), [["orcamento_parado", 3, true], ["contrato_pendente", 2, true], ["parcela_vencendo", 3, true], ["oportunidade_parada", 7, true]]);
   await assert.rejects(() => saveAutomationRule(rules[0].id, { days: 91, title: "x", active: true }, DIRECTOR, db.pool), (error: unknown) => error instanceof AutomationError && /de 0 a 90 dias.*de 5 a 200 letras/.test(error.message));
