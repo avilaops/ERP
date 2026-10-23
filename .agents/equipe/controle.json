@@ -4,6 +4,23 @@
   "members": [],
   "tasks": [
     {
+      "id": "T-20261023-nfe-pagamento-eletronico",
+      "title": "Informar pagamento eletrônico não integrado na NF-e",
+      "owner": null,
+      "status": "em-revisao",
+      "acceptance": "PIX, crédito e débito informam o grupo eletrônico exigido pela SEFAZ SP\nO ERP não inventa credenciadora, bandeira ou autorização\nPagamentos não eletrônicos permanecem sem o grupo card\nXML passa no XSD oficial e testes fiscais afetados",
+      "evidence": "Homologação SP em 23/10/2026 reproduziu cStat 391 com PIX sem card\nTeste de regressão falhou antes da correção e passou depois\n12 testes de NF-e, 12 de conformidade, 4 de assinatura e 8 de SEFAZ aprovados\nLint e tipos aprovados\nSem alteração visual; screenshots não aplicáveis",
+      "next": "Enviar o módulo completo ao GitHub, aguardar o CI obrigatório e repetir a homologação PIX após a publicação.",
+      "blocker": "",
+      "history": [
+        {
+          "at": "2026-10-23",
+          "status": "em-revisao",
+          "note": "Rejeição real 391 reproduzida e correção implementada para pagamento eletrônico não integrado."
+        }
+      ]
+    },
+    {
       "id": "T-20261018-consultas-em-escala",
       "title": "Padronizar consultas do ERP para 3.000 registros",
       "owner": null,
