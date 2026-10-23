@@ -3,8 +3,6 @@ import {
   OID_SIGNATURE_TIME_STAMP_TOKEN, OID_SIGNING_TIME, padesAdRbPolicy,
 } from "@/lib/contract/icp/lpa";
 import { chainComplete, parsePadesCms } from "@/lib/contract/pades-cms";
-import { dssProblems } from "@/lib/contract/pades-dss";
-import { revocationProblem } from "@/lib/contract/pades-revocation";
 import { sealOf } from "@/lib/contract/seal";
 
 /**
@@ -12,8 +10,9 @@ import { sealOf } from "@/lib/contract/seal";
  * it does not replace the ICP-Brasil trust anchor. It checks what the PA and
  * DOC-ICP-15.03 require us to be able to see before the contract is kept:
  * the mandated signed attributes, the policy OID and the internal hash, the
- * absence of signingTime, a complete chain, CRL or OCSP in the DSS, and an
- * intact ByteRange. OpenSSL checks the cryptographic signature separately.
+ * absence of signingTime, a complete chain, DocMDP, and an intact ByteRange.
+ * OpenSSL checks the cryptographic signature separately. Revocation is checked
+ * by the signer immediately before signing, against its current CRL or OCSP.
  */
 export async function padesAttributeProblems(pdf: Uint8Array, expectedFingerprint?: string): Promise<string[]> {
   const seal = sealOf(pdf);
@@ -64,14 +63,6 @@ export async function padesAttributeProblems(pdf: Uint8Array, expectedFingerprin
   }
   if (fingerprint && !chainComplete(parsed.certificateDers, fingerprint)) {
     problems.push("Cadeia de certificados incompleta no CMS.");
-  }
-  problems.push(...dssProblems(pdf, seal.signature, seal.range[2] + seal.range[3]));
-  if (fingerprint) {
-    const signer = parsed.certificateDers.find((der) => createHash("sha256").update(der).digest("hex") === fingerprint);
-    if (signer) {
-      const revoked = await revocationProblem(pdf, signer);
-      if (revoked) problems.push(revoked);
-    }
   }
   return problems;
 }

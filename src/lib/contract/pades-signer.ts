@@ -134,7 +134,7 @@ const certificatesOf = (key: TenantKey) => ({
 
 /** Assina com a chave já resolvida. Quem chama já conferiu tenant, prazo e revogação. */
 export async function signWithMaterial(pdf: Uint8Array, key: TenantKey, info: SealInfo): Promise<Uint8Array> {
-  return sealPdf(pdf, certificatesOf(key), info, { crl: key.crl, ocsp: key.ocsp });
+  return sealPdf(pdf, certificatesOf(key), info);
 }
 
 type SignRequest = {

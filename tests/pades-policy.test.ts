@@ -52,13 +52,13 @@ const sample = async () => {
   return pdf.save();
 };
 
-test("assinatura AD-RB de teste não tem problemas de atributo, cadeia, DSS nem ByteRange", async () => {
+test("assinatura AD-RB de teste não tem problemas de atributo, cadeia, DocMDP nem ByteRange", async () => {
   const signed = await sealPdf(await sample(), chain.key, {
     name: "Empresa de teste", reason: "Teste PAdES", at: new Date("2026-10-21T12:00:00Z"),
-  }, { crl: chain.crl, ocsp: chain.ocsp });
+  });
   assert.deepEqual(await padesAttributeProblems(signed, chain.fingerprint), []);
   const seal = sealOf(signed)!;
-  assert.ok(seal.range[2] + seal.range[3] < signed.length);
+  assert.equal(seal.range[2] + seal.range[3], signed.length);
   verifyCmsIndependently(seal.signed, seal.signature);
   const text = Buffer.from(signed).toString("latin1");
   assert.equal(text.includes("/Filter /PBAD_PAdES"), true);
@@ -66,13 +66,6 @@ test("assinatura AD-RB de teste não tem problemas de atributo, cadeia, DSS nem 
   assert.equal(text.includes("/TransformMethod /DocMDP"), true);
   assert.match(text, /\/TransformParams\s*<<[\s\S]*?\/P 1\b/);
   assert.match(text, /\/Perms\s*<<[\s\S]*?\/DocMDP\s+\d+\s+0\s+R/);
-});
-
-test("assinatura AD-RB aceita somente a CRL quando a autoridade não oferece OCSP", async () => {
-  const signed = await sealPdf(await sample(), chain.key, {
-    name: "Empresa de teste", reason: "Teste PAdES", at: new Date("2026-10-21T12:00:00Z"),
-  }, { crl: chain.crl });
-  assert.deepEqual(await padesAttributeProblems(signed, chain.fingerprint), []);
 });
 
 test("atributos incompatíveis com a PA AD-RB continuam reprovados", async () => {
@@ -93,13 +86,6 @@ test("atributos incompatíveis com a PA AD-RB continuam reprovados", async () =>
   assert.match((await padesAttributeProblems(await withCms({ omitSigningCertificate: true }))).join(" "), /signingCertificateV2/);
   assert.match((await padesAttributeProblems(await withCms({ policyHashHex: "ab".repeat(32) }))).join(" "), /Hash da política/);
   assert.match((await padesAttributeProblems(await withCms({ includeTimeStampToken: true }))).join(" "), /Carimbo do tempo/);
-});
-
-test("certificado revogado na CRL do DSS é recusado", async () => {
-  const signed = await sealPdf(await sample(), chain.key, {
-    name: "Empresa de teste", reason: "Teste PAdES", at: new Date("2026-10-21T12:00:00Z"),
-  }, { crl: chain.revokedCrl, ocsp: chain.ocsp });
-  assert.match((await padesAttributeProblems(signed, chain.fingerprint)).join(" "), /revogad/);
 });
 
 test("impressão de outro certificado não é aceita como a da empresa", async () => {

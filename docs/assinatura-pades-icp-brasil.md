@@ -41,10 +41,10 @@ OIDs que a PA não lista, e que o código cita pela norma:
 - `id-spq-ets-uri` `1.2.840.113549.1.9.16.5.1` — RFC 5126. Um qualificador, com a URI da PA (DOC-ICP-15.03, nota 1).
 - `id-data` e `id-signedData` — RFC 5652.
 
-CRL ou OCSP não vão no CMS (tabela A.15, ND para PAdES). Vão no dicionário DSS, num
-incremento depois do ByteRange (tabelas A.19, A.20 e A.22; ETSI EN 319 142). O perfil
-AD-RB permite DSS. Este ERP exige os dois, cadeia completa e VRI. É mais estrito que
-o mínimo da PA.
+CRL ou OCSP não vão no CMS (tabela A.15, ND para PAdES). O perfil AD-RB permite DSS,
+mas não o exige. O assinador consulta a evidência de revogação antes de assinar e não
+acrescenta DSS ao PDF: em 23/10/2026, o VALIDAR/ITI aprovou o PDF sem DSS e respondeu
+HTTP 500 para a mesma assinatura com o incremento DSS.
 
 ## Assinador
 
@@ -65,13 +65,22 @@ privada entra pelo arquivo `ERP_PADES_TLS_CA_FILE` ou, em instalações legadas,
 por `ERP_PADES_TLS_CA`.
 
 A resposta é conferida de novo neste processo: atributos da PA, política, hash
-interno, ausência de signingTime e de carimbo, cadeia, DSS, CRL ou OCSP, ByteRange
+interno, ausência de signingTime e de carimbo, cadeia, ByteRange
 e DocMDP de nível 1, além de `openssl cms -verify`. O `-noverify` desliga só a confiança da cadeia. Não é
 o VALIDAR/ITI.
 
-## O que ainda não é o VALIDAR
+## Validação oficial
 
-OpenSSL e o preflight não substituem o validador oficial do ITI. Falta submeter
-um PDF assinado com certificado ICP-Brasil real. Isso depende de autorização
-para usar esse certificado. Até lá, o contrato não deve ser tratado como
-validado pelo ITI.
+OpenSSL e o preflight não substituem o validador oficial do ITI. Por isso, um
+PDF sintético, sem dados de cliente, foi assinado com o A1 real da Ludus e
+submetido ao VALIDAR em 23/10/2026 às 14:24 BRT:
+
+- documento: `contrato-teste-icp-sem-dss.pdf`;
+- SHA-256 informado pelo VALIDAR: `36ccbf14ee928ce7edfc055673a175c6d1f581378533bed6b944f53bbabc5366`;
+- titular reconhecido: `LUDUS EQUIPAMENTOS PARA MUSCULACAO LTDA:66058955000108`;
+- assinatura, caminho de certificação, política e resultado geral: `Aprovado`;
+- política reconhecida: `PA_PAdES_AD_RB_v1_3`, OID `2.16.76.1.7.1.11.1.3`;
+- VALIDAR: Validador de Documentos 3.5.2 e Verificador de Conformidade 2.32.1.
+
+A aprovação vale para o artefato e o fluxo testados; mudanças no assinador ou na
+política exigem nova submissão.

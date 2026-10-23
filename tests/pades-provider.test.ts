@@ -116,8 +116,8 @@ test("assinatura válida, isolamento de tenant, revogação e corpo sem chave pr
   const identity = identityOf(chain, "casa");
   const signed = await signPadesViaService(bytes, identity, info, signer.env);
   const seal = sealOf(signed)!;
-  assert.ok(seal.range[2] + seal.range[3] < signed.length);
-  assert.equal(Buffer.from(signed).toString("latin1").includes("/Type /DSS"), true);
+  assert.equal(seal.range[2] + seal.range[3], signed.length);
+  assert.equal(Buffer.from(signed).toString("latin1").includes("/Type /DSS"), false);
   assert.equal(Buffer.from(signed).includes("PRIVATE"), false);
 
   await assert.rejects(
