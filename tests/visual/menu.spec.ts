@@ -20,9 +20,9 @@ test("menu: grupos, página atual, conta e teclado nos cinco tamanhos", async ({
     await expect(menu.getByRole("link", { name: "Contas a pagar", exact: true })).toBeHidden();
     const fiscal = menu.locator("summary").filter({ hasText: "Fiscal" });
     await fiscal.click();
-    await expect(menu.getByRole("link", { name: "Fiscal", exact: true })).toBeVisible();
+    await expect(menu.getByRole("link", { name: "Notas fiscais", exact: true })).toBeVisible();
     await fiscal.click();
-    await expect(menu.getByRole("link", { name: "Fiscal", exact: true })).toBeHidden();
+    await expect(menu.getByRole("link", { name: "Notas fiscais", exact: true })).toBeHidden();
     const frame = page.locator("#menu-principal");
     expect(await frame.evaluate((el) => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);

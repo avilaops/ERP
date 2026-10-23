@@ -12,12 +12,6 @@ const GROUPS = [
   ["Gestão", ["relatorios", "documentos", "equipe", "parametros"]],
 ] as const;
 
-const MENU_LABELS: Partial<Record<MenuItem["key"], string>> = {
-  dashboard: "Painel",
-  fiscal: "Notas fiscais",
-  parametros: "Parâmetros do sistema",
-};
-
 /** Organizes only destinations already authorized by the server. */
 export function navigationGroups(items: readonly MenuItem[]): NavigationGroup[] {
   const groups: NavigationGroup[] = GROUPS.map(([title, keys]) => ({
@@ -25,8 +19,7 @@ export function navigationGroups(items: readonly MenuItem[]): NavigationGroup[] 
     items: keys.flatMap((key) => {
       const item = items.find((candidate) => candidate.key === key);
       if (!item) return [];
-      const label = MENU_LABELS[item.key] ?? item.label;
-      return [{ href: item.href, label }];
+      return [{ href: item.href, label: item.label }];
     }),
   })).filter((group) => group.items.length > 0);
   // New destinations remain reachable until their group is defined.
