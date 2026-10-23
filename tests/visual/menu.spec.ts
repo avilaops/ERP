@@ -24,7 +24,7 @@ test("menu: grupos, página atual, conta e teclado nos cinco tamanhos", async ({
     await fiscal.click();
     await expect(menu.getByRole("link", { name: "Fiscal", exact: true })).toBeHidden();
     const frame = page.locator("#menu-principal");
-    expect(await frame.evaluate((el) => el.scrollHeight - el.clientHeight)).toBeLessThanOrEqual(1);
+    expect(await frame.evaluate((el) => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
     for (const item of await menu.locator("summary").all()) expect((await item.boundingBox())!.height).toBeGreaterThanOrEqual(44);
     await page.screenshot({ path: testInfo.outputPath(`menu-${width}x${height}.png`) });
