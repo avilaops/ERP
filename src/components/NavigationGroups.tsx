@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { NavigationGroup } from "@/lib/navigation";
 
-/** Native disclosures retain keyboard support and work before hydration. */
+/** Native disclosures retain keyboard support and let people keep useful groups open. */
 export function NavigationGroups({ groups }: { groups: NavigationGroup[] }) {
   const pathname = usePathname();
   const current = groups.flatMap((group) => group.items)
@@ -14,7 +14,7 @@ export function NavigationGroups({ groups }: { groups: NavigationGroup[] }) {
   return (
     <nav aria-label="Menu principal" className="flex min-w-0 flex-col gap-1">
       {groups.map((group) => (
-        <details key={`${pathname}:${group.title}`} name="menu-secoes" open={group.items.some((item) => item.href === current)} className="group rounded-lg border border-slate-200">
+        <details key={`${pathname}:${group.title}`} open={group.items.some((item) => item.href === current)} className="group rounded-lg border border-slate-200">
           <summary className="flex min-h-[var(--control)] cursor-pointer list-none items-center justify-between gap-2 rounded-lg px-3 py-2 font-semibold text-slate-700 [&::-webkit-details-marker]:hidden">
             <span className="min-w-0 break-words">{group.title}</span>
             <span aria-hidden="true" className="shrink-0 group-open:rotate-180">⌄</span>

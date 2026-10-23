@@ -22,10 +22,10 @@ const MATRIX: [MenuItemKey, string, string, [boolean, boolean, boolean, boolean]
   ["contas-pagar", "Contas a pagar", "/contas-pagar", [true, false, false, true]],
   ["fornecedores", "Fornecedores", "/fornecedores", [true, false, false, true]],
   ["comissoes", "Comissões", "/comissoes", [true, false, true, true]],
-  ["fiscal", "Fiscal", "/fiscal", [true, false, false, false]],
+  ["fiscal", "Notas fiscais", "/fiscal", [true, false, false, false]],
   ["tabela-precos", "Tabela de preços", "/tabela-precos", [true, true, true, false]],
   ["produtos", "Produtos e custos", "/produtos", [true, false, false, false]],
-  ["parametros", "Configurações", "/parametros", [true, false, false, false]],
+  ["parametros", "Parâmetros do sistema", "/parametros", [true, false, false, false]],
   ["simulador", "Simulador", "/simulador", [true, true, true, false]],
   ["equipe", "Equipe e acessos", "/equipe", [true, false, false, false]],
   ["documentos", "Documentos", "/documentos", [true, true, true, true]],
@@ -43,7 +43,7 @@ test("os perfis são exatamente os quatro, com os rótulos de tela", () => {
   });
 });
 
-test("o menu tem os 21 itens do manual, incluindo Fiscal e a biblioteca Documentos", () => {
+test("o menu tem os 21 itens do manual, incluindo Notas fiscais e a biblioteca Documentos", () => {
   assert.equal(MENU_ITEMS.length, 21);
   assert.deepEqual(
     MENU_ITEMS.map((item) => [item.key, item.label, item.href]),

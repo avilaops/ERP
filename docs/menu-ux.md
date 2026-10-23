@@ -1,18 +1,19 @@
 # Organização do menu
 
-O menu organiza somente os destinos autorizados pelo servidor em seis grupos:
-Visão geral, Vendas, Preços e propostas, Financeiro, Produtos e operação e
-Administração. Grupos vazios não aparecem. O grupo da página atual começa aberto;
-abrir outro grupo ou Minha conta recolhe o anterior.
+O menu organiza somente os destinos autorizados pelo servidor em sete grupos que
+acompanham o trabalho: Início, Comercial, Preços, Operação, Financeiro, Fiscal e
+Gestão. Grupos vazios não aparecem. O grupo da página atual começa aberto e cada
+grupo pode ser aberto ou fechado sem esconder os demais. Minha conta também é
+independente das áreas do sistema.
 
 Os quatro atalhos móveis e Novo pedido permanecem disponíveis. Minha conta reúne
 identificação completa, aparência, conexão do assistente, troca de empresa e saída.
-Painel e Configurações são os nomes apresentados na navegação, sem alterar rotas
-ou permissões.
+Painel, Notas fiscais e Parâmetros do sistema são os nomes apresentados na
+navegação, sem alterar rotas ou permissões.
 
 ## Verificação das sete perguntas de UX
 
-1. **Tarefa clara:** grupos nomeados por assunto e Novo pedido separado da navegação.
+1. **Tarefa clara:** grupos nomeados pela etapa do trabalho e Novo pedido separado da navegação.
 2. **Informação que decide:** a página atual tem destaque e `aria-current`; o seu
    grupo começa aberto. A identidade completa fica em Minha conta.
 3. **Ação principal:** Novo pedido continua sendo a ação principal do menu; abrir
@@ -31,7 +32,7 @@ ou permissões.
 ## Evidências reproduzíveis
 
 - `tests/navigation.test.ts`: organização, cobertura dos destinos e permissões.
-- `tests/visual/menu.spec.ts`: abertura exclusiva, conta, destino ativo, teclado,
+- `tests/visual/menu.spec.ts`: abertura independente, conta, destino ativo, teclado,
   texto ampliado, medidas e capturas nos cinco tamanhos.
 - No CI, as capturas ficam em `test-results/menu`, separadas da varredura geral
   para não serem apagadas pela execução seguinte do Playwright.
