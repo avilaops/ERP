@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CARD } from "@/components/ui";
+import { CARD, EmptyState, PageHeader, PRIMARY, SECONDARY } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { MENU_ITEMS, menuItem } from "@/lib/auth/permissions";
 import { ROLE_LABELS, ROLES } from "@/lib/auth/roles";
@@ -25,35 +25,22 @@ export default async function EquipePage() {
   if (users.length === 0 && selling.length === 0) {
     // Nobody yet: the screen says what it is for and offers the one thing to do.
     return (
-      <div className="mx-auto flex min-h-[70vh] max-w-xl flex-col">
-        <h1 className="text-2xl font-semibold">{menuItem("equipe").label}</h1>
-        <div className="flex flex-1 flex-col items-center justify-center text-center">
-          <p className="text-xl font-semibold">Ainda não há pessoas cadastradas</p>
-          <p className="mt-2 text-slate-600">Aqui você convida quem trabalha em {session.tenant.name} e escolhe o que cada pessoa pode ver e fazer.</p>
+      <>
+        <PageHeader title={menuItem("equipe").label} hint={`Quem entra em ${session.tenant.name} e o que cada pessoa pode ver e fazer.`} />
+        <div className={`${CARD} mt-4`}>
+          <EmptyState title="Nenhuma pessoa cadastrada" description="Convide a primeira pessoa e escolha o perfil de acesso." action={<Link href={NEW} className={PRIMARY}>Convidar pessoa</Link>} />
         </div>
-        <Link href={NEW} className="rounded-lg bg-brand px-4 py-3.5 text-center text-base font-semibold text-white hover:bg-brand-dark">
-          Convidar pessoa
-        </Link>
-      </div>
+      </>
     );
   }
 
   return (
     <>
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold">{menuItem("equipe").label}</h1>
-          <p className="mt-1 text-slate-600">Quem entra em {session.tenant.name}, o que cada tipo de acesso vê e quem está vendendo.</p>
-        </div>
-        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-          <Link href={`${menuItem("equipe").href}/perfis`} className="rounded-lg border border-slate-300 bg-white px-4 py-3 text-center font-semibold hover:bg-slate-50">
-            Perfis da empresa
-          </Link>
-          <Link href={NEW} className="rounded-lg bg-brand px-4 py-3 text-center font-semibold text-white hover:bg-brand-dark">
-            Convidar pessoa
-          </Link>
-        </div>
-      </div>
+      <PageHeader
+        title={menuItem("equipe").label}
+        hint={`Quem entra em ${session.tenant.name}, o que cada tipo de acesso vê e quem está vendendo.`}
+        actions={<><Link href={`${menuItem("equipe").href}/perfis`} className={SECONDARY}>Perfis da empresa</Link><Link href={NEW} className={PRIMARY}>Convidar pessoa</Link></>}
+      />
 
       <section className={`${CARD} mt-6`} aria-labelledby="pessoas">
         <h2 id="pessoas" className={`${TITLE} border-b border-slate-200 px-5 py-3`}>

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ListPager, ListQuery } from "@/components/ListQuery";
-import { CARD, MetricSummary, PageHeader, Pill, PRIMARY } from "@/components/ui";
+import { CARD, EmptyState, MetricSummary, PageHeader, Pill, PRIMARY, SECONDARY } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { menuItem, seesAllOrders } from "@/lib/auth/permissions";
 import { loadOrderOverview, queryOrders } from "@/lib/db/orders";
@@ -65,7 +65,13 @@ export default async function PedidosPage({ searchParams }: { searchParams: Prom
           searchPlaceholder="Cliente, CPF/CNPJ ou número"
           sorts={[{ value: "atualizacao", label: "Última atualização" }, { value: "numero", label: "Número" }, { value: "cliente", label: "Cliente" }, { value: "vendedor", label: "Vendedor" }]}
         />
-        {rows.length === 0 ? <p className="p-6 text-slate-600">{overview.counts.todos === 0 ? "Nenhum pedido ainda. Comece por + Novo pedido." : "Nenhum pedido corresponde à situação, busca e filtros aplicados."}</p> : (
+        {rows.length === 0 ? (
+          <EmptyState
+            title={overview.counts.todos === 0 ? "Nenhum pedido cadastrado" : "Nenhum pedido encontrado"}
+            description={overview.counts.todos === 0 ? "Crie o primeiro pedido para iniciar uma negociação." : "Ajuste a busca ou remova os filtros para ver outros pedidos."}
+            action={overview.counts.todos === 0 ? <Link href={`${HERE}/novo`} className={PRIMARY}>Novo pedido</Link> : <Link href={HERE} className={SECONDARY}>Limpar busca e filtros</Link>}
+          />
+        ) : (
           <div className="list-results">
             <ul className="md:hidden">
               {rows.map((row) => <li key={row.number} className="border-t border-slate-200 first:border-t-0"><Link href={`${HERE}/${row.number}`} className="block px-4 py-3 active:bg-slate-50"><span className="flex items-start justify-between gap-3"><span className="min-w-0 break-words font-medium text-brand">{row.customer}</span><span className="whitespace-nowrap font-semibold">{row.total}</span></span><span className="mt-1 block break-words text-xs text-slate-500">{[row.detail, everyone ? row.seller : null].filter(Boolean).join(" · ")}</span><span className="mt-2 flex items-center justify-between gap-3 text-xs"><Pill tone={STATUS_TONES[row.status]}>{row.statusLabel}</Pill><span className="text-right text-slate-600">desconto {row.discount} · {row.updated}</span></span></Link></li>)}

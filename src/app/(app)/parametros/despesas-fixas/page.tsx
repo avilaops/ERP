@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CARD, DANGER, INPUT, PRIMARY, SECONDARY } from "@/components/ui";
+import { CARD, DANGER, INPUT, PageHeader, PRIMARY, SECONDARY } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { menuItem } from "@/lib/auth/permissions";
 import { listFixedExpenses } from "@/lib/db/fixed-expenses";
@@ -75,16 +75,7 @@ export default async function DespesasFixasPage() {
 
   return (
     <>
-      <p className="text-sm">
-        <Link href={menuItem("parametros").href} className="text-brand underline">
-          ← {menuItem("parametros").label}
-        </Link>
-      </p>
-      <h1 className="mt-2 text-2xl font-semibold">Despesas fixas</h1>
-      <details className="mt-1 max-w-3xl text-sm text-slate-600"><summary className="inline-flex min-h-[var(--control)] cursor-pointer items-center text-brand">Como funciona</summary><p className="pb-3">
-        O que a empresa paga todo mês. A soma das despesas em uso é o valor “Despesas fixas por mês” dos Parâmetros, usado no ponto de
-        equilíbrio. Em Contas a pagar, um botão lança as contas do mês a partir desta lista.
-      </p></details>
+      <PageHeader title="Despesas fixas" hint="O que a empresa paga todo mês. A soma das despesas em uso é o valor “Despesas fixas por mês” dos Parâmetros, usado no ponto de equilíbrio. Em Contas a pagar, um botão lança as contas do mês a partir desta lista." actions={<Link href={menuItem("parametros").href} className={SECONDARY}>Configurações</Link>} />
       <p className="mt-3 text-lg">
         Total em uso: <strong>{showMoney(total)}</strong> por mês
       </p>

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CARD, DANGER, PRIMARY, SECONDARY } from "@/components/ui";
+import { CARD, DANGER, PageHeader, PRIMARY, SECONDARY } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { menuItem } from "@/lib/auth/permissions";
 import { tenantDb } from "@/lib/db/pool";
@@ -21,16 +21,7 @@ export default async function LinhasPage() {
 
   return (
     <>
-      <p className="text-sm">
-        <Link href={menuItem("parametros").href} className="text-brand underline">
-          ← {menuItem("parametros").label}
-        </Link>
-      </p>
-      <h1 className="mt-2 text-2xl font-semibold">Linhas de produto</h1>
-      <details className="mt-1 max-w-3xl text-sm text-slate-600"><summary className="inline-flex min-h-[var(--control)] cursor-pointer items-center text-brand">Como funciona</summary><p className="pb-3">
-        Cada linha (importada, nacional…) tem os seus parâmetros, as suas alíquotas por estado, os seus equipamentos e a sua tabela de
-        preços. Um pedido é de uma linha só. A linha nova nasce com uma cópia dos parâmetros de outra: depois é só mudar o que difere.
-      </p></details>
+      <PageHeader title="Linhas de produto" hint="Cada linha (importada, nacional…) tem os seus parâmetros, as suas alíquotas por estado, os seus equipamentos e a sua tabela de preços. Um pedido é de uma linha só. A linha nova nasce com uma cópia dos parâmetros de outra: depois é só mudar o que difere." actions={<Link href={menuItem("parametros").href} className={SECONDARY}>Configurações</Link>} />
 
       <section className={`${CARD} mt-6 p-5`} aria-labelledby="nova">
         <h2 id="nova" className="text-sm font-semibold uppercase tracking-wide">

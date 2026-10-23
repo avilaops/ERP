@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CARD, DANGER, Pill, PRIMARY, SECONDARY } from "@/components/ui";
+import { CARD, DANGER, PageHeader, Pill, PRIMARY, SECONDARY } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { menuItem } from "@/lib/auth/permissions";
 import { listAllPayableCategories } from "@/lib/db/payable-categories";
@@ -20,16 +20,7 @@ export default async function CategoriasDeContasPage() {
 
   return (
     <>
-      <p className="text-sm">
-        <Link href={menuItem("parametros").href} className="text-brand underline">
-          ← {menuItem("parametros").label}
-        </Link>
-      </p>
-      <h1 className="mt-2 text-2xl font-semibold">Categorias de contas a pagar</h1>
-      <p className="mt-1 max-w-3xl text-slate-600">
-        É a lista que aparece ao lançar uma conta a pagar. Categoria desligada sai da lista; as contas que já a usaram continuam mostrando o
-        nome.
-      </p>
+      <PageHeader title="Categorias de contas a pagar" hint="É a lista que aparece ao lançar uma conta a pagar. Categoria desligada sai da lista; as contas que já a usaram continuam mostrando o nome." actions={<Link href={menuItem("parametros").href} className={SECONDARY}>Configurações</Link>} />
 
       <section className={`${CARD} mt-6 p-5`} aria-labelledby="nova">
         <h2 id="nova" className="text-sm font-semibold uppercase tracking-wide">

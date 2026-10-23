@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CARD, DANGER, INPUT, PRIMARY, SECONDARY } from "@/components/ui";
+import { CARD, DANGER, INPUT, PageHeader, PRIMARY, SECONDARY } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { menuItem } from "@/lib/auth/permissions";
 import { formatDocument } from "@/lib/customer";
@@ -59,16 +59,7 @@ export default async function TransportadorasPage() {
 
   return (
     <>
-      <p className="text-sm">
-        <Link href={menuItem("parametros").href} className="text-brand underline">
-          ← {menuItem("parametros").label}
-        </Link>
-      </p>
-      <h1 className="mt-2 text-2xl font-semibold">Transportadoras</h1>
-      <details className="mt-1 max-w-3xl text-sm text-slate-600"><summary className="inline-flex min-h-[var(--control)] cursor-pointer items-center text-brand">Como funciona</summary><p className="pb-3">
-        Quem leva a mercadoria. Na nota fiscal a transportadora é opcional: só a modalidade do frete é obrigatória. Cadastre aqui para
-        escolher no pedido. Só CNPJ ou CPF e o nome são exigidos; com inscrição estadual, a UF também.
-      </p></details>
+      <PageHeader title="Transportadoras" hint="Quem leva a mercadoria. Na nota fiscal a transportadora é opcional: só a modalidade do frete é obrigatória. Cadastre aqui para escolher no pedido. Só CNPJ ou CPF e o nome são exigidos; com inscrição estadual, a UF também." actions={<Link href={menuItem("parametros").href} className={SECONDARY}>Configurações</Link>} />
 
       <section className={`${CARD} mt-6 p-5`} aria-labelledby="nova">
         <h2 id="nova" className="text-sm font-semibold uppercase tracking-wide">

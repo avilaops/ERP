@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CARD, PRIMARY, SECONDARY } from "@/components/ui";
+import { CARD, PageHeader, PRIMARY, SECONDARY } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { menuItem } from "@/lib/auth/permissions";
 import { ROLE_LABELS, ROLES } from "@/lib/auth/roles";
@@ -24,16 +24,7 @@ export default async function UsuariosPage() {
 
   return (
     <>
-      <p className="text-sm">
-        <Link href={menuItem("parametros").href} className="text-brand underline">
-          ← {menuItem("parametros").label}
-        </Link>
-      </p>
-      <h1 className="mt-2 text-2xl font-semibold">Usuários de {session.tenant.name}</h1>
-      <details className="mt-1 max-w-3xl text-sm text-slate-600"><summary className="inline-flex min-h-[var(--control)] cursor-pointer items-center text-brand">Como funciona</summary><p className="pb-3">
-        Quem está aqui entra no sistema com o perfil escolhido. A pessoa entra pelo login da Ávila Ops, com este mesmo e-mail; a
-        senha é dela e não fica neste sistema.
-      </p></details>
+      <PageHeader title={`Usuários de ${session.tenant.name}`} hint="Quem está aqui entra no sistema com o perfil escolhido. A pessoa entra pelo login da Ávila Ops, com este mesmo e-mail; a senha é dela e não fica neste sistema." actions={<Link href={menuItem("parametros").href} className={SECONDARY}>Configurações</Link>} />
 
       <section className={`${CARD} mt-6 p-5`} aria-labelledby="novo">
         <h2 id="novo" className="text-sm font-semibold uppercase tracking-wide">

@@ -50,6 +50,7 @@ teclado aberto a tela pode rolar: o que não pode é um campo ou uma ação fica
 | Peça | Uso |
 |---|---|
 | `PageHeader` | Título, no máximo uma frase curta e as ações da tela à direita |
+| `EmptyState` | Lista vazia com título, explicação curta e, quando existe, a próxima ação permitida |
 | `CARD`, `SECTION_TITLE` | Cartão só quando separa de verdade; agrupamento simples usa só o título pequeno |
 | `LABEL`, `INPUT` | Todo campo com rótulo permanente acima e 44 px de altura (`--control`) |
 | `PRIMARY`, `SECONDARY` | Uma ação principal por etapa; as demais são secundárias |
@@ -90,6 +91,11 @@ falhar: meta de 1,0 em todos, e o que passar disso entra na lista de pendências
 motivo. Os prints de cada tela nos cinco tamanhos ficam em `test-results/telas/`.
 
 A harmonização usa a especificação e os critérios de [harmonizacao-ui.md](harmonizacao-ui.md).
+
+Na revisão de 23/10/2026, os índices e listas principais de Comercial, Operação, Financeiro,
+Fiscal, Gestão e Parâmetros passaram a compartilhar `PageHeader` e `EmptyState`. Os testes de
+harmonização dividem cada viewport em um caso independente: muitas capturas de página inteira no
+mesmo contexto acumulam memória no navegador e tornam a evidência instável.
 
 Para rodar na própria máquina, num banco com nome terminado em `_demo` e com `ERP_LOCAL_LOGIN=1`:
 

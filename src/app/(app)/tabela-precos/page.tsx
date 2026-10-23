@@ -6,7 +6,7 @@ import { createOrderAction } from "../pedidos/actions";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { FitRows } from "@/components/FitRows";
-import { CARD, INPUT, Pager, PageHeader, pageOf, QUIET_LINK, SECONDARY, SECTION_TITLE } from "@/components/ui";
+import { CARD, EmptyState, INPUT, Pager, PageHeader, pageOf, QUIET_LINK, SECONDARY, SECTION_TITLE } from "@/components/ui";
 import { rowsPerPage, ROWS_COOKIE } from "@/lib/rows";
 import { requirePermission } from "@/lib/auth";
 import { tenantDb } from "@/lib/db/pool";
@@ -172,12 +172,13 @@ export default async function TabelaPrecosPage({
         </p>
 
         {view.rows.length === 0 ? (
-          <p className="border-t border-slate-200 p-5 text-slate-600">
-            Nenhum equipamento encontrado para &quot;{search}&quot;.{" "}
-            <Link href={lineHref(ITEM.href, line.id)} className={QUIET_LINK}>
-              Limpar a busca
-            </Link>
-          </p>
+          <div className="border-t border-slate-200">
+            <EmptyState
+              title="Nenhum equipamento encontrado"
+              description={`A busca por “${search}” não encontrou equipamentos nesta tabela.`}
+              action={<Link href={lineHref(ITEM.href, line.id)} className={SECONDARY}>Limpar busca</Link>}
+            />
+          </div>
         ) : (
           <>
             <div className={`hidden items-center gap-3 border-t border-slate-200 bg-slate-50 px-3 py-1.5 md:flex ${SECTION_TITLE}`} aria-hidden="true">

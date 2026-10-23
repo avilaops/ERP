@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CARD, SECONDARY, SectionDisclosure } from "@/components/ui";
+import { CARD, PageHeader, SECONDARY, SectionDisclosure } from "@/components/ui";
 import { Bars, Columns, Kpi } from "@/components/Charts";
 import { requirePermission } from "@/lib/auth";
 import { allows, menuItem, seesAllOrders, seesCosts } from "@/lib/auth/permissions";
@@ -87,24 +87,24 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
   return (
     <>
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold">{menuItem("dashboard").label}</h1>
-          <p className="mt-1 text-slate-600">{everyone ? "Vendas de toda a equipe." : "Os seus números."}</p>
-        </div>
-        <nav aria-label="Período" className="view-tabs">
-          {PERIODS.map((item) => (
-            <Link
-              key={item.key}
-              href={periodHref(item.key)}
-              aria-current={item.key === period ? "page" : undefined}
-              className={`inline-flex min-h-[var(--control)] items-center rounded-md px-3 font-medium ${item.key === period ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100"}`}
-            >
-              {item.label}
-            </Link>
-          ))}
-        </nav>
-      </div>
+      <PageHeader
+        title={menuItem("dashboard").label}
+        hint={everyone ? "Vendas de toda a equipe." : "Os seus números."}
+        actions={
+          <nav aria-label="Período" className="view-tabs">
+            {PERIODS.map((item) => (
+              <Link
+                key={item.key}
+                href={periodHref(item.key)}
+                aria-current={item.key === period ? "page" : undefined}
+                className={`inline-flex min-h-[var(--control)] items-center rounded-md px-3 font-medium ${item.key === period ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100"}`}
+              >
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+        }
+      />
       {sellers.length > 1 && (
         <form method="get" action={HERE} className="mt-3 flex flex-wrap items-center gap-2 text-sm">
           {period !== "mes" && <input type="hidden" name="periodo" value={period} />}

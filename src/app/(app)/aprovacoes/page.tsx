@@ -1,12 +1,12 @@
 import Link from "next/link";
-import { CARD, DANGER_OUTLINE, INPUT, PRIMARY } from "@/components/ui";
+import { CARD, DANGER_OUTLINE, EmptyState, INPUT, PageHeader, PRIMARY, SECONDARY } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { approvesAtLoss, menuItem } from "@/lib/auth/permissions";
 import { listPastDecisions, listPendingApprovals } from "@/lib/db/approvals";
 import { tenantDb } from "@/lib/db/pool";
 import { isoDate, showDateTime } from "@/lib/format";
 import { BAND_TEXT, REASON_TEXT } from "@/lib/order-form";
-import { ordersCount, ordersView } from "@/lib/orders-view";
+import { ordersView } from "@/lib/orders-view";
 import { ActionForm } from "../pedidos/ActionForm";
 import { decideApprovalAction } from "./actions";
 
@@ -35,12 +35,21 @@ export default async function AprovacoesPage() {
 
   return (
     <>
-      <h1 className="text-2xl font-semibold">{menuItem("aprovacoes").label}</h1>
-      <p className="mt-1 text-sm text-slate-600">
-        {pending.length === 0 ? "Nenhum pedido aguardando aprovação." : `${ordersCount(pending.length)} aguardando decisão.`}
-      </p>
+      <PageHeader
+        title={menuItem("aprovacoes").label}
+        hint="Pedidos fora das regras comerciais aguardam sua decisão."
+      />
 
       <div className="mt-6 flex flex-col gap-4">
+        {pending.length === 0 && (
+          <div className={CARD}>
+            <EmptyState
+              title="Nenhuma aprovação pendente"
+              description="Quando um pedido precisar de decisão, ele aparecerá aqui."
+              action={<Link href={ORDERS} className={SECONDARY}>Ver pedidos</Link>}
+            />
+          </div>
+        )}
         {pending.map((item, index) => {
           const row = rows[index];
           const blocked = item.directorOnly && !atLoss;
