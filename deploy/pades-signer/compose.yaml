@@ -4,9 +4,7 @@
 # pades-signer. Isso não abre a interface do servidor.
 services:
   pades-signer:
-    build:
-      context: ../..
-      dockerfile: deploy/pades-signer/Dockerfile
+    image: ghcr.io/avilaops/erp-pades-signer:${ERP_PADES_IMAGE_TAG:?informe o SHA aprovado}
     environment:
       ERP_PADES_BIND: 0.0.0.0
       ERP_PADES_SIGNER_PORT: "8443"

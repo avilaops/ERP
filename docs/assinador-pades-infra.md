@@ -174,7 +174,10 @@ que exija o PDF selado nos contratos já assinados antes desta coluna.
 
 ## Imagem
 
-`deploy/pades-signer/Dockerfile` e `deploy/pades-signer/compose.yaml`.
+`deploy/pades-signer/Dockerfile` e `deploy/pades-signer/compose.yaml`. A imagem é
+construída no GitHub Actions e publicada com o SHA integral do commit em
+`ghcr.io/avilaops/erp-pades-signer:<sha>`. O servidor apenas baixa essa imagem;
+não compila o código.
 A imagem não contém chave, token nem certificado TLS. Os volumes `./tls` e
 `./chaves` são só leitura. Não foi executado contra servidor nenhum.
 
@@ -211,9 +214,7 @@ services:
       retries: 10
 
   pades-signer:
-    build:
-      context: .
-      dockerfile: deploy/pades-signer/Dockerfile
+    image: ghcr.io/avilaops/erp-pades-signer:${ERP_PADES_IMAGE_TAG:?informe o SHA aprovado}
     environment:
       ERP_PADES_BIND: 0.0.0.0
       ERP_PADES_SIGNER_PORT: "8443"

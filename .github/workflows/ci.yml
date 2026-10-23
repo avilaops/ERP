@@ -55,6 +55,9 @@ jobs:
       - name: Conferir scripts de publicação
         run: bash -n deploy/*.sh
 
+      - name: Conferir imagem do assinador PAdES
+        run: docker build --file deploy/pades-signer/Dockerfile --tag erp-pades-signer:ci .
+
       # Falha se algum teste for pulado: sem banco, os testes de banco não provam nada.
       - name: Testes
         shell: bash
