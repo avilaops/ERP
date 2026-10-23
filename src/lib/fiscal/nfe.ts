@@ -121,6 +121,8 @@ export type NfePayment = {
   amount: number;
 };
 
+const NON_INTEGRATED_ELECTRONIC_PAYMENTS = new Set(["03", "04", "17"]);
+
 /** The ways of freight of the layout (`modFrete`), with the official wording. */
 export const FREIGHT_MODES = [
   ["0", "Contratação do frete por conta do remetente (CIF)"],
@@ -670,7 +672,13 @@ export function buildNfeXml(input: NfeInput): { key: string; xml: string; totals
   const payment = group(
     "pag",
     input.payments
-      .map((item) => group("detPag", tag("tPag", item.code) + tag("xPag", item.code === "99" ? clean(item.description ?? "", 60) : null) + tag("vPag", money(item.amount))))
+      .map((item) => group(
+        "detPag",
+        tag("tPag", item.code) +
+          tag("xPag", item.code === "99" ? clean(item.description ?? "", 60) : null) +
+          tag("vPag", money(item.amount)) +
+          (NON_INTEGRATED_ELECTRONIC_PAYMENTS.has(item.code) ? group("card", tag("tpIntegra", "2")) : ""),
+      ))
       .join(""),
   );
 

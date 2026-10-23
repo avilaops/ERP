@@ -4,7 +4,7 @@ import { listLines } from "@/lib/db/product-lines";
 import { exactLine } from "@/lib/lines-view";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/auth";
-import { tenantDb } from "@/lib/db/pool";
+import { tenantDb, withTenantConnection } from "@/lib/db/pool";
 import { menuItem } from "@/lib/auth/permissions";
 import { appliedText, ignoredText, parseAdvisoryPaste, pasteSizeProblem, previewRows } from "@/lib/advisory-paste";
 import type { InvalidLine, PasteState } from "@/lib/advisory-paste";
@@ -12,7 +12,9 @@ import {
   applyAdvisoryCosts,
   createProduct,
   deleteProduct,
+  loadPriceTableDraftRevision,
   listProducts,
+  lockPriceTableDraft,
   ProductError,
   saveProductMeasures,
   setProductPlateLoaded,
@@ -208,34 +210,47 @@ const publishError = (message: string): PublishState => ({ status: "error", mess
  */
 export async function publishPriceTableAction(_previous: PublishState, formData: FormData): Promise<PublishState> {
   const session = await requirePermission("produtos");
-  const conn = tenantDb(session.tenant.slug);
-
   const expected = Number(formData.get("expected"));
+  const reviewedRevision = String(formData.get("revision") ?? "");
   try {
-    const line = exactLine(await listLines(conn), formData.get("lineId"));
-    if (!line) return publishError(NO_LINE);
-    const [params, products, latest, next] = await Promise.all([
-      loadParams(conn, line.id),
-      listProducts({ active: true, lineId: line.id }, conn),
-      latestVersion(conn, line.id),
-      nextVersionNumber(conn),
-    ]);
-    const published = latest ? await loadPublishedSnapshot(latest.version, conn) : null;
-
-    const draft = draftPriceTable(params, products);
-    if (draft.items.length === 0) return publishError(NOTHING_TO_PUBLISH);
-    if (!pendingChanges(draft, published)) return publishError(`Nada mudou desde a tabela v${latest?.version}.`);
-
-    if (expected !== next) {
-      return publishError("A tabela já foi publicada por outra pessoa. Confira o que está pendente e publique de novo.");
-    }
-
-    const { version } = await publishPriceTable(draft, next, session.email, conn, line.id);
-    console.info(`[produtos] tabela v${version} publicada: ${draft.items.length} equipamento(s), por ${session.email}`);
+    const result = await withTenantConnection(session.tenant.slug, async (conn) => {
+      await conn.query("BEGIN ISOLATION LEVEL REPEATABLE READ");
+      let committed = false;
+      try {
+        await lockPriceTableDraft(conn);
+        const line = exactLine(await listLines(conn), formData.get("lineId"));
+        if (!line) return publishError(NO_LINE);
+        const revision = await loadPriceTableDraftRevision(line.id, conn);
+        if (!/^[a-f0-9]{32}$/.test(reviewedRevision) || revision !== reviewedRevision) {
+          return publishError("Custos, cadastro ou regras mudaram depois da revisão. Confira a nova revisão antes de publicar.");
+        }
+        // This transaction is pinned to one pg client. Execute its reads in
+        // order: concurrent `client.query()` calls are deprecated and can hide
+        // which snapshot each value belongs to.
+        const params = await loadParams(conn, line.id);
+        const products = await listProducts({ active: true, lineId: line.id }, conn);
+        const latest = await latestVersion(conn, line.id);
+        const next = await nextVersionNumber(conn);
+        const published = latest ? await loadPublishedSnapshot(latest.version, conn) : null;
+        const draft = draftPriceTable(params, products);
+        if (draft.items.length === 0) return publishError(NOTHING_TO_PUBLISH);
+        if (!pendingChanges(draft, published)) return publishError(`Nada mudou desde a tabela v${latest?.version}.`);
+        if (expected !== next) return publishError("A tabela já foi publicada por outra pessoa. Confira o que está pendente e publique de novo.");
+        const { version } = await publishPriceTable(draft, next, session.email, conn, line.id);
+        await conn.query("COMMIT");
+        committed = true;
+        return { status: "published", message: `Tabela v${version} publicada. A equipe já vende com ela.`, version, count: draft.items.length } as const;
+      } finally {
+        if (!committed) await conn.query("ROLLBACK");
+      }
+    });
+    if (!("version" in result)) return result;
+    console.info(`[produtos] tabela v${result.version} publicada: ${result.count} equipamento(s), por ${session.email}`);
 
     revalidatePath(menuItem("produtos").href);
+    revalidatePath("/produtos/publicacao");
     revalidatePath(menuItem("tabela-precos").href);
-    return { status: "published", message: `Tabela v${version} publicada. A equipe já vende com ela.` };
+    return { status: "published", message: result.message };
   } catch (error) {
     if (error instanceof PriceTableError) return publishError(error.message);
     console.error("[produtos] falha ao publicar:", error instanceof Error ? error.message : error);

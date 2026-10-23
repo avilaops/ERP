@@ -93,7 +93,7 @@ test("leitura: cada campo inválido vira um erro com o rótulo dele, todos de um
   assert.deepEqual(parsed.errors, [
     '"Nome": informe o nome do equipamento.',
     '"Custo assessoria R$": informe um valor em reais (ex.: 8.146,64) ou deixe em branco.',
-    '"Crédito imp. %": informe um percentual de 0 até menos de 100 (ex.: 28,11565).',
+    '"Crédito tributário %": informe um percentual de 0 até menos de 100 (ex.: 28,11565).',
     '"Embalagem R$": informe um valor em reais, zero ou mais (ex.: 1.234,56).',
   ]);
 

@@ -1,5 +1,7 @@
 import { DEFAULT_NFE_BODY, DEFAULT_NFE_SUBJECT, fillMailText, loadMailInfo, mailChannel } from "@/lib/db/mail";
+import { listOrderContracts } from "@/lib/db/contracts";
 import type { Queryable } from "@/lib/db/pool";
+import { contractFile, contractFileName } from "@/lib/db/send-contract";
 import { loadDanfeReformDate } from "@/lib/db/fiscal";
 import { danfeData, renderDanfe, usesReformLayout } from "@/lib/fiscal/danfe";
 import { buildMessage, isMailAddress, MailError } from "@/lib/mail/message";
@@ -26,6 +28,9 @@ export async function listOrderInvoiceMails(orderId: number, conn: Queryable): P
 
 export const MAIL_NOT_SET = "Envio de e-mail não configurado: cadastre a caixa da empresa em Parâmetros → E-mail das notas, ou peça à Ávila Ops para ligar a caixa padrão.";
 
+export const INVOICE_MAIL_DOCUMENTS = ["xml", "danfe", "evento", "contrato"] as const;
+export type InvoiceMailDocument = (typeof INVOICE_MAIL_DOCUMENTS)[number];
+
 export type SendInvoiceMail = {
   invoiceId: number;
   /** Default sends the current invoice and applicable events; correction sends the latest CC-e. */
@@ -34,6 +39,8 @@ export type SendInvoiceMail = {
   eventId?: number;
   /** `null`: the e-mail of the customer of the order. */
   to: string | null;
+  /** Undefined keeps the automatic package; the manual form sends exactly this selection. */
+  documents?: readonly InvoiceMailDocument[];
   sentBy: string;
   now: Date;
   env: Record<string, string | undefined>;
@@ -50,8 +57,11 @@ export type SendInvoiceMail = {
  */
 export async function sendInvoiceMail(request: SendInvoiceMail, conn: Queryable): Promise<{ status: "enviado" | "falhou"; recipient: string; detail: string | null }> {
   if (request.eventId !== undefined && (request.kind !== "correcao" || !Number.isSafeInteger(request.eventId) || request.eventId < 1)) throw new MailError("Evento fiscal inválido para envio.");
+  const selected = request.documents === undefined ? null : new Set(request.documents);
+  if (selected !== null && selected.size === 0) throw new MailError("Escolha pelo menos um documento para enviar.");
+  if (selected !== null && [...selected].some((document) => !INVOICE_MAIL_DOCUMENTS.includes(document))) throw new MailError("Há um documento inválido na seleção de anexos.");
   const { rows } = await conn.query(
-    `SELECT i.id, i.status, i.number, i.series, i.access_key, i.authorized_xml, c.name AS customer_name, c.email AS customer_email
+    `SELECT i.id, i.status, i.number, i.series, i.access_key, i.authorized_xml, o.id AS order_id, o.number AS order_number, c.name AS customer_name, c.email AS customer_email
        FROM fiscal_invoices i JOIN orders o ON o.id = i.order_id LEFT JOIN customers c ON c.id = o.customer_id WHERE i.id = $1`,
     [request.invoiceId],
   );
@@ -74,16 +84,18 @@ export async function sendInvoiceMail(request: SendInvoiceMail, conn: Queryable)
   if ((cancelled || request.kind === "correcao") && !event) throw new MailError("O evento fiscal ainda não está registrado nesta nota.");
   if (event && (!String(event.signed_xml).includes("<procEventoNFe") || !String(event.signed_xml).includes("<retEvento"))) throw new MailError("O evento antigo não tem o XML completo do recibo. Consulte a SEFAZ para recuperar o arquivo antes de enviar.");
   const words = { numero: String(invoice.number), serie: String(invoice.series), empresa: data.issuer.name, cliente: String(invoice.customer_name ?? data.recipient.name), chave: String(invoice.access_key) };
-  const attachments: MailAttachment[] = [{ filename: `NFe${invoice.access_key}.xml`, contentType: "application/xml", content: Buffer.from(xml, "utf8") }];
+  const includes = (document: InvoiceMailDocument) => selected === null || selected.has(document);
+  const attachments: MailAttachment[] = [];
+  if (includes("xml")) attachments.push({ filename: `NFe${invoice.access_key}.xml`, contentType: "application/xml", content: Buffer.from(xml, "utf8") });
   let subject = fillMailText(settings.subject ?? DEFAULT_NFE_SUBJECT, words);
   let text = fillMailText(settings.body ?? DEFAULT_NFE_BODY, words);
   if (cancelled) {
     subject = `Cancelamento da nota fiscal nº ${words.numero} - ${words.empresa}`;
     text = `Olá,\n\nA nota fiscal eletrônica nº ${words.numero}, série ${words.serie}, emitida por ${words.empresa} para ${words.cliente}, foi CANCELADA.\n\nChave de acesso: ${words.chave}\nProtocolo do cancelamento: ${event.protocol}\n\nO XML da nota e o do cancelamento estão em anexo.`;
-    attachments.push({ filename: `Cancelamento-NFe${invoice.access_key}.xml`, contentType: "application/xml", content: Buffer.from(String(event.signed_xml), "utf8") });
+    if (includes("evento")) attachments.push({ filename: `Cancelamento-NFe${invoice.access_key}.xml`, contentType: "application/xml", content: Buffer.from(String(event.signed_xml), "utf8") });
   } else {
-    attachments.push({ filename: `DANFE-${invoice.number}.pdf`, contentType: "application/pdf", content: await renderDanfe(data, { reform: usesReformLayout(data.issuedAt, await loadDanfeReformDate(conn)) }) });
-    if (event) {
+    if (includes("danfe")) attachments.push({ filename: `DANFE-${invoice.number}.pdf`, contentType: "application/pdf", content: await renderDanfe(data, { reform: usesReformLayout(data.issuedAt, await loadDanfeReformDate(conn)) }) });
+    if (event && includes("evento")) {
       attachments.push({ filename: `CCe-${event.sequence}-NFe${invoice.access_key}.xml`, contentType: "application/xml", content: Buffer.from(String(event.signed_xml), "utf8") });
       const correctionText = `\n\nCarta de correção nº ${event.sequence}, protocolo ${event.protocol}:\n${event.text}\n\nO XML da CC-e e seu recibo estão em anexo. A carta complementa a nota; o XML autorizado e o DANFE preservam os dados originais.`;
       if (request.kind === "correcao") {
@@ -93,6 +105,17 @@ export async function sendInvoiceMail(request: SendInvoiceMail, conn: Queryable)
       text += correctionText;
     }
   }
+  if (selected?.has("evento") && !event) throw new MailError("Esta nota ainda não tem evento fiscal disponível para anexar.");
+  if (selected?.has("contrato")) {
+    const contract = (await listOrderContracts(Number(invoice.order_id), conn)).find((item) => item.status === "assinado");
+    if (!contract) throw new MailError("Este pedido ainda não tem contrato assinado para anexar.");
+    attachments.push({
+      filename: contractFileName(String(invoice.order_number), contract),
+      contentType: "application/pdf",
+      content: await contractFile(contract, { company: data.issuer.name, orderNumber: String(invoice.order_number), now: request.now, vault: request.key }, conn),
+    });
+  }
+  if (attachments.length === 0) throw new MailError("Nenhum dos documentos escolhidos está disponível para envio.");
   if (data.homologation) text += "\n\nNOTA EMITIDA EM AMBIENTE DE HOMOLOGAÇÃO: SEM VALOR FISCAL.";
 
   const message = buildMessage({ from: channel.from, fromName: data.issuer.name, to: recipient, replyTo: settings.replyTo, subject, text, attachments }, request.now);

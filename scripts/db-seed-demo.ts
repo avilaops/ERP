@@ -2,7 +2,7 @@
  * Fictitious data for ONE company, to see and photograph the screens with
  * content instead of empty lists:
  *
- *   npm run db:seed-demo -- --empresa <identificador>
+ *   npm run db:seed-demo -- --empresa <identificador> [--escala 3000]
  *
  * Only runs on a database whose name ends in `_demo`, `_dev` or `_test`, and
  * only on a company that has no customer and no order yet: it never mixes with
@@ -30,7 +30,7 @@ import type { Uf } from "@/lib/pricing/states";
 import { saleOf } from "@/lib/order-quote";
 import { draftPriceTable } from "@/lib/price-table";
 
-const USAGE = "Uso: npm run db:seed-demo -- --empresa <identificador>";
+const USAGE = "Uso: npm run db:seed-demo -- --empresa <identificador> [--escala <quantidade>]";
 const DATABASE_SUFFIXES = ["_demo", "_dev", "_test"];
 
 function fail(message: string): never {
@@ -40,11 +40,17 @@ function fail(message: string): never {
 
 const args = process.argv.slice(2);
 let slug: string | undefined;
+let scale: number | null = null;
 for (let index = 0; index < args.length; index += 1) {
   const arg = args[index];
   if (arg === "--empresa") slug = args[(index += 1)];
   else if (arg.startsWith("--empresa=")) slug = arg.slice("--empresa=".length);
+  else if (arg === "--escala") scale = Number(args[(index += 1)]);
+  else if (arg.startsWith("--escala=")) scale = Number(arg.slice("--escala=".length));
   else fail(`Opção desconhecida: ${arg}\n${USAGE}`);
+}
+if (scale !== null && (!Number.isSafeInteger(scale) || scale < 1 || scale > 10_000)) {
+  fail("Escala inválida: informe um inteiro de 1 a 10.000.");
 }
 const tenants = parseTenants(process.env.ERP_TENANTS);
 const available = tenants.map((tenant) => tenant.slug).join(", ") || "nenhuma: ERP_TENANTS ausente";
@@ -282,7 +288,101 @@ async function seed(conn: Queryable): Promise<string[]> {
   await saveGoal(SELLER.email, month, 250000, DIRECTOR, conn);
   await saveGoal(MANAGER.email, month, 200000, DIRECTOR, conn);
   done.push("metas do mês da equipe e de cada vendedor");
+  if (scale !== null) done.push(...await seedScale(scale, conn));
   return done;
+}
+
+/**
+ * Completa as quatro listas grandes com dados sintéticos. Continua restrito a
+ * banco de demonstração/teste e empresa vazia pelo bloqueio no início do seed.
+ * Inserções em lote deixam 3.000 registros reproduzíveis sem transformar a
+ * preparação visual em 12.000 viagens ao PostgreSQL.
+ */
+async function seedScale(target: number, conn: Queryable): Promise<string[]> {
+  const counts = await conn.query(`SELECT
+    (SELECT count(*) FROM customers)::int AS customers,
+    (SELECT count(*) FROM orders)::int AS orders,
+    (SELECT count(*) FROM products)::int AS products,
+    (SELECT count(*) FROM suppliers)::int AS suppliers`);
+  const current = counts.rows[0] as Record<string, number>;
+  const missing = (key: string) => Math.max(0, target - Number(current[key]));
+
+  const customerCount = missing("customers");
+  if (customerCount > 0) {
+    const start = Number(current.customers) + 1;
+    const documents = Array.from({ length: customerCount }, (_, offset) => cnpj(10_000 + start + offset));
+    await conn.query(
+      `INSERT INTO customers
+         (kind, document, name, trade_name, contact_name, state_registration, phone, email, cep, street, street_number, district, city, uf, updated_by)
+       SELECT 'PJ', document, 'Academia Simulação ' || lpad(ordinal::text, 4, '0') || ' Ltda.',
+              'Academia Demo ' || lpad(ordinal::text, 4, '0'), 'Contato Simulado ' || lpad(ordinal::text, 4, '0'),
+              'ISENTO', '1191' || lpad(ordinal::text, 7, '0'), 'cliente' || ordinal || '@exemplo.invalid',
+              '01001000', 'Rua de Demonstração', ordinal::text, 'Centro',
+              (ARRAY['São Paulo','Campinas','Santos','Ribeirão Preto','Sorocaba','Belo Horizonte'])[(ordinal % 6) + 1],
+              (ARRAY['SP','SP','SP','SP','SP','MG'])[(ordinal % 6) + 1], $3
+         FROM unnest($1::text[], $2::integer[]) AS batch(document, ordinal)`,
+      [documents, Array.from({ length: customerCount }, (_, offset) => start + offset), DIRECTOR],
+    );
+  }
+
+  const productCount = missing("products");
+  if (productCount > 0) {
+    const start = Number(current.products) + 1;
+    await conn.query(
+      `INSERT INTO products
+         (name, code, supplier_name, supplier_model, supplier_price_usd, advisory_cost, tax_credit, packaging, active, updated_by)
+       SELECT 'Equipamento Simulação ' || lpad(ordinal::text, 4, '0'), 'SIM-' || lpad(ordinal::text, 5, '0'),
+              'Fornecedor Simulado', 'MOD-' || lpad(ordinal::text, 4, '0'), 300 + ordinal, 4000 + ordinal,
+              0.2780009, (ordinal % 5) * 10, true, $2
+         FROM unnest($1::integer[]) AS batch(ordinal)`,
+      [Array.from({ length: productCount }, (_, offset) => start + offset), DIRECTOR],
+    );
+  }
+
+  const supplierCount = missing("suppliers");
+  if (supplierCount > 0) {
+    const start = Number(current.suppliers) + 1;
+    await conn.query(
+      `INSERT INTO suppliers (kind, document, name, trade_name, contact_name, country, active, updated_by)
+       SELECT 'EX', 'DEMO-' || lpad(ordinal::text, 6, '0'), 'Fornecedor Simulação ' || lpad(ordinal::text, 4, '0'),
+              'Fornecedor Demonstração ' || lpad(ordinal::text, 4, '0'), 'Contato Fornecedor ' || lpad(ordinal::text, 4, '0'),
+              (ARRAY['China','Estados Unidos','Alemanha'])[(ordinal % 3) + 1], true, $2
+         FROM unnest($1::integer[]) AS batch(ordinal)`,
+      [Array.from({ length: supplierCount }, (_, offset) => start + offset), DIRECTOR],
+    );
+  }
+
+  const orderCount = missing("orders");
+  if (orderCount > 0) {
+    const customers = await conn.query("SELECT id FROM customers ORDER BY id LIMIT $1", [orderCount]);
+    const customerIds = customers.rows.map((row) => Number(row.id));
+    const currentVersion = await latestVersion(conn);
+    const currentTable = currentVersion ? await loadPublishedTable(currentVersion.version, conn) : null;
+    const firstProduct = currentTable?.items[0]?.productId;
+    if (!currentVersion || !firstProduct || customerIds.length < orderCount) throw new Error("Massa de escala sem clientes, tabela publicada ou equipamentos suficientes.");
+    const date = new Date();
+    const prefix = `${String(date.getFullYear()).slice(2)}${String(date.getMonth() + 1).padStart(2, "0")}${String(date.getDate()).padStart(2, "0")}`;
+    const numbers = Array.from({ length: orderCount }, (_, offset) => `${prefix}-S${(offset + 1).toString(36).toUpperCase().padStart(3, "0")}`);
+    await conn.query(
+      `WITH inserted AS (
+         INSERT INTO orders
+           (number, status, seller_email, seller_name, customer_id, price_table_version, discount, delivery_uf, taxpayer, freight, updated_by)
+         SELECT number, 'em_negociacao', $3, 'Vendedor Simulação', customer_id, $4, ((ordinal % 8) * 0.01), 'SP', false, 0, $3
+           FROM unnest($1::text[], $2::integer[]) WITH ORDINALITY AS batch(number, customer_id, ordinal)
+         RETURNING id, price_table_version
+       )
+       INSERT INTO order_items (order_id, price_table_version, product_id, quantity)
+       SELECT id, price_table_version, $5, 1 FROM inserted`,
+      [numbers, customerIds, SELLER.email, currentVersion.version, firstProduct],
+    );
+  }
+
+  return [
+    `${target} clientes para consulta em escala`,
+    `${target} pedidos para consulta em escala`,
+    `${target} equipamentos para consulta em escala`,
+    `${target} fornecedores para consulta em escala`,
+  ];
 }
 
 let exitCode = 1;

@@ -39,10 +39,10 @@ export function ProductTools({
 
   return (
     <>
-      <div className="flex flex-wrap items-start justify-between gap-4">
+      <div className="product-tools flex flex-wrap items-start justify-between gap-2">
         <div>{heading}</div>
-        <div className="flex flex-wrap items-start gap-2">
-          <SectionDisclosure title="Ferramentas do catálogo">
+        <div className="flex flex-nowrap items-start gap-2">
+          <SectionDisclosure title="Ferramentas">
           <div className="flex flex-wrap gap-2">
           {BUTTONS.map(([panel, label, controls]) => (
             <button

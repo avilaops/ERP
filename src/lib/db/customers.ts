@@ -2,12 +2,22 @@ import { isValidDocument } from "@/lib/customer";
 import type { CustomerInput, CustomerKind } from "@/lib/customer";
 import { pgErrorCode } from "@/lib/db/pool";
 import type { Queryable } from "@/lib/db/pool";
+import { normalizedSearch, searchableText } from "@/lib/db/search";
 import type { Uf } from "@/lib/pricing/states";
 import { normalizedAddress } from "@/lib/address";
+import { listResult } from "@/lib/list-query";
+import { compactDocumentSearch } from "@/lib/list-query";
+import type { ListQuery, ListResult } from "@/lib/list-query";
 
 export type { CustomerInput } from "@/lib/customer";
 
 export type Customer = CustomerInput & { id: number };
+export type CustomerListSort = "nome" | "cadastro" | "ultima_compra";
+export type CustomerListItem = Customer & {
+  closedOrders: number;
+  totalBought: number;
+  lastPurchase: Date | null;
+};
 
 /** A refusal the user can act on. The message goes to the screen as it is. */
 export class CustomerError extends Error {}
@@ -140,6 +150,58 @@ export async function findCustomerByDocument(document: string, conn: Queryable):
 export async function listCustomers(conn: Queryable): Promise<Customer[]> {
   const { rows } = await conn.query(`SELECT ${COLUMNS} FROM customers ORDER BY name, id`);
   return rows.map(toCustomer);
+}
+
+const QUALIFIED_COLUMNS = COLUMNS.split(", ").map((column) => `c.${column}`).join(", ");
+const CUSTOMER_FROM = `FROM customers c
+  LEFT JOIN LATERAL (
+    SELECT count(*)::int AS closed_orders, COALESCE(sum(k.invoice_total), 0) AS total_bought, max(k.closed_at) AS last_purchase
+      FROM orders o
+      JOIN order_closings k ON k.order_id = o.id AND k.reopened_at IS NULL
+     WHERE o.customer_id = c.id AND o.status = 'fechado'
+  ) b ON true`;
+
+/** A customer page. Filters and count are applied in PostgreSQL before any row reaches Next.js. */
+export async function queryCustomers(query: ListQuery<CustomerListSort>, conn: Queryable): Promise<ListResult<CustomerListItem>> {
+  const values: unknown[] = [normalizedSearch(query.search), compactDocumentSearch(query.search)];
+  const where = [
+    `($1 = '' OR strpos(${searchableText("c.name")}, $1) > 0 OR strpos(${searchableText("c.trade_name")}, $1) > 0
+      OR ($2 <> '' AND strpos(regexp_replace(upper(COALESCE(c.document, '')), '[^0-9A-Z]', '', 'g'), $2) > 0))`,
+  ];
+  const addArray = (column: string, selected: string[] | undefined) => {
+    if (!selected?.length) return;
+    values.push(selected);
+    where.push(`${column} = ANY($${values.length}::text[])`);
+  };
+  addArray("c.kind", query.filters.tipo);
+  addArray("c.uf", query.filters.uf);
+  const purchase = query.filters.compra?.[0];
+  if (purchase === "com") where.push("COALESCE(b.closed_orders, 0) > 0");
+  if (purchase === "sem") where.push("COALESCE(b.closed_orders, 0) = 0");
+
+  const restriction = `WHERE ${where.join(" AND ")}`;
+  const counted = await conn.query(`SELECT count(*) AS total ${CUSTOMER_FROM} ${restriction}`, values);
+  const total = Number(counted.rows[0]?.total ?? 0);
+  const pages = Math.max(1, Math.ceil(total / query.pageSize));
+  const page = Math.min(pages, query.page);
+  const orderColumn = query.sort === "cadastro" ? "c.created_at" : query.sort === "ultima_compra" ? "b.last_purchase" : "lower(c.name)";
+  const nulls = query.sort === "ultima_compra" ? " NULLS LAST" : "";
+  const dataValues = [...values, query.pageSize, (page - 1) * query.pageSize];
+  const { rows } = await conn.query(
+    `SELECT ${QUALIFIED_COLUMNS},
+            COALESCE(b.closed_orders, 0) AS closed_orders, COALESCE(b.total_bought, 0) AS total_bought, b.last_purchase
+       ${CUSTOMER_FROM} ${restriction}
+      ORDER BY ${orderColumn} ${query.direction.toUpperCase()}${nulls}, c.id ${query.direction.toUpperCase()}
+      LIMIT $${dataValues.length - 1} OFFSET $${dataValues.length}`,
+    dataValues,
+  );
+  const items = rows.map((row) => ({
+    ...toCustomer(row),
+    closedOrders: Number(row.closed_orders),
+    totalBought: Number(row.total_bought),
+    lastPurchase: (row.last_purchase as Date | null) ?? null,
+  }));
+  return listResult(items, total, page, query.pageSize);
 }
 
 /** Removes a customer with no order. One that has orders has history and stays. */

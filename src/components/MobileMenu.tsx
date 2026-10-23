@@ -27,7 +27,7 @@ export function MobileMenu({ brand, tabs, more, children }: { brand: ReactNode; 
   useEffect(() => {
     if (!open) return;
     // Only where the menu is a sheet over the page; on a wide screen it is a column and nothing is held.
-    const phone = window.matchMedia("(max-width: 767px)");
+    const phone = window.matchMedia("(max-width: 1023px)");
     const hold = () => {
       document.body.style.overflow = phone.matches ? "hidden" : "";
     };
@@ -47,20 +47,20 @@ export function MobileMenu({ brand, tabs, more, children }: { brand: ReactNode; 
   return (
     <>
       <aside
-        className={`${open ? "fixed inset-0 h-dvh pb-[var(--tabbar)]" : "sticky top-0 h-[var(--topbar)]"} z-20 flex shrink-0 flex-col border-b border-slate-200 bg-white md:sticky md:top-0 md:h-dvh md:w-60 md:border-b-0 md:border-r md:pb-0`}
+        className={`${open ? "fixed inset-0 h-dvh pb-[var(--tabbar)]" : "sticky top-0 h-[var(--topbar)]"} z-20 flex shrink-0 flex-col border-b border-slate-200 bg-white lg:sticky lg:top-0 lg:h-dvh lg:w-60 lg:border-b-0 lg:border-r lg:pb-0`}
       >
-        <div className="flex h-[3.25rem] shrink-0 items-center justify-between gap-3 px-4 md:h-auto md:pt-4">
+        <div className="flex h-[3.25rem] shrink-0 items-center justify-between gap-3 px-4 lg:h-auto lg:pt-4">
           <div className="min-w-0">{brand}</div>
         </div>
         {/* `relative`: what is placed out of the flow inside (texts for screen readers) slides with the menu instead of stretching the page. */}
-        <div id="menu-principal" className={`${open ? "flex" : "hidden"} relative min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain p-3 md:flex`}>
+        <div id="menu-principal" className={`${open ? "flex" : "hidden"} relative min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain p-3 lg:flex`}>
           {children}
         </div>
       </aside>
 
       <nav
         aria-label="Atalhos"
-        className="fixed inset-x-0 bottom-0 z-30 flex h-[var(--tabbar)] items-stretch border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] md:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 flex h-[var(--tabbar)] items-stretch border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] lg:hidden"
       >
         {tabs.map((tab) => (
           <Link

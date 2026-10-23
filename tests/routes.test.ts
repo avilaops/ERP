@@ -105,8 +105,8 @@ test("toda ação de servidor confere a permissão antes de qualquer outra coisa
 test("a página lê o banco só depois de conferir a permissão", () => {
   const reads: [string, string, string[]][] = [
     ["/parametros", "parametros", ["loadParams(", "listProductCosts("]],
-    ["/produtos", "produtos", ["loadParams(", "listProducts(", "latestVersion(", "loadPublishedSnapshot("]],
-    ["/clientes", "clientes", ["listCustomers("]],
+    ["/produtos", "produtos", ["loadParams(", "queryProducts(", "loadProductTabCounts(", "latestVersion(", "loadProductPublicationSummary("]],
+    ["/clientes", "clientes", ["queryCustomers("]],
     ["/clientes/[id]", "clientes", ["getCustomer("]],
     ["/pedidos/novo", "pedidos", ["latestVersion(", "loadPublishedTable("]],
     ["/tabela-precos", "tabela-precos", ["latestVersion(", "loadPublishedTable(", "loadPublishedSnapshot("]],
@@ -191,7 +191,8 @@ test("Pedido: custo só é lido para quem pode ver, e nada dele vai para compone
   const list = source("/pedidos");
   assert.doesNotMatch(list, /loadPublishedSnapshot|loadOrderStanding|seesCosts|directorOf|DirectorBoard/);
   assert.ok(list.includes("seesAllOrders(session)"));
-  assert.ok(list.includes("listOrders({ sellerEmail: everyone ? null : session.email }, conn)"));
+  assert.ok(list.includes("queryOrders(query, scope, conn)"));
+  assert.ok(list.includes("loadOrderOverview(scope, month, conn)"));
 });
 
 test("multi-empresa: toda leitura e gravação usa o banco da empresa da sessão", () => {
@@ -370,7 +371,8 @@ test("não existe página no grupo protegido sem requirePermission", () => {
   // and, of production, the materials, what will run short, the list of materials of one equipment and the hours.
   // and the preparation of the fiscal rules of one order's invoice.
   // and, of incoming invoices, one invoice and the link of one of its items.
-  assert.equal(all.length, MENU_ITEMS.length + 65);
+  // Product publishing has its own review screen before the irreversible action.
+  assert.equal(all.length, MENU_ITEMS.length + 66);
   for (const route of all) {
     assert.match(source(route), /await requirePermission\(/, route);
   }
@@ -523,6 +525,16 @@ test("nota fiscal: a conferência do XML só sai para quem opera o Fiscal, de pe
   const loader = readFileSync(new URL("../src/lib/db/order-nfe.ts", import.meta.url), "utf8");
   assert.ok(loader.includes('order.status !== "fechado"'));
   assert.doesNotMatch(loader, /UPDATE|INSERT|DELETE/);
+});
+
+test("nota fiscal: emissão continua visível quando bloqueada e o reenvio oferece os anexos disponíveis", () => {
+  const order = readFileSync(new URL("../src/app/(app)/pedidos/[numero]/page.tsx", import.meta.url), "utf8");
+  assert.match(order, /firstProblemStep\(invoice\.problems\)/);
+  assert.match(order, /disabled[\s\S]{0,160}Emitir nota fiscal/);
+  assert.match(order, /Corrigir \{invoice\.problems\.length\} pendência/);
+  for (const document of ["xml", "danfe", "evento", "contrato"]) {
+    assert.ok(order.includes(`name="documents" value="${document}"`), `anexo ${document} não está disponível no formulário`);
+  }
 });
 
 test("nota fiscal: só quem opera o Fiscal coloca a emissão na fila; a verificação da SEFAZ nunca é desligada; o XML autorizado segue o alcance do pedido", () => {
