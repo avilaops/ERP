@@ -100,9 +100,9 @@ export function loadKeysFromDirectory(dir: string, password?: string): number {
       const privateKeyPem = opened.export({ type: "pkcs8", format: "pem" });
       if (typeof privateKeyPem !== "string") throw new Error("pem");
       const fingerprint = createHash("sha256").update(leaf.raw).digest("hex");
-      const chainDer = chainPem.split("-----END CERTIFICATE-----").flatMap((part) => {
-        const body = part.replace(/-----BEGIN CERTIFICATE-----/g, "").replace(/\s+/g, "");
-        if (body === "") return [];
+      const chainDer = [...chainPem.matchAll(/-----BEGIN CERTIFICATE-----([\s\S]*?)-----END CERTIFICATE-----/g)].flatMap((match) => {
+        const body = match[1].replace(/\s+/g, "");
+        if (body === "" || !/^[A-Za-z0-9+/]+={0,2}$/.test(body)) return [];
         const der = Buffer.from(body, "base64");
         const print = createHash("sha256").update(der).digest("hex");
         return print === fingerprint ? [] : [der];
