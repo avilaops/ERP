@@ -1,15 +1,21 @@
 import { gunzipSync } from "node:zlib";
+import { DOMParser } from "@xmldom/xmldom";
+import { ACCESS_KEY_PATTERN } from "@/lib/fiscal/nfe";
 import { SefazError } from "@/lib/fiscal/sefaz";
 
 const NFE_NS = "http://www.portalfiscal.inf.br/nfe";
 const WSDL = "http://www.portalfiscal.inf.br/nfe/wsdl/NFeDistribuicaoDFe";
 export const DISTRIBUTION_ACTION = `${WSDL}/nfeDistDFeInteresse`;
 export const DISTRIBUTION_URL = "https://www1.nfe.fazenda.gov.br/NFeDistribuicaoDFe/NFeDistribuicaoDFe.asmx";
+export const DISTRIBUTION_HOMOLOGATION_URL = "https://hom1.nfe.fazenda.gov.br/NFeDistribuicaoDFe/NFeDistribuicaoDFe.asmx";
+export const distributionUrl = (environment: "homologacao" | "producao") => environment === "producao" ? DISTRIBUTION_URL : DISTRIBUTION_HOMOLOGATION_URL;
 const MAX_DOCUMENT_BYTES = 2_097_152;
 const MAX_BATCH_DOCUMENTS = 50;
 
 export type DistributedDocument = { nsu: string; schema: string; kind: "summary" | "event" | "full"; xml: string };
 export type DistributionResult = { code: string; reason: string; lastNsu: string; maxNsu: string; documents: DistributedDocument[] };
+export type NfeSummary = { accessKey: string; issuerDocument: string; issuerName: string; issuedAt: Date; totalInvoice: number; situation: string };
+export type DistributedNfeEvent = { accessKey: string; eventType: string; sequence: number; statusCode: string; protocol: string | null; registeredAt: Date | null };
 
 const pick = (xml: string, name: string) => new RegExp(`<(?:\\w+:)?${name}>([^<]*)</(?:\\w+:)?${name}>`).exec(xml)?.[1]?.trim() ?? "";
 const xmlText = (value: string) => value.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;|&#39;/g, "'").replace(/&amp;/g, "&");
@@ -17,6 +23,41 @@ const paddedNsu = (value: string) => {
   if (!/^\d{1,15}$/.test(value)) throw new Error("NSU inválido.");
   return value.padStart(15, "0");
 };
+
+export function parseNfeSummary(xml: string): NfeSummary {
+  if (typeof xml !== "string" || Buffer.byteLength(xml, "utf8") > MAX_DOCUMENT_BYTES || /<!\s*(?:DOCTYPE|ENTITY)\b/i.test(xml)) throw new SefazError("Resumo de NF-e inválido.");
+  const errors: string[] = [];
+  const document = new DOMParser({ onError: (level, message) => { if (level !== "warning") errors.push(message); } }).parseFromString(xml, "application/xml");
+  const root = document.documentElement;
+  const value = (name: string) => root?.getElementsByTagNameNS("*", name).item(0)?.textContent?.trim() ?? "";
+  const accessKey = value("chNFe");
+  const issuerDocument = value("CNPJ").toUpperCase();
+  const issuerName = value("xNome");
+  const issuedAt = new Date(value("dhEmi"));
+  const totalInvoice = Number(value("vNF"));
+  const situation = value("cSitNFe");
+  if (errors.length || root?.localName !== "resNFe" || !ACCESS_KEY_PATTERN.test(accessKey) || !/^[0-9A-Z]{14}$/.test(issuerDocument) || !issuerName || Number.isNaN(issuedAt.valueOf()) || !Number.isFinite(totalInvoice) || totalInvoice < 0 || !/^\d+$/.test(situation)) throw new SefazError("Resumo de NF-e inválido.");
+  return { accessKey, issuerDocument, issuerName, issuedAt, totalInvoice, situation };
+}
+
+export function parseDistributedNfeEvent(xml: string): DistributedNfeEvent {
+  if (typeof xml !== "string" || Buffer.byteLength(xml, "utf8") > MAX_DOCUMENT_BYTES || /<!\s*(?:DOCTYPE|ENTITY)\b/i.test(xml)) throw new SefazError("Evento de NF-e inválido.");
+  const errors: string[] = [];
+  const document = new DOMParser({ onError: (level, message) => { if (level !== "warning") errors.push(message); } }).parseFromString(xml, "application/xml");
+  const root = document.documentElement;
+  const receipts = root?.getElementsByTagNameNS("*", "retEvento");
+  const info = receipts?.item(0)?.getElementsByTagNameNS("*", "infEvento").item(0);
+  const value = (name: string) => info?.getElementsByTagNameNS("*", name).item(0)?.textContent?.trim() ?? "";
+  const accessKey = value("chNFe");
+  const eventType = value("tpEvento");
+  const sequence = Number(value("nSeqEvento"));
+  const statusCode = value("cStat");
+  const protocol = value("nProt") || null;
+  const registeredText = value("dhRegEvento");
+  const registeredAt = registeredText ? new Date(registeredText) : null;
+  if (errors.length || root?.localName !== "procEventoNFe" || !ACCESS_KEY_PATTERN.test(accessKey) || !/^\d{6}$/.test(eventType) || !Number.isSafeInteger(sequence) || sequence < 1 || !/^\d{3}$/.test(statusCode) || (registeredAt && Number.isNaN(registeredAt.valueOf()))) throw new SefazError("Evento de NF-e inválido.");
+  return { accessKey, eventType, sequence, statusCode, protocol, registeredAt };
+}
 
 /** SOAP 1.2 request for the next sequential DF-e batch. */
 export function distributionEnvelope(cnpj: string, lastNsu: string, environment: "homologacao" | "producao"): string {

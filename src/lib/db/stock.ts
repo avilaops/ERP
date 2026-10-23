@@ -72,7 +72,7 @@ export async function countStock(productId: number, counted: number, note: strin
   if (text.length > 200) throw new StockError("Observação: até 200 letras.");
   const { rows } = await conn.query(
     `WITH product AS (SELECT id FROM products WHERE id = $1 FOR UPDATE),
-          balance AS (SELECT $2::integer - COALESCE((SELECT sum(quantity) FROM stock_moves WHERE product_id = $1), 0)::integer AS difference FROM product),
+          balance AS (SELECT $2::numeric(15,4) - COALESCE((SELECT sum(quantity) FROM stock_moves WHERE product_id = $1), 0) AS difference FROM product),
           written AS (INSERT INTO stock_moves (product_id, kind, quantity, note, created_by)
                       SELECT $1, 'ajuste', difference, $3, $4 FROM balance WHERE difference <> 0 RETURNING quantity)
      SELECT (SELECT count(*) FROM product) AS found, COALESCE((SELECT quantity FROM written), 0) AS difference`,

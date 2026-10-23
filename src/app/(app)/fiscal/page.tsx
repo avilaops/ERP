@@ -7,12 +7,12 @@ import { allows, menuItem, seesAllOrders } from "@/lib/auth/permissions";
 import { loadFiscalSettings } from "@/lib/db/fiscal";
 import { listFiscalOverview } from "@/lib/db/fiscal-overview";
 import { listReceivedNfes } from "@/lib/db/received-nfes";
-import { distributionStanding } from "@/lib/db/nfe-distribution";
+import { distributionStanding, listNfeSummaries } from "@/lib/db/nfe-distribution";
 import type { FiscalOrderOverview } from "@/lib/db/fiscal-overview";
 import { tenantDb } from "@/lib/db/pool";
-import { showDateTime } from "@/lib/format";
+import { showDateTime, showMoney } from "@/lib/format";
 import { rowsPerPage } from "@/lib/rows";
-import { importReceivedNfeAction, queryReceivedNfesAction } from "./actions";
+import { importReceivedNfeAction, queryReceivedNfesAction, queueSummaryManifestationAction } from "./actions";
 
 export const metadata = { title: `${menuItem("fiscal").label} · ERP` };
 export const dynamic = "force-dynamic";
@@ -47,7 +47,7 @@ function orderDetail(order: FiscalOrderOverview): string {
 export default async function FiscalPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const session = await requirePermission("fiscal");
   const conn = tenantDb(session.tenant.slug);
-  const [settings, query, store, received, distribution] = await Promise.all([loadFiscalSettings(conn), searchParams, cookies(), listReceivedNfes(conn), distributionStanding(conn)]);
+  const [settings, query, store, received, summaries, distribution] = await Promise.all([loadFiscalSettings(conn), searchParams, cookies(), listReceivedNfes(conn), listNfeSummaries(conn), distributionStanding(conn)]);
   const overview = await listFiscalOverview({ sellerEmail: seesAllOrders(session) ? null : session.email, environment: settings.environment }, conn);
   const asked = first(query.ver);
   const tab = asked === "notas" || asked === "inutilizacoes" || asked === "recebidas" ? asked : "pendencias";
@@ -99,6 +99,14 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
             </form>
             <form action={queryReceivedNfesAction} className="mt-2"><button className={SECONDARY} type="submit">Consultar próximo lote na SEFAZ</button></form>
           </div>
+          {summaries.length > 0 && <div className="border-b border-slate-200 p-4">
+            <h3 className="text-sm font-semibold">Aguardando XML completo</h3>
+            <p className="mt-1 text-xs text-slate-600">A SEFAZ entregou somente o resumo. A ciência é uma manifestação explícita e não confirma a operação comercial.</p>
+            <ul className="mt-3 divide-y divide-slate-200">{summaries.map((summary) => <li key={summary.nsu} className="grid gap-2 py-3 first:pt-0 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
+              <div className="min-w-0"><p className="font-semibold">{summary.issuerName}</p><p className="text-xs text-slate-600">{showDateTime(summary.issuedAt)} · {showMoney(summary.totalInvoice)}</p><p className="mt-1 break-all text-xs text-slate-600">Chave {summary.accessKey} · NSU {summary.nsu}</p></div>
+              <form action={queueSummaryManifestationAction}><input type="hidden" name="nsu" value={summary.nsu} /><input type="hidden" name="confirm" value="yes" /><button className={SECONDARY} type="submit">Manifestar ciência</button></form>
+            </li>)}</ul>
+          </div>}
           {received.length === 0 ? <p className="p-4 text-sm text-slate-600">Nenhuma NF-e completa importada.</p> : (
             <ul id="fiscal-list" className="divide-y divide-slate-200">{receivedSlice.rows.map((note) => <li data-row key={note.id} className="p-4">
               <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-semibold">{note.issuerName}</p><p className="text-xs text-slate-600">NF-e {note.number} · série {note.series} · {note.itemCount} item(ns) · {showDateTime(note.issuedAt)}</p></div><Pill tone={note.purchaseId ? "good" : "warn"}>{note.purchaseId ? "Compra vinculada" : "Conferir"}</Pill></div>

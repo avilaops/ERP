@@ -10,6 +10,8 @@ import type { RecipientManifestKind } from "@/lib/fiscal/recipient-manifest";
 import { signEventXml, signingKeyOf } from "@/lib/fiscal/sign";
 
 export const RECIPIENT_EVENT_URL = "https://www.nfe.fazenda.gov.br/NFeRecepcaoEvento4/NFeRecepcaoEvento4.asmx";
+export const RECIPIENT_EVENT_HOMOLOGATION_URL = "https://hom1.nfe.fazenda.gov.br/NFeRecepcaoEvento4/NFeRecepcaoEvento4.asmx";
+export const recipientEventUrl = (environment: "homologacao" | "producao") => environment === "producao" ? RECIPIENT_EVENT_URL : RECIPIENT_EVENT_HOMOLOGATION_URL;
 export const RECIPIENT_EVENT_ACTION = "http://www.portalfiscal.inf.br/nfe/wsdl/NFeRecepcaoEvento4/nfeRecepcaoEvento";
 
 export type RecipientManifestation = { id: number; kind: RecipientManifestKind; reason: string | null; status: "pending" | "processing" | "registered" | "manual_review"; protocol: string | null; statusCode: string | null; statusReason: string | null; lastError: string | null; createdAt: Date; registeredAt: Date | null };
@@ -24,13 +26,28 @@ export async function queueRecipientManifestation(nfeId: number, kind: Recipient
   const clean = reason?.replace(/\s+/g, " ").trim() || null;
   if (kind === "nao_realizada" && (!clean || clean.length < 15 || clean.length > 255)) throw new Error("Explique a operação não realizada com 15 a 255 letras.");
   const { rows } = await conn.query(
-    `INSERT INTO fiscal_recipient_manifestations (nfe_id,kind,reason,created_by)
-     SELECT id,$2,$3,$4 FROM fiscal_received_nfes WHERE id=$1
-     ON CONFLICT (nfe_id,kind) DO UPDATE SET reason=EXCLUDED.reason
+    `INSERT INTO fiscal_recipient_manifestations (nfe_id,access_key,kind,reason,created_by)
+     SELECT id,access_key,$2,$3,$4 FROM fiscal_received_nfes WHERE id=$1
+     ON CONFLICT (access_key,kind) DO UPDATE SET reason=EXCLUDED.reason
        WHERE fiscal_recipient_manifestations.status='pending' AND fiscal_recipient_manifestations.reason IS NOT DISTINCT FROM EXCLUDED.reason
      RETURNING id`, [nfeId, kind, clean, who],
   );
   if (!rows[0]) throw new Error("Esta manifestação já foi solicitada ou a NF-e não existe.");
+  return Number(rows[0].id);
+}
+
+export async function queueSummaryManifestation(nsu: string, kind: RecipientManifestKind, reason: string | null, who: string, conn: Queryable): Promise<number> {
+  if (!/^\d{15}$/.test(nsu) || !who.trim()) throw new Error("Resumo ou responsável inválido.");
+  const clean = reason?.replace(/\s+/g, " ").trim() || null;
+  if (kind === "nao_realizada" && (!clean || clean.length < 15 || clean.length > 255)) throw new Error("Explique a operação não realizada com 15 a 255 letras.");
+  const { rows } = await conn.query(
+    `INSERT INTO fiscal_recipient_manifestations (summary_nsu,access_key,kind,reason,created_by)
+     SELECT nsu,access_key,$2,$3,$4 FROM fiscal_received_nfe_summaries WHERE nsu=$1 AND full_nfe_id IS NULL
+     ON CONFLICT (access_key,kind) DO UPDATE SET reason=EXCLUDED.reason
+       WHERE fiscal_recipient_manifestations.status='pending' AND fiscal_recipient_manifestations.reason IS NOT DISTINCT FROM EXCLUDED.reason
+     RETURNING id`, [nsu, kind, clean, who],
+  );
+  if (!rows[0]) throw new Error("Esta manifestação já foi solicitada ou o resumo não existe mais.");
   return Number(rows[0].id);
 }
 
@@ -41,10 +58,12 @@ export async function runOneRecipientManifestation(now: Date, key: () => Buffer,
   const job = await withQueryableConnection(conn, async (held) => {
     await held.query("BEGIN");
     try {
-      const { rows } = await held.query(`SELECT m.id,m.nfe_id,m.kind,m.reason,n.access_key FROM fiscal_recipient_manifestations m
-        JOIN fiscal_received_nfes n ON n.id=m.nfe_id WHERE m.status='pending' AND m.available_at <= $1 ORDER BY m.id FOR UPDATE SKIP LOCKED LIMIT 1`, [now]);
+      await held.query(`UPDATE fiscal_recipient_manifestations SET status='manual_review',last_error='Envio interrompido; confira a situação na SEFAZ antes de repetir.'
+        WHERE status='processing' AND processing_started_at < $1::timestamptz - interval '15 minutes'`, [now]);
+      const { rows } = await held.query(`SELECT m.id,m.nfe_id,m.kind,m.reason,m.access_key FROM fiscal_recipient_manifestations m
+        WHERE m.status='pending' AND m.available_at <= $1 ORDER BY m.id FOR UPDATE SKIP LOCKED LIMIT 1`, [now]);
       if (!rows[0]) { await held.query("COMMIT"); return null; }
-      await held.query("UPDATE fiscal_recipient_manifestations SET status='processing',attempts=attempts+1,last_error=NULL WHERE id=$1", [rows[0].id]);
+      await held.query("UPDATE fiscal_recipient_manifestations SET status='processing',processing_started_at=$2,attempts=attempts+1,last_error=NULL WHERE id=$1", [rows[0].id, now]);
       await held.query("COMMIT"); return rows[0];
     } catch (error) { await held.query("ROLLBACK"); throw error; }
   });
@@ -56,7 +75,7 @@ export async function runOneRecipientManifestation(now: Date, key: () => Buffer,
     const event = recipientManifestXml({ accessKey: String(job.access_key), cnpj: settings.cnpj, environment: settings.environment, at: saoPauloTime(now), kind: job.kind as RecipientManifestKind, reason: job.reason === null ? undefined : String(job.reason) });
     const signed = signEventXml(event.xml, signingKeyOf(certificate.pfx, certificate.password));
     await assertFiscalXml(signed, "evento");
-    const response = await send(RECIPIENT_EVENT_URL, RECIPIENT_EVENT_ACTION, eventEnvelope(signed, String(job.id)), { pfx: certificate.pfx, passphrase: certificate.password });
+    const response = await send(recipientEventUrl(settings.environment), RECIPIENT_EVENT_ACTION, eventEnvelope(signed, String(job.id)), { pfx: certificate.pfx, passphrase: certificate.password });
     const result = parseEvent(response, String(job.access_key));
     if (!result.registered) throw new Error(`A SEFAZ não registrou (${result.code}): ${result.reason}`);
     const complete = processedEventXml(signed, response);

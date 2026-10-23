@@ -12,7 +12,7 @@ import { createSupplier, SupplierError } from "@/lib/db/suppliers";
 import { runNfeDistribution } from "@/lib/db/run-nfe-distribution";
 import { vaultKey } from "@/lib/fiscal/certificate";
 import { sendToSefaz } from "@/lib/fiscal/channel";
-import { queueRecipientManifestation } from "@/lib/db/recipient-manifestations";
+import { queueRecipientManifestation, queueSummaryManifestation } from "@/lib/db/recipient-manifestations";
 import type { RecipientManifestKind } from "@/lib/fiscal/recipient-manifest";
 
 export async function queryReceivedNfesAction(): Promise<void> {
@@ -39,6 +39,7 @@ export async function importReceivedNfeAction(formData: FormData): Promise<void>
     const settings = await loadFiscalSettings(conn);
     const ownDocument = (settings.cnpj ?? "").replace(/[^0-9A-Z]/gi, "").toUpperCase();
     if (!ownDocument || note.recipientDocument !== ownDocument) throw new ReceivedNfeError("A NF-e não foi emitida para o CNPJ desta empresa.");
+    if (note.environment !== settings.environment) throw new ReceivedNfeError("A NF-e pertence a outro ambiente fiscal.");
     const result = await importReceivedNfe(note, session.email, conn);
     notice = result.created ? "NF-e completa importada." : "Esta NF-e já estava importada.";
   } catch (error) {
@@ -115,5 +116,17 @@ export async function queueRecipientManifestationAction(formData: FormData): Pro
     redirect(detail(nfeId, error instanceof Error ? error.message : "Não foi possível enfileirar a manifestação."));
   }
   redirect(detail(nfeId, "Manifestação enfileirada para envio à SEFAZ.", "aviso"));
+}
+
+export async function queueSummaryManifestationAction(formData: FormData): Promise<void> {
+  const session = await requirePermission("fiscal");
+  const nsu = formData.get("nsu");
+  if (typeof nsu !== "string" || !/^\d{15}$/.test(nsu) || formData.get("confirm") !== "yes") redirect("/fiscal?ver=recebidas&erro=Confirme+a+ciência+da+operação.");
+  try {
+    await queueSummaryManifestation(nsu, "ciencia", null, session.email, tenantDb(session.tenant.slug));
+  } catch (error) {
+    redirect(`/fiscal?ver=recebidas&erro=${encodeURIComponent(error instanceof Error ? error.message : "Não foi possível enfileirar a ciência.")}`);
+  }
+  redirect("/fiscal?ver=recebidas&aviso=Ciência+enfileirada.+O+XML+completo+será+buscado+nas+próximas+consultas.");
 }
 

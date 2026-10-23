@@ -28,15 +28,16 @@ before(async () => { if (!SKIP_WITHOUT_DB) db = await openTestDb("received_nfe")
 after(async () => { if (!SKIP_WITHOUT_DB) await db.close(); });
 const xml = (overrides = "") => `<?xml version="1.0" encoding="UTF-8"?>
 <nfeProc xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00"><NFe><infNFe Id="NFe${KEY}" versao="4.00">
-<ide><cUF>35</cUF><serie>1</serie><nNF>123</nNF><dhEmi>2026-10-18T12:00:00-03:00</dhEmi></ide>
+<ide><cUF>35</cUF><tpAmb>1</tpAmb><serie>1</serie><nNF>123</nNF><dhEmi>2026-10-18T12:00:00-03:00</dhEmi></ide>
 <emit><CNPJ>60677380000106</CNPJ><xNome>Fornecedor Teste Ltda</xNome></emit><dest><CNPJ>60067738000106</CNPJ><xNome>Comprador Teste</xNome></dest>
 <det nItem="1"><prod><cProd>ABC-1</cProd><cEAN>SEM GTIN</cEAN><xProd>Produto completo</xProd><NCM>95069100</NCM><CEST>2109200</CEST><CFOP>5102</CFOP><uCom>UN</uCom><qCom>2.0000</qCom><vUnCom>50.0000000000</vUnCom><vProd>100.00</vProd><vFrete>10.00</vFrete><vDesc>5.00</vDesc></prod></det>
 <total><ICMSTot><vProd>100.00</vProd><vFrete>10.00</vFrete><vDesc>5.00</vDesc><vNF>105.00</vNF></ICMSTot></total>${overrides}</infNFe><Signature xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo/></Signature></NFe>
-<protNFe versao="4.00"><infProt><chNFe>${KEY}</chNFe><nProt>135260000000123</nProt><cStat>100</cStat><xMotivo>Autorizado o uso da NF-e</xMotivo></infProt></protNFe></nfeProc>`;
+<protNFe versao="4.00"><infProt><tpAmb>1</tpAmb><chNFe>${KEY}</chNFe><nProt>135260000000123</nProt><cStat>100</cStat><xMotivo>Autorizado o uso da NF-e</xMotivo></infProt></protNFe></nfeProc>`;
 
 test("extrai o XML completo autorizado com todos os campos operacionais", () => {
   const note = parseReceivedNfe(xml());
   assert.equal(note.accessKey, KEY);
+  assert.equal(note.environment, "producao");
   assert.equal(note.issuerDocument, "60677380000106");
   assert.equal(note.totalInvoice, 105);
   assert.deepEqual(note.items[0], { lineNumber: 1, supplierCode: "ABC-1", ean: "SEM GTIN", description: "Produto completo", ncm: "95069100", cest: "2109200", cfop: "5102", commercialUnit: "UN", quantity: 2, unitValue: 50, productValue: 100, freightValue: 10, insuranceValue: 0, discountValue: 5, otherValue: 0, icmsValue: 0, icmsStValue: 0, ipiValue: 0, importTaxValue: 0, pisValue: 0, cofinsValue: 0 });
@@ -49,9 +50,17 @@ test("recusa resumo, DTD, documento sem assinatura, chave divergente e nota não
     `<!DOCTYPE nfeProc [<!ENTITY x SYSTEM "file:///etc/passwd">]>${xml()}`,
     xml().replace(/<Signature[\s\S]*?<\/Signature>/, ""),
     xml().replace(`<chNFe>${KEY}</chNFe>`, `<chNFe>${"1".repeat(44)}</chNFe>`),
+    xml().replace("<tpAmb>1</tpAmb><chNFe>", "<tpAmb>2</tpAmb><chNFe>"),
     xml().replace("<cStat>100</cStat>", "<cStat>110</cStat>"),
   ];
   for (const sample of cases) assert.throws(() => parseReceivedNfe(sample), ReceivedNfeError);
+});
+
+test("aceita chave e emitente com CNPJ alfanumérico", () => {
+  const alphaKey = `352610${"AB12CD34EF56"}${"55001000000123100000123000"}`;
+  assert.equal(alphaKey.length, 44);
+  const note = parseReceivedNfe(xml().replaceAll(KEY, alphaKey).replaceAll("60677380000106", "AB12CD34EF5600"));
+  assert.deepEqual([note.accessKey, note.issuerDocument], [alphaKey, "AB12CD34EF5600"]);
 });
 
 test("o mesmo XML completo gera um DANFE em PDF com os itens recebidos", async () => {
@@ -116,6 +125,24 @@ test("banco preserva o XML e os itens uma vez, sem criar fornecedor, compra, cus
 test("banco bloqueia a mesma chave com conteúdo diferente", { skip: SKIP_WITHOUT_DB }, async () => {
   const changed = { ...parseReceivedNfe(xml()), xmlSha256: "f".repeat(64) };
   await assert.rejects(() => importReceivedNfe(changed, "diretoria@teste.local", db.pool), /conteúdo diferente/);
+});
+
+test("importações concorrentes da mesma chave convergem para uma única NF-e", { skip: SKIP_WITHOUT_DB }, async () => {
+  const note = parseReceivedNfe(xml().replaceAll(KEY, "35261060677380000106550010000001231000007777"));
+  const results = await Promise.all([
+    importReceivedNfe(note, "diretoria@teste.local", db.pool),
+    importReceivedNfe(note, "diretoria@teste.local", db.pool),
+  ]);
+  assert.equal(new Set(results.map((result) => result.id)).size, 1);
+  assert.deepEqual(results.map((result) => result.created).sort(), [false, true]);
+});
+
+test("NF-e cancelada não aceita vínculo de fornecedor", { skip: SKIP_WITHOUT_DB }, async () => {
+  const canceledKey = "35261070677380000106550010000001231000008888";
+  const imported = await importReceivedNfe(parseReceivedNfe(xml().replaceAll(KEY, canceledKey).replaceAll("60677380000106", "70677380000106")), "diretoria@teste.local", db.pool);
+  const supplier = Number((await db.pool.query("INSERT INTO suppliers (kind, document, name, updated_by) VALUES ('PJ','70677380000106','Fornecedor cancelado','teste') RETURNING id")).rows[0].id);
+  await db.pool.query("UPDATE fiscal_received_nfes SET canceled_at = now() WHERE id = $1", [imported.id]);
+  await assert.rejects(() => linkReceivedNfeSupplier(imported.id, supplier, "diretoria@teste.local", db.pool), /cancelada/);
 });
 
 test("conferência explícita cria fornecedor vinculado, compra e custo; estoque só muda no recebimento", { skip: SKIP_WITHOUT_DB }, async () => {

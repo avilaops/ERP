@@ -3,12 +3,20 @@ import type { Queryable } from "@/lib/db/pool";
 import { withQueryableConnection } from "@/lib/db/pool";
 import { importReceivedNfe } from "@/lib/db/received-nfes";
 import type { DistributedDocument, DistributionResult } from "@/lib/fiscal/distribution";
+import { parseDistributedNfeEvent, parseNfeSummary } from "@/lib/fiscal/distribution";
 import { validateReceivedNfe } from "@/lib/fiscal/received-nfe";
 
 export type DistributionStanding = {
   lastNsu: string; maxNsu: string; nextQueryAt: Date; lastCode: string | null; lastReason: string | null; lastQueriedAt: Date | null;
   pending: number; summaries: number; events: number; full: number;
 };
+
+export type NfeSummaryRow = { nsu: string; accessKey: string; issuerDocument: string; issuerName: string; issuedAt: Date; totalInvoice: number; situation: string; fullNfeId: number | null };
+
+export async function listNfeSummaries(conn: Queryable): Promise<NfeSummaryRow[]> {
+  const { rows } = await conn.query("SELECT nsu,access_key,issuer_document,issuer_name,issued_at,total_invoice,situation,full_nfe_id FROM fiscal_received_nfe_summaries WHERE full_nfe_id IS NULL ORDER BY issued_at DESC,nsu DESC");
+  return rows.map((row) => ({ nsu: String(row.nsu), accessKey: String(row.access_key), issuerDocument: String(row.issuer_document), issuerName: String(row.issuer_name), issuedAt: row.issued_at as Date, totalInvoice: Number(row.total_invoice), situation: String(row.situation), fullNfeId: row.full_nfe_id === null ? null : Number(row.full_nfe_id) }));
+}
 
 export async function distributionStanding(conn: Queryable): Promise<DistributionStanding> {
   const [state, counts] = await Promise.all([
@@ -61,14 +69,41 @@ export async function processDistributedDocuments(recipientDocument: string, con
   );
   let imported = 0; let failed = 0;
   for (const row of rows) {
-    if (row.kind !== "full") {
-      await conn.query("UPDATE fiscal_distributed_documents SET processed_at=now(),process_error=NULL WHERE nsu=$1", [row.nsu]);
+    if (row.kind === "summary") {
+      try {
+        const summary = parseNfeSummary(String(row.xml));
+        await conn.query(`INSERT INTO fiscal_received_nfe_summaries (nsu,access_key,issuer_document,issuer_name,issued_at,total_invoice,situation)
+          VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (nsu) DO UPDATE SET situation=EXCLUDED.situation WHERE fiscal_received_nfe_summaries.access_key=EXCLUDED.access_key`,
+        [row.nsu, summary.accessKey, summary.issuerDocument, summary.issuerName, summary.issuedAt, summary.totalInvoice, summary.situation]);
+        await conn.query("UPDATE fiscal_distributed_documents SET processed_at=now(),process_error=NULL WHERE nsu=$1", [row.nsu]);
+      } catch (error) {
+        await conn.query("UPDATE fiscal_distributed_documents SET processed_at=now(),process_error=$2 WHERE nsu=$1", [row.nsu, error instanceof Error ? error.message.slice(0, 1000) : "Resumo inválido."]);
+        failed += 1;
+      }
+      continue;
+    }
+    if (row.kind === "event") {
+      try {
+        const event = parseDistributedNfeEvent(String(row.xml));
+        await conn.query(`INSERT INTO fiscal_received_nfe_events (nsu,access_key,event_type,sequence,status_code,protocol,registered_at,xml)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT (nsu) DO NOTHING`, [row.nsu, event.accessKey, event.eventType, event.sequence, event.statusCode, event.protocol, event.registeredAt, row.xml]);
+        if (event.eventType === "110111" && ["135", "136", "155"].includes(event.statusCode)) {
+          await conn.query("UPDATE fiscal_received_nfes SET canceled_at=COALESCE(canceled_at,$2),cancellation_protocol=COALESCE(cancellation_protocol,$3) WHERE access_key=$1", [event.accessKey, event.registeredAt, event.protocol]);
+        }
+        await conn.query("UPDATE fiscal_distributed_documents SET processed_at=now(),process_error=NULL WHERE nsu=$1", [row.nsu]);
+      } catch (error) {
+        await conn.query("UPDATE fiscal_distributed_documents SET processed_at=now(),process_error=$2 WHERE nsu=$1", [row.nsu, error instanceof Error ? error.message.slice(0, 1000) : "Evento inválido."]);
+        failed += 1;
+      }
       continue;
     }
     try {
       const note = await validateReceivedNfe(String(row.xml));
       if (note.recipientDocument !== recipientDocument) throw new Error("O destinatário do XML não é a empresa desta consulta.");
       const saved = await importReceivedNfe(note, "distribuição SEFAZ", conn);
+      await conn.query("UPDATE fiscal_received_nfe_summaries SET full_nfe_id=$2 WHERE access_key=$1 AND full_nfe_id IS NULL", [note.accessKey, saved.id]);
+      await conn.query(`UPDATE fiscal_received_nfes n SET canceled_at=e.registered_at,cancellation_protocol=e.protocol
+        FROM fiscal_received_nfe_events e WHERE n.id=$1 AND e.access_key=n.access_key AND e.event_type='110111' AND e.status_code IN ('135','136','155') AND n.canceled_at IS NULL`, [saved.id]);
       await conn.query("UPDATE fiscal_distributed_documents SET processed_at=now(),process_error=NULL,nfe_id=$2 WHERE nsu=$1", [row.nsu, saved.id]);
       imported += saved.created ? 1 : 0;
     } catch (error) {

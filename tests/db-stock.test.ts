@@ -71,6 +71,8 @@ test("compra e estoque preservam quantidades fracionadas em até quatro casas", 
   assert.equal((await getPurchase(order, db.pool))?.items[0].quantity, 12.3456);
   await receivePurchase(order, "2026-10-18", WHO, db.pool);
   assert.equal((await of(material)).physical, 12.3456);
+  assert.deepEqual(await countStock(material, 10.5, "Contagem fracionada", WHO, db.pool), { difference: -1.8456 });
+  assert.equal((await of(material)).physical, 10.5);
 });
 
 test("estoque: a compra a caminho aparece como a chegar; recebida, entra; desfeita, sai", { skip }, async () => {

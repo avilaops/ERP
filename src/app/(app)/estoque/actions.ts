@@ -7,6 +7,7 @@ import { tenantDb } from "@/lib/db/pool";
 import { countStock, shipOrder, StockError, unshipOrder } from "@/lib/db/stock";
 import type { ActionState } from "@/lib/order-form";
 import { ORDER_NUMBER } from "@/lib/order-number";
+import { parseStockCount } from "@/lib/stock-count";
 
 const HERE = menuItem("estoque").href;
 
@@ -26,10 +27,11 @@ export async function countStockAction(_previous: ActionState, formData: FormDat
   const session = await requirePermission("estoque");
   const id = Number(field(formData, "id"));
   const typed = field(formData, "counted").trim();
-  if (!/^\d{1,7}$/.test(typed)) return { error: "Contagem: informe um número inteiro, zero ou maior." };
+  const counted = parseStockCount(typed);
+  if (counted === null) return { error: "Contagem: informe zero ou mais, com até quatro casas decimais." };
   let difference: number;
   try {
-    ({ difference } = await countStock(id, Number(typed.replace(",", ".")), field(formData, "note"), session.email, tenantDb(session.tenant.slug)));
+    ({ difference } = await countStock(id, counted, field(formData, "note"), session.email, tenantDb(session.tenant.slug)));
   } catch (error) {
     return problem(error);
   }

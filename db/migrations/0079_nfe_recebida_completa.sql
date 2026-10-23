@@ -1,12 +1,12 @@
 -- Documento fiscal de entrada preservado como recebido. Nada desta tabela movimenta estoque.
 CREATE TABLE fiscal_received_nfes (
     id                 bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    access_key         text NOT NULL CHECK (access_key ~ '^[0-9]{44}$'),
+    access_key         text NOT NULL CHECK (access_key ~ '^[0-9]{6}[0-9A-Z]{12}[0-9]{26}$'),
     xml_sha256         text NOT NULL CHECK (xml_sha256 ~ '^[0-9a-f]{64}$'),
     xml                text NOT NULL CHECK (octet_length(xml) BETWEEN 1 AND 2097152),
     protocol           text NOT NULL CHECK (btrim(protocol) <> ''),
     status_code        text NOT NULL,
-    issuer_document    text NOT NULL CHECK (issuer_document ~ '^[0-9]{14}$'),
+    issuer_document    text NOT NULL CHECK (issuer_document ~ '^[0-9A-Z]{14}$'),
     issuer_name        text NOT NULL CHECK (btrim(issuer_name) <> ''),
     recipient_document text NOT NULL CHECK (recipient_document ~ '^[0-9A-Z]{11,14}$'),
     number             bigint NOT NULL CHECK (number > 0),
@@ -28,6 +28,8 @@ CREATE TABLE fiscal_received_nfes (
     supplier_linked_at timestamptz,
     supplier_linked_by text,
     purchase_id        integer REFERENCES purchases (id),
+    canceled_at        timestamptz,
+    cancellation_protocol text,
     imported_at        timestamptz NOT NULL DEFAULT now(),
     imported_by        text NOT NULL CHECK (btrim(imported_by) <> ''),
     UNIQUE (access_key),

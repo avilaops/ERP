@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { DOMParser, XMLSerializer } from "@xmldom/xmldom";
 import { SignedXml } from "xml-crypto";
 import { assertFiscalXml } from "@/lib/fiscal/local-layout";
+import { ACCESS_KEY_PATTERN } from "@/lib/fiscal/nfe";
 
 export class ReceivedNfeError extends Error {}
 
@@ -12,6 +13,7 @@ export type ReceivedNfeItem = {
 };
 
 export type ReceivedNfe = {
+  environment: "homologacao" | "producao";
   accessKey: string; xmlSha256: string; xml: string; protocol: string; statusCode: string; issuerDocument: string; issuerName: string;
   recipientDocument: string; number: number; series: number; issuedAt: Date; totalProducts: number; totalInvoice: number; totalFreight: number; totalDiscount: number;
   totalInsurance: number; totalOther: number; totalIcms: number; totalIcmsSt: number; totalIpi: number; totalImportTax: number; totalPis: number; totalCofins: number;
@@ -66,7 +68,7 @@ export function parseReceivedNfe(xml: string): ReceivedNfe {
   const statusCode = required(infoProtocol, "cStat");
   if (statusCode !== "100") throw new ReceivedNfeError(`A NF-e não está autorizada para uso (cStat ${statusCode}).`);
   const accessKey = (info.getAttribute("Id") ?? "").replace(/^NFe/, "");
-  if (!/^\d{44}$/.test(accessKey) || required(infoProtocol, "chNFe") !== accessKey) throw new ReceivedNfeError("XML completo inválido: chave de acesso divergente.");
+  if (!ACCESS_KEY_PATTERN.test(accessKey) || required(infoProtocol, "chNFe") !== accessKey) throw new ReceivedNfeError("XML completo inválido: chave de acesso divergente.");
   const ide = child(info, "ide"); const issuer = child(info, "emit"); const recipient = child(info, "dest");
   const totalGroup = child(info, "total");
   const total = totalGroup ? child(totalGroup, "ICMSTot") : null;
@@ -83,7 +85,11 @@ export function parseReceivedNfe(xml: string): ReceivedNfe {
   if (!items.length) throw new ReceivedNfeError("XML completo inválido: a NF-e não possui itens.");
   const issuedAt = new Date(required(ide, "dhEmi"));
   if (Number.isNaN(issuedAt.valueOf())) throw new ReceivedNfeError("XML completo inválido: data de emissão.");
+  const ideEnvironment = required(ide, "tpAmb");
+  const protocolEnvironment = required(infoProtocol, "tpAmb");
+  if (!(["1", "2"].includes(ideEnvironment)) || protocolEnvironment !== ideEnvironment) throw new ReceivedNfeError("XML completo inválido: ambiente fiscal divergente.");
   return {
+    environment: ideEnvironment === "1" ? "producao" : "homologacao",
     accessKey, xmlSha256: createHash("sha256").update(xml, "utf8").digest("hex"), xml, protocol: required(infoProtocol, "nProt"), statusCode,
     issuerDocument: required(issuer, "CNPJ"), issuerName: required(issuer, "xNome"), recipientDocument: optional(recipient, "CNPJ") ?? required(recipient, "CPF"),
     number: Number(required(ide, "nNF")), series: Number(required(ide, "serie")), issuedAt,

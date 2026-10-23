@@ -18,6 +18,7 @@ export async function importReceivedNfe(note: ReceivedNfe, who: string, conn: Qu
   return withQueryableConnection(conn, async (held) => {
     await held.query("BEGIN");
     try {
+      await held.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [note.accessKey]);
       const existing = await held.query<{ id: string; xml_sha256: string }>("SELECT id, xml_sha256 FROM fiscal_received_nfes WHERE access_key = $1 FOR UPDATE", [note.accessKey]);
       if (existing.rows[0]) {
         if (existing.rows[0].xml_sha256 !== note.xmlSha256) throw new Error("Já existe NF-e com esta chave e conteúdo diferente. A importação foi bloqueada para revisão.");
@@ -106,10 +107,10 @@ export async function linkReceivedNfeSupplier(nfeId: number, supplierId: number,
   if (!Number.isSafeInteger(nfeId) || !Number.isSafeInteger(supplierId) || !who.trim()) throw new ReceivedNfeOperationError("NF-e, fornecedor ou responsável inválido.");
   const { rows } = await conn.query(
     `UPDATE fiscal_received_nfes n SET supplier_id = s.id, supplier_linked_at = now(), supplier_linked_by = $3
-       FROM suppliers s WHERE n.id = $1 AND s.id = $2 AND n.purchase_id IS NULL AND s.document = n.issuer_document RETURNING n.id`,
+       FROM suppliers s WHERE n.id = $1 AND s.id = $2 AND n.purchase_id IS NULL AND n.canceled_at IS NULL AND s.document = n.issuer_document RETURNING n.id`,
     [nfeId, supplierId, who],
   );
-  if (!rows[0]) throw new ReceivedNfeOperationError("Escolha o fornecedor com o mesmo CNPJ da NF-e; uma nota já confirmada não pode ser trocada.");
+  if (!rows[0]) throw new ReceivedNfeOperationError("Escolha o fornecedor com o mesmo CNPJ da NF-e; uma nota confirmada ou cancelada não pode ser alterada.");
 }
 
 export async function linkReceivedNfeProduct(nfeId: number, lineNumber: number, productId: number, who: string, conn: Queryable): Promise<void> {
@@ -117,7 +118,7 @@ export async function linkReceivedNfeProduct(nfeId: number, lineNumber: number, 
   const { rows } = await conn.query(
     `UPDATE fiscal_received_nfe_items i SET product_id = p.id, product_linked_at = now(), product_linked_by = $4
        FROM products p, fiscal_received_nfes n
-      WHERE i.nfe_id = $1 AND i.line_number = $2 AND p.id = $3 AND n.id = i.nfe_id AND n.purchase_id IS NULL RETURNING i.line_number`,
+      WHERE i.nfe_id = $1 AND i.line_number = $2 AND p.id = $3 AND n.id = i.nfe_id AND n.purchase_id IS NULL AND n.canceled_at IS NULL RETURNING i.line_number`,
     [nfeId, lineNumber, productId, who],
   );
   if (!rows[0]) throw new ReceivedNfeOperationError("Item ou produto não encontrado; uma nota já confirmada não pode ser alterada.");
@@ -129,9 +130,10 @@ export async function confirmReceivedNfePurchase(nfeId: number, who: string, con
   return withQueryableConnection(conn, async (held) => {
     await held.query("BEGIN");
     try {
-      const locked = await held.query(`SELECT id, supplier_id, purchase_id, number, access_key, issued_at FROM fiscal_received_nfes WHERE id = $1 FOR UPDATE`, [nfeId]);
+      const locked = await held.query(`SELECT id, supplier_id, purchase_id, number, access_key, issued_at, canceled_at FROM fiscal_received_nfes WHERE id = $1 FOR UPDATE`, [nfeId]);
       const note = locked.rows[0];
       if (!note) throw new ReceivedNfeOperationError("NF-e não encontrada.");
+      if (note.canceled_at !== null) throw new ReceivedNfeOperationError("A NF-e está cancelada e não pode gerar compra.");
       if (note.purchase_id !== null) { await held.query("COMMIT"); return { purchaseId: Number(note.purchase_id), created: false }; }
       if (note.supplier_id === null) throw new ReceivedNfeOperationError("Confira e vincule o fornecedor antes de criar a compra.");
       const lines = await held.query(`SELECT line_number, product_id, quantity, product_value, freight_value, insurance_value, discount_value, other_value FROM fiscal_received_nfe_items WHERE nfe_id = $1 ORDER BY line_number FOR UPDATE`, [nfeId]);

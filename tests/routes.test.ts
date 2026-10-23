@@ -43,6 +43,29 @@ test("páginas portadas não são mais marcador; as outras continuam Em constru�
   assert.equal(MENU_ITEMS.filter((item) => !PORTED.includes(item.key)).length, 0);
 });
 
+test("Fiscal mantém resumos acionáveis sem chamá-los de XML completo", () => {
+  const page = source("/fiscal");
+  const actions = readFileSync(`${APP_DIR}fiscal/actions.ts`, "utf8");
+  assert.ok(page.includes("listNfeSummaries(conn)"));
+  assert.ok(page.includes("Manifestar ciência"));
+  assert.ok(page.includes("Aguardando XML completo"));
+  assert.ok(actions.includes("queueSummaryManifestation("));
+  assert.doesNotMatch(page, /summary[^]{0,300}Baixar XML completo/i);
+});
+
+test("detalhe da NF-e separa documento, manifestação e conciliação em tarefas", () => {
+  const detail = source("/fiscal/recebidas/[id]");
+  assert.ok(detail.includes("<ViewTabs"));
+  for (const step of ["documento", "manifestacao", "fornecedor", "produtos", "compra"]) assert.ok(detail.includes(`step === \"${step}\"`), step);
+});
+
+test("API de notas recebidas distingue resumos pendentes de XML completo", () => {
+  const route = readFileSync(fileURLToPath(new URL("../src/app/api/v1/notas-recebidas/route.ts", import.meta.url)), "utf8");
+  assert.ok(route.includes("listNfeSummaries"));
+  assert.ok(route.includes("pendencias"));
+  assert.ok(route.includes("fullNfeId === null"));
+});
+
 /** Every source file under src/, relative to it, with its code. */
 const SRC_DIR = fileURLToPath(new URL("../src/", import.meta.url));
 const SOURCES_UNDER_SRC = () =>
