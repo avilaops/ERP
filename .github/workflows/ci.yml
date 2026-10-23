@@ -56,7 +56,20 @@ jobs:
         run: bash -n deploy/*.sh
 
       - name: Conferir imagem do assinador PAdES
-        run: docker build --file deploy/pades-signer/Dockerfile --tag erp-pades-signer:ci .
+        env:
+          IMAGE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          docker build --file deploy/pades-signer/Dockerfile --tag "ghcr.io/avilaops/erp-pades-signer:${IMAGE_SHA}" .
+          docker save "ghcr.io/avilaops/erp-pades-signer:${IMAGE_SHA}" | gzip -9 > "$RUNNER_TEMP/pades-signer.tar.gz"
+
+      - name: Guardar imagem de homologação do assinador
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: pades-signer-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}/pades-signer.tar.gz
+          if-no-files-found: error
+          retention-days: 3
 
       # Falha se algum teste for pulado: sem banco, os testes de banco não provam nada.
       - name: Testes
