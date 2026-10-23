@@ -47,7 +47,7 @@ export default async function EstoqueDoEquipamentoPage({ params }: { params: Pro
           <label htmlFor="counted" className={LABEL}>
             Contagem: quantos há
           </label>
-          <input id="counted" name="counted" type="text" inputMode="numeric" required key={stock.physical} defaultValue={Math.max(0, stock.physical)} className={INPUT} />
+          <input id="counted" name="counted" type="text" inputMode="decimal" required key={stock.physical} defaultValue={Math.max(0, stock.physical)} className={INPUT} />
         </div>
         <div className="basis-full sm:basis-48 sm:flex-1">
           <label htmlFor="note" className={LABEL}>

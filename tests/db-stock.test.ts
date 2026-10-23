@@ -62,6 +62,19 @@ test("compra: itens na moeda do fornecedor, custos em reais e o custo de cada pe
   assert.deepEqual(landedCosts([{ quantity: 3, goods: 0 }], 50), [{ share: 0, landedUnit: 0 }]);
 });
 
+test("compra e estoque preservam quantidades fracionadas em até quatro casas", { skip }, async () => {
+  const material = (await createProduct({ name: "Cabo por metro", code: "T-CABO", advisoryCost: 10 }, WHO, db.pool)).id;
+  const source = Number((await db.pool.query("INSERT INTO suppliers (kind, name, country, updated_by) VALUES ('EX', 'Fornecedor fracionado', 'China', $1) RETURNING id", [WHO])).rows[0].id);
+  const order = (await createPurchase({ ...INPUT(), supplierId: source, currency: "BRL", exchangeRate: 1 }, WHO, db.pool)).id;
+  await assert.rejects(() => savePurchaseItem(order, { productId: material, quantity: 1.23456, unitPrice: 8 }, WHO, db.pool), /quatro casas/);
+  await savePurchaseItem(order, { productId: material, quantity: 12.3456, unitPrice: 8 }, WHO, db.pool);
+  assert.equal((await getPurchase(order, db.pool))?.items[0].quantity, 12.3456);
+  await receivePurchase(order, "2026-10-18", WHO, db.pool);
+  assert.equal((await of(material)).physical, 12.3456);
+  assert.deepEqual(await countStock(material, 10.5, "Contagem fracionada", WHO, db.pool), { difference: -1.8456 });
+  assert.equal((await of(material)).physical, 10.5);
+});
+
 test("estoque: a compra a caminho aparece como a chegar; recebida, entra; desfeita, sai", { skip }, async () => {
   assert.deepEqual([(await of(leg)).physical, (await of(leg)).incoming], [0, 2]);
   await movePurchase(purchase, "em_transito", WHO, db.pool);

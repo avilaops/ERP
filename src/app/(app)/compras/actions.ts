@@ -22,6 +22,7 @@ const field = (formData: FormData, name: string) => {
 const idOf = (formData: FormData, name: string) => (/^[1-9]\d{0,8}$/.test(field(formData, name)) ? Number(field(formData, name)) : Number.NaN);
 /** `5,42` or `5.42`: a rate has no thousands to confuse with. */
 const rateOf = (typed: string) => (/^\d{1,4}([.,]\d{1,6})?$/.test(typed) ? Number(typed.replace(",", ".")) : Number.NaN);
+const quantityOf = (typed: string) => (/^\d{1,8}([.,]\d{1,4})?$/.test(typed) ? Number(typed.replace(",", ".")) : Number.NaN);
 
 function problem(error: unknown): ActionState {
   if (error instanceof PurchaseError) return { error: error.message };
@@ -84,7 +85,7 @@ export async function purchaseItemAction(_previous: ActionState, formData: FormD
   try {
     if (saving) {
       const [quantity, unitPrice] = [field(formData, "quantity"), parseMoney(field(formData, "unitPrice"))];
-      await savePurchaseItem(id, { productId, quantity: /^\d{1,6}$/.test(quantity) ? Number(quantity) : Number.NaN, unitPrice: unitPrice ?? Number.NaN }, session.email, conn);
+      await savePurchaseItem(id, { productId, quantity: quantityOf(quantity), unitPrice: unitPrice ?? Number.NaN }, session.email, conn);
     } else {
       await removePurchaseItem(id, productId, session.email, conn);
     }

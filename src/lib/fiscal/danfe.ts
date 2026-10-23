@@ -24,11 +24,12 @@ export type DanfeData = {
   protocol: string | null; authorizedAt: string | null;
   issuer: Party; recipient: Party;
   items: DanfeItem[];
-  totals: { icmsBase: number; icms: number; products: number; freight: number; discount: number; ipi: number; invoice: number; difal: number; fcp: number; ibs: number; cbs: number;
+  totals: { icmsBase: number; icms: number; icmsSt: number; products: number; freight: number; insurance: number; other: number; discount: number; ipi: number; importTax: number; pis: number; cofins: number; invoice: number; difal: number; fcp: number; ibs: number; cbs: number;
     /** The totals of IBS and CBS, apart, or `null` when the invoice has no such group. */
     reform: { ibsState: number; ibsCity: number; cbs: number } | null;
   };
   freightMode: string; info: string;
+  payments: { code: string; description: string; amount: number }[];
   /** The place of delivery, when it is not the recipient's address: already as the line the paper shows. */
   delivery: string | null;
   carrier: { name: string; document: string; registration: string; address: string; city: string; uf: string } | null;
@@ -121,14 +122,15 @@ export function danfeData(xml: string): DanfeData {
     issuer: party(block(xml, "emit"), "enderEmit"), recipient: party(block(xml, "dest"), "enderDest"),
     items,
     totals: {
-      icmsBase: number(totals, "vBC"), icms: number(totals, "vICMS"), products: number(totals, "vProd"), freight: number(totals, "vFrete"), discount: number(totals, "vDesc"),
-      ipi: number(totals, "vIPI"), invoice: number(totals, "vNF"), difal: number(totals, "vICMSUFDest"), fcp: number(totals, "vFCPUFDest"),
+      icmsBase: number(totals, "vBC"), icms: number(totals, "vICMS"), icmsSt: number(totals, "vST"), products: number(totals, "vProd"), freight: number(totals, "vFrete"), insurance: number(totals, "vSeg"), other: number(totals, "vOutro"), discount: number(totals, "vDesc"),
+      ipi: number(totals, "vIPI"), importTax: number(totals, "vII"), pis: number(totals, "vPIS"), cofins: number(totals, "vCOFINS"), invoice: number(totals, "vNF"), difal: number(totals, "vICMSUFDest"), fcp: number(totals, "vFCPUFDest"),
       ibs: number(block(block(xml, "IBSCBSTot"), "gIBS"), "vIBS"), cbs: number(block(block(xml, "IBSCBSTot"), "gCBS"), "vCBS"),
       reform: block(xml, "IBSCBSTot") === "" ? null : {
         ibsState: number(block(block(xml, "IBSCBSTot"), "gIBSUF"), "vIBSUF"), ibsCity: number(block(block(xml, "IBSCBSTot"), "gIBSMun"), "vIBSMun"), cbs: number(block(block(xml, "IBSCBSTot"), "gCBS"), "vCBS"),
       },
     },
     freightMode: value(block(xml, "transp"), "modFrete"), info: value(block(xml, "infAdic"), "infCpl"),
+    payments: [...xml.matchAll(/<detPag>[\s\S]*?<\/detPag>/g)].map(([payment]) => ({ code: value(payment, "tPag"), description: value(payment, "xPag"), amount: number(payment, "vPag") })),
     delivery: deliveryLine(xml),
     carrier: carrierXml === "" ? null : { name: value(carrierXml, "xNome"), document: value(carrierXml, "CNPJ") || value(carrierXml, "CPF"), registration: value(carrierXml, "IE"), address: value(carrierXml, "xEnder"), city: value(carrierXml, "xMun"), uf: value(carrierXml, "UF") },
     volumes: { quantity: value(volumesXml, "qVol"), kind: value(volumesXml, "esp"), netWeight: value(volumesXml, "pesoL"), grossWeight: value(volumesXml, "pesoB") },

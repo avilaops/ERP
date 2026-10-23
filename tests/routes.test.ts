@@ -43,6 +43,29 @@ test("páginas portadas não são mais marcador; as outras continuam Em constru�
   assert.equal(MENU_ITEMS.filter((item) => !PORTED.includes(item.key)).length, 0);
 });
 
+test("Fiscal mantém resumos acionáveis sem chamá-los de XML completo", () => {
+  const page = source("/fiscal");
+  const actions = readFileSync(`${APP_DIR}fiscal/actions.ts`, "utf8");
+  assert.ok(page.includes("listNfeSummaries(conn)"));
+  assert.ok(page.includes("Manifestar ciência"));
+  assert.ok(page.includes("Aguardando XML completo"));
+  assert.ok(actions.includes("queueSummaryManifestation("));
+  assert.doesNotMatch(page, /summary[^]{0,300}Baixar XML completo/i);
+});
+
+test("detalhe da NF-e separa documento, manifestação e conciliação em tarefas", () => {
+  const detail = source("/fiscal/recebidas/[id]");
+  assert.ok(detail.includes("<ViewTabs"));
+  for (const step of ["documento", "manifestacao", "fornecedor", "produtos", "compra"]) assert.ok(detail.includes(`step === \"${step}\"`), step);
+});
+
+test("API de notas recebidas distingue resumos pendentes de XML completo", () => {
+  const route = readFileSync(fileURLToPath(new URL("../src/app/api/v1/notas-recebidas/route.ts", import.meta.url)), "utf8");
+  assert.ok(route.includes("listNfeSummaries"));
+  assert.ok(route.includes("pendencias"));
+  assert.ok(route.includes("fullNfeId === null"));
+});
+
 /** Every source file under src/, relative to it, with its code. */
 const SRC_DIR = fileURLToPath(new URL("../src/", import.meta.url));
 const SOURCES_UNDER_SRC = () =>
@@ -284,9 +307,9 @@ test("certificado digital: só a diretoria envia; arquivo e senha não voltam pa
   }
   // Fora da camada fiscal ninguém abre o certificado guardado.
   const users = SOURCES_UNDER_SRC().filter(([, code]) => code.includes("openCertificate("));
-  // Só a emissão abre o PFX guardado: para assinar a nota e falar com a SEFAZ.
+  // Só operações fiscais abrem o PFX: emissão, distribuição e manifestação na SEFAZ.
   // O contrato não abre esse PFX. A chave do PDF fica no assinador, por empresa.
-  assert.deepEqual(users.map(([file]) => file).sort(), ["lib/db/issue-nfe.ts", "lib/fiscal/certificate.ts"]);
+  assert.deepEqual(users.map(([file]) => file).sort(), ["lib/db/issue-nfe.ts", "lib/db/recipient-manifestations.ts", "lib/db/run-nfe-distribution.ts", "lib/fiscal/certificate.ts"]);
 });
 
 test("e-mail das notas: a senha da caixa só é aberta para enviar, nunca volta à tela nem vai a log", () => {
@@ -347,8 +370,9 @@ test("não existe página no grupo protegido sem requirePermission", () => {
   // and the list of prospects; and the switch of the calls by the system;
   // and, of production, the materials, what will run short, the list of materials of one equipment and the hours.
   // and the preparation of the fiscal rules of one order's invoice.
+  // and, of incoming invoices, one invoice and the link of one of its items.
   // Product publishing has its own review screen before the irreversible action.
-  assert.equal(all.length, MENU_ITEMS.length + 64);
+  assert.equal(all.length, MENU_ITEMS.length + 66);
   for (const route of all) {
     assert.match(source(route), /await requirePermission\(/, route);
   }

@@ -84,7 +84,7 @@ const ONLY_OPEN = "A compra já foi recebida ou cancelada: desfaça o recebiment
 /** Adds an equipment to the purchase, or changes quantity and price of one already in it. Only while it has not arrived. */
 export async function savePurchaseItem(purchaseId: number, item: { productId: number; quantity: number; unitPrice: number }, who: string, conn: Queryable): Promise<void> {
   if (!Number.isSafeInteger(item.productId)) throw new PurchaseError("Escolha o equipamento.");
-  if (!Number.isSafeInteger(item.quantity) || item.quantity < 1 || item.quantity > 100_000) throw new PurchaseError("Quantidade: um número inteiro, de 1 para cima.");
+  if (!Number.isFinite(item.quantity) || item.quantity <= 0 || item.quantity > 100_000_000 || Math.round(item.quantity * 10_000) / 10_000 !== item.quantity) throw new PurchaseError("Quantidade: maior que zero, com até quatro casas decimais.");
   if (!Number.isFinite(item.unitPrice) || item.unitPrice < 0 || item.unitPrice > 100_000_000) throw new PurchaseError("Preço: informe o valor de uma peça, na moeda da compra.");
   const { rows } = await conn.query(SAVE_ITEM, [purchaseId, item.productId, item.quantity, item.unitPrice, who]);
   if (!rows[0]) throw new PurchaseError(`Compra ou equipamento não encontrado. ${ONLY_OPEN}`);
