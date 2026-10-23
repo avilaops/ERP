@@ -123,7 +123,7 @@ contador") e não foi alterada aqui.
 | NT 2020.006, B25c-10 | `indIntermed` obrigatório com `indPres` 2, 3, 4 ou 9 | `indPres` 9 e `indIntermed` 0, fixos | `tests/nfe.test.ts` | confere. Venda com retirada na loja sairia como "não presencial": o sistema não distingue |
 | Tabela de CST | PIS e COFINS: 01, 02, 04 a 09, 49 a 99; IPI: 00 a 05, 49 a 55, 99 | `nfeProblems` | `tests/nfe-conformidade.test.ts` | corrigido (qualquer par de dígitos passava e a nota caía no esquema da SEFAZ) |
 | NT 2025.001, YA03-10 e YA03-20 | Pagamentos somam o total da nota; forma 99 leva descrição | `nfeProblems` | `tests/nfe.test.ts` | confere |
-| NT 2025.001, YA04-10 | Grupo `card` para cartão e PIX | não é escrito | — | pendente sem prazo ("implementação futura" para o modelo 55) |
+| NT 2025.001, YA04-10 | Grupo `card` para cartão e PIX | PIX, crédito e débito levam `tpIntegra=2`, pois o ERP não integra a operação ao sistema de pagamento; não inventa CNPJ, bandeira ou autorização | `tests/nfe.test.ts` e homologação SP de 23/10/2026 após rejeição 391 | atende para pagamentos não integrados; integração futura exige os dados reais da transação |
 | Anexo I, Y01 a Y09 | Fatura e duplicatas (`cobr`) | não é escrito (grupo opcional) | — | não emite |
 | Anexo I, X02-20, X07-10 | Sem veículo em operação interestadual; IE da transportadora com UF | `transportXml`, `nfeProblems` | `tests/nfe.test.ts` | confere |
 | NT 2018.005, ZD01-10 | `infRespTec` | não é escrito | — | confere para SP (não exige). Vira pendência ao emitir por AM, MS, PE, PR, SC ou TO |

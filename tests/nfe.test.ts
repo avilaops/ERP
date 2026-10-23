@@ -69,7 +69,7 @@ test("venda para não contribuinte de outro estado: CFOP 6108, ICMS de saída e 
     "<pICMSUFDest>23.0000</pICMSUFDest><pICMSInter>7.00</pICMSInter><pICMSInterPart>100.0000</pICMSInterPart>",
     "<vICMSUFDest>3310.12</vICMSUFDest>", "<vFCPUFDest>0.00</vFCPUFDest><vICMSUFDest>3597.96</vICMSUFDest><vICMSUFRemet>0.00</vICMSUFRemet>",
     "<qCom>2.0000</qCom><vUnCom>10344.1200000000</vUnCom><vProd>20688.24</vProd>",
-    "<vNF>22487.22</vNF>", "<detPag><tPag>17</tPag><vPag>13492.33</vPag></detPag><detPag><tPag>15</tPag><vPag>8994.89</vPag></detPag>",
+    "<vNF>22487.22</vNF>", "<detPag><tPag>17</tPag><vPag>13492.33</vPag><card><tpIntegra>2</tpIntegra></card></detPag><detPag><tPag>15</tPag><vPag>8994.89</vPag></detPag>",
     "<infCpl>Pedido 261008-W9LG</infCpl>",
     // Reforma tributária (NT 2025.002): base sem os tributos embutidos, IBS de 0,1% e CBS de 0,9% em 2026, fora do total da nota.
     "<IBSCBS><CST>000</CST><cClassTrib>000001</cClassTrib><gIBSCBS><vBC>15174.82</vBC><gIBSUF><pIBSUF>0.1000</pIBSUF><vIBSUF>15.17</vIBSUF></gIBSUF><gIBSMun><pIBSMun>0.0000</pIBSMun><vIBSMun>0.00</vIBSMun></gIBSMun><vIBS>15.17</vIBS><gCBS><pCBS>0.9000</pCBS><vCBS>136.57</vCBS></gCBS></gIBSCBS></IBSCBS>",
@@ -82,6 +82,25 @@ test("venda para não contribuinte de outro estado: CFOP 6108, ICMS de saída e 
   // A soma dos itens é o total: a SEFAZ rejeita nota em que não fecha.
   const sum = (name: string) => [...xml.matchAll(new RegExp(`<det .*?<${name}>([\\d.]+)</${name}>`, "g"))].reduce((total, [, value]) => total + Number(value), 0);
   assert.equal(Math.round(sum("vProd") * 100), 2248722);
+});
+
+test("pagamento eletrônico não integrado: PIX e cartões informam tpIntegra sem inventar credenciadora", () => {
+  const payments = [
+    { code: "17", description: null, amount: 6000 },
+    { code: "03", description: null, amount: 9000 },
+    { code: "04", description: null, amount: 7487.22 },
+  ];
+  const { xml } = buildNfeXml({ ...INPUT, payments });
+  const paymentXml = /<pag>[\s\S]*<\/pag>/.exec(xml)?.[0] ?? "";
+
+  for (const [code, amount] of [["17", "6000.00"], ["03", "9000.00"], ["04", "7487.22"]]) {
+    assert.ok(paymentXml.includes(`<detPag><tPag>${code}</tPag><vPag>${amount}</vPag><card><tpIntegra>2</tpIntegra></card></detPag>`));
+  }
+  assert.doesNotMatch(paymentXml, /<CNPJ>|<tBand>|<cAut>|<CNPJReceb>|<idTermPag>/);
+
+  const cash = buildNfeXml({ ...INPUT, payments: [{ code: "01", description: null, amount: 22487.22 }] }).xml;
+  assert.ok(cash.includes("<detPag><tPag>01</tPag><vPag>22487.22</vPag></detPag>"));
+  assert.doesNotMatch(cash, /<card>/);
 });
 
 test("dentro do estado e para contribuinte: CFOP da operação, sem DIFAL; com IPI, a base do ICMS do consumidor final leva o IPI", () => {
