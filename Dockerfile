@@ -2,6 +2,8 @@
 # e chega pronto em standalone.tgz: o servidor não tem memória para buildar.
 # Fluxo completo em deploy/subir.sh e docs/operacao.md.
 FROM node:24-bookworm-slim
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 ENV NODE_ENV=production PORT=3140 HOSTNAME=0.0.0.0
 WORKDIR /app
 ADD standalone.tgz /app/

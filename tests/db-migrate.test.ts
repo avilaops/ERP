@@ -60,6 +60,13 @@ test("migração: uma numeração só pode ter uma reserva ativa", () => {
   assert.match(migration, /WITH duplicated[\s\S]*invoice_number IS NOT NULL/);
 });
 
+test("migração: o PDF selado do contrato é opcional e tem tamanho limitado", () => {
+  const migration = readFileSync(join(MIGRATIONS_DIR, "0079_pdf_selado_do_contrato.sql"), "utf8");
+  assert.match(migration, /ADD COLUMN sealed_pdf bytea/);
+  assert.match(migration, /octet_length\(sealed_pdf\) BETWEEN 100 AND 12000000/);
+  assert.doesNotMatch(migration, /status = 'assinado'/);
+});
+
 test("migração: aplica em ordem, registra e rodar de novo não muda nada", { skip }, async () => {
   const first = await withClient((client) => migrate(client, MIGRATIONS_DIR));
   assert.deepEqual(first, [
@@ -143,6 +150,7 @@ test("migração: aplica em ordem, registra e rodar de novo não muda nada", { s
     "0076_alvo_da_emissao_fiscal.sql",
     "0077_preparacao_confirmada_da_emissao.sql",
     "0078_reserva_unica_da_numeracao.sql",
+    "0079_pdf_selado_do_contrato.sql",
   ]);
 
   const second = await withClient((client) => migrate(client, MIGRATIONS_DIR));

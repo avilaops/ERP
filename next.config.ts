@@ -8,7 +8,7 @@ const nextConfig: NextConfig = {
   // The validator starts its own Node worker and locates its WASM next to the package.
   serverExternalPackages: ["xmllint-wasm"],
   outputFileTracingIncludes: {
-    "/*": ["./src/lib/fiscal/schemas/**/*", "./node_modules/xmllint-wasm/**/*"],
+    "/*": ["./src/lib/fiscal/schemas/**/*", "./src/lib/contract/icp/**/*", "./node_modules/xmllint-wasm/**/*"],
   },
   // A form may carry a photo: the photo layer has its own limit (15 MB) and normalizes what it stores.
   experimental: { serverActions: { bodySizeLimit: "16mb" } },
