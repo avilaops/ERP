@@ -31,16 +31,17 @@ export function firstProblemStep(problems: readonly string[]): number {
   return 0;
 }
 
-/** Only the displayed step is accepted; missing fields cannot erase another step. */
-export function noteRulePatch(step: number, read: (key: string) => string): Partial<FiscalRules> {
-  const group = NOTE_RULE_STEPS[step];
-  if (!Number.isInteger(step) || !group) throw new FiscalError("Etapa fiscal inválida. Recarregue a página.");
-  if (step === 0 && read("operation") !== "manual") {
-    const operation = read("operation");
-    if (operation !== "revenda" && operation !== "producao") throw new FiscalError("Escolha a operação na lista.");
-    return saleOperationCodes(operation);
-  }
-  return Object.fromEntries(group.fields.map(({ key, label, kind }) => {
+/** Visual groups for the one-screen form; the underlying field list remains shared with validation. */
+export const NOTE_RULE_SECTIONS = [
+  { title: "CFOP", fields: NOTE_RULE_STEPS.slice(1, 3).flatMap((group) => group.fields) },
+  { title: "Impostos atuais", fields: NOTE_RULE_STEPS.slice(3, 7).flatMap((group) => group.fields) },
+  { title: "IBS e CBS", fields: NOTE_RULE_STEPS.slice(7, 10).flatMap((group) => group.fields) },
+  { title: "Condições da operação", fields: NOTE_RULE_STEPS[10].fields },
+  { title: "Informações complementares", fields: NOTE_RULE_STEPS[11].fields },
+];
+
+function readFields(fields: RuleField[], read: (key: string) => string): Partial<FiscalRules> {
+  return Object.fromEntries(fields.map(({ key, label, kind }) => {
     const text = read(key).trim();
     if (kind === "boolean") return [key, text === "sim"];
     if (kind === "percent") {
@@ -50,4 +51,27 @@ export function noteRulePatch(step: number, read: (key: string) => string): Part
     }
     return [key, text || (key === "ipiFrameCode" ? "999" : null)];
   }));
+}
+
+/** Reads the whole fiscal form in one atomic save. */
+export function noteRulesPatch(read: (key: string) => string): Partial<FiscalRules> {
+  const operation = read("operation");
+  if (operation !== "manual" && operation !== "revenda" && operation !== "producao") {
+    throw new FiscalError("Escolha a operação na lista.");
+  }
+  const fields = NOTE_RULE_STEPS.flatMap((group) => group.fields);
+  const patch = readFields(fields, read);
+  return operation === "manual" ? patch : { ...patch, ...saleOperationCodes(operation) };
+}
+
+/** Only the displayed step is accepted; missing fields cannot erase another step. */
+export function noteRulePatch(step: number, read: (key: string) => string): Partial<FiscalRules> {
+  const group = NOTE_RULE_STEPS[step];
+  if (!Number.isInteger(step) || !group) throw new FiscalError("Etapa fiscal inválida. Recarregue a página.");
+  if (step === 0 && read("operation") !== "manual") {
+    const operation = read("operation");
+    if (operation !== "revenda" && operation !== "producao") throw new FiscalError("Escolha a operação na lista.");
+    return saleOperationCodes(operation);
+  }
+  return readFields(group.fields, read);
 }
