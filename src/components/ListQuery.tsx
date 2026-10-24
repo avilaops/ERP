@@ -14,6 +14,7 @@ type Props<Sort extends string> = {
   searchPlaceholder: string;
   sorts: { value: Sort; label: string }[];
   filters?: QueryFilter[];
+  controls?: "all" | "search";
 };
 
 const activeCount = <Sort extends string>(query: Query<Sort>, options: ListQueryOptions<Sort>, visible: Set<string>) =>
@@ -21,7 +22,7 @@ const activeCount = <Sort extends string>(query: Query<Sort>, options: ListQuery
   (query.sort === options.defaultSort && query.direction === (options.defaultDirection ?? "asc") ? 0 : 1);
 
 /** The same search/filter/sort grammar for every large operational list. */
-export function ListQuery<Sort extends string>({ path, query, options, searchLabel, searchPlaceholder, sorts, filters = [] }: Props<Sort>) {
+export function ListQuery<Sort extends string>({ path, query, options, searchLabel, searchPlaceholder, sorts, filters = [], controls = "all" }: Props<Sort>) {
   const visible = new Set(filters.map((filter) => filter.key));
   const hiddenFilters = Object.fromEntries(Object.entries(query.filters).filter(([key]) => !visible.has(key)));
   const clearHref = listHref(path, query, {
@@ -50,7 +51,7 @@ export function ListQuery<Sort extends string>({ path, query, options, searchLab
           {(query.search !== "" || count > 0) && <Link href={clearHref} className={SECONDARY}>Limpar</Link>}
         </div>
 
-        <details className="group" open={count > 0}>
+        {controls === "all" && <details className="group" open={count > 0}>
           <summary className="inline-flex min-h-[var(--control)] cursor-pointer items-center gap-2 font-medium text-brand">
             Filtros e ordenação{count > 0 ? ` (${count})` : ""}
           </summary>
@@ -84,7 +85,7 @@ export function ListQuery<Sort extends string>({ path, query, options, searchLab
             <input type="hidden" name="porPagina" value={query.pageSize} />
             <div className="self-end"><button type="submit" className={SECONDARY}>Aplicar filtros</button></div>
           </div>
-        </details>
+        </details>}
       </form>
       {(query.search || activeFilters.length > 0) && <div aria-label="Critérios ativos" className="mt-2 flex flex-wrap gap-2 text-xs">
         {query.search && <Link href={listHref(path, query, { search: "" }, options)} className="inline-flex min-h-[var(--control)] items-center rounded-full border border-slate-300 px-3">Busca: {query.search} ×</Link>}

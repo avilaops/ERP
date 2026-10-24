@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ListPager, ListQuery } from "@/components/ListQuery";
+import { OrdersGrid } from "@/components/OrdersGrid";
 import { CARD, EmptyState, MetricSummary, PageHeader, Pill, PRIMARY, SECONDARY } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { menuItem, seesAllOrders } from "@/lib/auth/permissions";
@@ -12,7 +13,7 @@ import { ORDER_TABS, ordersCount, ordersView } from "@/lib/orders-view";
 const ITEM = menuItem("pedidos");
 const HERE = ITEM.href;
 const OPTIONS = {
-  sorts: ["atualizacao", "numero", "cliente", "vendedor"] as const,
+  sorts: ["atualizacao", "numero", "cliente", "vendedor", "desconto", "total", "situacao"] as const,
   defaultSort: "atualizacao" as const,
   defaultDirection: "desc" as const,
   filters: { aba: ["abertos", "aprovacao", "fechados", "perdidos", "todos"] },
@@ -43,6 +44,14 @@ export default async function PedidosPage({ searchParams }: { searchParams: Prom
     ["Taxa de fechamento", indicators.closeRate === null ? "—" : showPercent(indicators.closeRate, 0), "fechados sobre fechados e perdidos"],
     ["Desconto médio", indicators.averageClosedDiscount === null ? "—" : showPercent(indicators.averageClosedDiscount), "nos pedidos fechados"],
   ] as const;
+  const sortHrefs = {
+    customer: listHref(HERE, query, { sort: "cliente", direction: query.sort === "cliente" && query.direction === "asc" ? "desc" : "asc" }, OPTIONS),
+    seller: listHref(HERE, query, { sort: "vendedor", direction: query.sort === "vendedor" && query.direction === "asc" ? "desc" : "asc" }, OPTIONS),
+    discount: listHref(HERE, query, { sort: "desconto", direction: query.sort === "desconto" && query.direction === "desc" ? "asc" : "desc" }, OPTIONS),
+    total: listHref(HERE, query, { sort: "total", direction: query.sort === "total" && query.direction === "desc" ? "asc" : "desc" }, OPTIONS),
+    status: listHref(HERE, query, { sort: "situacao", direction: query.sort === "situacao" && query.direction === "asc" ? "desc" : "asc" }, OPTIONS),
+    updated: listHref(HERE, query, { sort: "atualizacao", direction: query.sort === "atualizacao" && query.direction === "desc" ? "asc" : "desc" }, OPTIONS),
+  };
 
   return (
     <>
@@ -63,7 +72,8 @@ export default async function PedidosPage({ searchParams }: { searchParams: Prom
           options={OPTIONS}
           searchLabel="Buscar pedido por cliente, CPF/CNPJ ou número"
           searchPlaceholder="Cliente, CPF/CNPJ ou número"
-          sorts={[{ value: "atualizacao", label: "Última atualização" }, { value: "numero", label: "Número" }, { value: "cliente", label: "Cliente" }, { value: "vendedor", label: "Vendedor" }]}
+          sorts={[{ value: "atualizacao", label: "Última atualização" }, { value: "numero", label: "Número" }, { value: "cliente", label: "Cliente" }, { value: "vendedor", label: "Vendedor" }, { value: "desconto", label: "Desconto" }, { value: "total", label: "Total com IPI" }, { value: "situacao", label: "Situação" }]}
+          controls="search"
         />
         {rows.length === 0 ? (
           <EmptyState
@@ -76,10 +86,7 @@ export default async function PedidosPage({ searchParams }: { searchParams: Prom
             <ul className="md:hidden">
               {rows.map((row) => <li key={row.number} className="border-t border-slate-200 first:border-t-0"><Link href={`${HERE}/${row.number}`} className="block px-4 py-3 active:bg-slate-50"><span className="flex items-start justify-between gap-3"><span className="min-w-0 break-words font-medium text-brand">{row.customer}</span><span className="whitespace-nowrap font-semibold">{row.total}</span></span><span className="mt-1 block break-words text-xs text-slate-500">{[row.detail, everyone ? row.seller : null].filter(Boolean).join(" · ")}</span><span className="mt-2 flex items-center justify-between gap-3 text-xs"><Pill tone={STATUS_TONES[row.status]}>{row.statusLabel}</Pill><span className="text-right text-slate-600">desconto {row.discount} · {row.updated}</span></span></Link></li>)}
             </ul>
-            <table className="hidden w-full table-fixed text-sm md:table">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-3 py-2 text-left">Cliente</th>{everyone && <th className="px-3 py-2 text-left">Vendedor</th>}<th className="px-3 py-2 text-right">Desconto</th><th className="px-3 py-2 text-right">Total com IPI</th><th className="px-3 py-2 text-left">Situação</th><th className="px-3 py-2 text-left">Atualizado</th></tr></thead>
-              <tbody>{rows.map((row) => <tr key={row.number} className="border-t border-slate-200 align-top"><td className="px-3 py-3"><Link href={`${HERE}/${row.number}`} className="break-words font-medium text-brand underline">{row.customer}</Link><span className="block break-words text-xs text-slate-500">{[row.detail, row.document].filter(Boolean).join(" · ")}</span></td>{everyone && <td className="px-3 py-3">{row.seller}</td>}<td className="px-3 py-3 text-right">{row.discount}</td><td className="whitespace-nowrap px-3 py-3 text-right font-semibold">{row.total}</td><td className="px-3 py-3"><Pill tone={STATUS_TONES[row.status]}>{row.statusLabel}</Pill></td><td className="px-3 py-3 text-slate-600">{row.updated}</td></tr>)}</tbody>
-            </table>
+            <OrdersGrid rows={rows} showSeller={everyone} sortHrefs={sortHrefs} sort={query.sort} direction={query.direction} />
           </div>
         )}
         <ListPager path={HERE} query={query} options={OPTIONS} result={page} noun={["pedido", "pedidos"]} />
