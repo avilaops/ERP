@@ -70,7 +70,10 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
     <>
       <PageHeader
         title="Fiscal"
-        actions={allows(session, "parametros") ? <Link href="/parametros/fiscal" className={SECONDARY}>Configurações fiscais</Link> : undefined}
+        actions={<>
+          <Link href="/fiscal/nova" className={PRIMARY}>+ Nova nota fiscal</Link>
+          {allows(session, "parametros") && <Link href="/parametros/fiscal" className={SECONDARY}>Configurações fiscais</Link>}
+        </>}
       />
       <MetricSummary items={[
         { label: "A emitir", value: String(pending.filter((order) => order.stage === "emitir").length), note: "pedidos fechados" },
