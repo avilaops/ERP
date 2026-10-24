@@ -15,8 +15,8 @@ fechamento direto, no envio para aprovação e na decisão de aprovação. A gra
 confere as revisões dos termos do pedido e da empresa para recusar alterações
 concorrentes. Pedidos já fechados não são reabertos automaticamente.
 
-Em **Pedido → Dados do PDF**, oito etapas registram frete, previsão de transporte,
-instruções de entrega e condições específicas. Condições vazias herdam o padrão
+Em **Pedido → Dados do PDF**, um único formulário reúne frete, previsão de transporte,
+instruções de entrega e condições específicas em seções visíveis. Condições vazias herdam o padrão
 da empresa. A revisão impede sobrescrita por outra aba; contrato enviado/assinado,
 nota assinada/autorizada/denegada ou pedido indisponível impedem a alteração.
 Documentos de contrato já guardados continuam como foram enviados.
@@ -61,13 +61,13 @@ do hash guardado. Sem contrato enviado, continuam os espaços de assinatura fís
 
 ## Verificação de UX
 
-1. Título e etapa identificam a decisão e o pedido/empresa.
-2. Campos e instrução principal aparecem na primeira tela.
-3. Uma ação principal salva a etapa e avança; Enter executa o formulário.
-4. Quinze etapas nos cinco tamanhos: 75 amostras, sem rolagem lateral, uma tela e
-   controles de pelo menos 44 px.
+1. Título identifica a decisão e o pedido/empresa.
+2. Todos os campos ficam na mesma página, organizados por assunto.
+3. Uma ação principal salva o formulário inteiro; Enter executa essa ação.
+4. As duas páginas completas funcionam nos cinco tamanhos, sem rolagem lateral e
+   com controles de pelo menos 44 px; no celular, a página rola verticalmente.
 5. O padrão herdado abre em “Ver padrão da empresa”.
-6. Voltar salva a etapa; recusa preserva os campos. Conflito de revisão pede recarga.
+6. A recusa preserva os campos e o conflito de revisão pede recarga.
 7. Rótulos associados aos campos e ações nativas permitem teclado. Em 360×640,
    fonte da raiz a 32 px (200%) e zoom de 200% mantiveram a ação alcançável por
    Tab. As ampliações temporárias foram removidas depois da verificação.

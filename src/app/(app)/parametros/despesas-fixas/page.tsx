@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CARD, DANGER, INPUT, PageHeader, PRIMARY, SECONDARY } from "@/components/ui";
+import { CARD, DANGER, INPUT, PageHeader, Pager, PRIMARY, SECONDARY, pageOf } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { menuItem } from "@/lib/auth/permissions";
 import { listFixedExpenses } from "@/lib/db/fixed-expenses";
@@ -66,10 +66,12 @@ function Fields({ saved, categories }: { saved: FixedExpense | null; categories:
   );
 }
 
-export default async function DespesasFixasPage() {
+export default async function DespesasFixasPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const session = await requirePermission("parametros");
   const conn = tenantDb(session.tenant.slug);
   const expenses = await listFixedExpenses(conn);
+  const query = await searchParams;
+  const slice = pageOf(expenses, typeof query.pagina === "string" ? query.pagina : undefined, 10);
   const categories = (await listAllPayableCategories(conn)).filter((category) => category.active).map((category) => category.label);
   const total = roundCents(expenses.filter((expense) => expense.active).reduce((sum, expense) => sum + expense.amount, 0));
 
@@ -100,8 +102,11 @@ export default async function DespesasFixasPage() {
           <p className="p-5 text-sm text-slate-600">Nenhuma despesa fixa cadastrada ainda.</p>
         ) : (
           <ul>
-            {expenses.map((expense) => (
+            {slice.rows.map((expense) => (
               <li key={expense.id} className="border-t border-slate-200 px-5 py-3 first:border-t-0">
+                <details name="despesa-em-edicao" className="group">
+                  <summary className="disclosure-heading">{expense.label} · {showMoney(expense.amount)}<span className="disclosure-marker" aria-hidden="true">+</span></summary>
+                  <div className="border-t border-slate-200 pt-3">
                 <ActionForm action={updateFixedExpenseAction} className="flex flex-wrap items-end gap-3">
                   <input type="hidden" name="id" value={expense.id} />
                   <input type="hidden" name="hasActive" value="1" />
@@ -117,10 +122,13 @@ export default async function DespesasFixasPage() {
                   <input type="hidden" name="id" value={expense.id} />
                   <ConfirmButton label="Remover" confirmLabel="Confirmar: remover" className={DANGER} />
                 </ActionForm>
+                  </div>
+                </details>
               </li>
             ))}
           </ul>
         )}
+        <Pager {...slice} noun={["despesa", "despesas"]} hrefFor={(page) => (page === 1 ? "/parametros/despesas-fixas" : `/parametros/despesas-fixas?pagina=${page}`)} />
       </section>
     </>
   );

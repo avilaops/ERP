@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CARD, DANGER, INPUT, PageHeader, PRIMARY, SECONDARY } from "@/components/ui";
+import { CARD, DANGER, INPUT, PageHeader, Pager, PRIMARY, SECONDARY, pageOf } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { menuItem } from "@/lib/auth/permissions";
 import { formatDocument } from "@/lib/customer";
@@ -52,10 +52,12 @@ function Fields({ carrier, prefix }: { carrier: Carrier | null; prefix: string }
   );
 }
 
-export default async function TransportadorasPage() {
+export default async function TransportadorasPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const session = await requirePermission("parametros");
   const conn = tenantDb(session.tenant.slug);
   const carriers = await listCarriers(conn);
+  const query = await searchParams;
+  const slice = pageOf(carriers, typeof query.pagina === "string" ? query.pagina : undefined, 10);
 
   return (
     <>
@@ -83,9 +85,12 @@ export default async function TransportadorasPage() {
           <p className="p-5 text-sm text-slate-600">Nenhuma transportadora cadastrada.</p>
         ) : (
           <ul>
-            {carriers.map((carrier) => (
+            {slice.rows.map((carrier) => (
               <li key={carrier.id} className="border-t border-slate-200 px-5 py-4 first:border-t-0">
-                <ActionForm action={updateCarrierAction} className="grid gap-3 sm:grid-cols-3">
+                <details name="transportadora-em-edicao" className="group">
+                  <summary className="disclosure-heading">{carrier.name}<span className="disclosure-marker" aria-hidden="true">+</span></summary>
+                  <div className="border-t border-slate-200 pt-3">
+                  <ActionForm action={updateCarrierAction} className="grid gap-3 sm:grid-cols-3">
                   <input type="hidden" name="id" value={carrier.id} />
                   <Fields carrier={carrier} prefix={`c${carrier.id}`} />
                   <div className="sm:col-span-3">
@@ -98,10 +103,13 @@ export default async function TransportadorasPage() {
                   <input type="hidden" name="id" value={carrier.id} />
                   <ConfirmButton label="Remover" confirmLabel="Confirmar: remover" className={DANGER} />
                 </ActionForm>
+                  </div>
+                </details>
               </li>
             ))}
           </ul>
         )}
+        <Pager {...slice} noun={["transportadora", "transportadoras"]} hrefFor={(page) => (page === 1 ? "/parametros/transportadoras" : `/parametros/transportadoras?pagina=${page}`)} />
       </section>
     </>
   );

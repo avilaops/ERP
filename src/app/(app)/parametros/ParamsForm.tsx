@@ -1,7 +1,7 @@
 "use client";
 
-import { useActionState, useState } from "react";
-import { INPUT, PRIMARY, SectionDisclosure } from "@/components/ui";
+import { useActionState } from "react";
+import { PRIMARY, SectionDisclosure } from "@/components/ui";
 import { lineWords } from "@/lib/line-words";
 import { IDLE_FORM_STATE, PARAM_SECTIONS, STATE_RATE_COLUMNS } from "@/lib/params-form";
 import type { ParamField, ParamsFormState, ParamsFormValues, StateRateKey } from "@/lib/params-form";
@@ -31,14 +31,6 @@ export function ParamsForm({ saved, action, lineId, imported }: { saved: ParamsF
   };
   const [state, formAction, pending] = useActionState(action, IDLE_FORM_STATE);
   const values = state.status === "error" && state.values ? state.values : saved;
-  // One part of the rule at a time; the others stay in the form, only out of sight, and are saved with it.
-  // A refused form shows every part: the mistake may be in any of them.
-  const parts = [...PARAM_SECTIONS.map((section) => section.title), "ICMS por estado"];
-  const [part, setPart] = useState(0);
-  const [ufGroup, setUfGroup] = useState(0);
-  const everyPart = state.status === "error";
-  const out = (index: number) => (everyPart || index === part ? "" : " hidden");
-
   return (
     <form action={formAction} className="flex flex-col gap-6" noValidate>
       {/* The product line these parameters belong to. */}
@@ -59,16 +51,8 @@ export function ParamsForm({ saved, action, lineId, imported }: { saved: ParamsF
         </p>
       )}
 
-      {!everyPart && (
-        <label className="block text-sm font-medium">Parte da regra de preço
-          <select value={part} onChange={(event) => setPart(Number(event.target.value))} className={INPUT}>
-            {parts.map((title, index) => <option key={title} value={index}>{title}</option>)}
-          </select>
-        </label>
-      )}
-
-      {PARAM_SECTIONS.map((section, index) => (
-        <fieldset key={section.title} className={`rounded-lg border border-slate-200 bg-white${out(index)}`}>
+      {PARAM_SECTIONS.map((section) => (
+        <fieldset key={section.title} className="rounded-lg border border-slate-200 bg-white">
           <legend className="sr-only">{section.title}</legend>
           <h2 className="border-b border-slate-200 px-5 py-3 text-sm font-semibold uppercase tracking-wide">
             {section.title}
@@ -113,7 +97,7 @@ export function ParamsForm({ saved, action, lineId, imported }: { saved: ParamsF
         </fieldset>
       ))}
 
-      <fieldset className={`rounded-lg border border-slate-200 bg-white${out(PARAM_SECTIONS.length)}`}>
+      <fieldset className="rounded-lg border border-slate-200 bg-white">
         <legend className="sr-only">ICMS por estado de destino</legend>
         <h2 className="border-b border-slate-200 px-5 py-3 text-sm font-semibold uppercase tracking-wide">
           ICMS por estado de destino
@@ -130,14 +114,9 @@ export function ParamsForm({ saved, action, lineId, imported }: { saved: ParamsF
           </SectionDisclosure>
           {/* The names of the columns once, on top of each block of nine states: the rows are only the numbers. */}
           <p className="mt-4 text-xs font-medium text-slate-600">Em %: Interno = ICMS interno do estado · FCP · Saída = ICMS de saída para o estado</p>
-          {!everyPart && <label className="mt-3 block text-sm font-medium">Estados
-            <select value={ufGroup} onChange={(event) => setUfGroup(Number(event.target.value))} className={INPUT}>
-              {Array.from({ length: 9 }, (_, index) => <option key={index} value={index}>{UFS.slice(index * 3, index * 3 + 3).join(" · ")}</option>)}
-            </select>
-          </label>}
           <div className="mt-2 grid grid-cols-[minmax(0,1fr)] gap-x-8 gap-y-6 sm:grid-cols-2 xl:grid-cols-3">
             {Array.from({ length: 9 }, (_, index) => index * 3).map((start) => (
-              <table key={start} hidden={!everyPart && ufGroup !== start / 3} className="w-full min-w-0 table-fixed border-separate border-spacing-x-1.5 border-spacing-y-1.5 text-sm">
+              <table key={start} className="w-full min-w-0 table-fixed border-separate border-spacing-x-1.5 border-spacing-y-1.5 text-sm">
                 <thead>
                   <tr className="text-xs font-medium text-slate-500">
                     <th scope="col" className="w-8 text-left font-medium">

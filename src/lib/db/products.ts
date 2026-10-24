@@ -32,7 +32,7 @@ export type Product = {
   /** Plate-loaded: an order asks, for this equipment, whether the pegs are Olympic or standard. */
   plateLoaded: boolean;
 };
-export type ProductListSort = "codigo" | "nome";
+export type ProductListSort = "codigo" | "nome" | "fornecedor" | "modelo" | "ncm" | "situacao" | "custo" | "credito" | "embalagem";
 
 export type ProductInput = {
   name: string;
@@ -370,6 +370,13 @@ export async function queryProducts(query: ListQuery<ProductListSort>, lineId: n
     FROM regexp_matches(COALESCE(code, ''), '([0-9]+|[^0-9]+)', 'g') WITH ORDINALITY AS pieces(piece, ordinal))`;
   const orderSql = query.sort === "codigo"
     ? `(code IS NULL) ASC, ${codeNaturalKey} ${direction}, lower(code) ${direction}, lower(name) ${direction}`
+    : query.sort === "fornecedor" ? `lower(COALESCE(supplier_name, '')) ${direction}, lower(name) ${direction}`
+    : query.sort === "modelo" ? `lower(COALESCE(supplier_model, '')) ${direction}, lower(name) ${direction}`
+    : query.sort === "ncm" ? `(ncm IS NULL), ncm ${direction}, lower(name) ${direction}`
+    : query.sort === "situacao" ? `active ${direction}, lower(name) ${direction}`
+    : query.sort === "custo" ? `(advisory_cost IS NULL), advisory_cost ${direction}, lower(name) ${direction}`
+    : query.sort === "credito" ? `tax_credit ${direction}, lower(name) ${direction}`
+    : query.sort === "embalagem" ? `packaging ${direction}, lower(name) ${direction}`
     : `lower(name) ${direction}`;
   const { rows } = await conn.query(
     `SELECT ${COLUMNS} FROM products ${restriction} ORDER BY ${orderSql}, id ${direction}

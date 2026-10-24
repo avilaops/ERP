@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { controleBaixo, visitar, faltasDeCobertura, NavegacaoFalhou, VIEWPORTS, MIN_CONTROLE } from "../docs/revisao-telas/medir.mjs";
+import { controleBaixo, esperarTelaPronta, visitar, faltasDeCobertura, NavegacaoFalhou, VIEWPORTS, MIN_CONTROLE } from "../docs/revisao-telas/medir.mjs";
 
 test("capturas usam os cinco tamanhos do docs/ux.md", () => {
   assert.deepEqual(
@@ -15,7 +15,12 @@ test("controle abaixo de 44 px conta como defeito; 44 px passa", () => {
   assert.equal(controleBaixo(0), false);
 });
 
-const pagina = (goto: () => Promise<unknown>) => ({ goto });
+const pagina = (goto: () => Promise<unknown>) => ({
+  goto,
+  locator: () => ({ waitFor: () => Promise.resolve() }),
+  waitForFunction: () => Promise.resolve(),
+  evaluate: () => Promise.resolve(),
+});
 const resposta = (status: number) => ({ status: () => status });
 
 test("navegação que falha interrompe a medição da rota", async () => {
@@ -25,6 +30,33 @@ test("navegação que falha interrompe a medição da rota", async () => {
   await assert.rejects(visitar(pagina(() => Promise.resolve(resposta(404))), "/nao-existe"), /status 404/);
   await assert.rejects(visitar(pagina(() => Promise.resolve(resposta(500))), "/x"), /status 500/);
   assert.equal((await visitar(pagina(() => Promise.resolve(resposta(200))), "/x")).status(), 200);
+});
+
+test("captura espera conteúdo final, CSS, fontes e duas pinturas", async () => {
+  const chamadas: string[] = [];
+  const page = {
+    locator: (seletor: string) => ({
+      waitFor: ({ state }: { state: string }) => {
+        chamadas.push(`${seletor}:${state}`);
+        return Promise.resolve();
+      },
+    }),
+    waitForFunction: () => {
+      chamadas.push("css-e-fontes");
+      return Promise.resolve();
+    },
+    evaluate: () => {
+      chamadas.push("duas-pinturas");
+      return Promise.resolve();
+    },
+  };
+  await esperarTelaPronta(page);
+  assert.deepEqual(chamadas, [
+    "main:visible",
+    '[role="status"][aria-label="Carregando página"]:hidden',
+    "css-e-fontes",
+    "duas-pinturas",
+  ]);
 });
 
 test("cobertura exige cada rota uma vez em cada tamanho", () => {

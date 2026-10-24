@@ -91,9 +91,9 @@ O ensaio isolado é reproduzível com `node --env-file=.work/documents.env scrip
 
 1. A tarefa principal é buscar um documento; leitura, fonte, versões, campos e coletas têm destinos próprios.
 2. Título e estado aparecem na lista; detalhes longos ficam em Fonte. O texto é leitura em região rolável com foco, sem recorte do original.
-3. Buscar é a ação principal; filtros têm uma ação Aplicar por etapa.
+3. Buscar é a ação principal; todos os filtros são aplicados por uma única ação.
 4. Os cinco tamanhos são medidos por `tests/visual/documentos.spec.ts`; resultados ficam em `test-results/documentos/medidas.json`.
-5. Coleção/formato, categoria/estado e período/versão ficam em três etapas de Filtros. Conteúdo longo tem trechos e região de leitura com rolagem explícita.
+5. Coleção/formato, categoria/estado e período/versão ficam juntos na página de Filtros. Conteúdo longo tem trechos e região de leitura com rolagem explícita.
 6. Busca e filtros permanecem na URL; paginação keyset preserva os valores. Versões são endereçáveis.
 7. Controles nativos, foco visível, regiões de leitura acessíveis por teclado e componentes compartilhados. O teste adicional verifica teclado, texto ampliado a 200%, sessão obrigatória e hash do download.
 

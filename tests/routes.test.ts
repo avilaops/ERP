@@ -105,7 +105,8 @@ test("toda ação de servidor confere a permissão antes de qualquer outra coisa
 test("a página lê o banco só depois de conferir a permissão", () => {
   const reads: [string, string, string[]][] = [
     ["/parametros", "parametros", ["loadParams(", "listProductCosts("]],
-    ["/produtos", "produtos", ["loadParams(", "queryProducts(", "loadProductTabCounts(", "latestVersion(", "loadProductPublicationSummary("]],
+    ["/produtos", "produtos", ["queryProducts(", "loadProductTabCounts("]],
+    ["/custos", "custos", ["loadParams(", "queryProducts(", "loadProductTabCounts(", "latestVersion(", "loadProductPublicationSummary("]],
     ["/clientes", "clientes", ["queryCustomers("]],
     ["/clientes/[id]", "clientes", ["getCustomer("]],
     ["/pedidos/novo", "pedidos", ["latestVersion(", "loadPublishedTable("]],
@@ -372,7 +373,7 @@ test("não existe página no grupo protegido sem requirePermission", () => {
   // and the preparation of the fiscal rules of one order's invoice.
   // and, of incoming invoices, one invoice and the link of one of its items.
   // Product publishing has its own review screen before the irreversible action.
-  assert.equal(all.length, MENU_ITEMS.length + 66);
+  assert.equal(all.length, MENU_ITEMS.length + 67);
   for (const route of all) {
     assert.match(source(route), /await requirePermission\(/, route);
   }
@@ -391,7 +392,19 @@ test("o perfil não é lido de dado enviado pelo navegador", () => {
   // No celular o menu abre e fecha: essa moldura é o único pedaço de navegador, e não recebe sessão nem perfil.
   const frame = readFileSync(new URL("../src/components/MobileMenu.tsx", import.meta.url), "utf8");
   assert.match(frame, /^"use client"/);
-  assert.doesNotMatch(frame, /session|role|@\/lib\/(auth|db)/i);
+  assert.doesNotMatch(frame, /session|@\/lib\/(auth|db)/i);
+  assert.match(frame, /role=\{open \? "dialog"/);
+});
+
+test("a área autenticada distingue carregamento, falha recuperável e página inexistente", () => {
+  const loading = readFileSync(new URL("../src/app/(app)/loading.tsx", import.meta.url), "utf8");
+  const error = readFileSync(new URL("../src/app/(app)/error.tsx", import.meta.url), "utf8");
+  const missing = readFileSync(new URL("../src/app/(app)/not-found.tsx", import.meta.url), "utf8");
+  assert.match(loading, /role="status"/);
+  assert.match(error, /reset/);
+  assert.match(error, /Tentar novamente/);
+  assert.match(missing, /Página não encontrada/);
+  for (const code of [error, missing]) assert.match(code, /Voltar ao início/);
 });
 
 const API_DIR = fileURLToPath(new URL("../src/app/api/", import.meta.url));
@@ -584,4 +597,23 @@ test("Fiscal: painel mostra o trabalho completo e não lê XML nem certificado",
   assert.ok(background.includes("runOneNumberVoidJob(new Date(),"));
   const settings = source("/parametros/fiscal");
   assert.ok(settings.includes('allows(session, "fiscal") && <Link href="/fiscal"'));
+});
+
+test("cadastro de equipamento mostra identificação e custos juntos, com medidas e fiscal na mesma página", () => {
+  const screen = readFileSync(`${APP_DIR}produtos/ProductScreen.tsx`, "utf8");
+  const detail = source("/produtos/[id]");
+  for (const section of ["Identificação e foto", "Custos e formação do preço"]) assert.ok(screen.includes(section), section);
+  assert.doesNotMatch(screen, /Etapas do cadastro|hidden=\{step|Continuar para custos/);
+  assert.ok(detail.includes('id="product-measures"'));
+  assert.ok(detail.includes('id="product-fiscal"'));
+});
+
+test("cadastros auxiliares paginam e mantêm um editor aberto por vez", () => {
+  const routes = ["/parametros/categorias-de-contas", "/parametros/formas-de-pagamento", "/parametros/transportadoras", "/parametros/linhas", "/parametros/despesas-fixas"];
+  for (const route of routes) {
+    const page = source(route);
+    assert.ok(page.includes("pageOf("), `${route}: sem paginação`);
+    assert.ok(page.includes("<Pager"), `${route}: sem paginador`);
+    assert.match(page, /<details name="[^"]+-em-edicao"/, `${route}: editores não são exclusivos`);
+  }
 });

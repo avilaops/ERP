@@ -34,12 +34,12 @@ test("poderes: cada um é de alguns tipos; um perfil só abre mão, nunca ganha"
 
 test("perfil: telas e poderes são só os do tipo de origem; tela que mostra custo exige o poder de ver custo", () => {
   const clean = cleanProfile({ name: "  Fiscal  da   casa ", baseRole: "FINANCEIRO", items: ["recebimentos", "produtos", "parametros", "inventada"], denied: ["comissoes", "custos", "x"] });
-  // Produtos e Parâmetros não são do Financeiro, e "custos" não é poder dele: ficam de fora.
+  // Produtos e Parâmetros não são do Financeiro, e "custos" não é poder dele: a tela Custos só entra quando escolhida.
   assert.deepEqual(clean, { name: "Fiscal da casa", baseRole: "FINANCEIRO", items: ["recebimentos"], denied: ["comissoes"] });
   assert.throws(() => cleanProfile({ name: "X", baseRole: "VENDEDOR", items: ["pedidos"], denied: [] }), /de 2 a 40 letras/);
   assert.throws(() => cleanProfile({ name: "Vazio", baseRole: "VENDEDOR", items: ["produtos"], denied: [] }), /pelo menos uma tela/);
   assert.throws(() => cleanProfile({ name: "Fiscal", baseRole: "DIRETORIA", items: ["fiscal"], denied: [] }), /marque também a tela Pedidos/);
-  assert.throws(() => cleanProfile({ name: "Sem custo", baseRole: "DIRETORIA", items: ["pedidos", "produtos", "parametros"], denied: ["custos"] }), (error: unknown) => error instanceof ProfileError && /Produtos e custos e Parâmetros do sistema mostram custo/.test(error.message));
+  assert.throws(() => cleanProfile({ name: "Sem custo", baseRole: "DIRETORIA", items: ["pedidos", "custos", "parametros"], denied: ["custos"] }), (error: unknown) => error instanceof ProfileError && /Custos e Parâmetros do sistema mostram custo/.test(error.message));
   assert.deepEqual(cleanProfile({ name: "Sem custo", baseRole: "DIRETORIA", items: ["pedidos", "aprovacoes"], denied: ["custos"] }).denied, ["custos"]);
 });
 

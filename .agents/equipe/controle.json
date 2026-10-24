@@ -4,6 +4,67 @@
   "members": [],
   "tasks": [
     {
+      "id": "T-20261024-regras-fiscais-pagina-unica",
+      "title": "Reunir regras fiscais da nota em uma página",
+      "owner": null,
+      "status": "em-revisao",
+      "acceptance": "Natureza, CFOP, ICMS/IPI, PIS, COFINS, IBS/CBS e condições aparecem simultaneamente\nNão existe seletor de etapas nem botão Continuar\nUma única ação salva todas as regras fiscais da linha\nSem rolagem lateral nos cinco tamanhos obrigatórios",
+      "evidence": "Rota /parametros/fiscal?ver=regras usa FormSections e uma única ActionForm\nCinco testes Playwright aprovados em 360x640, 390x844, 430x932, 1366x768 e 1440x900\nCapturas de 360x640 e 1440x900 inspecionadas\n859 testes, lint, tipos, git diff --check e build de produção aprovados",
+      "next": "Publicar o módulo completo e exigir CI verde antes de integrar.",
+      "blocker": "",
+      "history": [
+        {
+          "at": "2026-10-24",
+          "status": "em-revisao",
+          "note": "As oito etapas foram substituídas por oito seções visíveis e uma gravação única."
+        }
+      ]
+    },
+    {
+      "id": "T-20261024-formularios-tela-unica",
+      "title": "Reunir tarefas fracionadas em formulários de tela única",
+      "owner": null,
+      "status": "em-revisao",
+      "acceptance": "Todos os campos de uma mesma tarefa ficam visíveis na mesma página\nCada formulário tem uma única ação final e gravação atômica quando aplicável\nSeletores artificiais de etapa, botões Continuar e ocultação de seções são removidos\nAs páginas não têm rolagem lateral nos cinco tamanhos obrigatórios",
+      "evidence": "Implementação local em clientes, produtos, propostas, compras, pedido, simulador, filtros de documentos e parâmetros\nFormSections substitui o componente de etapas compartilhado; FormSteps foi removido e não restam consumidores\n859 testes funcionais com PostgreSQL aprovados, sem falhas ou pulos\nLint, tipos, git diff --check e build de produção aprovados\nAuditoria visual integral aprovada em 755 capturas: 151 rotas ou estados nos cinco tamanhos, sem rolagem horizontal, controles menores que 44 px, skeleton persistente ou falha de recurso",
+      "next": "Integrar a main, repetir as verificações afetadas, publicar o módulo completo e exigir CI verde antes do deploy.",
+      "blocker": "",
+      "history": [
+        {
+          "at": "2026-10-24",
+          "status": "em-andamento",
+          "note": "Fluxos artificiais de várias etapas foram convertidos em seções visíveis com uma ação final."
+        },
+        {
+          "at": "2026-10-24",
+          "status": "em-revisao",
+          "note": "Implementação completa aprovada por 859 testes, build e auditoria visual integral antes da integração com a main."
+        }
+      ]
+    },
+    {
+      "id": "T-20261024-avl-140-menu-movel-acessivel",
+      "title": "Implementar sobreposição acessível no menu móvel",
+      "owner": null,
+      "status": "em-revisao",
+      "acceptance": "Ao abrir, o foco entra no menu e fica contido entre o primeiro controle e Fechar\nEscape fecha e devolve o foco ao botão Mais\nConteúdo coberto fica inerte enquanto o menu está aberto\nMudança para desktop remove bloqueios e estado modal",
+      "evidence": "Implementação local em fix/avl-140-menu-movel-acessivel\nLint, tipos, git diff --check e 31 testes de rotas aprovados\nTeste Playwright específico ampliado para foco, Tab, Shift+Tab, Escape e inert\nTeste visual do menu aprovado nos cinco tamanhos obrigatórios com PostgreSQL UTF-8 local\nSuíte funcional completa: 858 de 858 testes aprovados; lint, tipos e build de produção aprovados",
+      "next": "Revisar o diff consolidado, publicar o módulo completo e exigir CI verde antes de integrar.",
+      "blocker": "",
+      "history": [
+        {
+          "at": "2026-10-24",
+          "status": "em-andamento",
+          "note": "Comportamento acessível implementado localmente; validação visual aguarda banco de teste acessível."
+        },
+        {
+          "at": "2026-10-24",
+          "status": "em-revisao",
+          "note": "Menu validado por teclado e visualmente nos cinco tamanhos; bloqueio do banco removido com PostgreSQL UTF-8 local."
+        }
+      ]
+    },
+    {
       "id": "T-20261024-pagamento-pedido-tela-unica",
       "title": "Reunir o pagamento do pedido em uma tela",
       "owner": null,
@@ -281,6 +342,55 @@
           "at": "2026-10-23",
           "status": "em-revisao",
           "note": "Correções pós-revisão e integração com main em validação."
+        }
+      ]
+    },
+    {
+      "id": "T-20261024-auditoria-consolidacao-checkouts",
+      "title": "Auditar consolidacao de checkouts e evidencias visuais",
+      "owner": null,
+      "status": "em-revisao",
+      "acceptance": "Checkouts limpos e trabalho nao integrado identificado antes de excluir\nWorktrees comprovadamente contidos em main removidos\nCapturas dos cinco tamanhos inspecionadas e comparadas com docs/ux.md\nNenhum modulo enviado ou integrado sem CI e evidencia visual validos",
+      "evidence": "Tres worktrees de /home/avops/.codex/worktrees estavam limpos e contidos em origin/main; worktrees e branches locais removidos\nDoze checkouts em /home/avops/Documents/Codex estavam limpos; PRs correspondentes foram confirmados como merged\nPARTSAGRICOLA AVL-167 e AVL-168 locais correspondem ao conteudo incorporado pelas PRs 4 e 5; main contem evolucoes posteriores\nQuatro artefatos da NF-e de homologacao 2 da Ludus foram incorporados em docs/evidencias/fiscal/homologacao-2 com hashes preservados; a pasta de origem foi removida\nAuditoria inicial registrada em docs/revisao-telas/auditoria-integral-2026-10-24.md: 735 capturas de 147 rotas; 267 skeletons, uma captura sem CSS e .last-run.json failed\nGate de captura espera o fallback do App Router desaparecer, confirma CSS e fontes, aguarda duas pinturas e falha em recursos de script, estilo ou fonte; navegacoes toleram ate tres reinicios transitorios do Next\nReexecucao aprovada: 755 capturas finais de 151 rotas ou estados nos cinco tamanhos, zero overflow, zero controles abaixo de 44 px, zero skeletons e .last-run.json passed; amostras representativas inspecionadas\nMenu aprovado nos cinco tamanhos; harmonizacao 25 de 26 na rodada integral e o unico caso interrompido pelo reinicio do Next aprovado na repeticao focal\nSuite funcional completa: 858 de 858 testes aprovados; lint, tipos, git diff --check e build de producao aprovados",
+      "next": "Revisar o diff consolidado, publicar o modulo completo e exigir CI verde e inspecao dos artefatos publicados antes de integrar.",
+      "blocker": "",
+      "history": [
+        {
+          "at": "2026-10-24",
+          "status": "bloqueada",
+          "note": "Auditoria preservou trabalho local do ERP e interrompeu consolidacao porque o gate visual nao passou."
+        },
+        {
+          "at": "2026-10-24",
+          "status": "em-andamento",
+          "note": "Artefatos da NF-e de homologacao 2 incorporados ao ERP e pasta temporaria removida; permanece apenas o bloqueio da evidencia visual."
+        },
+        {
+          "at": "2026-10-24",
+          "status": "em-andamento",
+          "note": "Gate visual corrigido e validacoes estaticas aprovadas; nova execucao integral aguarda PostgreSQL de teste acessivel."
+        },
+        {
+          "at": "2026-10-24",
+          "status": "em-revisao",
+          "note": "Reexecucao integral e inspecao visual aprovadas com 755 capturas; validacoes locais completas estao verdes."
+        }
+      ]
+    },
+    {
+      "id": "T-20261024-tabelas-compras-custos-recebimentos",
+      "title": "Padronizar tabelas, compra, custos e recebimentos",
+      "owner": null,
+      "status": "em-revisao",
+      "acceptance": "Clientes e Produtos usam colunas ordenaveis, moveis e redimensionaveis com preferencias persistentes\nNova compra abre sem fornecedor e permite cadastra-lo na propria rota, retornando com ele selecionado\nProdutos mantem apenas o cadastro tecnico e Custos vira modulo do Financeiro com edicao e publicacao\nRecebimentos segue a hierarquia visual do Financeiro\nCinco tamanhos obrigatorios sem rolagem lateral da pagina",
+      "evidence": "Suite funcional completa: 858 testes, 592 aprovados, 266 integracoes sem banco puladas e zero falhas\nLint, tipos, git diff --check e build de producao aprovados\nPlaywright focal: sete casos aprovados; cinco tamanhos obrigatorios, texto a 200%, teclado, persistencia de largura e cadastro real de fornecedor dentro da compra validados\nNova compra em 360x640 foi dividida em etapas e mantem a acao principal visivel\nAcesso do perfil Financeiro a Custos aprovado; acesso ao cadastro tecnico de Produtos permanece negado\nTrinta capturas geradas e amostras mobile e desktop inspecionadas em test-results/telas",
+      "next": "Revisar o diff consolidado, executar o CI com banco e inspecionar os artefatos publicados antes de integrar.",
+      "blocker": "",
+      "history": [
+        {
+          "at": "2026-10-24",
+          "status": "em-revisao",
+          "note": "Implementacao local concluida e validada estaticamente e nos cinco tamanhos; publicacao nao executada."
         }
       ]
     }

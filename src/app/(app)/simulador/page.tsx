@@ -17,7 +17,7 @@ import { ORIGIN_UF, UFS } from "@/lib/pricing/states";
 import type { Uf } from "@/lib/pricing/states";
 import { compareByCode } from "@/lib/products-view";
 import { EquipmentPicker } from "@/components/EquipmentPicker";
-import { CARD, INPUT, LABEL, PageHeader, Pill, PRIMARY, QUIET_LINK, SECONDARY, SECTION_TITLE } from "@/components/ui";
+import { CARD, INPUT, LABEL, PageHeader, Pill, PRIMARY, QUIET_LINK, SECTION_TITLE } from "@/components/ui";
 import { ActionForm } from "../pedidos/ActionForm";
 import { createOrderAction } from "../pedidos/actions";
 import { DirectorBoard } from "../pedidos/DirectorBoard";
@@ -79,14 +79,9 @@ export default async function SimuladorPage({ searchParams }: { searchParams: Pr
     ...(hasIpi ? ([["Valor sem IPI", showMoney(sale.netSale)], [`IPI (${formatPercent(table.ipi)}%)`, showMoney(sale.ipi)]] as const) : []),
   ] as const;
 
-  // On a phone the sale is told in three short steps; a wide screen shows the conditions and the result side by side.
-  const STEPS = ["Equipamento", "Condições", "Resultado"] as const;
-  const step = Math.min(3, Math.max(1, Number(first(query.etapa)) || 1));
-  const only = (wanted: number) => (step === wanted ? "" : "hidden md:block");
   const sells = allows(session, "pedidos");
   const overFree = simulation.discount > table.freeDiscount;
   const destination = `${deliveryUf}${deliveryUf !== ORIGIN_UF ? (simulation.taxpayer ? " com IE" : " sem IE") : ""}`;
-  const FORM = "simulacao";
 
   return (
     <>
@@ -100,17 +95,13 @@ export default async function SimuladorPage({ searchParams }: { searchParams: Pr
         }
       />
       <LineTabs lines={lines} current={productLine.id} path={menuItem("simulador").href} />
-      <p className="mt-3 text-sm font-medium text-slate-600 md:hidden" aria-live="polite">
-        Etapa {step} de 3 · <span className="text-slate-900">{STEPS[step - 1]}</span>
-      </p>
-
       <div className="mt-2 grid grid-cols-[minmax(0,1fr)] items-start gap-4 md:mt-3 lg:grid-cols-[minmax(0,1fr)_24rem]">
-        <form id={FORM} method="get" className={`${CARD} ${step === 3 ? "hidden md:block" : ""} p-3 md:p-4`}>
+        <form method="get" className={`${CARD} p-3 md:p-4`}>
           {lines.length > 1 && <input type="hidden" name={LINE_PARAM} value={productLine.id} />}
 
-          <fieldset className={`${only(1)} min-w-0`}>
-            <legend className={`${SECTION_TITLE} hidden md:block`}>Equipamento</legend>
-            <div className="flex flex-col gap-3 md:mt-2 md:flex-row md:items-end">
+          <fieldset className="min-w-0">
+            <legend className={SECTION_TITLE}>Equipamento</legend>
+            <div className="mt-2 flex flex-col gap-3 md:flex-row md:items-end">
               <div className="min-w-0 flex-1">
                 <EquipmentPicker
                   key={product.productId}
@@ -128,9 +119,9 @@ export default async function SimuladorPage({ searchParams }: { searchParams: Pr
             </div>
           </fieldset>
 
-          <fieldset className={`${only(2)} min-w-0 md:mt-4`}>
-            <legend className={`${SECTION_TITLE} hidden md:block`}>Condições</legend>
-            <div className="grid grid-cols-2 gap-3 md:mt-2">
+          <fieldset className="mt-4 min-w-0">
+            <legend className={SECTION_TITLE}>Condições</legend>
+            <div className="mt-2 grid grid-cols-2 gap-3">
               <div>
                 <label htmlFor="uf" className={LABEL}>
                   Destino
@@ -172,25 +163,14 @@ export default async function SimuladorPage({ searchParams }: { searchParams: Pr
             </div>
           </fieldset>
 
-          {/* The main action comes first in the page so Enter in any field takes it; "Voltar" is drawn before it. */}
-          <div className="mt-4 flex gap-2 md:hidden">
-            <button type="submit" name="etapa" value={step + 1} className={`${PRIMARY} order-2 flex-1`}>
-              {step === 1 ? "Continuar" : "Ver resultado"}
-            </button>
-            {step === 2 && (
-              <button type="submit" name="etapa" value="1" className={`${SECONDARY} order-1`}>
-                Voltar
-              </button>
-            )}
-          </div>
-          <div className="mt-4 hidden md:block">
+          <div className="mt-4">
             <button type="submit" className={PRIMARY}>
               Simular
             </button>
           </div>
         </form>
 
-        <section className={`${CARD} ${only(3)} p-3 md:p-4`} aria-labelledby="resultado">
+        <section className={`${CARD} p-3 md:p-4`} aria-labelledby="resultado">
           <h2 id="resultado" className={`${SECTION_TITLE} sr-only md:not-sr-only`}>
             Resultado
           </h2>
@@ -248,9 +228,6 @@ export default async function SimuladorPage({ searchParams }: { searchParams: Pr
                 </button>
               </ActionForm>
             )}
-            <button type="submit" form={FORM} name="etapa" value="2" className={`${SECONDARY} order-1 md:hidden`}>
-              Editar condições
-            </button>
           </div>
 
           {board && (

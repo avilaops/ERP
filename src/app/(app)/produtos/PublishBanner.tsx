@@ -21,7 +21,7 @@ export function PublishBanner({ notice, lineId }: { notice: PublishNotice; lineI
           <span className="hidden sm:inline">{notice.strong && <strong className="font-semibold">{notice.strong} </strong>}{notice.text}</span>
         </p>
 
-        {notice.next !== null && <Link href={`/produtos/publicacao?linha=${lineId}`} className={PRIMARY}><span className="sm:hidden">Revisar v{notice.next}</span><span className="hidden sm:inline">Revisar publicação v{notice.next}</span></Link>}
+        {notice.next !== null && <Link href={`/custos/publicacao?linha=${lineId}`} className={PRIMARY}><span className="sm:hidden">Revisar v{notice.next}</span><span className="hidden sm:inline">Revisar publicação v{notice.next}</span></Link>}
       </div>
     </section>
   );

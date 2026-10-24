@@ -1,6 +1,7 @@
 import { withOptions } from "@/lib/plates";
 import { cookies } from "next/headers";
 import Link from "next/link";
+import { FitRows } from "@/components/FitRows";
 import { CARD, INPUT, Pager, pageOf, PageHeader, Pill, PRIMARY, SECONDARY } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { menuItem } from "@/lib/auth/permissions";
@@ -52,11 +53,11 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
           <p className={`${CARD} mt-3 p-4 text-sm text-slate-600`}>{shipped ? "Nenhum pedido expedido ainda." : "Nenhum pedido esperando para sair."}</p>
         ) : (
           <section className={`${CARD} mt-3`} aria-label="Pedidos">
-            <ul>
+            <ul id="pedidos-estoque">
               {slice.rows.map((order) => {
                 const short = order.items.some((item) => item.physical < item.quantity);
                 return (
-                  <li key={order.number} className="border-t border-slate-200 p-3 first:border-t-0">
+                  <li key={order.number} data-row className="border-t border-slate-200 p-3 first:border-t-0">
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <p className="min-w-0 text-sm">
                         <Link href={`${menuItem("pedidos").href}/${order.number}`} className="font-semibold text-brand underline">
@@ -82,6 +83,7 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
               })}
             </ul>
             <Pager {...slice} noun={["pedido", "pedidos"]} hrefFor={(page) => `${HERE}?ver=${tab}&pagina=${page}`} />
+            <FitRows listId="pedidos-estoque" shown={Math.max(2, Math.floor(size / 2))} minimum={2} />
           </section>
         )}
       </div>
@@ -125,7 +127,7 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
           <p className="p-4 text-sm text-slate-600">Nenhum equipamento neste filtro.</p>
         ) : (
           <>
-            <table className="stack-sm w-full text-sm">
+            <table id="saldo-estoque" className="stack-sm w-full text-sm">
               <thead>
                 <tr className="text-left text-xs text-slate-600">
                   <th scope="col" className="px-3 py-2 font-medium">Equipamento</th>
@@ -137,7 +139,7 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
               </thead>
               <tbody>
                 {slice.rows.map((row) => (
-                  <tr key={row.productId} className="border-t border-slate-200">
+                  <tr key={row.productId} data-row className="border-t border-slate-200">
                     <td className="px-3 py-2">
                       <Link href={`${HERE}/${row.productId}`} className="font-medium text-brand underline">
                         {row.name}
@@ -155,6 +157,7 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
               </tbody>
             </table>
             <Pager {...slice} noun={["equipamento", "equipamentos"]} hrefFor={(page) => link(`&pagina=${page}`)} />
+            <FitRows listId="saldo-estoque" shown={size} />
           </>
         )}
       </section>

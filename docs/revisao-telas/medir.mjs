@@ -19,18 +19,39 @@ export function controleBaixo(altura, min = MIN_CONTROLE) {
 export class NavegacaoFalhou extends Error {}
 
 /**
+ * Só libera a captura depois que o conteúdo final e a folha global do ERP estão
+ * aplicados. `main` existe também durante o loading do App Router, portanto não
+ * é, sozinho, um sinal de que a tela terminou de renderizar.
+ */
+export async function esperarTelaPronta(page) {
+  await page.locator('main').waitFor({ state: 'visible', timeout: 30_000 });
+  await page.locator('[role="status"][aria-label="Carregando página"]').waitFor({ state: 'hidden', timeout: 30_000 });
+  await page.waitForFunction(
+    () => getComputedStyle(document.documentElement).getPropertyValue('--control').trim() === '2.75rem' && document.fonts.status === 'loaded',
+    undefined,
+    { timeout: 30_000 },
+  );
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+}
+
+/**
  * Abre a rota e devolve a resposta. Qualquer falha (erro de rede, sem resposta ou status
  * 4xx/5xx) vira NavegacaoFalhou: nunca seguimos medindo a página anterior.
  */
 export async function visitar(page, url) {
   let resposta;
   try {
-    resposta = await page.goto(url, { waitUntil: 'networkidle' });
+    resposta = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60_000 });
   } catch (e) {
     throw new NavegacaoFalhou(`${url}: ${e.message.split('\n')[0]}`);
   }
   if (!resposta) throw new NavegacaoFalhou(`${url}: sem resposta`);
   if (resposta.status() >= 400) throw new NavegacaoFalhou(`${url}: status ${resposta.status()}`);
+  try {
+    await esperarTelaPronta(page);
+  } catch (e) {
+    throw new NavegacaoFalhou(`${url}: tela não ficou pronta: ${e.message.split('\n')[0]}`);
+  }
   return resposta;
 }
 

@@ -1,4 +1,4 @@
-import { FormSteps } from "@/components/FormSteps";
+import { FormSections } from "@/components/FormSections";
 import Link from "next/link";
 import { CARD, INPUT, PRIMARY, SECONDARY, SectionDisclosure, PageHeader } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
@@ -68,7 +68,7 @@ export default async function ContractSettingsPage() {
       </SectionDisclosure>
 
       <ActionForm action={saveContractSettingsAction} className="mt-3 flex flex-col gap-2">
-        <FormSteps steps={[{ title: "Título do modelo", content: (<section key="modelo" className={`${CARD} p-5`} aria-labelledby="modelo">
+        <FormSections sections={[{ title: "Título do modelo", content: (<section key="modelo" className={`${CARD} p-5`} aria-labelledby="modelo">
           <h2 id="modelo" className="sr-only">
             Modelo do contrato
           </h2>

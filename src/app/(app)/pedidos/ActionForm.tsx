@@ -2,7 +2,7 @@
 
 import { startTransition, useActionState, useEffect, useRef } from "react";
 import type { ReactNode } from "react";
-import { ActionFeedbackContext } from "@/components/FormSteps";
+import { ActionFeedbackContext } from "@/components/FormSections";
 import { IDLE_ACTION } from "@/lib/order-form";
 import type { ActionState } from "@/lib/order-form";
 
@@ -27,8 +27,13 @@ export function ActionForm({
   className?: string;
   children: ReactNode;
 }) {
+  // Keep the server action direct: wrapping it in a catch also captures Next's
+  // successful redirect signal and leaves a saved form stuck on this screen.
+  // Expected operational failures are returned by each action; unexpected
+  // failures reach the route error boundary, which offers a safe retry.
   const [state, formAction, pending] = useActionState(action, IDLE_ACTION);
   const form = useRef<HTMLFormElement>(null);
+  const feedback = useRef<HTMLParagraphElement>(null);
   const sent = useRef(false);
 
   useEffect(() => {
@@ -36,6 +41,7 @@ export function ActionForm({
     sent.current = false;
     // Accepted: back to what the server renders now (the saved values, or blank in a form that adds).
     if (state.error === null) form.current?.reset();
+    else requestAnimationFrame(() => feedback.current?.focus());
   }, [state, pending]);
 
   return (
@@ -60,7 +66,7 @@ export function ActionForm({
     >
       <ActionFeedbackContext.Provider value={state}>{children}</ActionFeedbackContext.Provider>
       {state.error && !pending && (
-        <p role="alert" className="mt-2 basis-full rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-900">
+        <p ref={feedback} role="alert" tabIndex={-1} className="mt-2 basis-full rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-900">
           <span className="font-semibold">Nada foi gravado.</span> {state.error}
         </p>
       )}

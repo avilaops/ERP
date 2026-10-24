@@ -1,4 +1,4 @@
-import { FormSteps } from "@/components/FormSteps";
+import { FormSections } from "@/components/FormSections";
 import { MENU_ITEMS, POWERS } from "@/lib/auth/permissions";
 import type { AccessProfile } from "@/lib/db/access-profiles";
 import { ROLE_LABELS, ROLES } from "@/lib/auth/roles";
@@ -25,7 +25,7 @@ export function PersonFields({ saved, profiles }: { saved: AppUser | null; profi
   // A profile of the company is one more choice of access, with its own screens.
   const profileKey = (id: number) => `perfil:${id}`;
   return (
-    <FormSteps label="Etapa da pessoa" steps={[{ title: "Identificação", content: <div key="identificacao" className="grid gap-3">
+    <FormSections sections={[{ title: "Identificação", content: <div key="identificacao" className="grid gap-3">
       <div>
         <label htmlFor="name" className="block font-medium">
           Nome

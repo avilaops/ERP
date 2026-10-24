@@ -1,4 +1,4 @@
-import { FormSteps } from "@/components/FormSteps";
+import { FormSections } from "@/components/FormSections";
 import { INPUT, LABEL } from "@/components/ui";
 import type { Opportunity } from "@/lib/db/funnel";
 import { formatMoney } from "@/lib/format";
@@ -11,7 +11,7 @@ import { formatMoney } from "@/lib/format";
  */
 export function OpportunityFields({ saved, customers }: { saved: Opportunity | null; customers: { id: number; name: string }[] }) {
   return (
-    <FormSteps label="Etapa da oportunidade" steps={[{ title: "Oportunidade", content: <div key="oportunidade" className="grid grid-cols-2 gap-3"><div className="col-span-2">
+    <FormSections sections={[{ title: "Oportunidade", content: <div key="oportunidade" className="grid grid-cols-2 gap-3"><div className="col-span-2">
         <label htmlFor="title" className={LABEL}>
           O que está sendo vendido
         </label>

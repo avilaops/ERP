@@ -15,7 +15,7 @@ import { priceTableReview, priceTableReviewRow, pricingRuleChanges } from "@/lib
 import { publishPriceTableAction } from "../actions";
 import { PublishReviewForm } from "./PublishReviewForm";
 
-const HERE = "/produtos/publicacao";
+const HERE = "/custos/publicacao";
 const OPTIONS = { sorts: ["nome"] as const, defaultSort: "nome" as const, filters: { categoria: ["custos", "novos", "removidos", "cadastro", "regras"], linha: [] as string[] } };
 const LABELS = { custos: "Custos e tributos", novos: "Novos", removidos: "Saem da tabela", cadastro: "Nome ou código", regras: "Regras comerciais" } as const;
 
@@ -23,7 +23,7 @@ export const metadata = { title: "Revisar publicação · ERP" };
 export const dynamic = "force-dynamic";
 
 export default async function PublicacaoPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  const session = await requirePermission("produtos");
+  const session = await requirePermission("custos");
   const raw = await searchParams;
   const data = await withTenantConnection(session.tenant.slug, async (conn) => {
     await conn.query("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY");
@@ -65,7 +65,7 @@ export default async function PublicacaoPage({ searchParams }: { searchParams: P
   const { options, query, next, revision, pending, items, pagination, rules } = data;
 
   return <>
-    <PageHeader title={`Revisar publicação v${next}`} hint={`Linha ${line.name}. Confira alterações e efeito financeiro antes de disponibilizar à equipe.`} actions={<Link href={`/produtos?linha=${line.id}`} className={SECONDARY}>Voltar aos produtos</Link>} />
+    <PageHeader title={`Revisar publicação v${next}`} hint={`Linha ${line.name}. Confira alterações e efeito financeiro antes de disponibilizar à equipe.`} actions={<Link href={`/custos?linha=${line.id}`} className={SECONDARY}>Voltar aos custos</Link>} />
     {!pending ? <section className={`${CARD} mt-4 p-5`}><p>Nada mudou desde a tabela publicada.</p></section> : <>
       <section className={`${CARD} mt-4 p-4`} aria-label="Resumo da publicação"><div className="flex flex-wrap gap-2">{pending.costs > 0 && <Pill tone="warn">{pending.costs} custos</Pill>}{pending.added > 0 && <Pill tone="good">{pending.added} novos</Pill>}{pending.removed > 0 && <Pill tone="bad">{pending.removed} removidos</Pill>}{pending.renamed > 0 && <Pill tone="neutral">{pending.renamed} nomes ou códigos</Pill>}{pending.rules && <Pill tone="warn">Regras alteradas</Pill>}</div>{rules.length > 0 && <details className="mt-3"><summary className="min-h-[var(--control)] cursor-pointer font-medium text-brand">Ver regras alteradas</summary><dl className="grid gap-2 sm:grid-cols-2">{rules.map((rule) => <div key={rule.field}><dt className="text-sm font-medium">{rule.field}</dt><dd className="text-sm text-slate-600">{rule.before} → {rule.after}</dd></div>)}</dl></details>}</section>
       <section className={`${CARD} mt-4 list-screen`}>

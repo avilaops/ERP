@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 
 export type MenuTab = { href: string; label: string; icon: ReactNode };
@@ -22,20 +22,82 @@ export type MenuTab = { href: string; label: string; icon: ReactNode };
 export function MobileMenu({ brand, tabs, more, children }: { brand: ReactNode; tabs: MenuTab[]; more: ReactNode; children: ReactNode }) {
   const pathname = usePathname();
   const [openAt, setOpenAt] = useState<string | null>(null);
+  const menuRef = useRef<HTMLElement>(null);
+  const toggleRef = useRef<HTMLButtonElement>(null);
   const open = openAt === pathname;
 
   useEffect(() => {
     if (!open) return;
-    // Only where the menu is a sheet over the page; on a wide screen it is a column and nothing is held.
     const phone = window.matchMedia("(max-width: 1023px)");
-    const hold = () => {
-      document.body.style.overflow = phone.matches ? "hidden" : "";
+    const content = document.getElementById("conteudo");
+    const skipLink = document.querySelector<HTMLElement>('a[href="#conteudo"]');
+    let active = false;
+    let previousOverflow = "";
+    let contentWasInert = false;
+    let skipLinkWasInert = false;
+
+    const focusable = () => {
+      const selector = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex="-1"])';
+      return [...(menuRef.current?.querySelectorAll<HTMLElement>(selector) ?? []), toggleRef.current].filter(
+        (element): element is HTMLElement => Boolean(element && element.getClientRects().length),
+      );
     };
-    hold();
-    phone.addEventListener("change", hold);
+    const close = () => {
+      setOpenAt(null);
+      requestAnimationFrame(() => toggleRef.current?.focus());
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        close();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const items = focusable();
+      if (items.length === 0) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    const activate = () => {
+      if (active || !phone.matches) return;
+      active = true;
+      previousOverflow = document.body.style.overflow;
+      contentWasInert = content?.inert ?? false;
+      skipLinkWasInert = skipLink?.inert ?? false;
+      document.body.style.overflow = "hidden";
+      if (content) content.inert = true;
+      if (skipLink) skipLink.inert = true;
+      document.addEventListener("keydown", onKeyDown);
+      requestAnimationFrame(() => focusable()[0]?.focus());
+    };
+    const deactivate = () => {
+      if (!active) return;
+      active = false;
+      document.body.style.overflow = previousOverflow;
+      if (content) content.inert = contentWasInert;
+      if (skipLink) skipLink.inert = skipLinkWasInert;
+      document.removeEventListener("keydown", onKeyDown);
+    };
+    const respondToViewport = () => {
+      if (phone.matches) activate();
+      else {
+        deactivate();
+        setOpenAt(null);
+      }
+    };
+
+    respondToViewport();
+    phone.addEventListener("change", respondToViewport);
     return () => {
-      phone.removeEventListener("change", hold);
-      document.body.style.overflow = "";
+      phone.removeEventListener("change", respondToViewport);
+      deactivate();
     };
   }, [open]);
 
@@ -47,6 +109,10 @@ export function MobileMenu({ brand, tabs, more, children }: { brand: ReactNode; 
   return (
     <>
       <aside
+        ref={menuRef}
+        role={open ? "dialog" : undefined}
+        aria-modal={open ? "true" : undefined}
+        aria-label={open ? "Menu principal" : undefined}
         className={`${open ? "fixed inset-0 h-dvh pb-[var(--tabbar)]" : "sticky top-0 h-[var(--topbar)]"} z-20 flex shrink-0 flex-col border-b border-slate-200 bg-white lg:sticky lg:top-0 lg:h-dvh lg:w-60 lg:border-b-0 lg:border-r lg:pb-0`}
       >
         <div className="flex h-[3.25rem] shrink-0 items-center justify-between gap-3 px-4 lg:h-auto lg:pt-4">
@@ -75,6 +141,7 @@ export function MobileMenu({ brand, tabs, more, children }: { brand: ReactNode; 
           </Link>
         ))}
         <button
+          ref={toggleRef}
           type="button"
           aria-expanded={open}
           aria-controls="menu-principal"

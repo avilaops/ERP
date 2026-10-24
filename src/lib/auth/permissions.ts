@@ -23,7 +23,8 @@ const MENU = [
   { key: "comissoes", label: "Comissões", href: "/comissoes", roles: ["DIRETORIA", "VENDEDOR", "FINANCEIRO"] },
   { key: "fiscal", label: "Notas fiscais", href: "/fiscal", roles: ["DIRETORIA"] },
   { key: "tabela-precos", label: "Tabela de preços", href: "/tabela-precos", roles: ["DIRETORIA", "GERENTE_COMERCIAL", "VENDEDOR"] },
-  { key: "produtos", label: "Produtos e custos", href: "/produtos", roles: ["DIRETORIA"] },
+  { key: "produtos", label: "Produtos", href: "/produtos", roles: ["DIRETORIA"] },
+  { key: "custos", label: "Custos", href: "/custos", roles: ["DIRETORIA", "FINANCEIRO"] },
   { key: "parametros", label: "Parâmetros do sistema", href: "/parametros", roles: ["DIRETORIA"] },
   { key: "simulador", label: "Simulador", href: "/simulador", roles: ["DIRETORIA", "GERENTE_COMERCIAL", "VENDEDOR"] },
   { key: "equipe", label: "Equipe e acessos", href: "/equipe", roles: ["DIRETORIA"] },
@@ -119,7 +120,7 @@ function has(who: Powered, power: PowerKey): boolean {
 export const powersOf = (role: Role) => POWERS.filter((power) => (power.roles as readonly Role[]).includes(role));
 
 /** Screens that show cost whoever opens them: a profile without the power of seeing costs cannot have them. */
-export const COST_SCREENS: readonly MenuItemKey[] = ["produtos", "parametros", "compras"];
+export const COST_SCREENS: readonly MenuItemKey[] = ["custos", "parametros", "compras"];
 
 /**
  * Who sees cost, real cost, largest discounts and profit. The single source for

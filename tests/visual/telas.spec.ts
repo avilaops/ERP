@@ -39,9 +39,64 @@ const CONTROL = 43.5;
 type Measure = { overflowX: number; screens: number; small: string[] };
 
 async function signIn(page: Page): Promise<void> {
-  await page.goto("/dev/login");
+  await openScreen(page, "/dev/login");
   await page.click("button[value=DIRETORIA]");
   await page.waitForURL((url) => !url.pathname.startsWith("/dev/login"));
+}
+
+/**
+ * The development server may restart itself while compiling the complete ERP
+ * route graph on a small machine. Reopen only transiently interrupted
+ * navigations; a real HTTP or rendering failure still reaches the assertions.
+ */
+async function openScreen(page: Page, path: string): Promise<string[]> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    const issues: string[] = [];
+    const onConsole = (message: { type(): string; text(): string }) => {
+      if (message.type() === "error" && !message.text().startsWith("Failed to load resource:")) issues.push(message.text().slice(0, 300));
+    };
+    const onPageError = (error: Error) => issues.push(error.message.slice(0, 300));
+    const onResponse = (response: { status(): number; url(): string; request(): { resourceType(): string } }) => {
+      const resource = response.request().resourceType();
+      if (response.status() >= 500 || (["script", "stylesheet", "font"].includes(resource) && response.status() >= 400)) {
+        issues.push(`${response.status()} ${resource} ${new URL(response.url()).pathname}`);
+      }
+    };
+    const onRequestFailed = (request: { resourceType(): string; url(): string; failure(): { errorText: string } | null }) => {
+      const resource = request.resourceType();
+      const failure = request.failure()?.errorText ?? "erro desconhecido";
+      if (["script", "stylesheet", "font"].includes(resource) && failure !== "net::ERR_ABORTED") {
+        issues.push(`${resource} não carregou: ${new URL(request.url()).pathname} (${failure})`);
+      }
+    };
+    page.on("console", onConsole);
+    page.on("pageerror", onPageError);
+    page.on("response", onResponse);
+    page.on("requestfailed", onRequestFailed);
+    try {
+      const response = await page.goto(path, { waitUntil: "domcontentloaded", timeout: 60_000 });
+      if (response && response.status() >= 400) throw new Error(`${path}: HTTP ${response.status()}`);
+      await page.locator("main").waitFor({ state: "visible", timeout: 30_000 });
+      await page.locator('[role="status"][aria-label="Carregando página"]').waitFor({ state: "detached", timeout: 30_000 });
+      await page.waitForFunction(
+        () => getComputedStyle(document.documentElement).getPropertyValue("--control").trim() === "2.75rem" && document.fonts.status === "loaded",
+        undefined,
+        { timeout: 30_000 },
+      );
+      await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+      return issues;
+    } catch (error) {
+      lastError = error;
+      if (attempt < 3) await page.waitForTimeout(1_000 * attempt);
+    } finally {
+      page.off("console", onConsole);
+      page.off("pageerror", onPageError);
+      page.off("response", onResponse);
+      page.off("requestfailed", onRequestFailed);
+    }
+  }
+  throw lastError;
 }
 
 async function discover(page: Page): Promise<string[]> {
@@ -55,7 +110,7 @@ async function discover(page: Page): Promise<string[]> {
     seen.add(path);
     kinds.add(kindOf(path));
     found.push(path);
-    await page.goto(path, { waitUntil: "networkidle" });
+    await openScreen(page, path);
     const links = await page.$$eval("a[href^='/']", (anchors) => anchors.map((anchor) => anchor.getAttribute("href")!));
     for (const link of links.map(screenOf)) if (!OUTSIDE.test(link.split("?")[0]) && !seen.has(link)) queue.push(link);
   }
@@ -92,13 +147,6 @@ function measure(control: number): Measure {
 test("telas: cabem na largura, controles com 44 px e nenhum erro, nos cinco tamanhos", async ({ page }, testInfo) => {
   const errors: string[] = [];
   let current = "";
-  page.on("console", (message) => {
-    if (message.type() === "error") errors.push(`${current}: ${message.text().slice(0, 300)}`);
-  });
-  page.on("pageerror", (error) => errors.push(`${current}: ${error.message.slice(0, 300)}`));
-  page.on("response", (response) => {
-    if (response.status() >= 500) errors.push(`${current}: ${response.status()} ${new URL(response.url()).pathname}`);
-  });
 
   await signIn(page);
   const paths = await discover(page);
@@ -109,13 +157,18 @@ test("telas: cabem na largura, controles com 44 px e nenhum erro, nos cinco tama
     for (const [width, height] of SIZES) {
       current = `${path} ${width}×${height}`;
       await page.setViewportSize({ width, height });
-      await page.goto(path, { waitUntil: "networkidle" });
+      const navigationIssues = await openScreen(page, path);
+      errors.push(...navigationIssues.map((issue) => `${current}: ${issue}`));
       const result = await page.evaluate(measure, CONTROL);
       report.push({ path, size: `${width}×${height}`, ...result });
       expect.soft(result.overflowX, `${current}: rolagem lateral`).toBeLessThanOrEqual(0);
       expect.soft(result.small, `${current}: controles abaixo de 44 px`).toEqual([]);
       {
-        await page.screenshot({ path: testInfo.outputPath(`${path.slice(1).replace(/[/?=&]/g, "_") || "inicio"}.${width}.png`), fullPage: true });
+        await page.screenshot({
+          path: testInfo.outputPath(`${path.slice(1).replace(/[/?=&]/g, "_") || "inicio"}.${width}.png`),
+          fullPage: true,
+          caret: "initial",
+        });
       }
     }
   }

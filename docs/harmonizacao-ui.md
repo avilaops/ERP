@@ -19,7 +19,7 @@ Referências: [Layout](https://developer.apple.com/design/human-interface-guidel
 - `ViewTabs` e `.view-tabs`: visões irmãs com seleção sublinhada, distintas da ação principal.
 - `SectionDisclosure`: instruções e ferramentas secundárias com nome explícito.
 - `MetricSummary`: dois indicadores na primeira dobra, demais informações sob demanda.
-- `FormSteps`: grupos de campos permanecem montados e são enviados juntos; erro do
+- `FormSections`: grupos de campos permanecem visíveis e são enviados juntos; erro do
   `ActionForm` revela todos os grupos para correção, sem descartar o preenchimento.
 - `FitRows`: considera somente linhas visíveis, reserva moldura e paginação e aceita um
   cookie por família. Usa a maior linha fechada como referência, respeitando nomes longos.
@@ -57,9 +57,9 @@ Movimento reduzido, foco visível e um atalho para o conteúdo fazem parte da mo
 | Tarefa clara? | Título e conteúdo inicial identificam a decisão. |
 | Informação decisiva visível? | Identificação, valor e estado têm prioridade; indicadores complementares são expansíveis. |
 | Ação principal clara? | Uma ação primária por contexto; ações de pagamento, publicação e permissão mantêm validação e confirmação. |
-| Cabe nos cinco tamanhos? | Medir cada etapa em 360×640, 390×844, 430×932, 1366×768 e 1440×900. Altura excedente continua sendo pendência explícita. |
-| Excedente alcançável? | Seletores de etapa, detalhes, ferramentas e paginação com nomes claros. |
-| Preserva preenchimento? | Testar troca de etapa, voltar no navegador e erros de validação em formulários reais de demonstração. |
+| Funciona nos cinco tamanhos? | Medir a página em 360×640, 390×844, 430×932, 1366×768 e 1440×900, sem rolagem lateral. A rolagem vertical mantém todas as seções alcançáveis. |
+| Excedente alcançável? | Seções visíveis, detalhes, ferramentas e paginação com nomes claros. |
+| Preserva preenchimento? | Testar envio, voltar no navegador e erros de validação em formulários reais de demonstração. |
 | Teclado e ampliação? | Testar foco, seletores nativos e texto a 200%; VoiceOver/Safari real exige validação adicional. |
 
 ## Verificação
@@ -68,7 +68,7 @@ Movimento reduzido, foco visível e um atalho para o conteúdo fazem parte da mo
 regras de negócio. Testes de banco exigem banco isolado terminado em `_test`.
 
 `tests/visual/harmonizacao.spec.ts` cobre preservação de dados, histórico do pedido,
-retorno de gravação, contraste da ação principal nos dois temas e captura das etapas.
+retorno de gravação, contraste da ação principal nos dois temas e captura dos formulários completos.
 `menu.spec.ts`, `cores-pedido.spec.ts` e `telas.spec.ts` complementam navegação, gravação
 das escolhas e varredura das rotas descobertas nos cinco tamanhos.
 

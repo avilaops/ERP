@@ -106,7 +106,7 @@ export default async function EquipamentoPage({ params }: { params: Promise<{ id
       </section>
 
       {measures && (
-        <details className="mx-auto mt-6 max-w-xl rounded-lg border border-slate-200 bg-white" open={Object.values(measures).every((value) => value === null)}>
+        <details id="product-measures" className="mx-auto mt-6 max-w-xl scroll-mt-4 rounded-lg border border-slate-200 bg-white" open={Object.values(measures).every((value) => value === null)}>
           <summary className="cursor-pointer px-4 py-3 font-medium">Dimensões e peso (saem na proposta)</summary>
           <ActionForm action={saveProductMeasuresAction} className="grid grid-cols-2 gap-4 border-t border-slate-200 p-4 sm:grid-cols-4">
             <input type="hidden" name="id" value={product.id} />
@@ -145,7 +145,7 @@ export default async function EquipamentoPage({ params }: { params: Promise<{ id
       )}
 
       {fiscal && (
-        <details className="mx-auto mt-6 max-w-xl rounded-lg border border-slate-200 bg-white">
+        <details id="product-fiscal" className="mx-auto mt-6 max-w-xl scroll-mt-4 rounded-lg border border-slate-200 bg-white">
           <summary className="cursor-pointer px-4 py-3 font-medium">Dados fiscais: NCM, origem e unidade</summary>
           <ActionForm action={saveProductFiscalAction} className="grid gap-4 border-t border-slate-200 p-4 sm:grid-cols-2">
             <input type="hidden" name="id" value={product.id} />

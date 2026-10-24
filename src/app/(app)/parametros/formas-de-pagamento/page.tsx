@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CARD, DANGER, PageHeader, Pill, PRIMARY, SECONDARY } from "@/components/ui";
+import { CARD, DANGER, PageHeader, Pager, Pill, PRIMARY, SECONDARY, pageOf } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { menuItem } from "@/lib/auth/permissions";
 import { listAllPaymentMethods } from "@/lib/db/payment-methods";
@@ -13,10 +13,12 @@ export const dynamic = "force-dynamic";
 
 const INPUT = "min-h-[var(--control)] rounded-lg border border-slate-300 bg-white px-3 text-base outline-none focus:ring-2 focus:ring-brand";
 
-export default async function FormasDePagamentoPage() {
+export default async function FormasDePagamentoPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const session = await requirePermission("parametros");
   const conn = tenantDb(session.tenant.slug);
   const methods = await listAllPaymentMethods(conn);
+  const query = await searchParams;
+  const slice = pageOf(methods, typeof query.pagina === "string" ? query.pagina : undefined, 10);
 
   return (
     <>
@@ -44,9 +46,9 @@ export default async function FormasDePagamentoPage() {
           Formas cadastradas ({methods.length})
         </h2>
         <ul>
-          {methods.map((method) => (
+          {slice.rows.map((method) => (
             <li key={method.id} className="border-t border-slate-200 first:border-t-0">
-              <details className="group">
+              <details name="forma-em-edicao" className="group">
                 <summary className="flex min-h-[var(--control)] cursor-pointer items-center gap-3 px-5 py-2">
                   <span className="w-6 shrink-0 text-right text-sm tabular-nums text-slate-500">{method.position}</span>
                   <span className="min-w-0 flex-1 font-medium">{method.label}</span>
@@ -117,6 +119,7 @@ export default async function FormasDePagamentoPage() {
             </li>
           ))}
         </ul>
+        <Pager {...slice} noun={["forma", "formas"]} hrefFor={(page) => (page === 1 ? "/parametros/formas-de-pagamento" : `/parametros/formas-de-pagamento?pagina=${page}`)} />
       </section>
     </>
   );

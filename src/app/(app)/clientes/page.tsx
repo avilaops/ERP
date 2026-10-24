@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CustomersGrid } from "@/components/CustomersGrid";
 import { ListPager, ListQuery } from "@/components/ListQuery";
 import { CARD, EmptyState, PageHeader, Pill, SECONDARY } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
@@ -7,12 +8,12 @@ import { completenessText, formatDocument, formatPhone, isComplete, taxpayerFrom
 import { queryCustomers } from "@/lib/db/customers";
 import { tenantDb } from "@/lib/db/pool";
 import { showDate, showMoney } from "@/lib/format";
-import { parseListQuery } from "@/lib/list-query";
+import { listHref, parseListQuery } from "@/lib/list-query";
 import { UFS } from "@/lib/pricing/states";
 
 const ITEM = menuItem("clientes");
 const OPTIONS = {
-  sorts: ["nome", "cadastro", "ultima_compra"] as const,
+  sorts: ["nome", "documento", "cidade", "celular", "compras", "ultima_compra", "completude", "cadastro"] as const,
   defaultSort: "nome" as const,
   filters: { tipo: ["PJ", "PF"], uf: UFS, compra: ["com", "sem"] },
 };
@@ -21,13 +22,20 @@ export const metadata = { title: `${ITEM.label} · ERP` };
 export const dynamic = "force-dynamic";
 
 const NONE = "—";
-const COLUMNS = ["Cliente", "Documento", "Cidade/UF", "Celular", "Compras", "Última compra", "Cadastro"];
-
 export default async function ClientesPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const session = await requirePermission("clientes");
   const query = parseListQuery(await searchParams, OPTIONS);
   const result = await queryCustomers(query, tenantDb(session.tenant.slug));
   const { items, ...page } = result;
+  const sortHrefs = {
+    customer: listHref(ITEM.href, query, { sort: "nome", direction: query.sort === "nome" && query.direction === "asc" ? "desc" : "asc" }, OPTIONS),
+    document: listHref(ITEM.href, query, { sort: "documento", direction: query.sort === "documento" && query.direction === "asc" ? "desc" : "asc" }, OPTIONS),
+    city: listHref(ITEM.href, query, { sort: "cidade", direction: query.sort === "cidade" && query.direction === "asc" ? "desc" : "asc" }, OPTIONS),
+    phone: listHref(ITEM.href, query, { sort: "celular", direction: query.sort === "celular" && query.direction === "asc" ? "desc" : "asc" }, OPTIONS),
+    purchases: listHref(ITEM.href, query, { sort: "compras", direction: query.sort === "compras" && query.direction === "asc" ? "desc" : "asc" }, OPTIONS),
+    lastPurchase: listHref(ITEM.href, query, { sort: "ultima_compra", direction: query.sort === "ultima_compra" && query.direction === "asc" ? "desc" : "asc" }, OPTIONS),
+    registration: listHref(ITEM.href, query, { sort: "completude", direction: query.sort === "completude" && query.direction === "asc" ? "desc" : "asc" }, OPTIONS),
+  };
 
   return (
     <>
@@ -40,6 +48,7 @@ export default async function ClientesPage({ searchParams }: { searchParams: Pro
           options={OPTIONS}
           searchLabel="Buscar cliente por nome, fantasia ou CPF/CNPJ"
           searchPlaceholder="Nome, fantasia ou CPF/CNPJ"
+          controls="search"
           sorts={[{ value: "nome", label: "Nome" }, { value: "cadastro", label: "Data de cadastro" }, { value: "ultima_compra", label: "Última compra" }]}
           filters={[
             { key: "tipo", label: "Tipo", multiple: true, choices: [{ value: "PJ", label: "Pessoa jurídica" }, { value: "PF", label: "Pessoa física" }] },
@@ -71,22 +80,7 @@ export default async function ClientesPage({ searchParams }: { searchParams: Pro
                 </li>
               ))}
             </ul>
-            <table className="hidden w-full table-fixed text-sm md:table">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr>{COLUMNS.map((column) => <th key={column} scope="col" className="px-3 py-2 text-left font-semibold">{column}</th>)}</tr></thead>
-              <tbody>
-                {items.map((customer) => (
-                  <tr key={customer.id} className="border-t border-slate-200 align-top">
-                    <td className="px-3 py-3"><Link href={`${ITEM.href}/${customer.id}`} className="break-words font-medium text-brand underline">{customer.name}</Link>{customer.tradeName && <span className="block break-words text-xs text-slate-500">{customer.tradeName}</span>}</td>
-                    <td className="px-3 py-3">{formatDocument(customer.document)}</td>
-                    <td className="px-3 py-3">{[customer.city, customer.uf].filter(Boolean).join("/") || NONE}</td>
-                    <td className="px-3 py-3">{customer.phone ? formatPhone(customer.phone) : NONE}</td>
-                    <td className="px-3 py-3">{customer.closedOrders > 0 ? <><span className="block font-medium">{showMoney(customer.totalBought)}</span><span className="text-xs text-slate-500">{customer.closedOrders} pedido{customer.closedOrders === 1 ? "" : "s"}</span></> : NONE}</td>
-                    <td className="px-3 py-3">{customer.lastPurchase ? showDate(customer.lastPurchase) : NONE}</td>
-                    <td className="px-3 py-3"><Pill tone={isComplete(customer) ? "good" : "warn"}>{completenessText(customer)}</Pill><span className="mt-1 block text-xs text-slate-500">ICMS: {taxpayerFromRegistration(customer.kind, customer.stateRegistration) ? "contribuinte" : "não contribuinte"}</span></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <CustomersGrid rows={items.map((customer) => ({ id: customer.id, name: customer.name, tradeName: customer.tradeName, document: formatDocument(customer.document), city: [customer.city, customer.uf].filter(Boolean).join("/") || NONE, phone: customer.phone ? formatPhone(customer.phone) : NONE, purchases: customer.closedOrders > 0 ? showMoney(customer.totalBought) : NONE, purchaseCount: `${customer.closedOrders} pedido${customer.closedOrders === 1 ? "" : "s"}`, lastPurchase: customer.lastPurchase ? showDate(customer.lastPurchase) : NONE, complete: isComplete(customer), completeness: completenessText(customer), taxpayer: taxpayerFromRegistration(customer.kind, customer.stateRegistration) ? "contribuinte" : "não contribuinte" }))} sortHrefs={sortHrefs} sort={query.sort} direction={query.direction} />
           </div>
         )}
         <ListPager path={ITEM.href} query={query} options={OPTIONS} result={page} noun={["cliente", "clientes"]} />

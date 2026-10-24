@@ -11,8 +11,27 @@ const pages = () => readdirSync(ROOT + APP, { recursive: true, encoding: "utf8" 
 
 test("diretrizes de UX: a regra está escrita e as instruções dos agentes apontam para ela", () => {
   const guide = read("docs/ux.md");
-  for (const expected of ["uma tela, uma tarefa, uma decisão", "360×640", "1440×900", "overflow: hidden", "PageHeader", "FitRows", "--tabbar"]) assert.ok(guide.includes(expected), expected);
-  for (const file of ["AGENTS.md", "CLAUDE.md"]) assert.ok(read(file).includes("docs/ux.md"), file);
+  for (const expected of ["uma tarefa, um formulário, uma página", "360×640", "1440×900", "overflow: hidden", "PageHeader", "FitRows", "--tabbar"]) assert.ok(guide.includes(expected), expected);
+  assert.ok(read("AGENTS.md").includes("docs/ux.md"), "AGENTS.md");
+});
+
+test("formulários de uma única tarefa não escondem campos em etapas", () => {
+  const sources = [
+    "src/components/FormSections.tsx",
+    "src/components/ProposalFields.tsx",
+    `${APP}clientes/CustomerForm.tsx`,
+    `${APP}produtos/ProductScreen.tsx`,
+    `${APP}documentos/filtros/page.tsx`,
+    `${APP}parametros/ParamsForm.tsx`,
+    `${APP}compras/PurchaseFields.tsx`,
+    `${APP}pedidos/OrderParts.tsx`,
+  ].map(read);
+  for (const source of sources) {
+    assert.doesNotMatch(source, /Salvar e continuar|Próxima etapa|Continuar para custos|Etapa do cadastro|hidden=\{[^}]*step/);
+  }
+  assert.ok(read("src/components/ProposalFields.tsx").includes("sections.map((group)"));
+  assert.ok(read(`${APP}clientes/CustomerForm.tsx`).includes("groups.map((group, index)"));
+  assert.doesNotMatch(read("src/app/globals.css"), /data-order-part/);
 });
 
 test("fatia de lista: página pedida além do fim cai na última, e lixo no endereço cai na primeira", () => {
@@ -94,15 +113,14 @@ test("tabela de preços: consulta paginada, sem rolagem lateral e sem cortar nom
   assert.ok(page.includes("preço em destaque: {view.mainLabel}"));
 });
 
-test("simulador: três etapas no celular, equipamento por busca e os dados seguem de uma etapa para a outra", () => {
+test("simulador: equipamento, condições e resultado ficam juntos no celular", () => {
   const page = read(`${APP}simulador/page.tsx`);
-  assert.ok(page.includes('const STEPS = ["Equipamento", "Condições", "Resultado"] as const;'));
   // Busca no lugar da lista com o catálogo inteiro.
   assert.ok(page.includes("<EquipmentPicker") && !page.includes('<select id="equipamento"'));
-  // Um formulário só: avançar, voltar e editar enviam tudo o que foi digitado.
+  // Um formulário só, sem navegação artificial por etapas.
   assert.equal(page.split("<form ").length - 1, 1);
-  assert.equal(page.split('name="etapa"').length - 1, 3);
-  assert.ok(page.includes('form={FORM} name="etapa" value="2"'));
+  assert.doesNotMatch(page, /name="etapa"|Etapa \{step\}|Continuar|Editar condições/);
+  for (const section of [">Equipamento<", ">Condições<", 'aria-labelledby="resultado"']) assert.ok(page.includes(section), section);
   // O resultado destaca o total, diz que não foi salvo e deixa a composição a um toque.
   for (const expected of ["Simulação não salva", "Total da venda", "Entrada mínima", "Ver composição", "Criar pedido", "<Pill tone={BAND_TONES[band]}>"]) assert.ok(page.includes(expected), expected);
   assert.doesNotMatch(page, /overflow-x-auto|overflow-hidden|truncate/);

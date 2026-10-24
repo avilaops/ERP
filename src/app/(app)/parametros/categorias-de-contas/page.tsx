@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CARD, DANGER, PageHeader, Pill, PRIMARY, SECONDARY } from "@/components/ui";
+import { CARD, DANGER, PageHeader, Pager, Pill, PRIMARY, SECONDARY, pageOf } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { menuItem } from "@/lib/auth/permissions";
 import { listAllPayableCategories } from "@/lib/db/payable-categories";
@@ -13,10 +13,12 @@ export const dynamic = "force-dynamic";
 
 const INPUT = "min-h-[var(--control)] rounded-lg border border-slate-300 bg-white px-3 text-base outline-none focus:ring-2 focus:ring-brand";
 
-export default async function CategoriasDeContasPage() {
+export default async function CategoriasDeContasPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const session = await requirePermission("parametros");
   const conn = tenantDb(session.tenant.slug);
   const categories = await listAllPayableCategories(conn);
+  const query = await searchParams;
+  const slice = pageOf(categories, typeof query.pagina === "string" ? query.pagina : undefined, 10);
 
   return (
     <>
@@ -44,9 +46,9 @@ export default async function CategoriasDeContasPage() {
           Categorias cadastradas ({categories.length})
         </h2>
         <ul>
-          {categories.map((category) => (
+          {slice.rows.map((category) => (
             <li key={category.id} className="border-t border-slate-200 first:border-t-0">
-              <details className="group">
+              <details name="categoria-em-edicao" className="group">
                 <summary className="flex min-h-[var(--control)] cursor-pointer items-center gap-3 px-5 py-2">
                   <span className="w-6 shrink-0 text-right text-sm tabular-nums text-slate-500">{category.position}</span>
                   <span className="min-w-0 flex-1 font-medium">{category.label}</span>
@@ -104,6 +106,7 @@ export default async function CategoriasDeContasPage() {
             </li>
           ))}
         </ul>
+        <Pager {...slice} noun={["categoria", "categorias"]} hrefFor={(page) => (page === 1 ? "/parametros/categorias-de-contas" : `/parametros/categorias-de-contas?pagina=${page}`)} />
       </section>
     </>
   );

@@ -34,6 +34,7 @@ const FAILED = "Não foi possível gravar agora. Nada foi alterado; tente de nov
 /** The list, and Parâmetros: the suggested down payment there depends on the costs. */
 function revalidate(): void {
   revalidatePath(menuItem("produtos").href);
+  revalidatePath(menuItem("custos").href);
   revalidatePath(menuItem("parametros").href);
 }
 
@@ -152,7 +153,7 @@ const unixLines = (text: string | null) => (text ?? "").replaceAll("\r\n", "\n")
  * row in one statement. Applying a text that was not the one checked only checks it.
  */
 export async function pasteAdvisoryCostsAction(_previous: PasteState, formData: FormData): Promise<PasteState> {
-  const session = await requirePermission("produtos");
+  const session = await requirePermission("custos");
   const conn = tenantDb(session.tenant.slug);
 
   const read = (key: string) => {
@@ -209,7 +210,7 @@ const publishError = (message: string): PublishState => ({ status: "error", mess
  * meantime, nothing is written and the notice says so.
  */
 export async function publishPriceTableAction(_previous: PublishState, formData: FormData): Promise<PublishState> {
-  const session = await requirePermission("produtos");
+  const session = await requirePermission("custos");
   const expected = Number(formData.get("expected"));
   const reviewedRevision = String(formData.get("revision") ?? "");
   try {
@@ -247,7 +248,7 @@ export async function publishPriceTableAction(_previous: PublishState, formData:
     if (!("version" in result)) return result;
     console.info(`[produtos] tabela v${result.version} publicada: ${result.count} equipamento(s), por ${session.email}`);
 
-    revalidatePath(menuItem("produtos").href);
+    revalidatePath(menuItem("custos").href);
     revalidatePath("/produtos/publicacao");
     revalidatePath(menuItem("tabela-precos").href);
     return { status: "published", message: result.message };

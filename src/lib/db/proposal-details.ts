@@ -23,7 +23,7 @@ export async function loadProposalDetails(conn: Queryable, orderId?: number): Pr
   return { details: rows[0].proposal_details as ProposalDetails, revision: String(rows[0].revision) };
 }
 
-/** A step patches its fields atomically; another tab cannot overwrite a newer revision. */
+/** The complete proposal is saved atomically; another tab cannot overwrite a newer revision. */
 export async function saveProposalDetails(input: { values: ProposalDetails; fields: ProposalField[]; revision: string; actor: string; orderId?: number }, conn: Queryable): Promise<void> {
   if (!input.actor.trim() || !/^\d+$/.test(input.revision)) throw new ProposalSettingsError("Recarregue a tela antes de salvar.");
   const stored = await loadProposalDetails(conn, input.orderId);
