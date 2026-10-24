@@ -885,7 +885,7 @@ export type OrderSummary = {
   items: { quantity: number; tableUnitPrice: number }[];
 };
 
-export type OrderListSort = "atualizacao" | "numero" | "cliente" | "vendedor";
+export type OrderListSort = "atualizacao" | "numero" | "cliente" | "vendedor" | "desconto" | "total" | "situacao";
 export type OrderListTab = "abertos" | "aprovacao" | "fechados" | "perdidos" | "todos";
 export type OrderOverview = { counts: Record<OrderListTab, number>; indicators: OrderIndicators };
 
@@ -946,7 +946,13 @@ export async function queryOrders(query: ListQuery<OrderListSort>, scope: OrderS
   const total = Number(counted.rows[0]?.total ?? 0);
   const pages = Math.max(1, Math.ceil(total / query.pageSize));
   const page = Math.min(pages, query.page);
-  const order = query.sort === "numero" ? "o.number" : query.sort === "cliente" ? "lower(COALESCE(c.trade_name, c.name, ''))" : query.sort === "vendedor" ? "lower(o.seller_name)" : "o.updated_at";
+  const order = query.sort === "numero" ? "o.number"
+    : query.sort === "cliente" ? "lower(COALESCE(c.trade_name, c.name, ''))"
+      : query.sort === "vendedor" ? "lower(o.seller_name)"
+        : query.sort === "desconto" ? "o.discount"
+          : query.sort === "situacao" ? "o.status"
+            : query.sort === "total" ? "COALESCE((SELECT sum(i.quantity * p.table_price) FROM order_items i JOIN price_table_items p ON p.version = i.price_table_version AND p.product_id = i.product_id WHERE i.order_id = o.id), 0) * (1 - o.discount) * (1 + v.ipi)"
+              : "o.updated_at";
   const direction = query.direction.toUpperCase();
   const dataValues = [...values, query.pageSize, (page - 1) * query.pageSize];
   const { rows } = await conn.query(

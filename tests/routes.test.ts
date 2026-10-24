@@ -369,10 +369,11 @@ test("não existe página no grupo protegido sem requirePermission", () => {
   // and production: one production order and the stages of the floor;
   // and the list of prospects; and the switch of the calls by the system;
   // and, of production, the materials, what will run short, the list of materials of one equipment and the hours.
-  // and the preparation of the fiscal rules of one order's invoice.
+  // and the preparation of the fiscal rules of one order's invoice, plus the
+  // selection of a closed order when a new outgoing invoice starts.
   // and, of incoming invoices, one invoice and the link of one of its items.
   // Product publishing has its own review screen before the irreversible action.
-  assert.equal(all.length, MENU_ITEMS.length + 66);
+  assert.equal(all.length, MENU_ITEMS.length + 67);
   for (const route of all) {
     assert.match(source(route), /await requirePermission\(/, route);
   }
@@ -569,14 +570,14 @@ test("DANFE: segue o alcance do pedido; a conferência é só de quem opera o Fi
 test("Fiscal: painel mostra o trabalho completo e não lê XML nem certificado", () => {
   const page = source("/fiscal");
   assert.ok(page.includes('await requirePermission("fiscal")'));
-  for (const label of ["Pendências", "Notas fiscais", "Inutilizações", "Configurações fiscais", "Abrir nota no pedido"]) assert.ok(page.includes(label), label);
+  for (const label of ["Pendências", "Notas fiscais", "Inutilizações", "Nova nota fiscal", "Configurações fiscais", "Abrir nota no pedido"]) assert.ok(page.includes(label), label);
   assert.doesNotMatch(page, /signed_xml|authorized_xml|certificate|passphrase|vaultKey/i);
   const query = readFileSync(new URL("../src/lib/db/fiscal-overview.ts", import.meta.url), "utf8");
   assert.doesNotMatch(query, /signed_xml|authorized_xml|certificate|passphrase/i);
   assert.equal(query.includes("search_path"), false);
   assert.ok(query.includes("o.seller_email = $1"));
   assert.ok(query.includes("environment = $2"));
-  assert.ok(page.includes('allows(session, "parametros") ? <Link href="/parametros/fiscal"'));
+  assert.ok(page.includes('allows(session, "parametros") && <Link href="/parametros/fiscal"'));
   assert.ok(page.includes('allows(session, "parametros") && <Link href="/parametros/fiscal?ver=numeracao#inutilizar"'));
   const jobs = readFileSync(new URL("../src/lib/db/fiscal-jobs.ts", import.meta.url), "utf8");
   assert.ok(jobs.includes("runOneFiscalJob(clock(), dependencies, conn, clock)"));
@@ -584,4 +585,26 @@ test("Fiscal: painel mostra o trabalho completo e não lê XML nem certificado",
   assert.ok(background.includes("runOneNumberVoidJob(new Date(),"));
   const settings = source("/parametros/fiscal");
   assert.ok(settings.includes('allows(session, "fiscal") && <Link href="/fiscal"'));
+});
+
+test("Fiscal: nova nota parte somente de pedido fechado pronto para emitir", () => {
+  const page = source("/fiscal/nova");
+  assert.ok(page.includes('await requirePermission("fiscal")'));
+  assert.ok(page.includes('order.stage === "emitir"'));
+  assert.ok(page.includes('href={`/pedidos/${order.orderNumber}/fiscal`}'));
+  assert.ok(page.includes("Pedidos prontos para faturar"));
+  assert.ok(page.includes("Nenhum pedido pronto para emitir"));
+  assert.doesNotMatch(page, /signed_xml|authorized_xml|certificate|passphrase|vaultKey/i);
+});
+
+test("Pedidos: a tabela permite ordenar pelo título e guardar a disposição local", () => {
+  const page = source("/pedidos");
+  const grid = readFileSync(new URL("../src/components/OrdersGrid.tsx", import.meta.url), "utf8");
+  for (const label of ["Desconto", "Total com IPI", "Situação", "Atualizado"]) assert.ok(grid.includes(label), label);
+  assert.ok(page.includes("<OrdersGrid"));
+  assert.ok(page.includes('controls="search"'));
+  assert.ok(grid.includes("window.localStorage"));
+  assert.ok(grid.includes("draggable"));
+  assert.ok(grid.includes("cursor-col-resize"));
+  assert.ok(grid.includes("column.sortHref"));
 });

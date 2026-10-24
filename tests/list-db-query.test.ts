@@ -73,7 +73,7 @@ test("pedidos: lista paginada e indicadores usam consultas agregadas, sem carreg
     if (text.includes("WITH scoped AS")) return { rows: [{ open_count: 2105, approval_count: 2, closed_count: 600, lost_count: 301, all_count: 3008, open_total: "90973773.09", month_count: 3, month_total: "97812.61", average_discount: "0.08" }] };
     return { rows: [{ number: "261018-TEST", status: "em_negociacao", seller_email: "vendas@teste.local", seller_name: "Vendedor", customer_name: "Academia", trade_name: null, customer_document: "48240052000161", delivery_uf: "SP", taxpayer: true, discount: 0.08, ipi: 0.13, updated_at: new Date("2026-10-18T12:00:00Z"), closed_at: null, items: [{ quantity: 2, price: 1000 }] }] };
   } } as unknown as Queryable;
-  const options = { sorts: ["atualizacao", "numero", "cliente", "vendedor"] as const, defaultSort: "atualizacao" as const, defaultDirection: "desc" as const, filters: { aba: ["abertos", "aprovacao", "fechados", "perdidos", "todos"] } };
+  const options = { sorts: ["atualizacao", "numero", "cliente", "vendedor", "desconto", "total", "situacao"] as const, defaultSort: "atualizacao" as const, defaultDirection: "desc" as const, filters: { aba: ["abertos", "aprovacao", "fechados", "perdidos", "todos"] } };
   const query = parseListQuery({ q: "DM09", pagina: "527", porPagina: "10", aba: "abertos" }, options);
 
   const [result, overview] = await Promise.all([
@@ -91,5 +91,8 @@ test("pedidos: lista paginada e indicadores usam consultas agregadas, sem carreg
   assert.match(pageCall.text, /regexp_replace\(\$2, '\^#', ''\) <> ''/);
   assert.deepEqual(pageCall.values?.slice(-2), [10, 2100]);
   assert.ok(calls.some((call) => call.text.includes("count(*) FILTER")));
+  const totalQuery = parseListQuery({ aba: "abertos", ordenar: "total", direcao: "desc" }, options);
+  await queryOrders(totalQuery, { sellerEmail: null }, conn);
+  assert.match(calls.at(-1)!.text, /ORDER BY COALESCE\(\(SELECT sum\(i\.quantity \* p\.table_price\)/);
   await assert.rejects(() => loadOrderOverview({ sellerEmail: null }, "18/10/2026", conn), /Mês inválido/);
 });
