@@ -6,12 +6,11 @@ import { requirePermission } from "@/lib/auth";
 import { seesAllOrders } from "@/lib/auth/permissions";
 import { getOrder, listPaymentMethods, OrderError, savePayment } from "@/lib/db/orders";
 import { tenantDb } from "@/lib/db/pool";
-import { formatMoney } from "@/lib/format";
 import { parseOrderPayment } from "@/lib/order-form";
 import type { ActionState, PaymentField } from "@/lib/order-form";
 import { ORDER_NUMBER } from "@/lib/order-number";
 
-export async function savePaymentStepAction(_previous: ActionState, form: FormData): Promise<ActionState> {
+export async function savePaymentAction(_previous: ActionState, form: FormData): Promise<ActionState> {
   const session = await requirePermission("pedidos");
   const conn = tenantDb(session.tenant.slug);
   const read = (key: string) => typeof form.get(key) === "string" ? String(form.get(key)).trim() : "";
@@ -20,22 +19,18 @@ export async function savePaymentStepAction(_previous: ActionState, form: FormDa
   const scope = { sellerEmail: seesAllOrders(session) ? null : session.email };
   const order = await getOrder(number, scope, conn);
   if (!order || order.status !== "em_negociacao") return { error: "Reabra o pedido antes de alterar o pagamento." };
-  const groups: PaymentField[][] = [["downPayment", "downPaymentMethod", "downPaymentDate"], ["balanceMethod", "paymentNotes"], ["installmentCount", "firstInstallmentDays", "installmentIntervalDays"]];
-  const step = Number(read("step"));
-  if (!Number.isInteger(step) || !groups[step] || !read("revision")) return { error: "Recarregue o pagamento do pedido." };
-  const values: Record<PaymentField, string | null> = { downPayment: formatMoney(order.downPayment), downPaymentMethod: order.downPaymentMethod,
-    downPaymentDate: order.downPaymentDate, balanceMethod: order.balanceMethod,
-    installmentCount: String(order.installmentCount ?? ""), firstInstallmentDays: String(order.firstInstallmentDays ?? ""),
-    installmentIntervalDays: String(order.installmentIntervalDays ?? ""), paymentNotes: order.paymentNotes };
+  if (!read("revision")) return { error: "Recarregue o pagamento do pedido." };
   const methods = await listPaymentMethods(conn);
-  // A retired method may remain in an unchanged step, but cannot be newly selected.
-  const accepted = [...methods, ...([order.downPaymentMethod, values.balanceMethod].filter((value): value is string => Boolean(value)))];
-  for (const key of groups[step]) {
-    const value = read(key);
-    if ((key === "downPaymentMethod" || key === "balanceMethod") && value && !methods.includes(value) && value !== values[key]) return { error: "Escolha um meio de pagamento ativo na lista." };
-    values[key] = value;
+  const values = Object.fromEntries([
+    "downPayment", "downPaymentMethod", "downPaymentDate", "balanceMethod",
+    "installmentCount", "firstInstallmentDays", "installmentIntervalDays", "paymentNotes",
+  ].map((key) => [key, read(key)])) as Record<PaymentField, string>;
+  for (const key of ["downPaymentMethod", "balanceMethod"] as const) {
+    if (values[key] && !methods.includes(values[key]) && values[key] !== order[key]) return { error: "Escolha um meio de pagamento ativo na lista." };
   }
-  const due = step === 1 ? read("balanceDue") : order.balanceOnDelivery ? "entrega" : "parcelas";
+  // A retired method may remain selected on an existing order, but cannot be newly chosen.
+  const accepted = [...methods, ...([order.downPaymentMethod, order.balanceMethod].filter((value): value is string => Boolean(value)))];
+  const due = read("balanceDue");
   if (due !== "entrega" && due !== "parcelas") return { error: "Escolha quando pagar o saldo." };
   const parsed = parseOrderPayment((key) => values[key], accepted);
   if (!parsed.ok) return { error: parsed.errors.join(" ") };
@@ -48,6 +43,5 @@ export async function savePaymentStepAction(_previous: ActionState, form: FormDa
   }
   revalidatePath(`/pedidos/${number}`);
   revalidatePath(`/pedidos/${number}/pagamento`);
-  const next = read("intent") === "back" ? Math.max(0, step - 1) : step + 1;
-  redirect(next > 2 || (step === 1 && due === "entrega" && read("intent") !== "back") ? `/pedidos/${number}?ver=pagamento` : `/pedidos/${number}/pagamento?etapa=${next}`);
+  redirect(`/pedidos/${number}?ver=pagamento`);
 }

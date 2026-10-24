@@ -4,6 +4,23 @@
   "members": [],
   "tasks": [
     {
+      "id": "T-20261024-pagamento-pedido-tela-unica",
+      "title": "Reunir o pagamento do pedido em uma tela",
+      "owner": null,
+      "status": "em-revisao",
+      "acceptance": "Entrada, saldo e parcelamento aparecem no mesmo formulário\nUma única gravação valida e salva todos os campos de forma atômica\nSalvar e conferir retorna ao resumo do pagamento sem navegação por etapas\nLayout sem rolagem lateral nos cinco tamanhos obrigatórios",
+      "evidence": "Teste visual e funcional aprovado com gravação real em banco isolado\nCapturas inspecionadas em 390x844 e 1440x900\nOito testes unitários de formulário aprovados\nLint, tipos e git diff --check aprovados",
+      "next": "Enviar ao GitHub, aguardar o CI obrigatório e integrar automaticamente após os checks.",
+      "blocker": "",
+      "history": [
+        {
+          "at": "2026-10-24",
+          "status": "em-revisao",
+          "note": "As três etapas foram substituídas por um formulário único conforme o modelo do usuário."
+        }
+      ]
+    },
+    {
       "id": "T-20261024-cores-pedido-responsivas",
       "title": "Corrigir seletores de cor comprimidos no pedido",
       "owner": null,
