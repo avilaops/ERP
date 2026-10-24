@@ -204,7 +204,6 @@ test("configurações: todas as etapas são alcançáveis nos cinco tamanhos", a
     ["/fornecedores?novo=1", "Etapa do fornecedor"],
     ["/funil/nova", "Etapa da oportunidade"],
     ["/equipe/nova", "Etapa da pessoa"],
-    ["/parametros/fiscal?ver=regras", "Etapa da configuração"],
     ["/parametros/contrato", "Etapa da configuração"],
     ["/parametros?ver=precos", "Parte da regra de preço"],
   ];
@@ -230,6 +229,21 @@ test("configurações: todas as etapas são alcançáveis nos cinco tamanhos", a
   await expect(page.getByRole("alert")).toBeVisible();
   await expect(page.getByRole("combobox", { name: "Etapa do fornecedor", exact: true })).toHaveValue("-1");
   await expect(page.getByRole("textbox", { name: "Observações", exact: true })).toBeVisible();
+});
+
+test("regras fiscais: todos os grupos ficam visíveis nos cinco tamanhos", async ({ page }, testInfo) => {
+  const sections = ["Natureza da operação", "CFOP", "ICMS e IPI", "PIS", "COFINS", "Classificação IBS/CBS", "Alíquotas IBS/CBS", "Condições da venda"];
+  for (const [width, height] of SIZES) {
+    await page.setViewportSize({ width, height });
+    await page.goto("/parametros/fiscal?ver=regras", { waitUntil: "networkidle" });
+    for (const section of sections) {
+      await expect(page.getByRole("heading", { name: section, exact: true })).toBeVisible();
+    }
+    await expect(page.getByRole("button", { name: "Salvar regras fiscais", exact: true })).toBeVisible();
+    await expect(page.getByText(/\d+ de 8 ·/)).toHaveCount(0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth), `${width}px`).toBeLessThanOrEqual(0);
+    await page.screenshot({ path: testInfo.outputPath(`regras-fiscais-${width}x${height}.png`), fullPage: true, caret: "initial" });
+  }
 });
 
 test("cores: erro preserva o nome e salvar confirma a alteração", async ({ page }) => {

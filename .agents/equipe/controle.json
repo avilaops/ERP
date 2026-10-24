@@ -4,6 +4,23 @@
   "members": [],
   "tasks": [
     {
+      "id": "T-20261024-regras-fiscais-pagina-unica",
+      "title": "Reunir regras fiscais da nota em uma página",
+      "owner": null,
+      "status": "em-revisao",
+      "acceptance": "Natureza, CFOP, ICMS/IPI, PIS, COFINS, IBS/CBS e condições aparecem simultaneamente\nNão existe seletor de etapas nem botão Continuar\nUma única ação salva todas as regras fiscais da linha\nSem rolagem lateral nos cinco tamanhos obrigatórios",
+      "evidence": "Implementação e testes locais aprovados; publicação em produção ainda não comprovada.",
+      "next": "Aguardar CI, integrar, publicar o artefato aprovado e verificar a rota autenticada em produção.",
+      "blocker": "",
+      "history": [
+        {
+          "at": "2026-10-24",
+          "status": "em-revisao",
+          "note": "As oito etapas foram substituídas por oito seções visíveis e uma gravação única."
+        }
+      ]
+    },
+    {
       "id": "T-20261024-pagamento-pedido-tela-unica",
       "title": "Reunir o pagamento do pedido em uma tela",
       "owner": null,

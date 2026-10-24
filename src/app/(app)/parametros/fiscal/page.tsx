@@ -3,7 +3,7 @@ import { FitRows } from "@/components/FitRows";
 import { cookies } from "next/headers";
 import { rowsPerPage } from "@/lib/rows";
 import { PasswordField } from "@/components/PasswordField";
-import { FormSteps } from "@/components/FormSteps";
+import { FormSections } from "@/components/FormSections";
 import { loadFiscalRules, listPaymentCodes, missingFiscalRules, PAYMENT_CODES } from "@/lib/db/fiscal-rules";
 import { listNumberVoids } from "@/lib/db/invoices";
 import { listNumberVoidJobs } from "@/lib/db/fiscal-void-jobs";
@@ -75,7 +75,7 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
     ["Classificação IBS/CBS", ruleFields.slice(11, 13)],
     ["Alíquotas IBS/CBS", ruleFields.slice(13)],
   ];
-  // One part at a time, preserving the fields and their existing server validation.
+  // Tabs separate fiscal tasks; the rules form shows every field at once.
   const TABS = [
     ["consulta", "Consultar CNPJ"],
     ["certificado", certificate ? "Certificado" : "Certificado · falta"],
@@ -305,7 +305,7 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
             )}
             <ActionForm key={line.id} action={saveFiscalRulesAction} className="mt-4 grid gap-4 sm:grid-cols-2">
               <input type="hidden" name="lineId" value={line.id} />
-              <FormSteps steps={[...ruleGroups.map(([title, fields]) => ({ title, content: <div key={title} className="grid gap-3 sm:grid-cols-2">{fields.map(([key, label, value, placeholder, span]) => (
+              <FormSections sections={[...ruleGroups.map(([title, fields]) => ({ title, content: <div key={title} className="grid gap-3 sm:grid-cols-2">{fields.map(([key, label, value, placeholder, span]) => (
                 <div key={key} className={span}>
                   <label htmlFor={key} className={LABEL}>
                     {label}
