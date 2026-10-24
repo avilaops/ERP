@@ -4,6 +4,23 @@
   "members": [],
   "tasks": [
     {
+      "id": "T-20261024-cores-pedido-responsivas",
+      "title": "Corrigir seletores de cor comprimidos no pedido",
+      "owner": null,
+      "status": "em-revisao",
+      "acceptance": "Seletores de estrutura e braço ocupam largura legível fora da coluna de equipamento\nOpções mantêm nomes, amostras e controles de pelo menos 44 px\nTela não ganha rolagem lateral em celular, 925 px e desktop",
+      "evidence": "Teste visual específico aprovado em 360x640, 390x844, 430x932, 925x1000, 1366x768 e 1440x900\nCapturas inspecionadas em 925x1000 e 1440x900\nLint, tipos e git diff --check aprovados",
+      "next": "Enviar ao GitHub, aguardar o CI obrigatório e integrar automaticamente após os checks.",
+      "blocker": "",
+      "history": [
+        {
+          "at": "2026-10-24",
+          "status": "em-revisao",
+          "note": "Seletores movidos para uma linha de largura total do item; regressão da largura de 925 px adicionada."
+        }
+      ]
+    },
+    {
       "id": "T-20261023-nfe-pagamento-eletronico",
       "title": "Informar pagamento eletrônico não integrado na NF-e",
       "owner": null,
