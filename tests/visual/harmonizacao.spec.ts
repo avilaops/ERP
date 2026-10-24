@@ -127,7 +127,7 @@ for (const [width, height] of SIZES) {
     for (const [route, title] of [
       ["/dashboard", "Painel"],
       ["/estoque", "Estoque"],
-      ["/compras", "Nova compra"],
+      ["/compras", "Compras"],
       ["/fornecedores", "Fornecedores"],
       ["/produtos", "Produtos"],
       ["/custos", "Custos"],
@@ -234,7 +234,7 @@ for (const [width, height] of SIZES) {
       ["/parametros/fiscal?ver=regras", ["Natureza da operação", "Condições da venda"]],
       ["/parametros/contrato", ["Título do modelo", "Código por SMS"]],
       ["/parametros?ver=precos", ["Política comercial", "ICMS por estado de destino"]],
-      ["/compras", ["Fornecedor e tipo", "Moeda e câmbio"]],
+      ["/compras?nova=1", ["Fornecedor e tipo", "Moeda e câmbio"]],
       ["/parametros/proposta", ["Contato da empresa", "Atraso da entrada"]],
     ] as const;
     await page.setViewportSize({ width, height });

@@ -19,6 +19,7 @@ for (const [width, height] of SIZES) {
       ["/produtos", "Produtos"],
       ["/custos", "Custos"],
       ["/recebimentos", "Recebimentos"],
+      ["/compras", "Compras"],
       ["/compras?nova=1", "Nova compra"],
       ["/compras?nova=1&fornecedor=novo", "Novo fornecedor"],
     ] as const) {

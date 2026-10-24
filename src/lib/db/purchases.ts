@@ -28,6 +28,7 @@ export type PurchaseInput = {
 };
 
 export type PurchaseSummary = { id: number; supplier: string; kind: PurchaseKind; status: PurchaseStatus; reference: string | null; orderedOn: string; expectedOn: string | null; receivedOn: string | null; pieces: number; total: number };
+export type PurchaseSort = "fornecedor" | "tipo" | "situacao" | "pedido" | "chegada" | "pecas" | "total";
 
 export type PurchaseItem = { productId: number; code: string | null; name: string; quantity: number; unitPrice: number; /** In reais, at the rate of the purchase. */ goods: number; /** The item's share of the costs of the purchase, by value. */ share: number; /** What one piece costs put in the warehouse. */ landedUnit: number };
 export type PurchaseCost = { id: number; label: string; amount: number };
@@ -175,14 +176,26 @@ export async function deletePurchase(id: number, conn: Queryable): Promise<void>
 const LIST = `
   SELECT b.id, COALESCE(s.trade_name, s.name) AS supplier, b.kind, b.status, b.reference, to_char(b.ordered_on, 'YYYY-MM-DD') AS ordered_on,
          to_char(b.expected_on, 'YYYY-MM-DD') AS expected_on, to_char(b.received_on, 'YYYY-MM-DD') AS received_on,
+         COALESCE(b.received_on, b.expected_on) AS arrival_sort,
          COALESCE((SELECT sum(i.quantity) FROM purchase_items i WHERE i.purchase_id = b.id), 0) AS pieces,
          COALESCE((SELECT sum(i.quantity * i.unit_price) FROM purchase_items i WHERE i.purchase_id = b.id), 0) * b.exchange_rate
            + COALESCE((SELECT sum(c.amount) FROM purchase_costs c WHERE c.purchase_id = b.id), 0) AS total
-    FROM purchases b JOIN suppliers s ON s.id = b.supplier_id
-   ORDER BY (b.status IN ('pedido', 'em_transito')) DESC, b.ordered_on DESC, b.id DESC`;
+    FROM purchases b JOIN suppliers s ON s.id = b.supplier_id`;
 
-export async function listPurchases(conn: Queryable): Promise<PurchaseSummary[]> {
-  const { rows } = await conn.query(LIST);
+const PURCHASE_SORT_SQL: Record<PurchaseSort, string> = {
+  fornecedor: "lower(COALESCE(s.trade_name, s.name))",
+  tipo: "b.kind",
+  situacao: "b.status",
+  pedido: "b.ordered_on",
+  chegada: "arrival_sort",
+  pecas: "pieces",
+  total: "total",
+};
+
+export async function listPurchases(conn: Queryable, sort: PurchaseSort = "pedido", direction: "asc" | "desc" = "desc"): Promise<PurchaseSummary[]> {
+  const order = PURCHASE_SORT_SQL[sort];
+  const orderedNulls = sort === "chegada" ? " NULLS LAST" : "";
+  const { rows } = await conn.query(`${LIST} ORDER BY ${order} ${direction === "asc" ? "ASC" : "DESC"}${orderedNulls}, b.id DESC`);
   return rows.map((row) => ({
     id: Number(row.id), supplier: String(row.supplier), kind: row.kind as PurchaseKind, status: row.status as PurchaseStatus, reference: day(row.reference),
     orderedOn: String(row.ordered_on), expectedOn: day(row.expected_on), receivedOn: day(row.received_on), pieces: Number(row.pieces), total: roundCents(Number(row.total)),

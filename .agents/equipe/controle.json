@@ -387,11 +387,16 @@
       "title": "Padronizar tabelas, compra, custos e recebimentos",
       "owner": null,
       "status": "em-revisao",
-      "acceptance": "Clientes e Produtos usam colunas ordenaveis, moveis e redimensionaveis com preferencias persistentes\nNova compra abre sem fornecedor e permite cadastra-lo na propria rota, retornando com ele selecionado\nProdutos mantem apenas o cadastro tecnico e Custos vira modulo do Financeiro com edicao e publicacao\nRecebimentos segue a hierarquia visual do Financeiro\nCinco tamanhos obrigatorios sem rolagem lateral da pagina",
-      "evidence": "Suite funcional completa: 858 testes, 592 aprovados, 266 integracoes sem banco puladas e zero falhas\nLint, tipos, git diff --check e build de producao aprovados\nPlaywright focal: sete casos aprovados; cinco tamanhos obrigatorios, texto a 200%, teclado, persistencia de largura e cadastro real de fornecedor dentro da compra validados\nNova compra em 360x640 foi dividida em etapas e mantem a acao principal visivel\nAcesso do perfil Financeiro a Custos aprovado; acesso ao cadastro tecnico de Produtos permanece negado\nTrinta capturas geradas e amostras mobile e desktop inspecionadas em test-results/telas",
+      "acceptance": "Clientes, Produtos e Compras usam colunas ordenaveis, moveis e redimensionaveis com preferencias persistentes\nCompras abre sempre na listagem, inclusive sem registros; Nova compra abre apenas pela acao explicita\nNova compra abre sem fornecedor e permite cadastra-lo na propria rota, retornando com ele selecionado\nProdutos mantem apenas o cadastro tecnico e Custos vira modulo do Financeiro com edicao e publicacao\nRecebimentos segue a hierarquia visual do Financeiro\nCinco tamanhos obrigatorios sem rolagem lateral da pagina",
+      "evidence": "Suite funcional completa: 858 testes, 592 aprovados, 266 integracoes sem banco puladas e zero falhas\nLint, tipos, git diff --check e build de producao aprovados\nPlaywright focal: sete casos aprovados; cinco tamanhos obrigatorios, texto a 200%, teclado, persistencia de largura e cadastro real de fornecedor dentro da compra validados\nCompras passou a abrir na listagem vazia ou preenchida; tabela ganhou ordenacao, movimento e redimensionamento persistente de colunas; build de producao aprovado em 24/10/2026\nNova compra em 360x640 foi dividida em etapas e mantem a acao principal visivel\nAcesso do perfil Financeiro a Custos aprovado; acesso ao cadastro tecnico de Produtos permanece negado\nTrinta capturas geradas e amostras mobile e desktop inspecionadas em test-results/telas",
       "next": "Revisar o diff consolidado, executar o CI com banco e inspecionar os artefatos publicados antes de integrar.",
       "blocker": "",
       "history": [
+        {
+          "at": "2026-10-24",
+          "status": "em-revisao",
+          "note": "Listagem de compras tornou-se a entrada padrao, inclusive vazia, e recebeu tabela configuravel; build aprovado."
+        },
         {
           "at": "2026-10-24",
           "status": "em-revisao",
