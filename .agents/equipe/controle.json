@@ -403,6 +403,23 @@
           "note": "Implementacao local concluida e validada estaticamente e nos cinco tamanhos; publicacao nao executada."
         }
       ]
+    },
+    {
+      "id": "T-20261024-fornecedor-consulta-cnpj",
+      "title": "Preencher fornecedor pela consulta de CNPJ",
+      "owner": null,
+      "status": "em-revisao",
+      "acceptance": "Cadastro de fornecedor PJ consulta o CNPJ na Receita e preenche razao social, fantasia, telefone e e-mail disponiveis\nDados consultados permanecem editaveis e nada e salvo antes da confirmacao\nFalha da consulta permite preenchimento manual",
+      "evidence": "Consulta server-side existente em src/lib/cnpj.ts reutilizada com BrasilAPI e fallback CNPJ.ws\nBusca no plugin n8n nao encontrou workflow de Receita, BrasilAPI ou fornecedor; integracao paralela nao foi criada\nBuild de producao aprovado em 24/10/2026",
+      "next": "Publicar na main e aguardar o pacote de deploy.",
+      "blocker": "",
+      "history": [
+        {
+          "at": "2026-10-24",
+          "status": "em-revisao",
+          "note": "Consulta de CNPJ adicionada ao novo fornecedor e build aprovado."
+        }
+      ]
     }
   ],
   "decisions": [

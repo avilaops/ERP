@@ -4,21 +4,22 @@ import { BANK_FIELDS, SUPPLIER_KIND_LABELS, SUPPLIER_KINDS } from "@/lib/db/supp
 import type { Supplier } from "@/lib/db/suppliers";
 
 const LABEL = "block text-sm font-medium";
+type SupplierDefaults = Partial<Pick<Supplier, "kind" | "name" | "tradeName" | "document" | "country" | "contactName" | "phone" | "email">>;
 
 /**
  * The fields of the supplier record, new or saved. A server component: the
  * values come from the database, nothing is decided in the browser. Document
  * is the CNPJ, the CPF or, abroad, the tax id as it comes.
  */
-export function SupplierFields({ saved }: { saved: Supplier | null }) {
+export function SupplierFields({ saved, defaults = {} }: { saved: Supplier | null; defaults?: SupplierDefaults }) {
   const plain = [
-    ["name", "Nome ou razão social *", saved?.name],
-    ["tradeName", "Nome fantasia", saved?.tradeName],
-    ["document", "CNPJ, CPF ou identificação fiscal", saved?.document],
-    ["country", "País (só para exterior)", saved?.country],
-    ["contactName", "Contato", saved?.contactName],
-    ["phone", "Telefone", saved?.phone],
-    ["email", "E-mail", saved?.email],
+    ["name", "Nome ou razão social *", saved?.name ?? defaults.name],
+    ["tradeName", "Nome fantasia", saved?.tradeName ?? defaults.tradeName],
+    ["document", "CNPJ, CPF ou identificação fiscal", saved?.document ?? defaults.document],
+    ["country", "País (só para exterior)", saved?.country ?? defaults.country],
+    ["contactName", "Contato", saved?.contactName ?? defaults.contactName],
+    ["phone", "Telefone", saved?.phone ?? defaults.phone],
+    ["email", "E-mail", saved?.email ?? defaults.email],
   ] as const;
   const fields = (rows: readonly (typeof plain[number])[]) => rows.map(([key, label, value]) => (
     <div key={key}>
@@ -33,7 +34,7 @@ export function SupplierFields({ saved }: { saved: Supplier | null }) {
         <label htmlFor="kind" className={LABEL}>
           Tipo
         </label>
-        <select key={saved?.kind ?? "novo"} id="kind" name="kind" defaultValue={saved?.kind ?? "PJ"} className={INPUT}>
+        <select key={saved?.kind ?? defaults.kind ?? "novo"} id="kind" name="kind" defaultValue={saved?.kind ?? defaults.kind ?? "PJ"} className={INPUT}>
           {SUPPLIER_KINDS.map((kind) => (
             <option key={kind} value={kind}>
               {SUPPLIER_KIND_LABELS[kind]}

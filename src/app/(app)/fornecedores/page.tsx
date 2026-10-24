@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { ListPager, ListQuery } from "@/components/ListQuery";
-import { CARD, PageHeader, Pill, PRIMARY } from "@/components/ui";
+import { CARD, INPUT, PageHeader, Pill, PRIMARY } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { menuItem } from "@/lib/auth/permissions";
-import { formatDocument } from "@/lib/customer";
+import { CnpjError, companySummary, lookupCnpj } from "@/lib/cnpj";
+import { formatDocument, formatPhone } from "@/lib/customer";
 import { listSupplierCountries, querySuppliers, SUPPLIER_KIND_LABELS } from "@/lib/db/suppliers";
 import { tenantDb } from "@/lib/db/pool";
 import { parseListQuery } from "@/lib/list-query";
@@ -33,6 +34,25 @@ export default async function FornecedoresPage({ searchParams }: { searchParams:
   const result = await querySuppliers(query, conn);
   const { items, ...page } = result;
   const adding = first(raw.novo) === "1" || (result.total === 0 && query.search === "" && Object.keys(query.filters).length === 0);
+  const typedCnpj = adding ? (first(raw.cnpj) ?? "").trim() : "";
+  let lookup: Awaited<ReturnType<typeof lookupCnpj>> | null = null;
+  let lookupError: string | null = null;
+  if (typedCnpj !== "") {
+    try {
+      lookup = await lookupCnpj(typedCnpj);
+    } catch (error) {
+      if (!(error instanceof CnpjError)) throw error;
+      lookupError = error.message;
+    }
+  }
+  const defaults = lookup ? {
+    kind: "PJ" as const,
+    name: lookup.legalName,
+    tradeName: lookup.tradeName,
+    document: formatDocument(lookup.cnpj),
+    phone: lookup.phone ? formatPhone(lookup.phone) : null,
+    email: lookup.email,
+  } : undefined;
 
   return (
     <>
@@ -41,8 +61,18 @@ export default async function FornecedoresPage({ searchParams }: { searchParams:
       {adding ? (
         <section className={`${CARD} mt-4`} aria-label="Novo fornecedor">
           <div className="flex items-center justify-between gap-3 px-5 py-3"><h2 className="text-sm font-semibold uppercase tracking-wide">Novo fornecedor</h2>{result.total > 0 && <Link href={HERE} className="font-medium text-brand underline">Voltar para a lista</Link>}</div>
+          <form method="get" role="search" className="flex flex-wrap items-end gap-2 border-t border-slate-200 px-5 py-3">
+            <input type="hidden" name="novo" value="1" />
+            <label className="min-w-0 flex-1 text-sm font-medium text-slate-700">
+              Preencher pela Receita Federal
+              <input type="text" name="cnpj" inputMode="numeric" defaultValue={typedCnpj} placeholder="00.000.000/0000-00" autoComplete="off" className={INPUT} />
+            </label>
+            <button type="submit" className="inline-flex min-h-[var(--control)] items-center rounded-lg border border-slate-300 bg-white px-4 text-sm font-medium hover:bg-slate-50">Buscar CNPJ</button>
+          </form>
+          {lookupError && <p role="alert" className="mx-5 mt-3 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">{lookupError}</p>}
+          {lookup && <p role="status" className="mx-5 mt-3 rounded border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">{companySummary(lookup)}. Confira os dados antes de salvar.</p>}
           <ActionForm action={createSupplierAction} className="grid gap-4 border-t border-slate-200 p-5 sm:grid-cols-2">
-            <SupplierFields saved={null} />
+            <SupplierFields key={lookup?.cnpj ?? "vazio"} saved={null} defaults={defaults} />
             <div className="sticky bottom-[var(--tabbar)] z-10 -mx-4 border-t border-slate-200 bg-white px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:col-span-2 lg:static lg:mx-0 lg:border-0 lg:bg-transparent lg:p-0"><button type="submit" className={`${PRIMARY} w-full lg:w-auto`}>Salvar fornecedor</button></div>
           </ActionForm>
         </section>
