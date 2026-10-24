@@ -6,7 +6,7 @@ Transformar documentos fiscais recebidos em entradas auditáveis de compra, cust
 
 ## Responsabilidade
 
-O ERP é a fonte de verdade para certificado, distribuição DF-e, manifestação, XML original, DANFE, fornecedor, compra, custos e estoque. O Lojas apenas consome a API versionada do ERP e apresenta o estado ao lojista.
+O ERP é a fonte de verdade para certificado, distribuição NF-e, manifestação, XML original, DANFE, fornecedor, compra, custos e estoque. O Lojas apenas consome a API versionada do ERP e apresenta o estado ao lojista. CT-e emitido pelo transporte pertence ao módulo fiscal isolado do TMS; o ERP não abre um segundo consumidor nem reaproveita o serviço exclusivo de NF-e para buscá-lo.
 
 ## Fluxo
 
