@@ -7,16 +7,21 @@
       "id": "T-20261024-regras-fiscais-pagina-unica",
       "title": "Reunir regras fiscais da nota em uma página",
       "owner": null,
-      "status": "em-revisao",
+      "status": "concluida",
       "acceptance": "Natureza, CFOP, ICMS/IPI, PIS, COFINS, IBS/CBS e condições aparecem simultaneamente\nNão existe seletor de etapas nem botão Continuar\nUma única ação salva todas as regras fiscais da linha\nSem rolagem lateral nos cinco tamanhos obrigatórios",
-      "evidence": "Implementação e testes locais aprovados; publicação em produção ainda não comprovada.",
-      "next": "Aguardar CI, integrar, publicar o artefato aprovado e verificar a rota autenticada em produção.",
+      "evidence": "PR https://github.com/avilaops/ERP/pull/40 integrado\nCI do PR https://github.com/avilaops/ERP/actions/runs/40107578544 aprovado\nCI da main https://github.com/avilaops/ERP/actions/runs/40109200260 aprovado\n856 testes, lint, tipos, build e matriz visual completa aprovados\nCapturas da tela fiscal inspecionadas em 360x640, 390x844, 430x932, 1366x768 e 1440x900\nProdução publicada em 308e729; backup criado, bancos sem migrações pendentes e health público confirmado",
+      "next": "Concluído em produção em 24/10/2026.",
       "blocker": "",
       "history": [
         {
           "at": "2026-10-24",
           "status": "em-revisao",
           "note": "As oito etapas foram substituídas por oito seções visíveis e uma gravação única."
+        },
+        {
+          "at": "2026-10-24",
+          "status": "concluida",
+          "note": "PR 40 integrado e produção 308e729 verificada após os dois CIs e inspeção das cinco resoluções."
         }
       ]
     },
