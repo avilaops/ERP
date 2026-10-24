@@ -22,7 +22,10 @@ export default defineConfig({
     launchOptions: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE } : undefined,
   },
   webServer: {
-    command: "npm run dev",
+    // Webpack releases compiled route entries more predictably during the
+    // repository-wide crawl; Turbopack crossed Next's memory restart threshold
+    // before the first screenshot on the 4 GB development host.
+    command: "npm run dev -- --webpack",
     url: "http://127.0.0.1:3020/dev/login",
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,

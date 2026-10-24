@@ -1,7 +1,9 @@
 import { futureCommission } from "@/lib/db/receivables";
 import { roundCents } from "@/lib/pricing/money";
+import { cookies } from "next/headers";
 import Link from "next/link";
-import { CARD, DANGER_OUTLINE, INPUT, PRIMARY, SECONDARY, PageHeader, MetricSummary } from "@/components/ui";
+import { FitRows } from "@/components/FitRows";
+import { CARD, DANGER_OUTLINE, INPUT, PRIMARY, SECONDARY, PageHeader, MetricSummary, Pager, pageOf } from "@/components/ui";
 import { OrderReference } from "@/components/OrderReference";
 import { requirePermission } from "@/lib/auth";
 import { allows, managesCommissions, menuItem } from "@/lib/auth/permissions";
@@ -10,6 +12,7 @@ import { listCarriedBalances, listCommissionMonths, listCommissions } from "@/li
 import { loadCommissionDay } from "@/lib/db/company";
 import { tenantDb } from "@/lib/db/pool";
 import { isoDate, showDate, showIsoDate, showMoney, showPercent } from "@/lib/format";
+import { rowsPerPage } from "@/lib/rows";
 import { ActionForm } from "../pedidos/ActionForm";
 import { adjustManualCommissionAction, createManualCommissionAction, payCommissionsAction } from "./actions";
 
@@ -37,6 +40,8 @@ export default async function ComissoesPage({ searchParams }: { searchParams: Pr
   const months = await listCommissionMonths(scope, conn);
   const month = chooseMonth(first(query.mes), months, current);
   const groups = commissionsView(await listCommissions(month, scope, conn), await listCarriedBalances(month, scope, conn));
+  const size = rowsPerPage((await cookies()).get("erp_linhas_comissoes")?.value, 1);
+  const groupsPage = pageOf(groups, first(query.pagina), size);
   const paymentDay = await loadCommissionDay(conn);
   // The four numbers of the month, for who is looking: a seller's are only their own.
   const totals = {
@@ -108,11 +113,11 @@ export default async function ComissoesPage({ searchParams }: { searchParams: Pr
         </p>
       )}
 
-      <div className="mt-6 flex flex-col gap-6">
-        {groups.map((group) => {
+      <div id="comissoes-vendedores" className="mt-6 flex flex-col gap-3">
+        {groupsPage.rows.map((group) => {
           const [label, color] = STATUS[group.status];
           return (
-            <section key={group.sellerEmail} className={CARD} aria-label={`Comissões de ${group.sellerName}`}>
+            <section key={group.sellerEmail} data-row className={CARD} aria-label={`Comissões de ${group.sellerName}`}>
               <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
                 <div>
                   <h2 className="text-lg font-semibold">{group.sellerEmail === session.email ? "Você" : group.sellerName}</h2>
@@ -231,6 +236,14 @@ export default async function ComissoesPage({ searchParams }: { searchParams: Pr
           );
         })}
       </div>
+      {groups.length > 0 && <>
+        <Pager
+          {...groupsPage}
+          noun={["vendedor", "vendedores"]}
+          hrefFor={(page) => `${HERE}?${new URLSearchParams({ ...(month !== current ? { mes: month } : {}), ...(page > 1 ? { pagina: String(page) } : {}) })}`}
+        />
+        <FitRows listId="comissoes-vendedores" shown={size} minimum={1} cookieName="erp_linhas_comissoes" />
+      </>}
     </>
   );
 }

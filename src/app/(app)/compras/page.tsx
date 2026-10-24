@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import Link from "next/link";
-import { CARD, Pager, pageOf, PageHeader, Pill, PRIMARY, QUIET_LINK } from "@/components/ui";
+import { CARD, INPUT, LABEL, Pager, pageOf, PageHeader, Pill, PRIMARY, QUIET_LINK, SECONDARY } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { menuItem } from "@/lib/auth/permissions";
 import { tenantDb } from "@/lib/db/pool";
@@ -9,7 +9,7 @@ import { listSuppliers } from "@/lib/db/suppliers";
 import { isoDate, showIsoDate, showMoney } from "@/lib/format";
 import { ROWS_COOKIE, rowsPerPage } from "@/lib/rows";
 import { ActionForm } from "../pedidos/ActionForm";
-import { createPurchaseAction } from "./actions";
+import { createPurchaseAction, createPurchaseSupplierAction } from "./actions";
 import { PurchaseFields } from "./PurchaseFields";
 
 export const metadata = { title: `${menuItem("compras").label} · ERP` };
@@ -27,6 +27,8 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
   const active = suppliers.filter((supplier) => supplier.active).map((supplier) => ({ id: supplier.id, name: supplier.tradeName ?? supplier.name }));
   // One task at a time: the list, or the form of a new purchase. With none yet, the form comes first.
   const adding = first(query.nova) === "1" || purchases.length === 0;
+  const supplierMode = first(query.fornecedor);
+  const selectedSupplierId = /^\d+$/.test(supplierMode ?? "") ? Number(supplierMode) : undefined;
 
   if (adding) {
     return (
@@ -38,20 +40,21 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
             </Link>
           </p>
         )}
-        <PageHeader title="Nova compra" hint="Primeiro quem vende, a moeda e as datas. Os equipamentos e os custos entram na tela seguinte." />
-        {active.length === 0 ? (
-          <p className={`${CARD} mt-3 p-4 text-sm`}>
-            Cadastre antes o fornecedor em{" "}
-            <Link href={menuItem("fornecedores").href} className="text-brand underline">
-              {menuItem("fornecedores").label}
-            </Link>
-            .
-          </p>
+        <PageHeader title={supplierMode === "novo" ? "Novo fornecedor" : "Nova compra"} hint={supplierMode === "novo" ? "Cadastre o fornecedor e volte à compra com ele selecionado." : "Primeiro quem vende, a moeda e as datas. Os equipamentos e os custos entram na tela seguinte."} />
+        {supplierMode === "novo" ? (
+          <ActionForm action={createPurchaseSupplierAction} className={`${CARD} mt-3 grid gap-3 p-4 sm:grid-cols-2`}>
+            <label className={LABEL}>Tipo<select name="kind" className={INPUT} defaultValue="PJ"><option value="PJ">Empresa (CNPJ)</option><option value="PF">Pessoa física (CPF)</option><option value="EX">Exterior</option></select></label>
+            <label className={LABEL}>Nome ou razão social<input name="name" className={INPUT} required autoComplete="organization" /></label>
+            <label className={LABEL}>CNPJ, CPF ou identificação fiscal<input name="document" className={INPUT} autoComplete="off" /></label>
+            <label className={LABEL}>País (só para exterior)<input name="country" className={INPUT} autoComplete="country-name" /></label>
+            <div className="flex flex-wrap gap-2 sm:col-span-2"><button type="submit" className={PRIMARY}>Cadastrar e usar</button><Link href={`${HERE}?nova=1`} className={SECONDARY}>Voltar à compra</Link></div>
+          </ActionForm>
         ) : (
           <ActionForm action={createPurchaseAction} className={`${CARD} mt-3 flex flex-wrap items-end gap-3 p-4`}>
-            <PurchaseFields saved={null} suppliers={active} today={isoDate(new Date())} />
+            <PurchaseFields saved={null} suppliers={active} today={isoDate(new Date())} selectedSupplierId={selectedSupplierId} />
+            {active.length === 0 && <p className="basis-full text-sm text-slate-600">Cadastre o primeiro fornecedor nesta tela para liberar a compra.</p>}
             <div className="basis-full">
-              <button type="submit" className={PRIMARY}>
+              <button type="submit" className={PRIMARY} disabled={active.length === 0}>
                 Criar compra
               </button>
             </div>

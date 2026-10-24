@@ -24,6 +24,19 @@ try {
     const page = await ctx.newPage();
     const errs = [];
     page.on('console', m => m.type() === 'error' && errs.push(m.text().slice(0, 160)));
+    page.on('pageerror', e => errs.push(e.message.slice(0, 160)));
+    page.on('response', resposta => {
+      const tipo = resposta.request().resourceType();
+      if (resposta.status() >= 400 && ['stylesheet', 'script', 'font'].includes(tipo)) {
+        errs.push(`${resposta.status()} ${tipo} ${resposta.url()}`.slice(0, 160));
+      }
+    });
+    page.on('requestfailed', pedido => {
+      const tipo = pedido.resourceType();
+      if (['stylesheet', 'script', 'font'].includes(tipo)) {
+        errs.push(`${tipo} ${pedido.failure()?.errorText ?? 'falhou'} ${pedido.url()}`.slice(0, 160));
+      }
+    });
 
     await visitar(page, BASE + '/dev/login');
     await Promise.all([page.waitForURL(u => !u.pathname.startsWith('/dev/login')), page.click('button[value="DIRETORIA"]')]);
@@ -68,6 +81,7 @@ try {
       }, MIN_CONTROLE);
       const { links, ...medidas } = m;
       report.push({ vp: vp.nome, path: p, status: resposta.status(), url: page.url().replace(BASE, ''), ...medidas, errs: [...errs] });
+      if (errs.length) falhas.push(`${vp.nome} ${p}: ${errs.join('; ')}`);
       if (descobrir) for (const l of links) if (!vistas.includes(l) && !fila.includes(l)) fila.push(l);
     }
     if (descobrir) {

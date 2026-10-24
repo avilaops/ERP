@@ -75,7 +75,7 @@ export default async function FiscalPage({ searchParams }: { searchParams: Promi
     ["Classificação IBS/CBS", ruleFields.slice(11, 13)],
     ["Alíquotas IBS/CBS", ruleFields.slice(13)],
   ];
-  // Tabs separate fiscal tasks; the rules form shows every field at once.
+  // Tabs separate fiscal tasks; each form inside a tab shows all of its fields at once.
   const TABS = [
     ["consulta", "Consultar CNPJ"],
     ["certificado", certificate ? "Certificado" : "Certificado · falta"],

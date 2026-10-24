@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/auth";
 import { menuItem } from "@/lib/auth/permissions";
 import { tenantDb } from "@/lib/db/pool";
+import { createSupplier, SupplierError } from "@/lib/db/suppliers";
+import { readSupplierForm } from "@/lib/payable-form";
 import {
   addPurchaseCost, createPurchase, deletePurchase, movePurchase, PurchaseError, receivePurchase, removePurchaseCost, removePurchaseItem, savePurchaseItem,
   unreceivePurchase, updatePurchase,
@@ -63,6 +65,25 @@ export async function createPurchaseAction(_previous: ActionState, formData: For
   }
   revalidatePath(HERE);
   redirect(`${HERE}/${id}`);
+}
+
+export async function createPurchaseSupplierAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
+  const session = await requirePermission("compras");
+  const formReader = (key: string) => {
+    const value = formData.get(key);
+    return typeof value === "string" ? value : null;
+  };
+  let id: number;
+  try {
+    id = (await createSupplier(readSupplierForm(formReader), session.email, tenantDb(session.tenant.slug))).id;
+    revalidatePath(HERE);
+    revalidatePath(menuItem("fornecedores").href);
+  } catch (error) {
+    if (error instanceof SupplierError) return { error: error.message };
+    console.error("[compras] falha ao cadastrar fornecedor:", error instanceof Error ? error.message : error);
+    return { error: "Não foi possível cadastrar o fornecedor agora. Nada foi alterado; tente de novo." };
+  }
+  redirect(`${HERE}?nova=1&fornecedor=${id}`);
 }
 
 export async function updatePurchaseAction(_previous: ActionState, formData: FormData): Promise<ActionState> {

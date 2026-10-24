@@ -14,7 +14,7 @@ export function Bars({ bars, format, empty }: { bars: ChartBar[]; format: (value
       {bars.map((bar) => (
         <li key={bar.label} className="text-sm">
           <div className="flex items-baseline justify-between gap-3">
-            <span className="min-w-0 truncate">{bar.label}</span>
+            <span className="min-w-0 break-words">{bar.label}</span>
             <span className="whitespace-nowrap font-medium">{format(bar.value)}</span>
           </div>
           <div className="mt-1 h-2 rounded bg-slate-100">
@@ -44,7 +44,7 @@ export function Columns({ bars, format, empty }: { bars: ChartBar[]; format: (va
       </div>
       <div className="mt-1 flex gap-1 text-[10px] text-slate-500 sm:gap-2 sm:text-xs" aria-hidden="true">
         {bars.map((bar) => (
-          <span key={bar.label} className="min-w-0 flex-1 truncate text-center">
+          <span key={bar.label} className="min-w-0 flex-1 break-words text-center leading-tight">
             {bar.label}
           </span>
         ))}

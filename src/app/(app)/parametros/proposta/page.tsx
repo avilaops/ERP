@@ -4,7 +4,7 @@ import { PageHeader, SECONDARY } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { tenantDb } from "@/lib/db/pool";
 import { loadProposalDetails } from "@/lib/db/proposal-details";
-import { COMPANY_PROPOSAL_STEPS, proposalStep } from "@/lib/quote/settings";
+import { COMPANY_PROPOSAL_SECTIONS } from "@/lib/quote/settings";
 import { saveCompanyProposalAction } from "./actions";
 
 export const metadata = { title: "Dados da proposta · ERP" };
@@ -13,9 +13,8 @@ export default async function ProposalSettingsPage({ searchParams }: { searchPar
   const session = await requirePermission("parametros");
   const stored = await loadProposalDetails(tenantDb(session.tenant.slug));
   const query = await searchParams;
-  const step = proposalStep(query.etapa, COMPANY_PROPOSAL_STEPS.length);
   return <><PageHeader title="Dados da proposta" hint="Contato e condições para os próximos documentos." actions={<Link href="/parametros?ver=inicio" className={SECONDARY}>Configurações</Link>} />
-    {query.salvo === "1" && <p role="status" className="mt-2 text-sm">Dados salvos. Escolha uma etapa para conferir ou alterar.</p>}
-    <ProposalFields steps={COMPANY_PROPOSAL_STEPS} step={step} details={stored.details} revision={stored.revision} back="/parametros?ver=inicio" action={saveCompanyProposalAction} />
+    {query.salvo === "1" && <p role="status" className="mt-2 text-sm">Dados salvos.</p>}
+    <ProposalFields sections={COMPANY_PROPOSAL_SECTIONS} details={stored.details} revision={stored.revision} back="/parametros?ver=inicio" action={saveCompanyProposalAction} />
   </>;
 }

@@ -1,7 +1,7 @@
 "use client";
 
-import { useActionState, useState } from "react";
-import { INPUT as SHARED_INPUT, PRIMARY, SECONDARY } from "@/components/ui";
+import { useActionState, useEffect } from "react";
+import { INPUT as SHARED_INPUT, PRIMARY } from "@/components/ui";
 import type { CustomerKind } from "@/lib/customer";
 import { CUSTOMER_FIELDS, IDLE_CUSTOMER } from "@/lib/customer-form";
 import type { CustomerFieldKey, CustomerFormState, CustomerFormValues } from "@/lib/customer-form";
@@ -40,7 +40,6 @@ export function CustomerForm({
   const [state, formAction, pending] = useActionState(action, IDLE_CUSTOMER);
   const values = state.status === "error" && state.values ? state.values : saved;
   const { main, address } = CUSTOMER_FIELDS[kind];
-  const [step, setStep] = useState(0);
   const groups = [
     { title: kind === "PJ" ? "Identificação da empresa" : "Identificação pessoal", fields: main.filter((item) => !["phone", "email", "contactName", "tradeName", "stateRegistration"].includes(item.key)) },
     ...(kind === "PJ" ? [{ title: "Dados da empresa", fields: main.filter((item) => ["tradeName", "stateRegistration"].includes(item.key)) }] : []),
@@ -49,12 +48,17 @@ export function CustomerForm({
     { title: "Bairro e complemento", fields: address.filter((item) => ["complement", "district"].includes(item.key)) },
     { title: "Cidade e estado", fields: address.filter((item) => ["city", "uf"].includes(item.key)) },
   ];
-  const showAll = state.status === "error";
+  useEffect(() => {
+    if (state.status !== "error") return;
+    const target = state.invalid[0] ? document.getElementById(state.invalid[0]) : document.getElementById("erros-cliente");
+    requestAnimationFrame(() => target?.focus());
+  }, [state]);
 
   const field = ({ key, label, help, wide }: (typeof main)[number]) => {
     const invalid = state.invalid.includes(key);
     const border = invalid ? "border-red-500" : "border-slate-300";
     const locked = key === "document" && id !== null;
+    const describedBy = [help ? `${key}-ajuda` : null, invalid ? `${key}-erro` : null].filter(Boolean).join(" ") || undefined;
     return (
       <div key={key} className={wide ? "sm:col-span-2" : undefined}>
         <label htmlFor={key} className="block text-sm font-medium">
@@ -69,6 +73,7 @@ export function CustomerForm({
             name={key}
             defaultValue={values[key] ?? ""}
             aria-invalid={invalid || undefined}
+            aria-describedby={describedBy}
             className={`${INPUT} ${border}`}
           >
             <option value="">—</option>
@@ -88,7 +93,7 @@ export function CustomerForm({
             readOnly={locked}
             defaultValue={values[key] ?? ""}
             aria-invalid={invalid || undefined}
-            aria-describedby={help ? `${key}-ajuda` : undefined}
+            aria-describedby={describedBy}
             className={`${INPUT} ${border} ${locked ? "bg-slate-100 text-slate-600" : ""}`}
           />
         )}
@@ -97,6 +102,7 @@ export function CustomerForm({
             {help}
           </p>
         )}
+        {invalid && <p id={`${key}-erro`} className="mt-1 text-xs font-medium text-red-700">Confira este campo.</p>}
       </div>
     );
   };
@@ -110,13 +116,19 @@ export function CustomerForm({
       ))}
 
       {state.status === "error" && (
-        <div role="alert" className="rounded border border-red-300 bg-red-50 p-4 text-sm text-red-900">
+        <div id="erros-cliente" role="alert" tabIndex={-1} className="rounded border border-red-300 bg-red-50 p-4 text-sm text-red-900">
           <p className="font-semibold">Nada foi gravado.</p>
           <ul className="mt-1 list-disc pl-5">
             {state.errors.map((error) => (
               <li key={error}>{error}</li>
             ))}
           </ul>
+          {state.invalid.length > 0 && <ul className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+            {state.invalid.map((key) => {
+              const item = [...main, ...address].find((field) => field.key === key);
+              return <li key={key}><a href={`#${key}`} className="font-medium underline">{item?.label ?? key}</a></li>;
+            })}
+          </ul>}
         </div>
       )}
       {state.status === "saved" && (
@@ -125,15 +137,10 @@ export function CustomerForm({
         </p>
       )}
 
-      {!showAll && <label className="block text-sm font-medium"><span className="sr-only">Etapa do cadastro</span>
-        <select value={step} onChange={(event) => setStep(Number(event.target.value))} className={SHARED_INPUT}>
-          {groups.map((group, index) => <option key={group.title} value={index}>{index + 1} de {groups.length} · {group.title}</option>)}
-        </select>
-      </label>}
       {groups.map((group, index) => (
-        <fieldset key={group.title} hidden={!showAll && step !== index} className="rounded-xl border border-slate-200 bg-white">
+        <fieldset key={group.title} className="rounded-xl border border-slate-200 bg-white">
           <legend className="sr-only">{group.title}</legend>
-          {showAll && <h2 className="border-b border-slate-200 px-4 py-3 text-sm font-semibold">{group.title}</h2>}
+          <h2 className="border-b border-slate-200 px-4 py-3 text-sm font-semibold uppercase tracking-wide">{group.title}</h2>
           <div className="grid gap-3 p-4 sm:grid-cols-2">{group.fields.map(field)}</div>
           {index === groups.length - 1 && cepNote && <p className="px-4 pb-4 text-sm text-slate-600">{cepNote}</p>}
         </fieldset>
@@ -141,17 +148,15 @@ export function CustomerForm({
 
       {/* On the customer's own screen the button stays in reach at the bottom of a phone. Inside an order, the order has its own bar. */}
       <div className={`flex flex-wrap items-center gap-2 ${hidden === undefined ? "sticky bottom-[var(--tabbar)] z-10 -mx-4 border-t border-slate-200 bg-white px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:static md:mx-0 md:border-0 md:bg-transparent md:p-0" : ""}`}>
-        {!showAll && step > 0 && <button type="button" className={SECONDARY} onClick={() => setStep(step - 1)}>Voltar</button>}
-        {!showAll && step < groups.length - 1 && <button type="submit" className={PRIMARY} onClick={(event) => { event.preventDefault(); setStep(step + 1); }}>Continuar</button>}
         <button
           type="submit"
           disabled={pending}
-          className={!showAll && step < groups.length - 1 ? SECONDARY : PRIMARY}
+          className={PRIMARY}
         >
           {pending ? "Gravando…" : "Salvar cliente"}
         </button>
       </div>
-        {showAll && <p className="text-xs text-slate-500">Campos com * são exigidos para fechar o pedido.</p>}
+        <p className="text-xs text-slate-500">Campos com * são exigidos para fechar o pedido.</p>
     </form>
   );
 }

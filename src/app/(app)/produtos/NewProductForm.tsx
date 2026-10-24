@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
 import { PRIMARY } from "@/components/ui";
 import { EMPTY_NEW_PRODUCT, fieldLabel, IDLE_NEW_PRODUCT, NEW_PRODUCT_FIELDS } from "@/lib/product-form";
 import type { NewProductKey, NewProductState } from "@/lib/product-form";
@@ -27,6 +27,12 @@ export function NewProductForm({ action, onClose, lineId, imported }: { action: 
   const [state, formAction, pending] = useActionState(action, IDLE_NEW_PRODUCT);
   const values = state.status === "error" && state.values ? state.values : EMPTY_NEW_PRODUCT;
 
+  useEffect(() => {
+    if (state.status !== "error") return;
+    const target = state.invalid[0] ? document.getElementById(`novo-${state.invalid[0]}`) : document.getElementById("erros-novo-equipamento");
+    requestAnimationFrame(() => target?.focus());
+  }, [state]);
+
   return (
     <form
       id="novo-equipamento"
@@ -42,13 +48,16 @@ export function NewProductForm({ action, onClose, lineId, imported }: { action: 
       </h2>
       <div className="flex flex-col gap-5 p-5">
         {state.status === "error" && (
-          <div role="alert" className="rounded border border-red-300 bg-red-50 p-4 text-sm text-red-900">
+          <div id="erros-novo-equipamento" role="alert" tabIndex={-1} className="rounded border border-red-300 bg-red-50 p-4 text-sm text-red-900">
             <p className="font-semibold">Nada foi gravado.</p>
             <ul className="mt-1 list-disc pl-5">
               {state.errors.map((error) => (
                 <li key={error}>{error}</li>
               ))}
             </ul>
+            {state.invalid.length > 0 && <ul className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+              {state.invalid.map((key) => <li key={key}><a href={`#novo-${key}`} className="font-medium underline">{fieldLabel(key, imported)}</a></li>)}
+            </ul>}
           </div>
         )}
         {state.status === "saved" && (
@@ -62,6 +71,7 @@ export function NewProductForm({ action, onClose, lineId, imported }: { action: 
             const invalid = state.invalid.includes(key);
             const id = `novo-${key}`;
             const numeric = key in UNIT;
+            const describedBy = [HELP[key] ? `${id}-ajuda` : null, invalid ? `${id}-erro` : null].filter(Boolean).join(" ") || undefined;
             return (
               <div key={key} className={key === "name" ? "sm:col-span-2" : undefined}>
                 <label htmlFor={id} className="block text-sm font-medium">
@@ -76,7 +86,7 @@ export function NewProductForm({ action, onClose, lineId, imported }: { action: 
                   required={key === "name"}
                   defaultValue={values[key]}
                   aria-invalid={invalid || undefined}
-                  aria-describedby={HELP[key] ? `${id}-ajuda` : undefined}
+                  aria-describedby={describedBy}
                   className={`mt-1 min-h-[var(--control)] w-full min-w-0 rounded border bg-white px-3 outline-none focus:ring-2 focus:ring-brand ${
                     numeric ? "text-right" : ""
                   } ${invalid ? "border-red-500" : "border-slate-300"}`}
@@ -86,6 +96,7 @@ export function NewProductForm({ action, onClose, lineId, imported }: { action: 
                     {HELP[key]}
                   </p>
                 )}
+                {invalid && <p id={`${id}-erro`} className="mt-1 text-xs font-medium text-red-700">Confira este campo.</p>}
               </div>
             );
           })}

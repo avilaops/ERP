@@ -87,7 +87,6 @@ export function OrdersGrid({ rows, showSeller, sortHrefs, sort, direction }: Pro
     return { order, widths: savedPreferences.widths };
   }, [available, savedPreferences]);
   const [dragging, setDragging] = useState<ColumnKey | null>(null);
-
   const columns = useMemo<Record<ColumnKey, Column>>(() => ({
     customer: { key: "customer", label: "Cliente", defaultWidth: 320, sortHref: sortHrefs.customer, sortCurrent: sort === "cliente", sortDirection: direction },
     seller: { key: "seller", label: "Vendedor", defaultWidth: 180, sortHref: sortHrefs.seller, sortCurrent: sort === "vendedor", sortDirection: direction },
@@ -105,7 +104,6 @@ export function OrdersGrid({ rows, showSeller, sortHrefs, sort, direction }: Pro
     order.splice(order.indexOf(to), 0, from);
     savePreferences({ ...preferences, order });
   };
-
   const cell = (row: OrderRow, key: ColumnKey) => {
     if (key === "customer") return <><Link href={`/pedidos/${row.number}`} className="break-words font-medium text-brand underline">{row.customer}</Link><span className="block break-words text-xs text-slate-500">{[row.detail, row.document].filter(Boolean).join(" · ")}</span></>;
     if (key === "seller") return row.seller;
@@ -114,7 +112,6 @@ export function OrdersGrid({ rows, showSeller, sortHrefs, sort, direction }: Pro
     if (key === "status") return <Pill tone={tone[row.status]}>{row.statusLabel}</Pill>;
     return row.updated;
   };
-
   return (
     <div className="hidden overflow-x-auto md:block" aria-label="Tabela de pedidos personalizável">
       <p className="px-3 py-2 text-xs text-slate-600">Clique no título para ordenar. Arraste o ícone para mover a coluna e a borda para ajustar a largura.</p>

@@ -30,8 +30,8 @@ export function closingProposalProblems(details: ProposalDetails): string[] {
     .filter((field) => !hasProposalValue(details[field]) || (field === "freightMode" && !["CIF", "FOB", "retirada"].includes(details[field]!)))
     .map((field) => `${PROPOSAL_FIELDS[field].label}: preencha em Dados do PDF.`);
 }
-export type ProposalStep = { title: string; fields: ProposalField[]; hint: string };
-export const COMPANY_PROPOSAL_STEPS: ProposalStep[] = [
+export type ProposalSection = { title: string; fields: ProposalField[]; hint: string };
+export const COMPANY_PROPOSAL_SECTIONS: ProposalSection[] = [
   { title: "Contato da empresa", fields: ["phone", "email"], hint: "CNPJ, inscrição estadual e endereço vêm do cadastro Fiscal." },
   { title: "Site da empresa", fields: ["website"], hint: "Informe o endereço público do site da empresa." },
   { title: "Garantia", fields: ["warranty"], hint: "Informe o prazo, a cobertura e as exclusões aprovadas para seus produtos." },
@@ -40,11 +40,11 @@ export const COMPANY_PROPOSAL_STEPS: ProposalStep[] = [
   { title: "Cancelamento", fields: ["cancellation"], hint: "Informe as condições de cancelamento aprovadas pela empresa." },
   { title: "Atraso da entrada", fields: ["delayedDownPayment"], hint: "Explique o efeito sobre a reserva, fabricação e prazos." },
 ];
-export const ORDER_PROPOSAL_STEPS: ProposalStep[] = [
+export const ORDER_PROPOSAL_SECTIONS: ProposalSection[] = [
   { title: "Frete", fields: ["freightMode", "freightAmount"], hint: "Valor direto à transportadora, fora do total dos equipamentos." },
   { title: "Condições do frete", fields: ["freightTerms"], hint: "Informe o responsável e as condições. Frete cobrado pela vendedora deve ser tratado no faturamento." },
   { title: "Previsão de entrega", fields: ["deliveryEstimate", "deliveryNotes"], hint: "O endereço vem de Entrega da nota ou, na ausência, do cadastro do cliente." },
-  ...COMPANY_PROPOSAL_STEPS.slice(2),
+  ...COMPANY_PROPOSAL_SECTIONS.slice(2),
 ];
 export class ProposalSettingsError extends Error {}
 
@@ -68,9 +68,4 @@ export function checkedProposalDetails(input: ProposalDetails): ProposalDetails 
   }
   if (result.freightAmount && result.freightMode !== "FOB") throw new ProposalSettingsError("Valor direto pelo cliente: escolha FOB. Para CIF ou retirada, deixe o valor em branco.");
   return result;
-}
-
-export function proposalStep(value: string | string[] | undefined, count: number): number {
-  const parsed = Number(Array.isArray(value) ? value[0] : value ?? 0);
-  return Number.isInteger(parsed) && parsed >= 0 && parsed < count ? parsed : 0;
 }

@@ -1,10 +1,13 @@
 import Link from "next/link";
-import { CARD, DANGER_OUTLINE, EmptyState, INPUT, PageHeader, PRIMARY, SECONDARY } from "@/components/ui";
+import { cookies } from "next/headers";
+import { FitRows } from "@/components/FitRows";
+import { CARD, DANGER_OUTLINE, EmptyState, INPUT, PageHeader, Pager, pageOf, PRIMARY, SECONDARY, ViewTabs } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { approvesAtLoss, menuItem } from "@/lib/auth/permissions";
 import { listPastDecisions, listPendingApprovals } from "@/lib/db/approvals";
 import { tenantDb } from "@/lib/db/pool";
 import { isoDate, showDateTime } from "@/lib/format";
+import { rowsPerPage } from "@/lib/rows";
 import { BAND_TEXT, REASON_TEXT } from "@/lib/order-form";
 import { ordersView } from "@/lib/orders-view";
 import { ActionForm } from "../pedidos/ActionForm";
@@ -20,13 +23,19 @@ const BAND_COLORS = {
   prejuizo: "bg-red-100 text-red-900",
 } as const;
 
-export default async function AprovacoesPage() {
+export default async function AprovacoesPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const session = await requirePermission("aprovacoes");
   const conn = tenantDb(session.tenant.slug);
 
   const pending = await listPendingApprovals(conn);
   const decisions = await listPastDecisions(20, conn);
   const atLoss = approvesAtLoss(session);
+  const query = await searchParams;
+  const first = (value: string | string[] | undefined) => Array.isArray(value) ? value[0] : value;
+  const view = first(query.ver) === "historico" ? "historico" : "pendentes";
+  const pendingPage = pageOf(pending, first(query.pagina), 1);
+  const historySize = rowsPerPage((await cookies()).get("erp_linhas_aprovacoes")?.value, 1);
+  const historyPage = pageOf(decisions, first(query.pagina), historySize);
   // The same text of the orders list: total from the engine, no cost.
   const { rows } = ordersView(
     pending.map((item) => item.order),
@@ -39,8 +48,12 @@ export default async function AprovacoesPage() {
         title={menuItem("aprovacoes").label}
         hint="Pedidos fora das regras comerciais aguardam sua decisão."
       />
+      <ViewTabs label="Partes das aprovações" items={[
+        { href: menuItem("aprovacoes").href, label: `Pendentes (${pending.length})`, current: view === "pendentes" },
+        { href: `${menuItem("aprovacoes").href}?ver=historico`, label: "Últimas decisões", current: view === "historico" },
+      ]} />
 
-      <div className="mt-6 flex flex-col gap-4">
+      {view === "pendentes" && <div className="mt-3 flex flex-col gap-4">
         {pending.length === 0 && (
           <div className={CARD}>
             <EmptyState
@@ -50,8 +63,8 @@ export default async function AprovacoesPage() {
             />
           </div>
         )}
-        {pending.map((item, index) => {
-          const row = rows[index];
+        {pendingPage.rows.map((item) => {
+          const row = rows[pending.indexOf(item)];
           const blocked = item.directorOnly && !atLoss;
           return (
             <section key={row.number} className={`${CARD} p-5`} aria-label={`Pedido ${row.number}`}>
@@ -116,15 +129,16 @@ export default async function AprovacoesPage() {
             </section>
           );
         })}
-      </div>
+        {pending.length > 0 && <Pager {...pendingPage} noun={["aprovação", "aprovações"]} hrefFor={(page) => page > 1 ? `${menuItem("aprovacoes").href}?pagina=${page}` : menuItem("aprovacoes").href} />}
+      </div>}
 
-      {decisions.length > 0 && (
-        <section className={`${CARD} mt-8`} aria-labelledby="decididos">
+      {view === "historico" && decisions.length > 0 && (
+        <section className={`${CARD} mt-3`} aria-labelledby="decididos">
           <h2 id="decididos" className="border-b border-slate-200 px-5 py-3 text-sm font-semibold uppercase tracking-wide">
             Últimas decisões
           </h2>
           <div className="relative overflow-x-auto">
-            <table className="stack-sm w-full text-sm">
+            <table id="historico-aprovacoes" className="stack-sm w-full text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>
                   {["Pedido", "Decisão", "Por", "Quando", "Comentário"].map((column) => (
@@ -135,8 +149,8 @@ export default async function AprovacoesPage() {
                 </tr>
               </thead>
               <tbody>
-                {decisions.map((decision) => (
-                  <tr key={`${decision.number}-${decision.decidedAt.getTime()}`} className="border-t border-slate-200 align-top">
+                {historyPage.rows.map((decision) => (
+                  <tr key={`${decision.number}-${decision.decidedAt.getTime()}`} data-row className="border-t border-slate-200 align-top">
                     <td className="px-4 py-3">
                       <Link href={`${ORDERS}/${decision.number}`} className="font-medium text-brand underline-offset-2 hover:underline">
                         {decision.customerName ?? "sem cliente"}
@@ -160,8 +174,11 @@ export default async function AprovacoesPage() {
               </tbody>
             </table>
           </div>
+          <Pager {...historyPage} noun={["decisão", "decisões"]} hrefFor={(page) => `${menuItem("aprovacoes").href}?ver=historico${page > 1 ? `&pagina=${page}` : ""}`} />
+          <FitRows listId="historico-aprovacoes" shown={historySize} minimum={1} cookieName="erp_linhas_aprovacoes" />
         </section>
       )}
+      {view === "historico" && decisions.length === 0 && <div className={`${CARD} mt-3`}><EmptyState title="Nenhuma decisão registrada" description="As aprovações e recusas aparecerão aqui." /></div>}
     </>
   );
 }

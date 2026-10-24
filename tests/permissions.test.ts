@@ -24,7 +24,8 @@ const MATRIX: [MenuItemKey, string, string, [boolean, boolean, boolean, boolean]
   ["comissoes", "Comissões", "/comissoes", [true, false, true, true]],
   ["fiscal", "Notas fiscais", "/fiscal", [true, false, false, false]],
   ["tabela-precos", "Tabela de preços", "/tabela-precos", [true, true, true, false]],
-  ["produtos", "Produtos e custos", "/produtos", [true, false, false, false]],
+  ["produtos", "Produtos", "/produtos", [true, false, false, false]],
+  ["custos", "Custos", "/custos", [true, false, false, true]],
   ["parametros", "Parâmetros do sistema", "/parametros", [true, false, false, false]],
   ["simulador", "Simulador", "/simulador", [true, true, true, false]],
   ["equipe", "Equipe e acessos", "/equipe", [true, false, false, false]],
@@ -43,8 +44,8 @@ test("os perfis são exatamente os quatro, com os rótulos de tela", () => {
   });
 });
 
-test("o menu tem os 21 itens do manual, incluindo Notas fiscais e a biblioteca Documentos", () => {
-  assert.equal(MENU_ITEMS.length, 21);
+test("o menu tem os 22 itens do manual, incluindo Notas fiscais e a biblioteca Documentos", () => {
+  assert.equal(MENU_ITEMS.length, 22);
   assert.deepEqual(
     MENU_ITEMS.map((item) => [item.key, item.label, item.href]),
     MATRIX.map(([key, label, href]) => [key, label, href]),
@@ -59,7 +60,7 @@ test("o menu tem os 21 itens do manual, incluindo Notas fiscais e a biblioteca D
   assert.deepEqual(MENU_ITEMS.map((item) => item.label), labels);
 });
 
-test("matriz de permissão: 21 itens × 4 perfis", () => {
+test("matriz de permissão: 22 itens × 4 perfis", () => {
   let checked = 0;
   for (const [key, , , row] of MATRIX) {
     COLUMNS.forEach((role, column) => {
@@ -67,7 +68,7 @@ test("matriz de permissão: 21 itens × 4 perfis", () => {
       checked += 1;
     });
   }
-  assert.equal(checked, 84);
+  assert.equal(checked, 88);
 });
 
 test("menuFor devolve só os itens do perfil, na ordem do manual", () => {
@@ -83,6 +84,7 @@ test("menuFor devolve só os itens do perfil, na ordem do manual", () => {
     "Contas a pagar",
     "Fornecedores",
     "Comissões",
+    "Custos",
     "Documentos",
   ]);
   assert.deepEqual(menuFor("VENDEDOR").map((item) => item.href), [
@@ -98,7 +100,7 @@ test("menuFor devolve só os itens do perfil, na ordem do manual", () => {
   ]);
 });
 
-test("custo, desconto máximo e lucro: só a Diretoria vê", () => {
+test("custo fora do módulo financeiro, desconto máximo e lucro: só a Diretoria vê", () => {
   assert.deepEqual(
     COLUMNS.map((role) => [role, seesCosts(role)]),
     [

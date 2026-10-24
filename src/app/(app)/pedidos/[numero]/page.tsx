@@ -48,7 +48,6 @@ import { cancelContractAction, resendContractAction, sendContractAction, sendUpl
 import { issueNfeAction, registerNfeEventAction, saveDeliveryAction, saveTransportAction, sendNfeMailAction } from "../nfe-actions";
 import { CustomerForm } from "../../clientes/CustomerForm";
 import { OrderParts } from "../OrderParts";
-import type { OrderPart } from "../OrderParts";
 import { ActionForm } from "../ActionForm";
 import {
   addItemAction,
@@ -278,23 +277,6 @@ export default async function PedidoPage({
   const here = `/pedidos/${order.number}`;
   const canBeTaxpayer = linked !== null && taxpayerFromRegistration(linked.kind, linked.stateRegistration);
 
-  // The parts of the page on a phone, each saying whether it is filled in.
-  const hasDocuments = contracts.length > 0 || contractDraft !== null || invoice !== null;
-  const parts: OrderPart[] = [
-    { key: "resumo", label: "Resumo", filled: null },
-    { key: "itens", label: "Itens", filled: order.items.length > 0 && !order.items.some((item) => item.plateLoaded && !item.plates) },
-    { key: "cliente", label: "Cliente", filled: linked !== null && isComplete(linked) },
-    { key: "entrega", label: "Entrega", filled: order.deliveryUf !== null && order.productionDays !== null },
-    { key: "pagamento", label: "Pagamento", filled: plan.balance === 0 || (order.installmentCount !== null && order.balanceMethod !== null) },
-    ...(editable ? [{ key: "fechar", label: "Fechar", filled: missing.length === 0 }] : []),
-    ...(hasDocuments ? [{ key: "documentos", label: "Documentos e nota fiscal", filled: null }] : []),
-  ];
-  // It opens where the work is: the first part still to fill in while the order is open, the summary after.
-  const asksPart = first(query.ver);
-  const initialPart =
-    parts.find((part) => part.key === asksPart)?.key ??
-    (first(query.doc) !== undefined || asked !== undefined ? "cliente" : editable ? (parts.find((part) => part.filled === false)?.key ?? "resumo") : "resumo");
-
   return (
     <>
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -326,8 +308,8 @@ export default async function PedidoPage({
           <strong>Aprovação recusada</strong> por {decision.decidedBy} em {showDateTime(decision.decidedAt)}: {decision.comment}
         </p>
       )}
-      {/* Fields remain mounted while the selected part changes at every viewport. */}
-      <OrderParts parts={parts} initial={initialPart}>
+      {/* Every section of the order stays visible on this page. */}
+      <OrderParts>
       {order.status === "aguardando_aprovacao" && allows(session, "aprovacoes") && (
         <section data-part="resumo" className="mt-3 rounded-lg border border-brand bg-white p-4" aria-labelledby="sua-decisao">
           <h2 id="sua-decisao" className="text-sm font-semibold uppercase tracking-wide">

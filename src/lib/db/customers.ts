@@ -12,7 +12,7 @@ import type { ListQuery, ListResult } from "@/lib/list-query";
 export type { CustomerInput } from "@/lib/customer";
 
 export type Customer = CustomerInput & { id: number };
-export type CustomerListSort = "nome" | "cadastro" | "ultima_compra";
+export type CustomerListSort = "nome" | "documento" | "cidade" | "celular" | "compras" | "ultima_compra" | "completude" | "cadastro";
 export type CustomerListItem = Customer & {
   closedOrders: number;
   totalBought: number;
@@ -184,7 +184,18 @@ export async function queryCustomers(query: ListQuery<CustomerListSort>, conn: Q
   const total = Number(counted.rows[0]?.total ?? 0);
   const pages = Math.max(1, Math.ceil(total / query.pageSize));
   const page = Math.min(pages, query.page);
-  const orderColumn = query.sort === "cadastro" ? "c.created_at" : query.sort === "ultima_compra" ? "b.last_purchase" : "lower(c.name)";
+  const orderColumn = query.sort === "cadastro" ? "c.created_at"
+    : query.sort === "documento" ? "c.document"
+    : query.sort === "cidade" ? "lower(COALESCE(c.city, ''))"
+    : query.sort === "celular" ? "COALESCE(c.phone, '')"
+    : query.sort === "compras" ? "COALESCE(b.total_bought, 0)"
+    : query.sort === "ultima_compra" ? "b.last_purchase"
+    : query.sort === "completude" ? `(
+        (c.phone IS NULL)::int + (c.email IS NULL)::int + (c.cep IS NULL)::int + (c.street IS NULL)::int +
+        (c.street_number IS NULL)::int + (c.district IS NULL)::int + (c.city IS NULL)::int + (c.uf IS NULL)::int +
+        (c.kind = 'PJ' AND c.contact_name IS NULL)::int + (c.kind = 'PJ' AND c.state_registration IS NULL)::int
+      )`
+    : "lower(c.name)";
   const nulls = query.sort === "ultima_compra" ? " NULLS LAST" : "";
   const dataValues = [...values, query.pageSize, (page - 1) * query.pageSize];
   const { rows } = await conn.query(

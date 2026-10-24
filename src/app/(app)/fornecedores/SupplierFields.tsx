@@ -1,5 +1,5 @@
 import { INPUT } from "@/components/ui";
-import { FormSteps } from "@/components/FormSteps";
+import { FormSections } from "@/components/FormSections";
 import { BANK_FIELDS, SUPPLIER_KIND_LABELS, SUPPLIER_KINDS } from "@/lib/db/suppliers";
 import type { Supplier } from "@/lib/db/suppliers";
 
@@ -27,7 +27,7 @@ export function SupplierFields({ saved }: { saved: Supplier | null }) {
     </div>
   ));
   return (
-    <FormSteps label="Etapa do fornecedor" steps={[
+    <FormSections sections={[
       { title: "Identificação", content: <div key="identificacao" className="grid gap-3 sm:grid-cols-2">
       <div>
         <label htmlFor="kind" className={LABEL}>

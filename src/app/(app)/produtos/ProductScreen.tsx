@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { DANGER, DANGER_OUTLINE, SECONDARY } from "@/components/ui";
 import { fieldLabel, IDLE_ROW } from "@/lib/product-form";
 import type { NewProductKey, ProductFormValues, ProductScreenResult, RowState } from "@/lib/product-form";
@@ -11,8 +11,8 @@ type RowAction = (state: RowState, formData: FormData) => Promise<RowState>;
 
 const LIST = "/produtos";
 const INPUT = "mt-1 w-full rounded-lg border bg-white px-4 py-3 text-base outline-none focus:ring-2 focus:ring-brand";
-const MAIN: NewProductKey[] = ["name", "code", "advisoryCost"];
-const MORE: NewProductKey[] = ["supplierName", "supplierModel", "supplierPriceUsd", "taxCredit", "packaging"];
+const IDENTIFICATION: NewProductKey[] = ["name", "code", "supplierName", "supplierModel"];
+const COSTS: NewProductKey[] = ["supplierPriceUsd", "advisoryCost", "taxCredit", "packaging"];
 const HELP: Partial<Record<NewProductKey, string>> = {
   code: "Ex.: LD-B001. Pode ficar para depois.",
   advisoryCost: "Em branco, o equipamento entra como sem custo.",
@@ -20,8 +20,8 @@ const HELP: Partial<Record<NewProductKey, string>> = {
 const NUMERIC: NewProductKey[] = ["supplierPriceUsd", "advisoryCost", "taxCredit", "packaging"];
 
 /**
- * One equipment on one screen: photo, the three fields that matter, the rest
- * folded away, and the buttons always in reach at the bottom. It only collects
+ * One equipment on one screen: identification and costs remain visible, with
+ * the buttons always in reach at the bottom. It only collects
  * what was typed: the server checks and saves, and the photo goes by its own
  * route, which is the only way a photo enters the system.
  */
@@ -50,7 +50,9 @@ export function ProductScreen({
 }) {
   const router = useRouter();
   const form = useRef<HTMLFormElement>(null);
+  const feedback = useRef<HTMLDivElement>(null);
   const [errors, setErrors] = useState<string[]>([]);
+  const [persistedId, setPersistedId] = useState(id);
   // The cost is called by what the line chosen buys: it follows the select.
   const [chosenLine, setChosenLine] = useState(lineId);
   const imported = lines.find((line) => line.id === chosenLine)?.imported ?? true;
@@ -60,23 +62,43 @@ export function ProductScreen({
   const [removing, setRemoving] = useState(false);
   const [pending, start] = useTransition();
 
+  useEffect(() => {
+    if (errors.length === 0) return;
+    requestAnimationFrame(() => feedback.current?.focus());
+  }, [errors]);
+
   /** Saves the fields, then the photo when one was chosen, and goes on to the list or to a blank screen. */
   function submit(then: "list" | "another") {
     if (!form.current) return;
     const data = new FormData(form.current);
     start(async () => {
-      const result = await save(data);
+      let result: ProductScreenResult;
+      try {
+        result = await save(data);
+      } catch {
+        setErrors(["Não foi possível salvar o equipamento. Confira a conexão e tente novamente."]);
+        setInvalid([]);
+        return;
+      }
       if (!result.ok) {
         setErrors(result.errors);
         setInvalid(result.invalid);
         return;
       }
+      setPersistedId(result.id);
       if (file) {
-        const sent = await fetch(`/api/produtos/${result.id}/foto`, { method: "PUT", body: file });
-        if (!sent.ok) {
-          setErrors([`O equipamento foi salvo, mas a foto não: ${await sent.text()}`]);
+        let sent: Response;
+        try {
+          sent = await fetch(`/api/produtos/${result.id}/foto`, { method: "PUT", body: file });
+        } catch {
+          setErrors(["O equipamento foi salvo, mas a foto não foi enviada. Confira a conexão e tente salvar novamente."]);
           setInvalid([]);
-          if (id === null) router.replace(`${LIST}/${result.id}`);
+          return;
+        }
+        if (!sent.ok) {
+          const detail = await sent.text().catch(() => "");
+          setErrors([`O equipamento foi salvo, mas a foto não foi enviada.${detail ? ` ${detail}` : ""} Tente salvar novamente.`]);
+          setInvalid([]);
           return;
         }
       }
@@ -86,6 +108,7 @@ export function ProductScreen({
         setPreview(null);
         setErrors([]);
         setInvalid([]);
+        setPersistedId(null);
         router.replace(`${LIST}/novo?salvo=1`);
         router.refresh();
       } else {
@@ -141,10 +164,15 @@ export function ProductScreen({
       }}
       className="mx-auto flex max-w-xl flex-col gap-5"
     >
-      {id !== null && <input type="hidden" name="id" value={id} />}
+      {persistedId !== null && <input type="hidden" name="id" value={persistedId} />}
       <input type="hidden" name="wording" value={imported ? "importada" : "nacional"} />
-      {lines.length > 1 ? (
+      <section id="product-identification" aria-labelledby="product-identification-title" className="flex scroll-mt-4 flex-col gap-5 rounded-xl border border-slate-200 bg-white p-4">
         <div>
+          <h2 id="product-identification-title" className="text-lg font-semibold">Identificação e foto</h2>
+          <p className="mt-1 text-sm text-slate-600">O nome identifica o equipamento. Os demais dados podem ser completados depois.</p>
+        </div>
+        {lines.length > 1 ? (
+          <div>
           <label htmlFor="lineId" className="block font-medium">
             Linha de produto
           </label>
@@ -156,21 +184,21 @@ export function ProductScreen({
             ))}
           </select>
           <p className="mt-1 text-sm text-slate-500">Define os parâmetros e a tabela de preços em que o equipamento entra.</p>
-        </div>
-      ) : (
-        <input type="hidden" name="lineId" value={lineId} />
-      )}
+          </div>
+        ) : (
+          <input type="hidden" name="lineId" value={lineId} />
+        )}
 
-      <div className="flex items-center gap-4">
-        <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-slate-300 bg-white text-xs text-slate-500">
+        <div className="flex items-center gap-4">
+          <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-slate-300 bg-white text-xs text-slate-500">
           {preview ? (
             // eslint-disable-next-line @next/next/no-img-element -- a local preview or the photo served by the app itself
             <img src={preview} alt="" className="h-full w-full object-cover" />
           ) : (
             "sem foto"
           )}
-        </div>
-        <label className="cursor-pointer rounded-lg bg-brand-soft px-4 py-2.5 font-medium text-brand">
+          </div>
+          <label className="cursor-pointer rounded-lg bg-brand-soft px-4 py-2.5 font-medium text-brand">
           {preview ? "Trocar foto" : "Adicionar foto"}
           <input
             type="file"
@@ -182,23 +210,27 @@ export function ProductScreen({
               setPreview(chosen ? URL.createObjectURL(chosen) : photo);
             }}
           />
-        </label>
-      </div>
+          </label>
+        </div>
+
+        {IDENTIFICATION.map(field)}
+      </section>
 
       {errors.length > 0 && (
-        <div role="alert" className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-900">
+        <div ref={feedback} role="alert" tabIndex={-1} className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-900">
           {errors.map((error) => (
             <p key={error}>{error}</p>
           ))}
         </div>
       )}
 
-      {MAIN.map(field)}
-
-      <details className="rounded-lg border border-slate-200 bg-white" open={invalid.some((key) => MORE.includes(key)) || undefined}>
-        <summary className="cursor-pointer px-4 py-3 font-medium">Mais dados: fornecedor, crédito e embalagem</summary>
-        <div className="flex flex-col gap-5 border-t border-slate-200 p-4">{MORE.map(field)}</div>
-      </details>
+      <section id="product-costs" aria-labelledby="product-costs-title" className="flex scroll-mt-4 flex-col gap-5 rounded-xl border border-slate-200 bg-white p-4">
+        <div>
+          <h2 id="product-costs-title" className="text-lg font-semibold">Custos e formação do preço</h2>
+          <p className="mt-1 text-sm text-slate-600">Valores usados no cálculo da tabela. Em branco, o equipamento fica sinalizado para revisão.</p>
+        </div>
+        {COSTS.map(field)}
+      </section>
 
       {id !== null && (
         <div className="flex flex-wrap items-center gap-3 text-sm">

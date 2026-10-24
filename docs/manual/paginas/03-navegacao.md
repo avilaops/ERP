@@ -35,7 +35,8 @@ O menu fica à esquerda em todas as telas. Ele mostra apenas os itens liberados 
 | Comissões | Comissão de cada vendedor por mês. |
 | Notas fiscais | Pedidos a emitir, fila, revisões manuais, notas fiscais, e-mails e inutilizações. |
 | Tabela de preços | Preços publicados para a equipe. |
-| Produtos e custos | Equipamentos e custos da assessoria. |
+| Produtos | Cadastro técnico dos equipamentos usados em pedidos, compras e estoque. |
+| Custos | Custos, créditos tributários e preços dos equipamentos. |
 | Parâmetros do sistema | Impostos, canal e política comercial. |
 | Simulador | Simulação de preço e desconto sem criar pedido. |
 | Equipe e acessos | Usuários e perfis. |

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CARD, DANGER, PageHeader, PRIMARY, SECONDARY } from "@/components/ui";
+import { CARD, DANGER, PageHeader, Pager, PRIMARY, SECONDARY, pageOf } from "@/components/ui";
 import { requirePermission } from "@/lib/auth";
 import { menuItem } from "@/lib/auth/permissions";
 import { tenantDb } from "@/lib/db/pool";
@@ -14,10 +14,12 @@ export const dynamic = "force-dynamic";
 
 const INPUT = "min-h-[var(--control)] rounded-lg border border-slate-300 bg-white px-3 text-base outline-none focus:ring-2 focus:ring-brand";
 
-export default async function LinhasPage() {
+export default async function LinhasPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const session = await requirePermission("parametros");
   const conn = tenantDb(session.tenant.slug);
   const lines = await listLines(conn);
+  const query = await searchParams;
+  const slice = pageOf(lines, typeof query.pagina === "string" ? query.pagina : undefined, 10);
 
   return (
     <>
@@ -57,10 +59,16 @@ export default async function LinhasPage() {
           Linhas cadastradas ({lines.length})
         </h2>
         <ul>
-          {lines.map((line) => {
+          {slice.rows.map((line) => {
             const free = line.products === 0 && line.versions === 0 && lines.length > 1;
             return (
               <li key={line.id} className="border-t border-slate-200 px-5 py-3 first:border-t-0">
+                <details name="linha-em-edicao" className="group">
+                  <summary className="disclosure-heading">
+                    {line.name}
+                    <span className="disclosure-marker" aria-hidden="true">+</span>
+                  </summary>
+                  <div className="border-t border-slate-200 pt-3">
                 <ActionForm action={renameLineAction} className="flex flex-wrap items-end gap-3">
                   <input type="hidden" name="id" value={line.id} />
                   <div className="min-w-0 basis-full sm:basis-48 sm:flex-1">
@@ -104,10 +112,13 @@ export default async function LinhasPage() {
                     {lines.length === 1 ? "A empresa precisa de pelo menos uma linha." : "Só sai linha sem equipamento e sem tabela publicada."}
                   </p>
                 )}
+                  </div>
+                </details>
               </li>
             );
           })}
         </ul>
+        <Pager {...slice} noun={["linha", "linhas"]} hrefFor={(page) => (page === 1 ? "/parametros/linhas" : `/parametros/linhas?pagina=${page}`)} />
       </section>
     </>
   );

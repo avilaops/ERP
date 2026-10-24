@@ -2,7 +2,7 @@ import { monthLabel } from "@/lib/commissions-view";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { FitRows } from "@/components/FitRows";
-import { CARD, INPUT, DANGER_OUTLINE, pageOf, Pager, PRIMARY, SECONDARY, PageHeader, MetricSummary, ViewTabs } from "@/components/ui";
+import { CARD, INPUT, DANGER_OUTLINE, EmptyState, pageOf, Pager, PRIMARY, SECONDARY, PageHeader, MetricSummary, ViewTabs } from "@/components/ui";
 import { rowsPerPage } from "@/lib/rows";
 import { OrderReference } from "@/components/OrderReference";
 import { requirePermission } from "@/lib/auth";
@@ -60,6 +60,8 @@ export default async function RecebimentosPage({ searchParams }: { searchParams:
     <>
       <PageHeader title={menuItem("recebimentos").label} hint="Entradas e parcelas dos pedidos fechados." />
 
+      <MetricSummary items={cards.map(([label, value, note, color]) => ({ label, value, note, attention: Boolean(color) }))} />
+
       {seesCosts(session) && (
         <details className={`${CARD} mt-3`}>
           <summary className="disclosure-heading">Incluir cobrança manual<span className="disclosure-marker" aria-hidden="true">+</span></summary>
@@ -87,14 +89,12 @@ export default async function RecebimentosPage({ searchParams }: { searchParams:
       <ViewTabs label="Partes dos recebimentos" items={TABS.map(([key, label]) => ({ href: `${HERE}?ver=${key}`, label, current: key === tab }))} />
       {tab === "aberto" && (
         <>
-      <MetricSummary items={cards.map(([label, value, note, color]) => ({ label, value, note, attention: Boolean(color) }))} />
-
-      <section className={`${CARD} mt-6`} aria-labelledby="abertos">
+      <section className={`${CARD} mt-3`} aria-labelledby="abertos">
         <h2 id="abertos" className="border-b border-slate-200 px-5 py-3 text-sm font-semibold uppercase tracking-wide">
           Em aberto ({open.length})
         </h2>
         {open.length === 0 ? (
-          <p className="p-5 text-sm text-slate-600">Nada a receber. Os valores aparecem aqui quando um pedido é fechado.</p>
+          <EmptyState title="Nada a receber" description="Os valores aparecem aqui quando um pedido é fechado." />
         ) : (
           <>
           <ul id="parcelas">
@@ -162,11 +162,11 @@ export default async function RecebimentosPage({ searchParams }: { searchParams:
       {tab === "estornos" && (
         <>
       {refunds.length > 0 && (
-        <section className={`${CARD} mt-8 border-amber-300`} aria-labelledby="estornos">
+        <section className={`${CARD} mt-3 border-amber-300`} aria-labelledby="estornos">
           <h2 id="estornos" className="border-b border-slate-200 px-5 py-3 text-sm font-semibold uppercase tracking-wide">
             Estornos aguardando a diretoria ({refunds.length})
           </h2>
-          <ul>
+          <ul id="estornos-lista">
             {refundSlice.rows.map((refund) => (
               <li data-row key={refund.id} className="border-t border-slate-200 px-4 py-3 first:border-t-0">
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -206,14 +206,14 @@ export default async function RecebimentosPage({ searchParams }: { searchParams:
       )}
       {tab === "recebidos" && (
         <>
-      {receipts.length === 0 && <p className={`${CARD} mt-4 p-4 text-sm text-slate-700`}>Nenhum recebimento registrado ainda.</p>}
+      {receipts.length === 0 && <div className={`${CARD} mt-3`}><EmptyState title="Nenhum recebimento registrado" description="As baixas confirmadas aparecem aqui." /></div>}
       {receipts.length > 0 && (
-        <section className={`${CARD} mt-8`} aria-labelledby="recebidos">
+        <section className={`${CARD} mt-3`} aria-labelledby="recebidos">
           <h2 id="recebidos" className="border-b border-slate-200 px-5 py-3 text-sm font-semibold uppercase tracking-wide">
             Últimos recebimentos
           </h2>
           <div className="relative overflow-x-auto">
-            <table className="stack-sm w-full text-sm">
+            <table id="recebidos-lista" className="stack-sm w-full text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>
                   {["Pedido", "Recebido em", "Forma", "Vendedor"].map((column) => (
@@ -278,7 +278,12 @@ export default async function RecebimentosPage({ searchParams }: { searchParams:
         </>
       )}
       {tab !== "aberto" && <Pager {...activeSlice} noun={tab === "estornos" ? ["estorno", "estornos"] : ["recebimento", "recebimentos"]} hrefFor={(page) => `${HERE}?ver=${tab}&pagina=${page}`} />}
-      {tab === "aberto" && <FitRows listId="parcelas" shown={size} minimum={1} cookieName="erp_linhas_receber" />}
+      <FitRows
+        listId={tab === "aberto" ? "parcelas" : tab === "estornos" ? "estornos-lista" : "recebidos-lista"}
+        shown={size}
+        minimum={1}
+        cookieName="erp_linhas_receber"
+      />
     </>
   );
 }
