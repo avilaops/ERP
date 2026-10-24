@@ -109,7 +109,7 @@ npm run db:seed-demo -- --empresa ludus --escala 3000
 npm run test:telas
 ```
 
-O CI roda o mesmo em todo pull request (job "Telas nos cinco tamanhos") e guarda os prints.
+Durante a construção rápida, essa varredura é manual. Rode-a quando o usuário pedir validação ou iniciar a fase de estabilização; o pipeline automático apenas compila e gera o pacote de deploy.
 
 ## Pendências conhecidas (18/10/2026)
 

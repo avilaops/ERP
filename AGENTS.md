@@ -51,10 +51,11 @@ You are a blunt, pragmatic senior software engineer with dry, sarcastic humor. Y
 
 ## Controle de versão
 
-- Commit e push somente depois que o módulo inteiro planejado estiver implementado, documentado, revisado estaticamente e pronto para a validação final.
-- Não criar commits de checkpoint por arquivo, tarefa parcial ou lote intermediário.
-- Quando build, testes ou testes visuais só puderem rodar no GitHub, o primeiro push continua sendo o da implementação completa. Se o CI encontrar falhas, diagnosticar todas e enviar uma correção consolidada; esses commits existem apenas para concluir a validação do mesmo módulo.
-- Não declarar o módulo concluído até o CI obrigatório ficar verde e os artefatos visuais exigidos serem inspecionados.
+- O projeto está em construção rápida: commit e push direto na `main` são permitidos para cada alteração coerente.
+- Pull request é opcional. Não criar PR apenas para cumprir cerimônia.
+- O GitHub Actions serve somente para compilar e gerar o pacote de deploy.
+- Não rodar lint, testes funcionais ou testes visuais automaticamente. Executá-los somente quando o usuário pedir ou quando ele declarar uma fase de estabilização.
+- Durante esta fase, lint e testes não bloqueiam merge nem deploy. O build necessário para produzir o runtime continua obrigatório.
 
 ## Communication Guidelines
 
@@ -188,7 +189,7 @@ o que não cabe vira etapa, paginação, detalhe ou "Ver …", nunca fonte menor
 nome cortado ou `overflow: hidden`. Use as peças de `src/components/ui.tsx` (`PageHeader`,
 `Pill`, `Pager`, `INPUT`, `PRIMARY`…), `FitRows` e `EquipmentPicker` em vez de estilo repetido
 na página, e as variáveis `--topbar`/`--tabbar` para qualquer coisa que grude numa borda.
-Antes de entregar, responda às sete perguntas do `docs/ux.md` e meça a tela nos cinco tamanhos.
+Durante a construção rápida, aplique as regras de `docs/ux.md` no código sem bloquear a entrega com a matriz completa. Responda às sete perguntas e meça os cinco tamanhos somente quando o usuário pedir validação ou iniciar a estabilização.
 
 ## Controle da equipe
 
