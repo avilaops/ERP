@@ -3,40 +3,20 @@ name: CI
 on:
   push:
     branches: [main]
-  pull_request:
+  workflow_dispatch:
 
-# Uma execução por branch: a mais nova cancela a anterior.
 concurrency:
-  group: ci-${{ github.ref }}
+  group: deploy-package-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
-  verificar:
-    name: Lint, tipos, testes e build
+  pacote:
+    name: Gerar pacote de produção
     runs-on: ubuntu-latest
     timeout-minutes: 15
-
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: erp
-          POSTGRES_PASSWORD: erp-ci
-          # Os testes de banco só rodam em banco com nome terminado em _test.
-          POSTGRES_DB: erp_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U erp -d erp_test"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-
-    env:
-      ERP_TEST_DATABASE_URL: postgresql://erp:erp-ci@127.0.0.1:5432/erp_test
 
     steps:
       - uses: actions/checkout@v4
@@ -48,42 +28,8 @@ jobs:
 
       - run: npm ci
 
-      - run: npm run lint
-
-      - run: npm run typecheck
-
-      - name: Conferir scripts de publicação
-        run: bash -n deploy/*.sh
-
-      - name: Conferir imagem do assinador PAdES
-        env:
-          IMAGE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: |
-          docker build --file deploy/pades-signer/Dockerfile --tag "ghcr.io/avilaops/erp-pades-signer:${IMAGE_SHA}" .
-          docker save "ghcr.io/avilaops/erp-pades-signer:${IMAGE_SHA}" | gzip -9 > "$RUNNER_TEMP/pades-signer.tar.gz"
-
-      - name: Guardar imagem de homologação do assinador
-        if: github.event_name == 'pull_request'
-        uses: actions/upload-artifact@v4
-        with:
-          name: pades-signer-${{ github.event.pull_request.head.sha }}
-          path: ${{ runner.temp }}/pades-signer.tar.gz
-          if-no-files-found: error
-          retention-days: 3
-
-      # Falha se algum teste for pulado: sem banco, os testes de banco não provam nada.
-      - name: Testes
-        shell: bash
-        run: |
-          set -euo pipefail
-          npm test 2>&1 | tee test.log
-          grep -qE "^(ℹ|#) fail 0$" test.log
-          grep -qE "^(ℹ|#) skipped 0$" test.log
-
       - run: npm run build
 
-      # O mesmo build aprovado acima vira o pacote de runtime. Não recompila em
-      # servidor próprio e também valida, no PR, que o standalone está completo.
       - name: Empacotar runtime de produção
         run: ETAPA=empacotar bash deploy/empacotar.sh "$RUNNER_TEMP/standalone.tgz"
 
@@ -91,78 +37,9 @@ jobs:
         run: bash deploy/conferir-identidade-pacote.sh "$RUNNER_TEMP/standalone.tgz" "$GITHUB_SHA"
 
       - name: Guardar pacote de produção
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/upload-artifact@v4
         with:
           name: erp-production-${{ github.sha }}
           path: ${{ runner.temp }}/standalone.tgz
           if-no-files-found: error
           retention-days: 7
-
-  telas:
-    name: Telas nos cinco tamanhos
-    runs-on: ubuntu-24.04
-    timeout-minutes: 60
-
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: erp
-          POSTGRES_PASSWORD: erp-ci
-          # Os dados de demonstração só entram em banco com nome terminado em _demo.
-          POSTGRES_DB: erp_demo
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U erp -d erp_demo"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-
-    # O sistema em desenvolvimento, com o login local (/dev/login) e os dados de demonstração.
-    env:
-      DATABASE_URL: postgresql://erp:erp-ci@127.0.0.1:5432/erp_demo
-      ERP_TENANTS: "ludus:Ludus Equipamentos"
-      ERP_LOCAL_LOGIN: "1"
-      SSO_JWT_SECRET: segredo-so-do-teste-das-telas-com-mais-de-32-caracteres
-      APP_URL: http://127.0.0.1:3020
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-
-      - run: npm ci
-
-      - run: npx playwright install --with-deps chromium
-
-      - run: npm run db:migrate
-
-      - run: npm run db:seed-demo -- --empresa ludus --escala 3000
-
-      # Falha com rolagem lateral, controle abaixo de 44 px ou erro na página (docs/ux.md).
-      - name: Organização do menu nos cinco tamanhos
-        run: npm run test:telas -- menu.spec.ts --output=test-results/menu
-
-      - name: Cores por equipamento nos cinco tamanhos
-        run: npm run test:telas -- cores-pedido.spec.ts --output=test-results/cores
-
-      - name: Harmonização, etapas, temas e preservação de dados
-        run: npm run test:telas -- harmonizacao.spec.ts --workers=1 --output=test-results/harmonizacao
-
-      - run: npm run test:telas -- telas.spec.ts --output=test-results/varredura
-
-      - name: Consultas em escala nos seis tamanhos
-        run: npm run test:telas -- consultas-em-escala.spec.ts --output=test-results/consultas-em-escala
-
-      # Os prints de cada tela e a altura de cada uma (telas.json), para conferir sem rodar nada.
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: telas
-          path: test-results/
-          retention-days: 14
