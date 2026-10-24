@@ -37,6 +37,13 @@ test("dashboard do mês: fechado, ticket, conversão, desconto médio, funil e r
   assert.equal(view.averageDiscount?.toFixed(4), "0.0333");
   // Criados em outubro: 2 fechados e 1 perdido decidem a conversão.
   assert.deepEqual(view.funnel, { created: 5, negotiating: 1, waiting: 1, closed: 2, lost: 1 });
+  assert.deepEqual(view.funnelNumbers, {
+    created: ["261001-AAAA", "261003-BBBB", "261004-CCCC", "261005-DDDD", "261005-EEEE"],
+    negotiating: ["261004-CCCC"],
+    waiting: ["261005-DDDD"],
+    closed: ["261001-AAAA", "261003-BBBB"],
+    lost: ["261005-EEEE"],
+  });
   assert.equal(view.conversion?.toFixed(4), "0.6667");
   assert.deepEqual(view.bySeller, [{ label: "Bia", value: 7119 }, { label: "Ana", value: 3390 }]);
   assert.deepEqual(view.byState, [{ label: "SP", value: 7119 }, { label: "MA", value: 3390 }]);

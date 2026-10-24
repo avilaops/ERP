@@ -1,6 +1,7 @@
+import Link from "next/link";
 import type { ReactNode } from "react";
 
-export type ChartBar = { label: string; value: number };
+export type ChartBar = { label: string; value: number; href?: string };
 
 /**
  * Horizontal bars, the largest on top of the scale. A server component: the
@@ -13,16 +14,34 @@ export function Bars({ bars, format, empty }: { bars: ChartBar[]; format: (value
     <ul className="flex flex-col gap-2">
       {bars.map((bar) => (
         <li key={bar.label} className="text-sm">
-          <div className="flex items-baseline justify-between gap-3">
-            <span className="min-w-0 break-words">{bar.label}</span>
-            <span className="whitespace-nowrap font-medium">{format(bar.value)}</span>
-          </div>
-          <div className="mt-1 h-2 rounded bg-slate-100">
-            <div className="h-2 rounded bg-brand" style={{ width: `${top > 0 ? Math.max(2, (bar.value / top) * 100) : 0}%` }} />
-          </div>
+          {bar.href ? (
+            <Link
+              href={bar.href}
+              className="block min-h-[var(--control)] rounded px-1 py-1 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+              aria-label={`${bar.label}: ${format(bar.value)}. Ver ${bar.value === 1 ? "pedido" : "pedidos"}`}
+            >
+              <BarContent bar={bar} top={top} format={format} />
+            </Link>
+          ) : (
+            <BarContent bar={bar} top={top} format={format} />
+          )}
         </li>
       ))}
     </ul>
+  );
+}
+
+function BarContent({ bar, top, format }: { bar: ChartBar; top: number; format: (value: number) => string }) {
+  return (
+    <>
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="min-w-0 break-words">{bar.label}</span>
+        <span className="whitespace-nowrap font-medium">{format(bar.value)}</span>
+      </div>
+      <div className="mt-1 h-2 rounded bg-slate-100">
+        <div className="h-2 rounded bg-brand" style={{ width: `${top > 0 ? Math.max(2, (bar.value / top) * 100) : 0}%` }} />
+      </div>
+    </>
   );
 }
 

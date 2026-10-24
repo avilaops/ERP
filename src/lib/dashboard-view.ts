@@ -72,6 +72,8 @@ export type DashboardView = {
   averageDiscount: number | null;
   /** The orders created in the period, by where they are now. */
   funnel: { created: number; negotiating: number; waiting: number; closed: number; lost: number };
+  /** The exact orders behind each funnel number, for drill-down and audit. */
+  funnelNumbers: { created: string[]; negotiating: string[]; waiting: string[]; closed: string[]; lost: string[] };
   /** Closed by month, with IPI: the twelve months that end in the month of `today`, oldest first. */
   byMonth: Bar[];
   bySeller: Bar[];
@@ -118,6 +120,8 @@ export function dashboardView(orders: DashboardOrder[], period: PeriodKey, today
 
   const closed = orders.filter((order) => order.status === "fechado" && within(order.closedOn));
   const created = orders.filter((order) => within(order.createdOn));
+  const numbers = (status?: DashboardOrder["status"]) =>
+    created.filter((order) => status === undefined || order.status === status).map((order) => order.number);
   const count = (status: DashboardOrder["status"]) => created.filter((order) => order.status === status).length;
   const decided = count("fechado") + count("perdido");
 
@@ -182,6 +186,13 @@ export function dashboardView(orders: DashboardOrder[], period: PeriodKey, today
     conversion: decided === 0 ? null : count("fechado") / decided,
     averageDiscount: closed.length === 0 ? null : closed.reduce((sum, order) => sum + order.discount, 0) / closed.length,
     funnel: { created: created.length, negotiating: count("em_negociacao"), waiting: count("aguardando_aprovacao"), closed: count("fechado"), lost: count("perdido") },
+    funnelNumbers: {
+      created: numbers(),
+      negotiating: numbers("em_negociacao"),
+      waiting: numbers("aguardando_aprovacao"),
+      closed: numbers("fechado"),
+      lost: numbers("perdido"),
+    },
     byMonth: months.map((item) => ({ label: shortMonth(item), value: roundCents(monthly.get(item) ?? 0) })),
     bySeller: ranked(bySeller),
     byProduct: ranked(byProduct, 8),

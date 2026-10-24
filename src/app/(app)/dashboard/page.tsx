@@ -8,7 +8,8 @@ import { listDashboardOrders, ordersProfit, ordersProfitEach } from "@/lib/db/da
 import { listCommissionsDue, listPayables } from "@/lib/db/payables";
 import { tenantDb } from "@/lib/db/pool";
 import { listOpenReceivables, receivedInMonth } from "@/lib/db/receivables";
-import { isoDate, showMoney, showPercent } from "@/lib/format";
+import { isoDate, showIsoDate, showMoney, showPercent } from "@/lib/format";
+import { STATUS_LABELS } from "@/lib/order-form";
 import { payablesSummary } from "@/lib/payables-view";
 import { addDays } from "@/lib/pricing/payment";
 import { receivablesSummary } from "@/lib/receivables-view";
@@ -21,6 +22,16 @@ const HERE = menuItem("dashboard").href;
 const TITLE = "text-sm font-semibold uppercase tracking-wide";
 const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
 const NONE = "—";
+const FUNNEL_DETAILS = {
+  created: "Criados",
+  negotiating: "Em negociação",
+  waiting: "Aguardando aprovação",
+  closed: "Fechados",
+  lost: "Perdidos",
+} as const;
+type FunnelDetail = keyof typeof FUNNEL_DETAILS;
+const funnelDetail = (value: string | undefined): FunnelDetail | null =>
+  value && Object.hasOwn(FUNNEL_DETAILS, value) ? (value as FunnelDetail) : null;
 
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const session = await requirePermission("dashboard");
@@ -35,15 +46,19 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   // "Toda a equipe" or one seller: a filter over what this person may already see, never a wider read.
   const sellers = everyone ? [...new Map(orders.map((order) => [order.sellerEmail, order.sellerName])).entries()].sort((a, b) => a[1].localeCompare(b[1], "pt-BR")) : [];
   const seller = sellers.find(([email]) => email === first(query.vendedor))?.[0] ?? null;
-  const view = dashboardView(seller ? orders.filter((order) => order.sellerEmail === seller) : orders, period, today);
+  const visibleOrders = seller ? orders.filter((order) => order.sellerEmail === seller) : orders;
+  const view = dashboardView(visibleOrders, period, today);
   // One part at a time. The money part exists only for who has those screens (or sees profit).
   const askedTab = first(query.ver);
-  const linkTo = (to: { period?: string; tab?: string }) => {
+  const detail = funnelDetail(first(query.detalhe));
+  const linkTo = (to: { period?: string; tab?: string; detail?: FunnelDetail | null }) => {
     const params = new URLSearchParams();
     const wantedTab = to.tab ?? askedTab ?? "resumo";
+    const wantedDetail = to.detail === undefined ? detail : to.detail;
     if ((to.period ?? period) !== "mes") params.set("periodo", to.period ?? period);
     if (seller) params.set("vendedor", seller);
     if (wantedTab !== "resumo") params.set("ver", wantedTab);
+    if (wantedTab === "vendas" && wantedDetail) params.set("detalhe", wantedDetail);
     const text = params.toString();
     return text === "" ? HERE : `${HERE}?${text}`;
   };
@@ -84,6 +99,21 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const { funnel } = view;
   const tabs: [string, string][] = [["resumo", "Resumo"], ["vendas", "Vendas"], ["aberto", "Em aberto"], ...(cash || profitByMonth || receivables || payables ? ([["dinheiro", "Dinheiro"]] as [string, string][]) : [])];
   const tab = tabs.find(([key]) => key === askedTab)?.[0] ?? "resumo";
+  const canOpenOrders = allows(session, "pedidos");
+  const auditNumbers = detail ? view.funnelNumbers[detail] : [];
+  const auditOrders = detail
+    ? auditNumbers.flatMap((number) => {
+        const order = visibleOrders.find((item) => item.number === number);
+        return order ? [order] : [];
+      })
+    : [];
+  const drillDown = (key: FunnelDetail) => {
+    if (!canOpenOrders) return undefined;
+    const numbers = view.funnelNumbers[key];
+    if (numbers.length === 0) return undefined;
+    if (numbers.length === 1) return `/pedidos/${numbers[0]}`;
+    return `${linkTo({ tab: "vendas", detail: key })}#pedidos-do-indicador`;
+  };
 
   return (
     <>
@@ -109,6 +139,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         <form method="get" action={HERE} className="mt-3 flex flex-wrap items-center gap-2 text-sm">
           {period !== "mes" && <input type="hidden" name="periodo" value={period} />}
           {tab !== "resumo" && <input type="hidden" name="ver" value={tab} />}
+          {tab === "vendas" && detail && <input type="hidden" name="detalhe" value={detail} />}
           <label htmlFor="vendedor" className="text-slate-600">
             Vendedor
           </label>
@@ -208,11 +239,11 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           <p className="mb-4 text-xs text-slate-600">criados em: {periodLabel}</p>
           <Bars
             bars={[
-              { label: "Criados", value: funnel.created },
-              { label: "Em negociação", value: funnel.negotiating },
-              { label: "Aguardando aprovação", value: funnel.waiting },
-              { label: "Fechados", value: funnel.closed },
-              { label: "Perdidos", value: funnel.lost },
+              { label: "Criados", value: funnel.created, href: drillDown("created") },
+              { label: "Em negociação", value: funnel.negotiating, href: drillDown("negotiating") },
+              { label: "Aguardando aprovação", value: funnel.waiting, href: drillDown("waiting") },
+              { label: "Fechados", value: funnel.closed, href: drillDown("closed") },
+              { label: "Perdidos", value: funnel.lost, href: drillDown("lost") },
             ]}
             format={String}
             empty=""
@@ -242,6 +273,35 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           <Bars bars={view.byState} format={showMoney} empty="Nenhuma venda no período." />
         </section>
       </div>
+
+      {detail && canOpenOrders && (
+        <section id="pedidos-do-indicador" className={`${CARD} mt-4 scroll-mt-[calc(var(--topbar)+1rem)] p-5`} aria-labelledby="pedidos-do-indicador-titulo">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 id="pedidos-do-indicador-titulo" className={TITLE}>Pedidos em {FUNNEL_DETAILS[detail]}</h2>
+              <p className="mt-1 text-xs text-slate-600">Composição exata do indicador · criados em {periodLabel}</p>
+            </div>
+            <Link href={linkTo({ tab: "vendas", detail: null })} className={SECONDARY}>Fechar composição</Link>
+          </div>
+          {auditOrders.length === 0 ? (
+            <p className="mt-4 text-sm text-slate-600">Nenhum pedido compõe este indicador.</p>
+          ) : (
+            <ul className="mt-4 divide-y divide-slate-200 border-y border-slate-200">
+              {auditOrders.map((order) => (
+                <li key={order.number}>
+                  <Link href={`/pedidos/${order.number}`} className="flex min-h-[var(--control)] flex-wrap items-center justify-between gap-x-4 gap-y-1 px-2 py-3 hover:bg-slate-50">
+                    <span className="font-medium text-brand underline">Pedido #{order.number}</span>
+                    <span className="text-sm font-medium">{STATUS_LABELS[order.status]}</span>
+                    <span className="basis-full text-xs text-slate-600">
+                      {order.sellerName} · criado em {showIsoDate(order.createdOn)}{order.closedOn ? ` · fechado em ${showIsoDate(order.closedOn)}` : ""}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
 
         </>
       )}
