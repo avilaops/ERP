@@ -13,7 +13,7 @@ BRANCH="$(git branch --show-current)"
 git fetch --quiet origin main
 [ "$(git rev-parse origin/main)" = "$HEAD" ] || { echo "! main local não corresponde a origin/main"; exit 1; }
 
-RUN_ID="$(gh run list --repo "$REPO" --workflow CI --branch main --commit "$HEAD" --event push --limit 5 \
+RUN_ID="$(gh run list --repo "$REPO" --workflow CI --branch main --commit "$HEAD" --limit 5 \
   --json databaseId,status,conclusion,headSha \
   --jq 'map(select(.headSha == "'"$HEAD"'" and .status == "completed" and .conclusion == "success"))[0].databaseId // empty')"
 [ -n "$RUN_ID" ] || { echo "! não há CI verde de main para $HEAD"; exit 1; }
