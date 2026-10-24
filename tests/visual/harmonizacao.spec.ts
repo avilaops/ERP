@@ -171,21 +171,31 @@ test("cadastro: etapas e erro de validação preservam o preenchimento", async (
   await expect(name).toHaveValue("Empresa de teste de navegação");
 });
 
-test("pedido: etapas no desktop e histórico preservam os dados", async ({ page }) => {
+test("pedido: pagamento inteiro cabe em uma tela e salva junto", async ({ page }, testInfo) => {
   test.setTimeout(90_000);
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/pedidos?busca=DM09");
   const href = await page.locator('a[href$="-DM09"]').first().getAttribute("href");
   expect(href).toBeTruthy();
-  await page.goto(`${href}/pagamento?etapa=1`);
+  await page.goto(`${href}/pagamento`);
   const note = page.getByLabel("Observações", { exact: true });
-  await note.fill("Manter ao alternar etapas");
-  await page.getByRole("button", { name: "Voltar", exact:true }).click();
-  await expect(page).toHaveURL(/etapa=0/);
-  await expect(note).toBeHidden();
-  await page.goBack();
-  await expect(note).toBeVisible();
-  await expect(note).toHaveValue("Manter ao alternar etapas");
+  await expect(page.getByLabel("Entrada (R$)", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("Quando pagar o saldo", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("Número de parcelas", { exact: true })).toBeVisible();
+  await note.fill("Pagamento salvo em uma tela");
+  await page.getByRole("button", { name: "Salvar e conferir", exact: true }).click();
+  await expect(page).toHaveURL(/\?ver=pagamento$/);
+  await expect(page.getByText("Pagamento salvo em uma tela", { exact: true })).toBeVisible();
+  for (const [width, height] of SIZES) {
+    await page.setViewportSize({ width, height });
+    await page.goto(`${href}/pagamento`);
+    await expect(page.getByLabel("Entrada (R$)", { exact: true })).toBeVisible();
+    await expect(page.getByLabel("Quando pagar o saldo", { exact: true })).toBeVisible();
+    await expect(page.getByLabel("Número de parcelas", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Salvar e conferir", exact: true })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth), `pagamento / ${width}`).toBeLessThanOrEqual(0);
+    await page.screenshot({ path: testInfo.outputPath(`pagamento-unico-${width}x${height}.png`), fullPage: true });
+  }
 });
 
 test("configurações: todas as etapas são alcançáveis nos cinco tamanhos", async ({ page }, testInfo) => {
