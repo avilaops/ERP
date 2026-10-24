@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Fragment } from "react";
 import { EquipmentColorPicker } from "@/components/EquipmentColorPicker";
 import { CARD, INPUT, PRIMARY, SECONDARY, DANGER_OUTLINE } from "@/components/ui";
 import { notFound } from "next/navigation";
@@ -979,55 +980,64 @@ export default async function PedidoPage({
                   const product = products.get(item.productId);
                   const line = sale.lines[index];
                   return (
-                    <tr key={item.productId} className="border-t border-slate-200 align-top">
-                      <td className="px-4 py-3">
-                        <span className="font-medium">{product?.name}</span>
-                        <span className="block text-xs text-slate-500">{product?.code ?? "sem código"}</span>
-                        {optionsOf(item, "mt-2 flex flex-wrap items-center gap-x-4 gap-y-2")}
-                      </td>
-                      <td className="px-4 py-3">
-                        <ActionForm action={setItemQuantityAction} className="flex flex-wrap items-center gap-2">
-                          <input type="hidden" name="number" value={order.number} />
-                          <input type="hidden" name="productId" value={item.productId} />
-                          <input
-                            key={item.quantity}
-                            name="quantity"
-                            type="text"
-                            inputMode="numeric"
-                            size={1}
-                            defaultValue={item.quantity}
-                            aria-label={`Quantidade de ${product?.name}`}
-                            className={`${INPUT} w-16 py-1 text-right`}
-                          />
-                          {editable && (
-                            <button type="submit" className={SECONDARY}>
-                              Alterar
-                            </button>
-                          )}
-                        </ActionForm>
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right">{showMoney(line.unitPrice)}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right">{moneyOrNone(line.unitDiscount)}</td>
-                      {hasIpi && (
-                        <td className="whitespace-nowrap px-4 py-3 text-right">
-                          {showMoney(line.unitIpi)}
-                          <span className="block text-xs text-slate-500">{ipi}</span>
+                    <Fragment key={item.productId}>
+                      <tr className="border-t border-slate-200 align-top">
+                        <td className="px-4 py-3">
+                          <span className="font-medium">{product?.name}</span>
+                          <span className="block text-xs text-slate-500">{product?.code ?? "sem código"}</span>
+                          {!editable && optionsOf(item, "mt-2 flex flex-wrap items-center gap-x-4 gap-y-2")}
                         </td>
-                      )}
-                      <td className="whitespace-nowrap px-4 py-3 text-right">{showMoney(line.unitWithIpi)}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right font-semibold">{showMoney(line.totalWithIpi)}</td>
-                      <td className="px-4 py-3 text-right">
-                        {editable && order.items.length > 1 && (
-                          <ActionForm action={removeItemAction}>
+                        <td className="px-4 py-3">
+                          <ActionForm action={setItemQuantityAction} className="flex flex-wrap items-center gap-2">
                             <input type="hidden" name="number" value={order.number} />
                             <input type="hidden" name="productId" value={item.productId} />
-                            <button type="submit" className={DANGER_OUTLINE}>
-                              Remover
-                            </button>
+                            <input
+                              key={item.quantity}
+                              name="quantity"
+                              type="text"
+                              inputMode="numeric"
+                              size={1}
+                              defaultValue={item.quantity}
+                              aria-label={`Quantidade de ${product?.name}`}
+                              className={`${INPUT} w-16 py-1 text-right`}
+                            />
+                            {editable && (
+                              <button type="submit" className={SECONDARY}>
+                                Alterar
+                              </button>
+                            )}
                           </ActionForm>
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-right">{showMoney(line.unitPrice)}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-right">{moneyOrNone(line.unitDiscount)}</td>
+                        {hasIpi && (
+                          <td className="whitespace-nowrap px-4 py-3 text-right">
+                            {showMoney(line.unitIpi)}
+                            <span className="block text-xs text-slate-500">{ipi}</span>
+                          </td>
                         )}
-                      </td>
-                    </tr>
+                        <td className="whitespace-nowrap px-4 py-3 text-right">{showMoney(line.unitWithIpi)}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-right font-semibold">{showMoney(line.totalWithIpi)}</td>
+                        <td className="px-4 py-3 text-right">
+                          {editable && order.items.length > 1 && (
+                            <ActionForm action={removeItemAction}>
+                              <input type="hidden" name="number" value={order.number} />
+                              <input type="hidden" name="productId" value={item.productId} />
+                              <button type="submit" className={DANGER_OUTLINE}>
+                                Remover
+                              </button>
+                            </ActionForm>
+                          )}
+                        </td>
+                      </tr>
+                      {editable && (
+                        <tr>
+                          <td colSpan={hasIpi ? 8 : 7} className="px-4 pb-3">
+                            {optionsOf(item, "grid min-w-[32rem] gap-2")}
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                   );
                 })}
                 <tr className="border-t border-slate-200 bg-slate-50 font-semibold">

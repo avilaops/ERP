@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("cores por equipamento: amostras, gravação e leitura nos cinco tamanhos", async ({ page }, testInfo) => {
+test("cores por equipamento: amostras, gravação e leitura nos tamanhos críticos", async ({ page }, testInfo) => {
   await page.goto("/dev/login");
   await page.click("button[value=DIRETORIA]");
   await page.waitForURL((url) => !url.pathname.startsWith("/dev/login"));
@@ -20,7 +20,7 @@ test("cores por equipamento: amostras, gravação e leitura nos cinco tamanhos",
   await expect(first.locator("summary").filter({ hasText: "Cor do braço" })).toContainText("Apple Green");
   await expect(forms.nth(1).locator("summary").first()).toContainText("Escolher cor");
 
-  for (const [width, height] of [[360, 640], [390, 844], [430, 932], [1366, 768], [1440, 900]]) {
+  for (const [width, height] of [[360, 640], [390, 844], [430, 932], [925, 1000], [1366, 768], [1440, 900]]) {
     await page.setViewportSize({ width, height });
     await page.reload();
     const form = forms.first();
@@ -30,6 +30,8 @@ test("cores por equipamento: amostras, gravação e leitura nos cinco tamanhos",
     await expect(selected).toBeChecked();
     const label = selected.locator("..");
     expect((await label.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    expect((await summary.boundingBox())!.width).toBeGreaterThanOrEqual(180);
+    expect((await label.boundingBox())!.width).toBeGreaterThanOrEqual(120);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
     await page.screenshot({ path: testInfo.outputPath(`cores-${width}x${height}.png`), fullPage: true });
   }
